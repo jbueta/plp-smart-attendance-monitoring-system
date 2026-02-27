@@ -1,0 +1,130 @@
+<!-- Load base layout -->
+{% extends "base.html" %}
+
+<!-- Page title -->
+{% block title %}Reports Center - PLP{% endblock %}
+
+<!-- Page content -->
+{% block content %}
+<!-- Sidebar -->
+<div class="sidebar d-flex flex-column flex-shrink-0 p-3">
+    <a href="#" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
+        <i class="bi bi-bank2 fs-4 text-gold me-2"></i>
+        <span class="fs-5 fw-bold">PLP Admin</span>
+    </a>
+    <hr>
+    <ul class="nav nav-pills flex-column mb-auto">
+        <li><a href="{{ url_for('dashboard') }}" class="nav-link"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+        <li><a href="{{ url_for('manage_events') }}" class="nav-link"><i class="bi bi-calendar-event"></i> Events</a>
+        </li>
+        <li><a href="{{ url_for('admin_visitors') }}" class="nav-link"><i class="bi bi-person-lines-fill"></i>
+                Visitors</a></li>
+        <li><a href="{{ url_for('analytics_employee') }}" class="nav-link"><i class="bi bi-people"></i> Employees</a>
+        </li>
+        <li><a href="{{ url_for('analytics_students') }}" class="nav-link"><i class="bi bi-mortarboard"></i>
+                Students</a></li>
+        <li><a href="{{ url_for('reports') }}" class="nav-link active"><i class="bi bi-file-earmark-bar-graph"></i>
+                Reports</a></li>
+    </ul>
+    <hr>
+    <div>
+        <a href="{{ url_for('index') }}" class="btn btn-outline-light w-100 btn-sm">
+            <i class="bi bi-box-arrow-left me-2"></i>Exit Kiosk Mode
+        </a>
+    </div>
+</div>
+
+<!-- Main Content -->
+<div class="main-content">
+    <div
+        class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4 border-bottom border-secondary">
+        <div>
+            <h1 class="h2">Reports Center</h1>
+            <p class="text-white-50 mb-0">Generate and Export Data Logs</p>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Generate New Report -->
+        <div class="col-md-12">
+            <div class="card-glass p-5">
+                <h4 class="mb-4"><i class="bi bi-cloud-download me-2 text-gold"></i>Generate New Report</h4>
+                <form class="row g-4 align-items-end">
+                    <!-- Category Selection -->
+                    <div class="col-md-3">
+                        <label class="form-label text-white-50 text-uppercase small">Report Category</label>
+                        <select class="form-select bg-dark text-white border-secondary" id="report-category">
+                            <option value="general">General Logs</option>
+                            <option value="visitor">Visitor Logs</option>
+                            <option value="event">Event Attendance</option>
+                            <option value="violation">Violations</option>
+                        </select>
+                    </div>
+
+                    <!-- Dynamic Sub-selection (Managed by JS) -->
+                    <div class="col-md-3">
+                        <label class="form-label text-white-50 text-uppercase small">Specific Report</label>
+                        <select class="form-select bg-dark text-white border-secondary" id="report-type">
+                            <option>Employee Attendance (Flag Ceremony)</option>
+                            <option>Student Entry/Exit Logs</option>
+                            <option>Daily Traffic Analysis</option>
+                        </select>
+                    </div>
+
+                    <!-- Filters -->
+                    <div class="col-md-3">
+                        <label class="form-label text-white-50 text-uppercase small" id="filter-label">Department /
+                            Filter</label>
+                        <select class="form-select bg-dark text-white border-secondary" id="report-filter">
+                            <option>All Departments</option>
+                            <option>College of Engineering</option>
+                            <option>College of Nursing</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label text-white-50 text-uppercase small">Date Range</label>
+                        <div class="input-group">
+                            <input type="date" id="report-start"
+                                class="form-control bg-dark text-white border-secondary px-2">
+                            <span class="input-group-text bg-dark text-white border-secondary px-2">to</span>
+                            <input type="date" id="report-end"
+                                class="form-control bg-dark text-white border-secondary px-2">
+                        </div>
+                    </div>
+
+                    <div class="col-12 mt-4 text-end border-top border-secondary pt-4">
+                        <button type="button" class="btn btn-primary-gold px-5 py-2" onclick="generateReport()">
+                            <i class="bi bi-file-earmark-arrow-down me-2"></i>Generate Report Download
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Recent Reports -->
+        <div class="col-md-12">
+            <div class="card-glass p-4">
+                <h5 class="mb-3">Recently Generated</h5>
+                <div class="list-group list-group-flush border-secondary rounded">
+                    {% for report in reports %}
+                    <a href="#"
+                        class="list-group-item list-group-item-action bg-transparent text-white border-secondary d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="bi bi-{{ report.icon }} me-3 fs-5"></i>
+                            <strong>{{ report.name }}</strong>
+                        </div>
+                        <span class="text-white-50 small">{{ report.time }}</span>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/reports.js') }}"></script>
+{% endblock %}

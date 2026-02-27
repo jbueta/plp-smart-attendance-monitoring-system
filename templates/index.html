@@ -1,0 +1,87 @@
+<!-- Load base layout -->
+{% extends "base.html" %}
+
+<!-- Page title -->
+{% block title %}PLP Smart System{% endblock %}
+
+<!-- Page content -->
+{% block content %}
+<!-- Main Container for Index/Landing Page -->
+<div class="container d-flex flex-column justify-content-center min-vh-100 py-5">
+
+    <header class="mb-5 pb-4 border-bottom border-secondary border-opacity-25">
+        <div
+            class="d-flex flex-column flex-md-row justify-content-between align-items-center text-center text-md-start">
+            <!-- Left: Branding -->
+            <div class="d-flex flex-column flex-md-row align-items-center mb-3 mb-md-0">
+                <div class="display-3 text-gold me-md-4 mb-2 mb-md-0"><i class="bi bi-bank2"></i></div>
+                <div>
+                    <h1 class="h2 fw-bold text-gold-gradient mb-1 text-uppercase">Pamantasan ng Lungsod ng Pasig</h1>
+                    <p class="text-white-50 fs-5 mb-0 spacing-1">Integrated Smart Entrance & Attendance System</p>
+                </div>
+            </div>
+
+            <!-- Right: Hero Clock (Dual Line) -->
+            <div class="text-center text-md-end">
+                <div id="hero-clock"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Portal Selection Cards (Student / Employee) -->
+    <div class="row g-4 justify-content-center mb-4">
+        <!-- Student Card -->
+        <div class="col-md-5">
+            <a href="{{ url_for('kiosk_student') }}" class="text-decoration-none">
+                <div
+                    class="card-glass py-5 px-4 text-center transition-hover d-flex flex-column justify-content-center">
+                    <div class="display-2 mb-3 text-white"><i class="bi bi-mortarboard-fill"></i></div>
+                    <h2 class="h3 text-white fw-bold">Student Portal</h2>
+                    <p class="text-white-50 mt-2 mb-4">Daily Campus Entrance & Exit Monitoring for Students</p>
+                    <div><span class="badge bg-light bg-opacity-10 rounded-pill px-4 py-2 fw-normal">Tap to
+                            Access</span></div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Employee Card -->
+        <div class="col-md-5">
+            <a href="{{ url_for('kiosk_employee_select_event') }}" class="text-decoration-none">
+                <div class="card-glass py-5 px-4 text-center transition-hover d-flex flex-column justify-content-center"
+                    style="border-color: rgba(245, 221, 0, 0.3);">
+                    <div class="display-2 mb-3 text-gold"><i class="bi bi-person-badge-fill"></i></div>
+                    <h2 class="h3 text-gold fw-bold">Employee Portal</h2>
+                    <p class="text-white-50 mt-2 mb-4">Official Flag Ceremony Attendance & Faculty Events</p>
+                    <div><span
+                            class="badge bg-warning bg-opacity-10 text-warning rounded-pill px-4 py-2 fw-normal border border-warning border-opacity-25">Tap
+                            to Access</span></div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard Link Section -->
+    <div class="row justify-content-center mb-5">
+        <div class="col-md-8">
+            <a href="{{ url_for('dashboard') }}" class="text-decoration-none">
+                <div
+                    class="btn-glass p-4 rounded-4 d-flex align-items-center justify-content-center transition-hover shadow-lg">
+                    <i class="bi bi-shield-lock-fill fs-1 me-4 text-white-50"></i>
+                    <div class="text-start flex-grow-1">
+                        <h5 class="fw-bold text-white mb-0">Admin Dashboard</h5>
+                        <p class="text-white-50 small mb-0">View Real-time Analytics, Attendance Logs, and Generate
+                            Reports</p>
+                    </div>
+                    <i class="bi bi-arrow-right ms-auto display-5 text-white-50"></i>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- Page Footer -->
+    <footer class="text-center mt-auto pb-4 text-white-50">
+        <small>&copy; 2026 PLP Management Information Systems</small>
+    </footer>
+
+</div>
+{% endblock %}

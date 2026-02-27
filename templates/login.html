@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - PLP Monitoring</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- Injecting static CSS file using Flask url_for -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body class="d-flex align-items-center justify-content-center min-vh-100">
+
+    <!-- Main Login Container -->
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-5 col-lg-4">
+                <div class="text-center mb-4">
+                    <i class="bi bi-shield-lock display-1 text-gold"></i>
+                    <h2 class="text-white mt-3 fw-bold">Admin Portal</h2>
+                    <p class="text-white-50">Pamantasan ng Lungsod ng Pasig</p>
+                </div>
+
+                <div class="login-card p-4 p-md-5">
+                    <!-- Flashed Messages Block -->
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                    {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} border-0 bg-{{ category }} bg-opacity-10 text-{{ category }} mb-4"
+                        role="alert">
+                        <i class="bi bi-exclamation-circle me-2"></i>{{ message }}
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                    {% endwith %}
+
+                    <!-- Login Form -->
+                    <form action="{{ url_for('login') }}" method="POST">
+                        <div class="mb-3">
+                            <label for="username" class="form-label text-white-50 small text-uppercase">Username</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-transparent border-secondary text-white-50"><i
+                                        class="bi bi-person"></i></span>
+                                <input type="text" class="form-control" id="username" name="username"
+                                    placeholder="admin" required>
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <label for="password" class="form-label text-white-50 small text-uppercase">Password</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-transparent border-secondary text-white-50"><i
+                                        class="bi bi-key"></i></span>
+                                <input type="password" class="form-control" id="password" name="password"
+                                    placeholder="•••••••" required>
+                            </div>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary-gold py-2">
+                                <i class="bi bi-box-arrow-in-right me-2"></i>Access Dashboard
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="text-center mt-4">
+                        <!-- URL for index route -->
+                        <a href="{{ url_for('index') }}" class="text-white-50 text-decoration-none small">
+                            <i class="bi bi-arrow-left me-1"></i> Return to Kiosk
+                        </a>
+                    </div>
+                </div>
+
+                <div class="text-center mt-4 text-white-50 small">
+                    <p>&copy; 2026 PLP Monitoring System. Restricted Access.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

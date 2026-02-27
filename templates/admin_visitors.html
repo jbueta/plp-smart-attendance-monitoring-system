@@ -1,0 +1,98 @@
+<!-- Load base layout -->
+{% extends "base.html" %}
+
+<!-- Page title -->
+{% block title %}Visitor Logs - PLP Admin{% endblock %}
+
+<!-- Page content -->
+{% block content %}
+<!-- Sidebar -->
+<div class="sidebar d-flex flex-column flex-shrink-0 p-3">
+    <a href="#" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
+        <i class="bi bi-bank2 fs-4 text-gold me-2"></i>
+        <span class="fs-5 fw-bold">PLP Admin</span>
+    </a>
+    <hr>
+    <ul class="nav nav-pills flex-column mb-auto">
+        <li><a href="{{ url_for('dashboard') }}" class="nav-link"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+        <li><a href="{{ url_for('manage_events') }}" class="nav-link"><i class="bi bi-calendar-event"></i> Events</a>
+        </li>
+        <li><a href="{{ url_for('admin_visitors') }}" class="nav-link active"><i class="bi bi-person-lines-fill"></i>
+                Visitors</a></li>
+        <li><a href="{{ url_for('analytics_employee') }}" class="nav-link"><i class="bi bi-people"></i> Employees</a>
+        </li>
+        <li><a href="{{ url_for('analytics_students') }}" class="nav-link"><i class="bi bi-mortarboard"></i>
+                Students</a></li>
+        <li><a href="{{ url_for('reports') }}" class="nav-link"><i class="bi bi-file-earmark-bar-graph"></i> Reports</a>
+        </li>
+    </ul>
+    <hr>
+    <div>
+        <a href="{{ url_for('index') }}" class="btn btn-outline-light w-100 btn-sm">
+            <i class="bi bi-box-arrow-left me-2"></i>Exit Kiosk Mode
+        </a>
+    </div>
+</div>
+
+<!-- Main Content -->
+<div class="main-content flex-grow-1">
+    <div
+        class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4 border-bottom border-secondary">
+        <div>
+            <h1 class="h2">Visitor Logs</h1>
+            <p class="text-white-50 mb-0">Monitor guest entry and exit records.</p>
+        </div>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <button type="button" class="btn btn-outline-light me-2">
+                <i class="bi bi-download me-2"></i>Export
+            </button>
+        </div>
+    </div>
+
+    <!-- Visitor Table -->
+    <div class="card-glass p-0 mb-4 overflow-hidden">
+        <div class="table-responsive">
+            <table class="table table-dark-glass table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-4">Visitor Name</th>
+                        <th>Purpose</th>
+                        <th>Details</th>
+                        <th>Date</th>
+                        <th>Time In</th>
+                        <th>Time Out</th>
+                        <th class="text-end pe-4">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for visitor in visitors %}
+                    <tr>
+                        <td class="fw-bold text-white ps-4">{{ visitor.name }}</td>
+                        <td>{{ visitor.purpose }}</td>
+                        <td class="text-white-50 small">{{ visitor.details }}</td>
+                        <td class="text-white-50 font-monospace small">{{ visitor.date }}</td>
+                        <td class="text-success font-monospace small">{{ visitor.time_in }}</td>
+                        <td class="text-danger font-monospace small">{{ visitor.time_out or '--:--' }}</td>
+                        <td class="text-end pe-4">
+                            {% if visitor.status == 'Checked In' %}
+                            <span
+                                class="badge bg-success bg-opacity-25 border border-success text-success">Active</span>
+                            {% else %}
+                            <span class="badge bg-secondary bg-opacity-25 border border-secondary">Completed</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-white-50 py-5">
+                            <i class="bi bi-clipboard-x display-4 d-block mb-3"></i>
+                            No visitor records found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

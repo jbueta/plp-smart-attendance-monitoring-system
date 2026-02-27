@@ -1,0 +1,61 @@
+/* Background Styles */
+body {
+    background-color: #051a10;
+    /* Fallback */
+    /* Set the static image as the primary background */
+    background-image: url('../images/bg-main.png');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    position: relative;
+    /* Ensure body is relative for the overlay */
+    min-height: 100vh;
+}
+
+/* Create the animated overlay */
+body::before {
+    content: "";
+    /* Required for pseudo-element */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    /* Place it behind the content but (conceptually) "above" the static bg image if we weren't on the body itself. 
+                  Since it's a child of body, we need to be careful. 
+                  Actually, if it's z-index -1, it goes behind the body content.
+                  To ensure it overlays the background image but stays under content:
+                  1. The body has the image.
+                  2. This element covers the body.
+                  3. If body content has z-index > -1 (default auto is stack context), it should be fine.
+                  */
+
+    /* The moving gradients - boosted visibility */
+    background-image:
+        radial-gradient(circle at 15% 50%, rgba(11, 125, 63, 0.4), transparent 50%),
+        /* Stronger Green */
+        radial-gradient(circle at 85% 30%, rgba(212, 175, 55, 0.4), transparent 50%);
+    /* Stronger Gold */
+
+    background-size: 200% 200%;
+    animation: ambientShift 20s ease-in-out infinite alternate;
+    pointer-events: none;
+    /* Ensure clicks pass through */
+    /* Removed mix-blend-mode for better visibility */
+}
+
+@keyframes ambientShift {
+    0% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 50% 100%;
+    }
+}
