@@ -1,6 +1,9 @@
 from datetime import date, datetime
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, request
+from db_connect import Database
+
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'plp_secure_key_2026'  # Required for session management
@@ -351,5 +354,75 @@ def check_student_status():
 # MAIN ENTRY POINT
 # ==============================================================================
 
+errors = []
+
+@app.route('/authenticate', methods=['POST'])
+def authenticate():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+        
+        student_id = data.get('student_id')
+        if not student_id:
+            return jsonify({"error": "Student ID is required"}), 400
+        
+        now = datetime.now()
+        formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")
+        date = now.strftime("%Y-%m-%d")
+
+        parameter = (student_id,)
+
+        db = Database(parameter)
+        result = db.authenticate_user()
+
+        if not result or len(result) == 0:
+            return jsonify({"Invalid": "Student does not found!"}), 404
+        elif result and len(result) > 0:
+            user_id = result[0]['user_id']
+            params = (user_id, date)
+            db_log = Database(params)
+            log_result = db_log.check_logs()
+
+            status = result[0]['status']
+            db_status_param = (student_id, status)
+            db_status = Database(db_status_param)
+            try:
+                db_status_result = db_status.change_status()
+            except e as Exception:
+                errors[0] = str(e)
+
+            match log_result:
+                case None:
+                    log_params = (user_id, "Entry", formatted_time)
+                    db_insert_log = Database(log_params)
+                    db_insert_log.insert_log()
+                case lst if isinstance(lst, list):
+                    entry = 0
+                    exit = 0
+
+                    for log in lst:
+                        log_action = log.get('action', '').lower()
+                        if log_action == 'entry':
+                            entry += 1
+                        elif log_action == 'exit':
+                            exit += 1
+
+                    if entry > exit:
+                        log_params = (user_id, "Exit", formatted_time)
+                    elif entry == 0 or entry == exit:
+                        log_params = (user_id, "Entry", formatted_time)
+                    else:
+                        return jsonify({"success": False, "message": f"Error inserting log: Invalid log state"}), 500
+
+                    db_insert_log = Database(log_params)
+                    db_insert_log.insert_log()
+
+            return jsonify({"success": True, "message": "User authenticated and log updated"}), 200
+
+        
+    except Exception as e:
+            return jsonify({"success": False, "message": f"Error during authentication: {str(e)}"}), 500
+    
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
