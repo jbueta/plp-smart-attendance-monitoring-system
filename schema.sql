@@ -52,3 +52,50 @@ CREATE TABLE IF NOT EXISTS attendance_logs (
     FOREIGN KEY (schedule_id) REFERENCES attendance_schedules(id)
 );
 
+
+-- ATTENDANCE LOG
+-- 1. Create the base 'user' table first since other tables depend on it
+CREATE TABLE IF NOT EXISTS user (
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_name VARCHAR(100) NOT NULL,
+    user_type ENUM('Student', 'Visitor', 'Employee') NOT NULL
+);
+
+-- 2. Create the 'employee' table
+CREATE TABLE IF NOT EXISTS employee (
+    user_id INT PRIMARY KEY,
+    employee_id VARCHAR(20) NOT NULL,
+    department VARCHAR(10),
+    status ENUM('Inside', 'Outside') NOT NULL,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE
+);
+
+-- 3. Create the 'students' table
+CREATE TABLE IF NOT EXISTS students (
+    user_id INT PRIMARY KEY,
+    student_no VARCHAR(20) NOT NULL,
+    course VARCHAR(10),
+    status ENUM('Inside', 'Outside') NOT NULL,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE
+);
+
+-- 4. Create the 'visitors' table
+CREATE TABLE IF NOT EXISTS visitors (
+    person_id INT PRIMARY KEY,
+    purpose VARCHAR(200) NOT NULL,
+    status ENUM('Inside', 'Outside') NOT NULL,
+    FOREIGN KEY (person_id) REFERENCES user(user_id) ON DELETE CASCADE
+);
+
+-- 5. Create the 'attendance_log' table
+CREATE TABLE IF NOT EXISTS attendance_log (
+    log_id INT AUTO_INCREMENT PRIMARY KEY,
+    person_id INT NOT NULL,
+    action ENUM('Entry', 'Exit') NOT NULL,
+    gate ENUM('Gate 1', 'Gate 2', 'Gate 3', 'Gate 4') NOT NULL,
+    log_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (person_id) REFERENCES user(user_id) ON DELETE CASCADE
+);
+
