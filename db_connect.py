@@ -25,6 +25,7 @@ class Database:
         else:
             raise Exception("Failed to connect to the database.")
         
+    
     def authenticate_user(self):
         try:
             query = "SELECT * FROM students WHERE student_no = %s LEFT JOIN user using (user_id)"
@@ -57,15 +58,10 @@ class Database:
                 return f"{self.parameter.student_id} status changed sucessfully!"
             else:
                 return None
-            
-        except connector.Error as err:
-            print(f"Error: {err}")
-            return None
-        finally:
-            self.cursor.close()
-            self.conn.close()
+
 
     def check_logs(self):
+        
         try:
             log_query = "SELECT * FROM attendance_log WHERE person_id = %s AND DATE(log_time) = %s"
 

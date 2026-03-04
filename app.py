@@ -354,12 +354,11 @@ def check_student_status():
 # MAIN ENTRY POINT
 # ==============================================================================
 
-errors = []
-
 @app.route('/authenticate', methods=['POST'])
 def authenticate():
     try:
         data = request.get_json()
+
         if not data:
             return jsonify({"error": "No JSON data provided"}), 400
         
@@ -383,14 +382,6 @@ def authenticate():
             params = (user_id, date)
             db_log = Database(params)
             log_result = db_log.check_logs()
-
-            status = result[0]['status']
-            db_status_param = (student_id, status)
-            db_status = Database(db_status_param)
-            try:
-                db_status_result = db_status.change_status()
-            except e as Exception:
-                errors[0] = str(e)
 
             match log_result:
                 case None:
@@ -418,9 +409,17 @@ def authenticate():
                     db_insert_log = Database(log_params)
                     db_insert_log.insert_log()
 
+            status = result[0]['status']
+            db_status_param = (student_id, status)
+            db_status = Database(db_status_param)
+
+            try:
+                db_status_result = db_status.change_status()
+            except e as Exception:
+                errors[0] = str(e)
+
             return jsonify({"success": True, "message": "User authenticated and log updated"}), 200
 
-        
     except Exception as e:
             return jsonify({"success": False, "message": f"Error during authentication: {str(e)}"}), 500
     
