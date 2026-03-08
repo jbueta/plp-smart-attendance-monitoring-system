@@ -105,9 +105,4 @@ function initAnimations() {
             // subtle effect
         });
     });
-
-json = {
-    'date': '2022-01-01',
-    'event': 'Flag Ceremony'
-}
 }

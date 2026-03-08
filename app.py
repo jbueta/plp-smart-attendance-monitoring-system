@@ -1,12 +1,24 @@
+print("FILE LOADED", flush=True)
 from datetime import date, datetime
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, request
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, request, g
+from datetime import datetime
 from db_connect import Database
 
-from datetime import datetime
+import json
+import os
+import logging
+import mysql.connector as connector
+from mysql.connector import pooling
 
+        
 app = Flask(__name__)
 app.secret_key = 'plp_secure_key_2026'  # Required for session management
+
+app.logger.setLevel(logging.DEBUG)
+app.logger.addHandler(logging.StreamHandler())
+app.logger.addHandler(logging.FileHandler('logs/app.log'))
+
 
 # ==============================================================================
 # MOCK DATA (Prototype State)
@@ -354,69 +366,115 @@ def check_student_status():
 # MAIN ENTRY POINT
 # ==============================================================================
 
+pool = None
+def create_pool():
+    print("Creating database connection pool...")
+    dbconfig = {
+        'host': 'localhost',
+        'user': 'root',
+        'password': '',
+        'database': 'smart_monitoring',
+        'use_pure': True
+    }
+    try:
+        pool = pooling.MySQLConnectionPool (pool_name="main_entry_exit", pool_size=20, autocommit=True, **dbconfig)
+        print("Database connection pool created.")
+        return pool
+    except SystemExit as e:
+        print(f"SystemExit caught: {e}", flush=True)
+    except BaseException as e:
+        print(f"BaseException caught: {type(e).__name__}: {e}", flush=True)
+    except Exception as err:
+        print(f"Warning: Could not connect to database: {err}")
+        print("App will run in mock/offline mode.")
+
+def connect_db():
+    if 'db' not in g:        
+        try:
+            c_pool = create_pool()
+            if c_pool is None:
+                g.db = None
+            else:
+                g.db = c_pool.get_connection()
+        except Exception as err:
+            print(f"Pool exhausted or error: {err}")
+            g.db = None
+    return g.db
+
+@app.teardown_appcontext
+def close_db(error):
+    db = g.pop('db', None)
+    if db is not None:
+        # It simply returns used connection to the 'attendance_pool' so another request can use it.
+        db.close()
+
 @app.route('/authenticate', methods=['POST'])
 def authenticate():
     try:
+        print("Authenticating...")
         data = request.get_json()
+        # data = json.loads(data)
 
         if not data:
             return jsonify({"error": "No JSON data provided"}), 400
+
+        event = data.get('event') 
+        if not event:
+            return jsonify({"error": "Event is required"}), 400
         
         student_id = data.get('student_id')
         if not student_id:
             return jsonify({"error": "Student ID is required"}), 400
         
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "message": "Database offline"}), 500
+
         now = datetime.now()
         formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")
         date = now.strftime("%Y-%m-%d")
-
         parameter = (student_id,)
-
-        db = Database(parameter)
+        print(parameter)
+        db = Database(conn, parameter)
         result = db.authenticate_user()
 
         if not result or len(result) == 0:
             return jsonify({"Invalid": "Student does not found!"}), 404
         elif result and len(result) > 0:
-            user_id = result[0]['user_id']
-            params = (user_id, date)
-            db_log = Database(params)
-            log_result = db_log.check_logs()
 
-            match log_result:
-                case None:
-                    log_params = (user_id, "Entry", formatted_time)
-                    db_insert_log = Database(log_params)
-                    db_insert_log.insert_log()
-                case lst if isinstance(lst, list):
-                    entry = 0
-                    exit = 0
-
-                    for log in lst:
-                        log_action = log.get('action', '').lower()
-                        if log_action == 'entry':
-                            entry += 1
-                        elif log_action == 'exit':
-                            exit += 1
-
-                    if entry > exit:
-                        log_params = (user_id, "Exit", formatted_time)
-                    elif entry == 0 or entry == exit:
-                        log_params = (user_id, "Entry", formatted_time)
-                    else:
-                        return jsonify({"success": False, "message": f"Error inserting log: Invalid log state"}), 500
-
-                    db_insert_log = Database(log_params)
-                    db_insert_log.insert_log()
+            # =========================================================
+            # # CHECKING LOGS FOR STUDENT STATUS
+            # =========================================================
+            print("Getting student status...")
 
             status = result[0]['status']
             db_status_param = (student_id, status)
-            db_status = Database(db_status_param)
+            db_status = Database(conn, db_status_param)
 
+            # =========================================================
+            # # CHANGING STUDENT STATUS
+            # =========================================================
             try:
                 db_status_result = db_status.change_status()
-            except e as Exception:
-                errors[0] = str(e)
+            except Exception as e:
+                return jsonify({"success": False, "message": f"Error changing status: {e}"}), 500  # Internal Server Error status 
+                
+            if db_status_result['status'] == 'Inside':
+                log_type = 'Entry'
+                gate = 'Gate 1'
+            elif db_status_result['status'] == 'Outside':
+                log_type = 'Exit'
+                gate = 'Gate 2'
+
+            user_id = result[0]['user_id']
+            log_params = (user_id, formatted_time, log_type, gate)
+            db_insert_log = Database(conn, log_params)
+            print("Inserting log...")
+
+            try:
+                db_insert_log_result = db_insert_log.insert_general_log()
+            except Exception as e:
+                return jsonify({"success": False, "message": f"Error inserting log: {e}"}), 500  # Internal Server Error status 
 
             return jsonify({"success": True, "message": "User authenticated and log updated"}), 200
 
@@ -425,3 +483,4 @@ def authenticate():
     
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
+ 
