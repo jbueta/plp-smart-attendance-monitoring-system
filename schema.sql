@@ -99,3 +99,58 @@ CREATE TABLE IF NOT EXISTS attendance_log (
     FOREIGN KEY (person_id) REFERENCES user(user_id) ON DELETE CASCADE
 );
 
+-- EVENTS
+
+-- 2. Events Table
+CREATE TABLE events (
+    event_id INT AUTO_INCREMENT PRIMARY KEY,
+    event_name VARCHAR(200),
+    event_type ENUM('flag_ceremony', 'seminar', 'other'),
+    scheduled_date DATE,
+    time_start TIME,
+    time_end TIME,
+    location VARCHAR(200)
+);
+
+-- 3. Event Attendance Logs Table
+CREATE TABLE event_attendance_logs (
+    attendance_id INT AUTO_INCREMENT PRIMARY KEY,
+    event_id INT,
+    user_id INT,
+    timestamp DATETIME,
+    log_type ENUM('entrance', 'exit'),
+    status ENUM('present', 'late', 'absent'),
+    FOREIGN KEY (event_id) REFERENCES events(event_id),
+    FOREIGN KEY (user_id) REFERENCES users(user_id) on delete cascade
+);
+
+-- 4. Student Details Table
+CREATE TABLE student_details (
+    user_id INT PRIMARY KEY,
+    student_id VARCHAR(20),
+    college VARCHAR(100),
+    section VARCHAR(20),
+    FOREIGN KEY (user_id) REFERENCES users(user_id) on delete cascade
+);
+
+-- 5. Employee Details Table
+CREATE TABLE employee_details (
+    user_id INT PRIMARY KEY,
+    employee_id VARCHAR(20),
+    department VARCHAR(100),
+    position VARCHAR(100),
+    FOREIGN KEY (user_id) REFERENCES users(user_id) on delete cascade
+);
+
+-- 6. Visitor Details Table
+CREATE TABLE visitor_details (
+    user_id INT PRIMARY KEY,
+    details VARCHAR(20),
+    purpose ENUM('Active', 'Completed'),
+    date DATE,         -- Inferred type (blank in document)
+    time_in TIME,      -- Inferred type (blank in document)
+    time_out TIME,     -- Inferred type (blank in document)
+    status VARCHAR(50),-- Inferred type (blank in document)
+    FOREIGN KEY (user_id) REFERENCES users(user_id) on delete cascade
+);
+
