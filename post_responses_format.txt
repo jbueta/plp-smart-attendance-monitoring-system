@@ -1,0 +1,41 @@
+ADD_EVENT ()
+
+***WEEKLY
+{
+  "event_name": "Data Structures & Algorithms",
+  "event_type": "Class",
+  "frequency": "WEEKLY",
+  "day": "Monday",
+  "start_date": "2026-03-16",
+  "end_date": "2026-07-15",
+  "time_start": "09:00:00",
+  "time_end": "12:00:00",
+  "location": "Room 404",
+  "participants": ["23-00314", "23-00315", "23-00316", "23-00317"]
+}
+
+*** DAILY
+{
+  "event_name": "Annual Tech Symposium",
+  "event_type": "Seminar",
+  "frequency": "DAILY",
+  "start_date": "2026-04-10",
+  "end_date": "2026-04-12",
+  "time_start": "13:00:00",
+  "time_end": "17:00:00",
+  "location": "Main Auditorium",
+  "participants": ["23-00314", "23-00315"]
+}
+
+*** ONCE
+{
+  "event_name": "Data Structures & Algorithms",
+  "event_type": "Seminar",
+  "frequency": "ONCE",
+  "start_date": "2026-03-16",
+  "end_date": "2026-03-16",
+  "time_start": "09:00:00",
+  "time_end": "12:00:00",
+  "location": "Room 404",
+  "participants": ["23-00314", "23-00315", "23-00316", "23-00317"]
+}
