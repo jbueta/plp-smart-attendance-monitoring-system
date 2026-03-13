@@ -277,6 +277,132 @@ def events_authentication():
     finally:
         close_db(conn)
 
+# ====================================================
+# ENDPOINT 3: Status Update for Excused Individuals
+# ====================================================
+@app.route("/admin/update-attendance", methods=["PUT"])
+def update_attendance():
+    conn = None
+    try:
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "message": "Database offline"}), 500
+
+        data = request.get_json()
+        required_fields = ["user_id", "instance_id", "status"]
+        if not data or not all(field in data for field in required_fields):
+            return jsonify({"success": False, "message": "Missing required fields"}), 400
+
+        user_id = data['user_id']
+        instance_id = data['instance_id']
+        status = data['status'] 
+        remarks = data.get('remarks', None)
+
+        if status not in ['Present', 'Absent', 'Late', 'Excused']:
+            return jsonify({"success": False, "message": "Invalid status option"}), 400
+
+        params = (status, remarks, user_id, instance_id)
+        db = Database(conn, params)
+        result = db.update_attendance_status()
+
+        if not result or result.get('success') is False:
+            return jsonify({"success": False, "message": result.get('message', 'Error updating status')}), 500
+
+        return jsonify({"success": True, "message": f"Attendance updated to {status}."}), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        if conn:
+            close_db(conn)
+
+# ====================================================
+# ENDPOINT 4: Update Event Status (Completed or Cancelled)
+# ====================================================
+@app.route("/admin/events/update-status", methods=["PUT"])
+def update_event_status():
+    conn = None
+    try:
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "message": "Database offline"}), 500
+
+        data = request.get_json()
+        required_fields = ["instance_id", "new_status"]
+        if not data or not all(field in data for field in required_fields):
+            return jsonify({"success": False, "message": "Missing required fields"}), 400
+
+        instance_id = data['instance_id']
+        status = data['new_status'] 
+
+        if status not in ['Scheduled','Completed','Cancelled']:
+            return jsonify({"success": False, "message": "Invalid status option"}), 400
+
+        params = (status, instance_id)
+        db = Database(conn, params)
+        result = db.update_instance_status()
+
+        if not result or result.get('success') is False:
+            return jsonify({"success": False, "message": result.get('message', 'Error updating status')}), 500
+
+        return jsonify({"success": True, "message": f"Event satus updated to {status}."}), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        if conn:
+            close_db(conn)
+
+# ====================================================
+# ENDPOINT 5: Get All Events
+# ====================================================
+@app.route("/admin/get-events", methods=["GET"])
+def get_all_events():
+    conn = None
+    try:
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "message": "Database offline"}), 500
+
+        db = Database(conn)
+        events = db.get_all_events()
+
+        return jsonify({"success": True, "data": events}), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        if conn:
+            close_db(conn)
+
+# ====================================================
+# ENDPOINT 6: Get Roster & Attendance for an Instance
+# ====================================================
+@app.route("/admin/instances/<int:instance_id>/get-attendance", methods=["GET"])
+def get_instance_attendance(instance_id):
+    """
+    Fetches the complete roster for a specific event date (instance_id),
+    including user names, IDs, and attendance statuses.
+    """
+    conn = None
+    try:
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "message": "Database offline"}), 500
+
+        db = Database(conn, (instance_id,))
+        roster = db.get_instance_attendance()
+
+        if roster is None:
+            return jsonify({"success": False, "message": "Error fetching roster"}), 500
+
+        return jsonify({"success": True, "data": roster}), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        if conn:
+            close_db(conn)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)

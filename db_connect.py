@@ -18,7 +18,7 @@ class Database:
 
     def authenticate_user(self):
         try:
-            query = """ SELECT * FROM users LEFT JOIN students USING (user_id) LEFT JOIN employees USING (user_id)
+            query = """ SELECT user_id, * FROM users LEFT JOIN students USING (user_id) LEFT JOIN employees USING (user_id)
                         WHERE student_id = %s OR employee_id = %s
                     """
             print(self.parameter)
@@ -177,8 +177,28 @@ class Database:
                     participant_data = [(event_id, user_id) for user_id in participants]
                     self.cursor.executemany(new_query, participant_data)
 
-                self.conn.commit()
                 print ("Participants attached successfully!")
+
+                # ==========================================
+                # ONCE TIME EVENT INSTANCE GENERATOR
+                # ==========================================
+                frequency = self.parameter[2]
+                start_date = self.parameter[4]
+
+                if frequency not in ['WEEKLY', 'DAILY', 'MONTHLY', 'YEARLY']: 
+                    instance_query = """ INSERT IGNORE INTO event_instances (event_id, event_date, status) 
+                                         VALUES (%s, %s, 'Scheduled') """
+                    self.cursor.execute(instance_query, (event_id, start_date))
+                    instance_id = int(self.cursor.lastrowid)
+
+                    attendance_query = """ INSERT IGNORE INTO event_attendance (instance_id, user_id, event_date, status) 
+                                           SELECT %s, user_id, %s, 'Absent' FROM event_participants WHERE event_id = %s """
+                    self.cursor.execute(attendance_query, (instance_id, start_date, event_id))
+                    
+                    self.conn.commit()
+                    print(f"One-time instance and roster generated for {start_date}!")
+
+                self.conn.commit()
                 return {"message": "Event created successfully!", "success": True}
             else:
                 return {"success": False, "message": "Event already exists or could not be created."}
@@ -259,21 +279,26 @@ class Database:
 
             log_type = self.parameter[2]
             
-            if log_type == 'Entry':
-                log_query = """ UPDATE event_attendance JOIN event_instances ON 
-                                event_attendance.instance_id = event_instances.instance_id
-                                SET event_attendance.status = 'Present', event_attendance.first_in = NOW()
+            if log_type.lower() == 'entry':
+                log_query = """ UPDATE event_attendance 
+                                JOIN event_instances ON event_attendance.instance_id = event_instances.instance_id
+                                JOIN events ON event_instances.event_id = events.event_id
+                                SET 
+                                    event_attendance.status = IF(CURRENT_TIME() > ADDTIME(events.time_start, '00:15:00'), 'Late', 'Present'), 
+                                    event_attendance.first_in = NOW()
                                 WHERE event_attendance.user_id = %s 
                                 AND event_instances.event_id = %s 
                                 AND event_attendance.event_date = CURRENT_DATE() 
-                                AND event_attendance.status = 'Absent'
+                                AND event_attendance.status IN ('Absent', 'Excused')
                             """
-            elif log_type == 'Exit':
+            elif log_type.lower() == 'exit':
                 log_query = """ UPDATE event_attendance JOIN event_instances ON event_attendance.instance_id = event_instances.instance_id
                                 SET event_attendance.last_out = NOW() WHERE event_attendance.user_id = %s 
                                 AND event_instances.event_id = %s 
                                 AND event_attendance.event_date = CURRENT_DATE()
                             """
+            else:
+                return {"message": "Invalid log type.", "success": False}
 
             params = (self.parameter[0], self.parameter[1])
             self.cursor.execute(log_query, params)
@@ -284,3 +309,79 @@ class Database:
         except connector.Error as err:
             self.conn.rollback()
             return {"message": f"Error: {err}", "success": False}
+
+    def update_attendance_status(self):
+        try:
+            query = """ UPDATE event_attendance 
+                        SET status = %s, remarks = %s 
+                        WHERE user_id = %s AND instance_id = %s """
+            
+            self.cursor.execute(query, self.parameter)
+            
+            if self.cursor.rowcount == 0:
+                return {"success": False, "message": "No matching attendance record found."}
+                
+            self.conn.commit()
+            return {"success": True, "message": "Status updated successfully!"}
+            
+        except connector.Error as err:
+            self.conn.rollback()
+            return {"success": False, "message": f"Database Error: {err}"}
+
+    def update_instance_status(self, instance_id, new_status):
+        """
+        Updates the status of a specific event instance (e.g., to 'Completed' or 'Cancelled').
+        Expected new_status values: 'Scheduled', 'Completed', 'Cancelled'
+        """
+        try:
+            new_status = self.parameter[0]
+            instance_id = self.parameter[1]
+            
+            query = "UPDATE event_instances SET status = %s WHERE instance_id = %s"
+            self.cursor.execute(query, (new_status, instance_id))
+            self.conn.commit()
+            
+            if self.cursor.rowcount > 0:
+                return {"message": f"Event instance successfully marked as {new_status}!", "success": True}
+            else:
+                return {"message": "No event found with that ID, or status was already set.", "success": False}
+                
+        except connector.Error as err:
+            self.conn.rollback()
+            return {"message": f"Database Error: {err}", "success": False}
+
+    # =============================================================
+    # GET (READ) METHODS
+    # =============================================================
+
+    def get_all_events(self):
+        try:
+            # Fetches all events, ordering by the most recently created
+            query = """ SELECT * FROM events ORDER BY event_id DESC """
+            self.cursor.execute(query)
+            result = self.cursor.fetchall()
+            return result if result else []
+            
+        except connector.Error as err:
+            print(f"Error fetching events: {err}")
+            return []
+
+    def get_instance_attendance(self):
+        try:
+            query = """ 
+                        SELECT ea.attendance_id, ea.user_id, ea.status, ea.first_in, ea.last_out, ea.remarks, u.name,
+                               s.student_id, e.employee_id
+                        FROM event_attendance ea
+                        LEFT JOIN users u ON ea.user_id = u.user_id
+                        LEFT JOIN students s ON u.user_id = s.user_id
+                        LEFT JOIN employees e ON u.user_id = e.user_id
+                        WHERE ea.instance_id = %s
+                        ORDER BY u.name ASC
+                    """
+            self.cursor.execute(query, self.parameter)
+            result = self.cursor.fetchall()
+            return result if result else []
+            
+        except connector.Error as err:
+            print(f"Error fetching attendance: {err}")
+            return None
