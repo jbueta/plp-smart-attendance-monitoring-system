@@ -352,4 +352,7 @@ def check_student_status():
 # ==============================================================================
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # ssl_context='adhoc' enables HTTPS so the browser allows camera access.
+    # Requires: pip install pyopenssl
+    # Access via: https://192.168.1.15:5000  (click Advanced → Proceed on the warning)
+    app.run(debug=True, host='0.0.0.0', port=5000, ssl_context='adhoc')
