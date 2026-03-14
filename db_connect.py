@@ -1,4 +1,5 @@
 import mysql.connector as connector
+from datetime import date, datetime, timedelta
 
 class Database:
     
@@ -18,86 +19,75 @@ class Database:
 
     def authenticate_user(self):
         try:
-            query = """ SELECT user_id, * FROM users LEFT JOIN students USING (user_id) LEFT JOIN employees USING (user_id)
-                        WHERE student_id = %s OR employee_id = %s
-                    """
-            print(self.parameter)
+            query = """ 
+                SELECT u.user_id, u.role, u.active,
+                       COALESCE(s.student_id, e.employee_id) as scan_id,
+                       COALESCE(s.status, e.status) as current_status
+                FROM users u 
+                LEFT JOIN students s ON u.user_id = s.user_id 
+                LEFT JOIN employees e ON u.user_id = e.user_id
+                WHERE s.student_id = %s OR e.employee_id = %s
+            """
             self.cursor.execute(query, self.parameter)
             result = self.cursor.fetchall()
-
             return result if result else []
             
         except connector.Error as err:
-            print(f"Error: {err}")
+            print(f"Error authenticating: {err}")
             return None
-
 
     def change_status(self):
         try:
-            query = """UPDATE students SET status = %s WHERE student_id = %s"""
-            if self.parameter[1].lower() == 'inside':
-                status = 'Outside'
-            else: 
-                status = 'Inside'
+            user_id = self.parameter[0]
+            current_status = self.parameter[1]
+            role = self.parameter[2]
 
-            new_param = (status, self.parameter[0])
-            self.cursor.execute(query, new_param)
-            rows_affected = self.cursor.rowcount
+            new_status = 'Outside' if current_status and current_status.lower() == 'inside' else 'Inside'
 
-            id = self.parameter[0]
-
-            if rows_affected > 0:
-                data = {"message": f"{id} status changed sucessfully!", "status": status}
-                return data
+            if role == 'student':
+                query = "UPDATE students SET status = %s WHERE user_id = %s"
+            elif role == 'employee':
+                query = "UPDATE employees SET status = %s WHERE user_id = %s"
             else:
-                return None
-        
-        except connector.Error as err:
-            self.conn.rollback()
-            print(f"Error: {err}")
+                query ="UPDATE visitors SET status = %s WHERE user_id = %s" 
+
+            self.cursor.execute(query, (new_status, user_id))
+            self.conn.commit()
+
+            if self.cursor.rowcount > 0:
+                return {"message": "Status changed successfully!", "status": new_status}
             return None
-
-    def check_general_logs(self):
-        
-        try:
-            log_query = """SELECT * FROM general_log WHERE user_id = %s AND DATE(timestamp) = %s"""
-
-            self.cursor.execute(log_query, self.parameter)
-            result = self.cursor.fetchall()
-
-            return result if result else []
             
         except connector.Error as err:
-            print(f"Error: {err}")
+            self.conn.rollback()
+            print(f"Error changing status: {err}")
             return None
-        
+
     def insert_general_log(self):
         try:
             insert_log_query = """INSERT INTO general_log (user_id, timestamp, log_type, gate) VALUES (%s, %s, %s, %s)"""
             self.cursor.execute(insert_log_query, self.parameter)
             self.conn.commit()
-            rows_affected = self.cursor.rowcount
-            if rows_affected > 0:
+            
+            if self.cursor.rowcount > 0:
                 return "Log inserted successfully!"
-            else:
-                return None  # No rows inserted
-        
+            return None 
+            
         except connector.Error as err:
             self.conn.rollback()
-            print(f"Error: {err}")
+            print(f"Error inserting log: {err}")
             return None
 
     def retrieve_log(self):
         try:
-            log_query = """SELECT * FROM general_log WHERE person_id = %s AND DATE(timestamp) = %s"""
-
+            # Fixed 'person_id' to 'user_id'
+            log_query = """SELECT * FROM general_log WHERE user_id = %s AND DATE(timestamp) = %s"""
             self.cursor.execute(log_query, self.parameter)
             result = self.cursor.fetchall()
-
             return result if result else []
             
         except connector.Error as err:
-            print(f"Error: {err}")
+            print(f"Error retrieving log: {err}")
             return None
 
 
@@ -169,13 +159,118 @@ class Database:
                 print("Event created!")
 
                 event_id = int(self.cursor.lastrowid)
-                participants = self.parameter[9]
 
-                if participants and isinstance(participants, list):
-                    new_query = "INSERT IGNORE INTO event_participants (event_id, user_id) VALUES (%s, %s)"
-                    #List ([1, "23-00314"], [2, "23-00315"])
-                    participant_data = [(event_id, user_id) for user_id in participants]
-                    self.cursor.executemany(new_query, participant_data)
+                match (self.parameter[10]):
+                    case 'grouped':
+                        departments = self.parameter[9]
+                        
+                        if departments and isinstance(departments, list):
+                            print(f"Retrieving user_ids for {len(departments)} departments...")
+
+                            format_strings = ','.join(['%s'] * len(departments))
+
+                            get_users_query = f"""
+                                SELECT user_id 
+                                FROM employees 
+                                WHERE department_id IN ({format_strings})
+                            """
+
+                            self.cursor.execute(get_users_query, tuple(departments))
+                            fetched_users = self.cursor.fetchall()
+
+                            print(fetched_users)
+                            actual_user_ids = [row['user_id'] if isinstance(row, dict) else row[0] for row in fetched_users]
+
+                            if actual_user_ids:
+                                new_query = "INSERT IGNORE INTO event_participants (event_id, user_id) VALUES (%s, %s)"
+                                participant_data = [(event_id, uid) for uid in actual_user_ids]
+                                self.cursor.executemany(new_query, participant_data)
+                                print(f"Successfully attached {len(actual_user_ids)} valid participants from grouped departments!")
+                            else:
+                                print("Warning: No employees found in the provided departments.")
+                    case 'custom':
+                        raw_ids = self.parameter[9]
+                        if raw_ids and isinstance(raw_ids, list):
+                            print(f"Translating {len(raw_ids)} raw IDs to user_ids...")
+
+                            format_strings = ','.join(['%s'] * len(raw_ids))
+
+                            get_users_query = f"""
+                                SELECT u.user_id 
+                                FROM users u
+                                LEFT JOIN students s ON u.user_id = s.user_id
+                                LEFT JOIN employees e ON u.user_id = e.user_id
+                                LEFT JOIN visitors v ON u.user_id = v.user_id
+                                WHERE s.student_id IN ({format_strings})
+                                OR e.employee_id IN ({format_strings})
+                                OR v.visitor_id IN ({format_strings})
+                            """
+
+                            query_params = tuple(raw_ids + raw_ids + raw_ids)
+
+                            self.cursor.execute(get_users_query, query_params)
+                            fetched_users = self.cursor.fetchall()
+
+                            actual_user_ids = [row['user_id'] if isinstance(row, dict) else row[0] for row in fetched_users]
+
+                            if actual_user_ids:
+                                new_query = "INSERT IGNORE INTO event_participants (event_id, user_id) VALUES (%s, %s)"
+                                participant_data = [(event_id, uid) for uid in actual_user_ids]
+                                self.cursor.executemany(new_query, participant_data)
+                                print(f"Successfully attached {len(actual_user_ids)} valid participants!")
+                            else:
+                                print("Warning: None of the provided IDs matched any users in the database.")
+
+                    case 'hybrid':
+                        hybrid_data = self.parameter[9]
+                        
+                        grouped_deps = hybrid_data.get('grouped_participants', [])
+                        custom_raw_ids = hybrid_data.get('custom_participants', [])
+                        
+                        final_user_ids = set()
+
+                        # 2. PROCESS GROUPED DEPARTMENTS
+                        if grouped_deps:
+                            print(f"Fetching users for {len(grouped_deps)} departments...")
+                            format_strings = ','.join(['%s'] * len(grouped_deps))
+                            get_dept_query = f"""
+                                SELECT user_id FROM employees WHERE department_id IN ({format_strings})
+                            """
+                            self.cursor.execute(get_dept_query, tuple(grouped_deps))
+                            dept_users = self.cursor.fetchall()
+                            
+                            # Add it to set
+                            for row in dept_users:
+                                final_user_ids.add(row['user_id'] if isinstance(row, dict) else row[0])
+
+                        # 3. PROCESS CUSTOM IDS
+                        if custom_raw_ids:
+                            print(f"Fetching users for {len(custom_raw_ids)} custom IDs...")
+                            format_strings = ','.join(['%s'] * len(custom_raw_ids))
+                            get_custom_query = f"""
+                                SELECT u.user_id FROM users u
+                                LEFT JOIN students s ON u.user_id = s.user_id
+                                LEFT JOIN employees e ON u.user_id = e.user_id
+                                LEFT JOIN visitors v ON u.user_id = v.user_id
+                                WHERE s.student_id IN ({format_strings})
+                                OR e.employee_id IN ({format_strings})
+                                OR v.visitor_id IN ({format_strings})
+                            """
+                            self.cursor.execute(get_custom_query, tuple(custom_raw_ids + custom_raw_ids + custom_raw_ids))
+                            custom_users = self.cursor.fetchall()
+                            
+                            # Add it to set
+                            for row in custom_users:
+                                final_user_ids.add(row['user_id'] if isinstance(row, dict) else row[0])
+
+                        # 4. INSERT EVERYONE AT ONCE
+                        if final_user_ids:
+                            new_query = "INSERT IGNORE INTO event_participants (event_id, user_id) VALUES (%s, %s)"
+                            participant_data = [(event_id, uid) for uid in final_user_ids]
+                            self.cursor.executemany(new_query, participant_data)
+                            print(f"Successfully attached {len(final_user_ids)} unique hybrid participants!")
+                        else:
+                            print("Warning: No valid participants found in either hybrid list.")
 
                 print ("Participants attached successfully!")
 
@@ -356,11 +451,24 @@ class Database:
 
     def get_all_events(self):
         try:
-            # Fetches all events, ordering by the most recently created
             query = """ SELECT * FROM events ORDER BY event_id DESC """
             self.cursor.execute(query)
             result = self.cursor.fetchall()
-            return result if result else []
+            cleaned_events = []
+            for row in result:
+                if isinstance(row, dict):
+                    for key, val in row.items():
+                        if isinstance(val, (timedelta, date, datetime)):
+                            row[key] = str(val)
+                    cleaned_events.append(row)
+                else:
+                    cleaned_row = tuple(
+                        str(val) if isinstance(val, (timedelta, date, datetime)) else val 
+                        for val in row
+                    )
+                    cleaned_events.append(cleaned_row)
+
+            return cleaned_events
             
         except connector.Error as err:
             print(f"Error fetching events: {err}")

@@ -67,12 +67,13 @@ CREATE TABLE IF NOT EXISTS employees (
 );
 
 CREATE TABLE IF NOT EXISTS visitors (
+    visitor_id INT(11) NOT NULL,
     user_id INT(11) NOT NULL,
     visitor_name VARCHAR(80) DEFAULT NULL,
     purpose VARCHAR(100) DEFAULT NULL,
     status ENUM('Inside','Outside') DEFAULT NULL,
     visitor_last_updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (user_id),
+    PRIMARY KEY (visitor_id),
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
