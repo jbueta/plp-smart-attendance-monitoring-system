@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS events (
     event_id INT(11) NOT NULL AUTO_INCREMENT,
     event_name VARCHAR(200) DEFAULT NULL,
     event_type ENUM('flag_ceremony','seminar','other') DEFAULT NULL,
-    frequency ENUM('ONCE','DAILY','WEEKLY','MONTHLY','YEARLY') DEFAULT NULL,
+    frequency ENUM('ONCE','DAILY','WEEKLY') DEFAULT NULL,
     day ENUM('Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday') DEFAULT NULL,
     start_date DATE DEFAULT NULL,
     end_date DATE DEFAULT NULL,

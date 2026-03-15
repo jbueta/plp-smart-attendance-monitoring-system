@@ -4,7 +4,11 @@ from datetime import datetime
 import json
 import re
 import urllib.parse
+from flask import Flask, request, jsonify
 
+
+app = Flask(__name__)
+qr_detector = cv2.QRCodeDetector()
 
 # ─────────────────────────────────────────────
 #  NOISE REDUCTION & IMAGE ENHANCEMENT
@@ -333,7 +337,7 @@ def draw_info_panel(frame, qr_type: str, fields: dict, anchor: tuple):
 # ─────────────────────────────────────────────
 
 def main():
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     detector = cv2.QRCodeDetector()
     scanned: dict[str, tuple] = {}   # data → (qr_type, fields, timestamp)
 
@@ -435,6 +439,40 @@ def main():
     cv2.destroyAllWindows()
     print(f"\nDone!  Total unique scans: {len(scanned)}")
     print("Results saved to: scanned_results.txt")
+
+
+@app.route('/api/scan_frame', methods=['POST'])
+def scan_frame():
+    try:
+        # 1. Grab the image file sent by the frontend
+        if 'frame' not in request.files:
+            return jsonify({"success": False, "message": "No image provided"}), 400
+            
+        file = request.files['frame'].read()
+        
+        # 2. Convert the image into an OpenCV format (numpy array)
+        npimg = np.frombuffer(file, np.uint8)
+        frame = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
+
+        # 3. Run your hardcore OpenCV detection!
+        data, bbox, _ = try_detect(qr_detector, frame)
+
+        if data:
+            # 4. Parse the data using your custom parsers
+            qr_type, fields = detect_and_parse(data)
+            
+            # 5. Send it back to the frontend!
+            return jsonify({
+                "success": True, 
+                "qr_type": qr_type, 
+                "parsed_fields": fields, 
+                "raw_data": data
+            })
+
+        return jsonify({"success": False, "message": "No QR found"})
+
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
 
 
 if __name__ == "__main__":

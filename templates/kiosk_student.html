@@ -322,35 +322,61 @@ document.addEventListener('DOMContentLoaded', function () {
     startCamera();
 
     // ── On successful QR scan ─────────────────────────────────────
-    function onScanSuccess(scannedId) {
+    function onScanSuccess(scannedText) {
         if (scanCooldown) return;
+
+        // The Regex: (Group 1) \[ (Group 2) \] (Group 3)
+        const match = scannedText.match(/(.*?)\[(.*?)\](.*)/s);
+
+        if (!match) {
+            console.warn("Invalid QR format scanned:", scannedText);
+            return; 
+        }
+
+        // Extract and trim the extra spaces!
+        const extractedName = match[1].trim();   // Result: "SALVADOR, JERICHO PAUL D."
+        const extractedId = match[2].trim();     // Result: "23-00312"
+        const extractedCourse = match[3].trim(); // Result: "BSCS"
+
         scanCooldown = true;
         setTimeout(() => { scanCooldown = false; }, 3000);
 
         setCamStatus('Reading ID...', 'text-warning');
-        processStudentId(scannedId, () => setCamStatus('Camera active', 'text-success'));
+        console.log(extractedName);
+        console.log(extractedId);
+        console.log(extractedCourse);
+        
+        // Pass ALL THREE variables to your process function
+        processStudentData(extractedId, extractedName, extractedCourse, () => setCamStatus('Camera active', 'text-success'));
     }
 
     // ── Core: API call + banner ───────────────────────────────────
-    window.processStudentId = function (studentId, callback) {
-        fetch('/api/check_student_status', {
+    window.processStudentData = function (scanned_id, scanned_name, scanned_department, callback) {
+        console.log("🚀 ATTEMPTING TO SEND FETCH REQUEST...");
+        console.log("Sending Data:", scanned_id, scanned_name, scanned_department);
+        fetch('http://127.0.0.1:5001/admin/user/authentication', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ student_id: studentId })
+            body: JSON.stringify({ 
+                "id": scanned_id,
+                "name": scanned_name,
+                "college_office": scanned_department
+            })
         })
         .then(r => r.json())
         .then(data => {
             if (data.status === 'found') {
                 const type = data.attendance_status === 'TIMED IN' ? 'in' : 'out';
-                showScanBanner(type, { id: studentId, name: data.name, course: data.course });
+                showScanBanner(type, { id: scanned_id, name: scanned_name, course: scanned_department });
                 if (typeof showSuccessOverlay === 'function') {
-                    showSuccessOverlay(type === 'in' ? 'entry' : 'exit', { id: studentId, name: data.name });
+                    showSuccessOverlay(type === 'in' ? 'entry' : 'exit', { id: scanned_id, name: scanned_name });
                 }
             } else {
-                showScanBanner('error', { id: studentId });
+                console.error("🚨 FETCH COMPLETELY FAILED:", error);
+                showScanBanner('error', { id: scanned_id });
             }
         })
-        .catch(() => showScanBanner('error', { id: studentId }))
+        .catch(() => showScanBanner('error', { id: scanned_id }))
         .finally(() => { if (callback) callback(); });
     };
 
