@@ -36,25 +36,28 @@ VISITORS = []
 MOCK_DASHBOARD_STATS = {
     "total_entries": "14,520",
     "entries_trend": "+12%",
-    "flag_ceremony_compliance": "87.5%",
-    "flag_ceremony_raw": "2,450 / 2,800",
+    "event_attendance_rate": "89.5%",
+    "event_attendance_raw": "2,506 / 2,800 Attendees",
     "currently_inside": "3,412",
+    "avg_dwell_time": "5 hrs 45 mins",
+    "peak_hour": "07:30 AM",
     "traffic_chart": [450, 2100, 1800, 1200, 900, 600, 1100, 1400, 800, 600, 1500, 900],
+    "dept_distribution": [35, 25, 20, 15, 5], # Percentages for top 5 depts
     "alerts": [
         {"type": "warning", "icon": "exclamation-triangle-fill", "title": "High Density: North Gate", "time": "15 minutes ago"},
-        {"type": "danger", "icon": "slash-circle-fill", "title": "Flag Ceremony < 70%", "time": "College of Arts"}
+        {"type": "info", "icon": "info-circle-fill", "title": "Peak Hour Detected", "time": "07:30 AM"}
     ]
 }
 
 MOCK_EMPLOYEE_STATS = {
-    "attendance_data": [60, 15, 15, 10], 
+    "attendance_data": [75, 20, 5], 
     "tardiness_data": [15, 12, 5, 8, 25, 18, 10]
 }
 
 MOCK_EMPLOYEE_LOGS = [
     {"initials": "JD", "name": "Juan Dela Cruz", "dept": "Civil Engineering", "in": "07:45 AM", "out": "05:00 PM", "status": "Present", "status_class": "success"},
     {"initials": "MS", "name": "Maria Santos", "dept": "College of Nursing", "in": "08:15 AM", "out": "--:--", "status": "Late +15m", "status_class": "warning"},
-    {"initials": "JR", "name": "Jose Rizal", "dept": "Arts & Letters", "in": "--:--", "out": "--:--", "status": "Absent", "status_class": "danger"}
+    {"initials": "AL", "name": "Antonio Luna", "dept": "Arts & Letters", "in": "08:30 AM", "out": "04:30 PM", "status": "Late", "status_class": "warning"}
 ]
 
 MOCK_STUDENT_STATS = {
@@ -141,11 +144,16 @@ def index():
     session.pop('logged_in', None)  # Auto-logout admin if they return to home
     return render_template('index.html')
 
-@app.route('/kiosk/student')
-def kiosk_student():
+@app.route('/kiosk/entrance')
+def kiosk_entrance():
     session.pop('logged_in', None)
     active_visitors = [v for v in VISITORS if v['status'] == 'Checked In']
-    return render_template('kiosk_student.html', active_visitors=active_visitors, kiosk_data=MOCK_KIOSK_DATA)
+    return render_template('kiosk_entrance.html', active_visitors=active_visitors, kiosk_data=MOCK_KIOSK_DATA)
+
+@app.route('/kiosk/exit')
+def kiosk_exit():
+    session.pop('logged_in', None)
+    return render_template('kiosk_exit.html', kiosk_data=MOCK_KIOSK_DATA)
 
 @app.route('/kiosk/employee/select-event')
 def kiosk_employee_select_event():
@@ -245,6 +253,11 @@ def analytics_students():
 def reports():
     return render_template('reports.html', events=EVENTS, reports=MOCK_REPORTS)
 
+@app.route('/reports/sample')
+@login_required
+def sample_report():
+    return render_template('sample_report.html', current_date=datetime.now().strftime('%B %d, %Y - %I:%M %p'))
+
 # ==============================================================================
 # ADMIN MANAGEMENT API
 # ==============================================================================
@@ -254,9 +267,24 @@ def reports():
 def add_event():
     name = request.form.get('name')
     etype = request.form.get('type')
-    dept = request.form.get('dept')
+    dept_list = request.form.getlist('dept')
+    custom_depts_raw = request.form.getlist('custom_dept')
     edate = request.form.get('date')
     time = request.form.get('time')
+    
+    # Format department string
+    if not dept_list or 'All Departments' in dept_list:
+        dept_str = 'All Departments'
+    else:
+        dept_str = ', '.join(dept_list)
+        
+    custom_depts = [c.strip() for c in custom_depts_raw if c.strip()]
+    if custom_depts:
+        custom_str = ', '.join(custom_depts)
+        if dept_str == 'All Departments':
+            dept_str = f"All Departments, {custom_str}"
+        else:
+            dept_str = f"{dept_str}, {custom_str}"
     
     if name and etype and edate and time:
         new_id = max([e['id'] for e in EVENTS]) + 1 if EVENTS else 1
@@ -264,7 +292,7 @@ def add_event():
             'id': new_id,
             'name': name,
             'type': etype,
-            'dept': dept or 'All Departments',
+            'dept': dept_str,
             'date': edate,
             'time': time
         })

@@ -135,10 +135,10 @@
         // Attendance Status (Doughnut)
         const ctxAttendance = document.getElementById('attendanceChart').getContext('2d');
         const dataAttendance = {
-            labels: ['Present', 'Late', 'Absent', 'On Leave'],
+            labels: ['Present (On-Time)', 'Late', 'Excused/Leave'],
             datasets: [{
                 data: {{ stats.attendance_data | tojson | safe }},
-            backgroundColor: ['#198754', '#ffc107', '#dc3545', '#0dcaf0'],
+            backgroundColor: ['#198754', '#ffc107', '#0dcaf0'],
             borderColor: 'rgba(255, 255, 255, 0.1)',
             borderWidth: 1
     }]

@@ -36,7 +36,7 @@ function generateReport() {
     btn.disabled = true;
 
     setTimeout(() => {
-        alert(`REPORT GENERATED:\n\nType: ${type}\nMode: ${modeText}\n${rangeText}\n\n(This is a prototype simulation. In production, this would download a PDF/CSV.)`);
+        window.open('/reports/sample?autoprint=true', '_blank');
         btn.innerHTML = originalText;
         btn.disabled = false;
     }, 1500);

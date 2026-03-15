@@ -17,6 +17,8 @@
 </head>
 
 <body class="{% block body_class %}{% endblock %}">
+    <!-- Overlay for background dimming -->
+    <div class="vignette-overlay"></div>
 
     <!-- Main Content Block - To be overridden by child templates -->
     {% block content %}{% endblock %}

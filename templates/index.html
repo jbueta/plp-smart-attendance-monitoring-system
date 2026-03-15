@@ -28,32 +28,48 @@
         </div>
     </header>
 
-    <!-- Portal Selection Cards (Student / Employee) -->
+    <!-- Portal Selection Cards -->
     <div class="row g-4 justify-content-center mb-4">
-        <!-- Student Card -->
-        <div class="col-md-5">
-            <a href="{{ url_for('kiosk_student') }}" class="text-decoration-none">
+        <!-- Entrance Kiosk Card -->
+        <div class="col-md-4">
+            <a href="{{ url_for('kiosk_entrance') }}" class="text-decoration-none">
                 <div
-                    class="card-glass py-5 px-4 text-center transition-hover d-flex flex-column justify-content-center">
-                    <div class="display-2 mb-3 text-white"><i class="bi bi-mortarboard-fill"></i></div>
-                    <h2 class="h3 text-white fw-bold">Student Portal</h2>
-                    <p class="text-white-50 mt-2 mb-4">Daily Campus Entrance & Exit Monitoring for Students</p>
-                    <div><span class="badge bg-light bg-opacity-10 rounded-pill px-4 py-2 fw-normal">Tap to
-                            Access</span></div>
+                    class="card-glass py-5 px-4 text-center transition-hover d-flex flex-column justify-content-center h-100">
+                    <div class="display-3 mb-3 text-success"><i class="bi bi-door-open-fill"></i></div>
+                    <h2 class="h4 text-white fw-bold">Student Entrance</h2>
+                    <p class="text-white-50 mt-2 mb-4 small">Main Entry &amp; Visitor Logging</p>
+                    <div class="mt-auto"><span
+                            class="badge bg-success bg-opacity-10 text-success rounded-pill px-4 py-2 border border-success border-opacity-25">Tap
+                            to Access</span></div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Exit Kiosk Card -->
+        <div class="col-md-4">
+            <a href="{{ url_for('kiosk_exit') }}" class="text-decoration-none">
+                <div
+                    class="card-glass py-5 px-4 text-center transition-hover d-flex flex-column justify-content-center h-100">
+                    <div class="display-3 mb-3 text-secondary"><i class="bi bi-box-arrow-right"></i></div>
+                    <h2 class="h4 text-white fw-bold">Exit Portal</h2>
+                    <p class="text-white-50 mt-2 mb-4 small">Student Exit Clearances</p>
+                    <div class="mt-auto"><span
+                            class="badge bg-light bg-opacity-10 rounded-pill px-4 py-2 text-white border border-light border-opacity-25">Tap
+                            to Access</span></div>
                 </div>
             </a>
         </div>
 
         <!-- Employee Card -->
-        <div class="col-md-5">
+        <div class="col-md-4">
             <a href="{{ url_for('kiosk_employee_select_event') }}" class="text-decoration-none">
-                <div class="card-glass py-5 px-4 text-center transition-hover d-flex flex-column justify-content-center"
+                <div class="card-glass py-5 px-4 text-center transition-hover d-flex flex-column justify-content-center h-100"
                     style="border-color: rgba(245, 221, 0, 0.3);">
-                    <div class="display-2 mb-3 text-gold"><i class="bi bi-person-badge-fill"></i></div>
-                    <h2 class="h3 text-gold fw-bold">Employee Portal</h2>
-                    <p class="text-white-50 mt-2 mb-4">Official Flag Ceremony Attendance & Faculty Events</p>
-                    <div><span
-                            class="badge bg-warning bg-opacity-10 text-warning rounded-pill px-4 py-2 fw-normal border border-warning border-opacity-25">Tap
+                    <div class="display-3 mb-3 text-gold"><i class="bi bi-person-badge-fill"></i></div>
+                    <h2 class="h4 text-gold fw-bold">Events Portal</h2>
+                    <p class="text-white-50 mt-2 mb-4 small">Flag Ceremony &amp; Gatherings</p>
+                    <div class="mt-auto"><span
+                            class="badge bg-warning bg-opacity-10 text-warning rounded-pill px-4 py-2 border border-warning border-opacity-25">Tap
                             to Access</span></div>
                 </div>
             </a>

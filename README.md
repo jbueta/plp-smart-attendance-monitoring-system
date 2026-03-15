@@ -74,7 +74,8 @@ plp_monitoring_system/
 │       ├── main.js         # Core interactions and clock
 │       ├── kiosk.js        # Kiosk-specific logic
 │       ├── events.js       # Event management logic
-│       └── reports.js      # Reporting functionality
+│       ├── reports.js      # Reporting functionality
+│       └── simulation.js   # Inactive data simulation/chart updates
 └── templates/          # HTML templates (Jinja2)
 ```
 

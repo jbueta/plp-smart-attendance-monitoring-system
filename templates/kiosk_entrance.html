@@ -2,7 +2,7 @@
 {% extends "base.html" %}
 
 <!-- Page title -->
-{% block title %}Student Access - PLP{% endblock %}
+{% block title %}Entrance Kiosk - PLP{% endblock %}
 
 <!-- Page content -->
 {% block content %}
@@ -30,7 +30,7 @@
             <i class="bi bi-arrow-left me-2"></i>Main Menu
         </a>
         <div class="text-end">
-            <h2 class="h4 text-gold mb-0">Student Access Point</h2>
+            <h2 class="h4 text-gold mb-0">Student Entrance</h2>
             <div class="live-clock badge bg-light bg-opacity-10 fw-normal py-2 px-3 mt-1">Connecting...</div>
         </div>
     </div>
@@ -73,20 +73,7 @@
 
         <!-- Right: Info Panel & Bulletin -->
         <div class="col-lg-6">
-            <!-- Student Search -->
-            <div class="card-glass p-4 mb-4">
-                <h4 class="h6 text-uppercase text-white-50 mb-3 border-bottom border-secondary pb-2">
-                    <i class="bi bi-search text-warning me-2"></i>Check Attendance
-                </h4>
-                <div class="input-group mb-3">
-                    <input type="text" id="search-id" class="form-control bg-transparent text-white border-secondary"
-                        placeholder="Enter Student ID (e.g., 2026-001)" aria-label="Student ID">
-                    <button class="btn btn-warning" type="button" onclick="checkStudentStatus()">Search</button>
-                </div>
-                <div id="search-result" class="d-none p-3 rounded bg-white bg-opacity-10">
-                    <!-- Result inserted by JS -->
-                </div>
-            </div>
+            <!-- Student Search tracking removed as requested -->
             <!-- Recent Activity -->
             <div class="card-glass p-4 mb-4">
                 <h4 class="h6 text-uppercase text-white-50 mb-3 border-bottom border-secondary pb-2">
@@ -139,7 +126,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content card-glass border-secondary">
             <div class="modal-header border-secondary">
-                <h5 class="modal-title text-white">Manual Attendance Entry</h5>
+                <h5 class="modal-title text-white">Manual Entry</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
                     aria-label="Close"></button>
             </div>
@@ -151,8 +138,6 @@
                 </div>
                 <div class="d-grid gap-2">
                     <button type="button" class="btn btn-success" onclick="submitManualEntry('entry')">Time In</button>
-                    <button type="button" class="btn btn-outline-light" onclick="submitManualEntry('exit')">Time
-                        Out</button>
                 </div>
             </div>
         </div>
@@ -170,19 +155,14 @@
                     aria-label="Close"></button>
             </div>
             <div class="modal-body p-0">
-                <!-- Inner Tabs -->
+                <!-- Tabs (Single tab now, for visuals) -->
                 <ul class="nav nav-pills nav-fill bg-dark bg-opacity-50 border-bottom border-secondary" id="visitorTabs"
                     role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active rounded-0 py-3 fw-bold text-uppercase" id="v-checkin-tab"
-                            data-bs-toggle="tab" data-bs-target="#v-checkin" type="button" role="tab">
-                            <i class="bi bi-box-arrow-in-right me-2"></i>Check In
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link rounded-0 py-3 fw-bold text-uppercase" id="v-checkout-tab"
-                            data-bs-toggle="tab" data-bs-target="#v-checkout" type="button" role="tab">
-                            <i class="bi bi-box-arrow-left me-2"></i>Check Out
+                            data-bs-toggle="tab" data-bs-target="#v-checkin" type="button" role="tab"
+                            style="cursor: default;">
+                            <i class="bi bi-box-arrow-in-right me-2"></i>Visitor Check In
                         </button>
                     </li>
                 </ul>
@@ -232,35 +212,7 @@
                         </form>
                     </div>
 
-                    <!-- Check Out List -->
-                    <div class="tab-pane fade" id="v-checkout" role="tabpanel">
-                        <div id="active-visitor-list"
-                            class="list-group list-group-flush border-secondary rounded mb-3 max-vh-50 overflow-auto">
-                            {% if active_visitors %}
-                            {% for v in active_visitors %}
-                            <form action="{{ url_for('visitor_checkout', visitor_id=v.id) }}?source=kiosk_student"
-                                method="POST">
-                                <button type="submit"
-                                    class="list-group-item list-group-item-action bg-transparent text-white border-secondary d-flex justify-content-between align-items-center p-3"
-                                    onclick="return confirm('Confirm check out for {{ v.name }}?')">
-                                    <div>
-                                        <h6 class="mb-1 fw-bold text-white">{{ v.name }}</h6>
-                                        <small class="text-white-50"><i class="bi bi-clock me-1"></i>Time In: {{
-                                            v.time_in }}</small>
-                                    </div>
-                                    <span class="badge bg-danger rounded-pill"><i
-                                            class="bi bi-box-arrow-left me-1"></i>Out</span>
-                                </button>
-                            </form>
-                            {% endfor %}
-                            {% else %}
-                            <div class="text-center py-4 text-white-50">
-                                <i class="bi bi-person-check display-4 mb-3 d-block opacity-50"></i>
-                                <p>No active visitors found.</p>
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
+                    <!-- Check Out List Removed as requested -->
                 </div>
             </div>
         </div>
