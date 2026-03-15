@@ -19,7 +19,15 @@ app.logger.setLevel(logging.DEBUG)
 app.logger.addHandler(logging.StreamHandler())
 app.logger.addHandler(logging.FileHandler('logs/app.log'))
 
+from flask_cors import CORS
 
+allowed_origins = [
+    "http://localhost:5000",
+    "http://127.0.0.1:5000",
+    "http://192.168.1.3:5000"
+]
+
+CORS(app, origins=allowed_origins)
 # ==============================================================================
 # MAIN ENTRY POINT
 # ==============================================================================
@@ -80,7 +88,7 @@ def user_authenticate():
         formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")
         
         # 1. AUTHENTICATE
-        db = Database(conn, (scan_id, scan_id))
+        db = Database(conn, (scan_id, scan_id, scan_id))
         result = db.authenticate_user()
 
         if not result or len(result) == 0:

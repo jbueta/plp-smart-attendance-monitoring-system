@@ -6,7 +6,7 @@
  */
 function submitManualEntry(type) {
     const idField = type === 'employee' ? 'manual-employee-id' : 'manual-student-id';
-    const id = document.getElementById(idField).value;
+    const id = document.getElementById(idField).value.trim();
 
     if (!id) {
         alert("Please enter an ID");
@@ -18,53 +18,43 @@ function submitManualEntry(type) {
     const modal = bootstrap.Modal.getInstance(modalEl);
     if (modal) modal.hide();
 
-    // Trigger Success Overlay with Manual Data
-    // showSuccessOverlay is defined in main.js
-    if (typeof showSuccessOverlay === 'function') {
-        showSuccessOverlay(type, {
-            id: id,
-            name: "Manual Entry" // In a real app, we'd fetch the name first
-        });
-    }
+    // Fetch student status first, then show appropriate banner
+    fetch('/api/check_student_status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ student_id: id })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'found') {
+            const bannerType = type === 'entry' ? 'in' : 'out';
+
+            // Show live feed banner (defined in kiosk_student.html)
+            if (typeof showScanBanner === 'function') {
+                showScanBanner(bannerType, {
+                    id:     id,
+                    name:   data.name,
+                    course: data.course
+                });
+            }
+
+            // Show full-screen overlay (defined in main.js)
+            if (typeof showSuccessOverlay === 'function') {
+                showSuccessOverlay(type, { id: id, name: data.name });
+            }
+
+        } else {
+            // ID not found — show red failed banner
+            if (typeof showScanBanner === 'function') {
+                showScanBanner('error', { id: id });
+            }
+        }
+    })
+    .catch(() => {
+        if (typeof showScanBanner === 'function') {
+            showScanBanner('error', { id: id });
+        }
+    });
 
     document.getElementById(idField).value = '';
-}
-
-/**
- * Check student status via API
- */
-async function checkStudentStatus() {
-    const id = document.getElementById('search-id').value;
-    const resultDiv = document.getElementById('search-result');
-
-    if (!id) return;
-
-    resultDiv.classList.remove('d-none');
-    resultDiv.innerHTML = '<div class="text-white-50"><span class="spinner-border spinner-border-sm me-2"></span>Checking...</div>';
-
-    try {
-        const response = await fetch('/api/check_student_status', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ student_id: id })
-        });
-        const data = await response.json();
-
-        if (data.status === 'found') {
-            let badgeClass = data.attendance_status === 'TIMED IN' ? 'bg-success' : 'bg-secondary';
-            resultDiv.innerHTML = `
-            <div class="d-flex align-items-center">
-                <div class="flex-grow-1">
-                    <h6 class="text-white mb-0">${data.name}</h6>
-                    <small class="text-white-50">${data.course}</small>
-                </div>
-                <span class="badge ${badgeClass}">${data.attendance_status}</span>
-            </div>
-        `;
-        } else {
-            resultDiv.innerHTML = `<div class="text-danger small"><i class="bi bi-x-circle me-1"></i>Student not found</div>`;
-        }
-    } catch (error) {
-        resultDiv.innerHTML = `<div class="text-danger small">Error connecting to server</div>`;
-    }
 }

@@ -21,12 +21,14 @@ class Database:
         try:
             query = """ 
                 SELECT u.user_id, u.role, u.active,
-                       COALESCE(s.student_id, e.employee_id) as scan_id,
-                       COALESCE(s.status, e.status) as current_status
+                       COALESCE(s.student_id, e.employee_id, v.visitor_id) as scan_id,
+                       COALESCE(s.status, e.status, v.status) as current_status
                 FROM users u 
                 LEFT JOIN students s ON u.user_id = s.user_id 
                 LEFT JOIN employees e ON u.user_id = e.user_id
-                WHERE s.student_id = %s OR e.employee_id = %s
+                LEFT JOIN visitors v ON u.user_id = v.user_id
+
+                WHERE s.student_id = %s OR e.employee_id = %s OR v.visitor_id = %s
             """
             self.cursor.execute(query, self.parameter)
             result = self.cursor.fetchall()
