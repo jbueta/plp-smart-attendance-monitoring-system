@@ -29,7 +29,12 @@ ADD_EVENT ()
   "time_end": "12:00:00",
   "location": "Room 404",
   =====================
-  "participants_type": "custom",
+  PS: (This should be automatic. If there is checked box in target Departments in the UI but nothing in custom participants, it should be "grouped". If there are no checked boxed
+      in target Departments but there is in custom, therefore "custom". If both have in them, checked boxes and file in custom, then is it "hybrid")
+
+  participants_type enum ("grouped", "custom", "hybrid")
+
+  "participants_type": "custom", 
   "grouped_participants": null,
   "custom_participants": ["23-00314", "23-00453", "23-00869"]
   =====================

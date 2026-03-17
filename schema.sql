@@ -24,8 +24,8 @@ CREATE TABLE IF NOT EXISTS reports (
     report_id INT(11) NOT NULL,
     report_name VARCHAR(100) NOT NULL,
     generated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    generated_by INT(11) NOT NULL
-    PRIMARY KEY (report_id)
+    generated_by INT(11) NOT NULL,
+    PRIMARY KEY (report_id),
     FOREIGN KEY (generated_by) REFERENCES users(user_id)
 );
 

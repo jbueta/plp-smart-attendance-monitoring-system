@@ -56,7 +56,7 @@ def connect_db():
             if global_pool is None:
                 g.db = None
             else:
-                g.db = global_pool.get_connection() # Borrow from pool
+                g.db = global_pool.get_connection()
         except Exception as err:
             print(f"Pool exhausted or error: {err}")
             g.db = None
@@ -65,7 +65,6 @@ def connect_db():
 def close_db(error):
     db = g.pop('db', None)
     if db is not None:
-        # returns used connection to the pool.
         db.close()
 
 @app.route('/admin/user/authentication', methods=['POST'])
@@ -75,6 +74,7 @@ def user_authenticate():
         print("Authenticating...")
         data = request.get_json()
 
+        print(data)
         if not data or not data.get('id'):
             return jsonify({"error": "ID is required. No ID string attached"}), 400
         
@@ -103,7 +103,6 @@ def user_authenticate():
         print(f"User found: ID {user_id}, Role: {role}, Status: {current_status}")
 
         # 3. CHANGE STATUS
-        # We now pass user_id, current_status, and role so it updates the correct table
         db_status_param = (user_id, current_status, role)
         db_status = Database(conn, db_status_param)
         
@@ -111,10 +110,19 @@ def user_authenticate():
         if not db_status_result:
             return jsonify({"success": False, "message": "Failed to update user status in database."}), 500
 
-        # 4. DETERMINE LOG TYPE & INSERT LOG
         new_status = db_status_result['status']
         log_type = 'Entry' if new_status == 'Inside' else 'Exit'
         gate = 'Gate 1' if new_status == 'Inside' else 'Gate 2'
+
+        violation = db_status_result['forgot_to_timeout']
+
+        # ==========================================
+        # SMTP: EMAILING MODULE FOR VIOLATION (optional)
+        # ==========================================
+
+        if forgot_to_checkout:
+            # Code goes through here
+            pass            
 
         log_params = (user_id, formatted_time, log_type, gate)
         db_insert_log = Database(conn, log_params)
@@ -125,13 +133,17 @@ def user_authenticate():
         if not db_insert_log_result:
             return jsonify({"success": False, "message": "Status changed, but failed to insert log."}), 500
 
-        return jsonify({"success": True, "message": f"User authenticated. Status updated to {new_status}."}), 200
+        return jsonify({
+            "success": True, 
+            "message": f"User authenticated. Status updated to {new_status}.", 
+            "status": "found",
+            "attendance_status": log_type
+        }), 200
 
     except Exception as e:
         return jsonify({"success": False, "message": f"Error during authentication: {str(e)}"}), 500
     
     finally:
-        # Always a good habit to close the connection if you are opening it per-route!
         if conn and conn.is_connected():
             conn.close()
 

@@ -44,20 +44,50 @@ class Database:
             current_status = self.parameter[1]
             role = self.parameter[2]
 
-            new_status = 'Outside' if current_status and current_status.lower() == 'inside' else 'Inside'
+            # check user last scanned
+            last_log_query = """
+                SELECT timestamp, log_type 
+                FROM general_log 
+                WHERE user_id = %s 
+                ORDER BY timestamp DESC LIMIT 1
+            """
+            self.cursor.execute(last_log_query, (user_id,))
+            last_log = self.cursor.fetchone()
+
+            new_status = 'Inside'
+            
+            now = datetime.now()
+            today_date = now.date()
+            forgot_to_timeout = False
+
+            if last_log:
+                last_time = last_log['timestamp']
+                last_type = last_log['log_type']
+                last_date = last_time.date()
+
+                if current_status.lower() == 'inside':
+                    if last_date < today_date:
+                        forgot_to_timeout = True
+                        new_status = 'Inside'
+                    else:
+                        new_status = 'Outside'
+                else:
+                    new_status = 'Inside'
+            else:
+                 new_status = 'Inside'
 
             if role == 'student':
                 query = "UPDATE students SET status = %s WHERE user_id = %s"
             elif role == 'employee':
                 query = "UPDATE employees SET status = %s WHERE user_id = %s"
             else:
-                query ="UPDATE visitors SET status = %s WHERE user_id = %s" 
+                query = "UPDATE visitors SET status = %s WHERE user_id = %s" 
 
             self.cursor.execute(query, (new_status, user_id))
             self.conn.commit()
 
             if self.cursor.rowcount > 0:
-                return {"message": "Status changed successfully!", "status": new_status}
+                return {"message": "Status changed successfully!", "status": new_status, "forgot_to_timeout": forgot_to_timeout}
             return None
             
         except connector.Error as err:

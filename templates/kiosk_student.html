@@ -297,7 +297,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 })
                 .catch(() => setCamStatus('Camera error — check permissions', 'text-danger'));
             })
-            .catch(() => setCamStatus('Camera permission denied', 'text-warning'));
+            .catch((err) => {
+            console.error("getCameras() failed:", err);
+            setCamStatus('Camera permission denied', 'text-warning');
+        });
     }
 
     function stopCamera() {
@@ -366,13 +369,13 @@ document.addEventListener('DOMContentLoaded', function () {
         .then(r => r.json())
         .then(data => {
             if (data.status === 'found') {
-                const type = data.attendance_status === 'TIMED IN' ? 'in' : 'out';
+                const type = data.attendance_status === 'Entry' ? 'in' : 'out';
                 showScanBanner(type, { id: scanned_id, name: scanned_name, course: scanned_department });
                 if (typeof showSuccessOverlay === 'function') {
                     showSuccessOverlay(type === 'in' ? 'entry' : 'exit', { id: scanned_id, name: scanned_name });
                 }
             } else {
-                console.error("🚨 FETCH COMPLETELY FAILED:", error);
+                console.error("🚨 FETCH COMPLETELY FAILED:", data.message);
                 showScanBanner('error', { id: scanned_id });
             }
         })
