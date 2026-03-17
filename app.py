@@ -51,7 +51,16 @@ MOCK_DASHBOARD_STATS = {
 
 MOCK_EMPLOYEE_STATS = {
     "attendance_data": [75, 20, 5], 
-    "tardiness_data": [15, 12, 5, 8, 25, 18, 10]
+    "tardiness_data": [15, 12, 5, 8, 25, 18, 10],
+    "dept_participation": [
+        {"name": "College of Education", "value": 85},
+        {"name": "College of Engineering", "value": 92},
+        {"name": "College of Nursing", "value": 78},
+        {"name": "Arts & Sciences", "value": 88},
+        {"name": "Business Admin", "value": 90}
+    ],
+    "avg_tardiness": "12 mins",
+    "on_time_rate": "88%"
 }
 
 MOCK_EMPLOYEE_LOGS = [
@@ -68,8 +77,15 @@ MOCK_STUDENT_STATS = {
     "currently_inside": "3,120",
     "avg_stay": "6.5 Hrs",
     "curfew_trigger": "09:40:00 PM",
-    "watchlist": []  # Empty for clear state
+    "watchlist": [],
+    "hourly_traffic": [300, 1800, 1500, 900, 700, 500, 900, 1200, 600, 400, 1200, 700]
 }
+
+MOCK_STUDENT_LOGS = [
+    {"id": "2026-0001", "name": "Juan Dela Cruz", "course": "BSCS", "time_in": "07:30 AM", "time_out": "05:00 PM", "status": "Out", "status_class": "secondary"},
+    {"id": "2026-0089", "name": "Maria Clara", "course": "BSN", "time_in": "08:15 AM", "time_out": "--:--", "status": "Inside", "status_class": "success"},
+    {"id": "2026-0152", "name": "Jose Rizal", "course": "BSA", "time_in": "07:45 AM", "time_out": "05:15 PM", "status": "Out", "status_class": "secondary"}
+]
 
 MOCK_KIOSK_DATA = {
     "bulletin": {
@@ -203,12 +219,12 @@ def visitor_checkin():
     else:
         flash('Check-in failed. Name and Purpose are required.', 'danger')
         
-    return redirect(url_for(source if source else 'kiosk_visitor'))
+    return redirect(url_for(source if source else 'kiosk_entrance'))
 
 @app.route('/api/visitor/checkout/<int:visitor_id>', methods=['POST'])
 def visitor_checkout(visitor_id):
     visitor = next((v for v in VISITORS if v['id'] == visitor_id), None)
-    source = request.args.get('source', 'kiosk_visitor')
+    source = request.args.get('source', 'kiosk_entrance')
     
     if visitor:
         visitor['status'] = 'Checked Out'
@@ -226,12 +242,28 @@ def visitor_checkout(visitor_id):
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    return render_template('dashboard.html', events=EVENTS, stats=MOCK_DASHBOARD_STATS)
+    # Pass structured stats for different tabs
+    return render_template('dashboard.html', 
+                           events=EVENTS, 
+                           overall_stats=MOCK_DASHBOARD_STATS,
+                           student_stats=MOCK_STUDENT_STATS,
+                           employee_stats=MOCK_EMPLOYEE_STATS,
+                           logs=MOCK_EMPLOYEE_LOGS)
 
 @app.route('/events')
 @login_required
 def manage_events():
     return render_template('events.html', events=EVENTS)
+
+@app.route('/admin/students')
+@login_required
+def admin_students():
+    return render_template('student_logs.html', logs=MOCK_STUDENT_LOGS)
+
+@app.route('/admin/employees')
+@login_required
+def admin_employees():
+    return render_template('employee_logs.html', logs=MOCK_EMPLOYEE_LOGS)
 
 @app.route('/admin/visitors')
 @login_required
@@ -241,12 +273,12 @@ def admin_visitors():
 @app.route('/analytics/employee')
 @login_required
 def analytics_employee():
-    return render_template('analytics_employee.html', events=EVENTS, stats=MOCK_EMPLOYEE_STATS, logs=MOCK_EMPLOYEE_LOGS)
+    return redirect(url_for('admin_employees'))
 
 @app.route('/analytics/students')
 @login_required
 def analytics_students():
-    return render_template('analytics_students.html', stats=MOCK_STUDENT_STATS)
+    return redirect(url_for('admin_students'))
 
 @app.route('/reports')
 @login_required

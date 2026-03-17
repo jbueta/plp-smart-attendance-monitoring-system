@@ -30,8 +30,8 @@
             <i class="bi bi-arrow-left me-2"></i>Main Menu
         </a>
         <div class="text-end">
-            <h2 class="h4 text-gold mb-0">Student Entrance</h2>
-            <div class="live-clock badge bg-light bg-opacity-10 fw-normal py-2 px-3 mt-1">Connecting...</div>
+            <h2 class="h1 text-gold fw-bold mb-0 tracking-wider">Student Entrance</h2>
+            <div class="live-clock fs-5 badge bg-light bg-opacity-10 fw-normal py-2 px-3 mt-1">Connecting...</div>
         </div>
     </div>
 
@@ -59,7 +59,7 @@
                 <!-- Hidden Input to catch exact scanner focus (optional, but global key listener added later) -->
 
                 <div class="mt-4 d-grid gap-2 d-md-flex justify-content-center">
-                    <button class="btn btn-outline-light rounded-pill px-4 text-white-50 small" data-bs-toggle="modal"
+                    <button class="btn btn-outline-light rounded-pill px-4 hover-text-dark small" data-bs-toggle="modal"
                         data-bs-target="#manualEntryModal">
                         <i class="bi bi-keyboard me-2"></i>Enter ID Manually
                     </button>
@@ -124,7 +124,7 @@
 <!-- Manual Entry Modal -->
 <div class="modal fade" id="manualEntryModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content card-glass border-secondary">
+        <div class="modal-content card-glass border-secondary" style="background: rgba(10, 20, 15, 0.95); backdrop-filter: blur(20px);">
             <div class="modal-header border-secondary">
                 <h5 class="modal-title text-white">Manual Entry</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
@@ -133,8 +133,8 @@
             <div class="modal-body">
                 <div class="mb-3">
                     <label for="manual-student-id" class="form-label text-white-50">Student ID Number</label>
-                    <input type="text" class="form-control bg-transparent text-white border-secondary"
-                        id="manual-student-id" placeholder="e.g. 2026-0001">
+                    <input type="text" class="form-control text-white border-secondary"
+                        id="manual-student-id" placeholder="e.g. 2026-0001" style="background: rgba(0,0,0,0.5);">
                 </div>
                 <div class="d-grid gap-2">
                     <button type="button" class="btn btn-success" onclick="submitManualEntry('entry')">Time In</button>
@@ -148,7 +148,7 @@
 <!-- Visitor Entry Modal -->
 <div class="modal fade" id="visitorModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content card-glass border-info">
+        <div class="modal-content card-glass portal-card border-info" style="background: rgba(10, 20, 15, 0.98); backdrop-filter: blur(20px);">
             <div class="modal-header border-secondary">
                 <h5 class="modal-title text-info"><i class="bi bi-person-lines-fill me-2"></i>Visitor Logging</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
@@ -171,7 +171,7 @@
                     <!-- Check In Form -->
                     <div class="tab-pane fade show active" id="v-checkin" role="tabpanel">
                         <form action="{{ url_for('visitor_checkin') }}" method="POST">
-                            <input type="hidden" name="source" value="kiosk_student">
+                            <input type="hidden" name="source" value="kiosk_entrance">
                             <div class="row g-3">
                                 <div class="col-md-6">
                                     <label class="form-label text-white-50">Full Name <span
@@ -236,6 +236,27 @@
         }
         setInterval(updateClock, 1000);
         updateClock();
+
+        // Check for flashed success messages (e.g. from visitor check-in)
+        {% with messages = get_flashed_messages(category_filter=["success"]) %}
+            {% if messages %}
+                {% for message in messages %}
+                // Wait a tiny bit for the page to render, then show overlay
+                setTimeout(() => {
+                    const msg = "{{ message }}";
+                    // ONLY trigger if this is a visitor check-in success message
+                    if (msg.includes("Check-in successful")) {
+                        let name = "Visitor";
+                        const nameMatch = msg.match(/Welcome, (.*?)\./);
+                        if (nameMatch && nameMatch[1]) {
+                            name = nameMatch[1];
+                        }
+                        showSuccessOverlay('entry', { id: 'VISITOR', name: name });
+                    }
+                }, 100);
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
 
         // Always Open Global Scanner listener
         let barcodeBuffer = "";
