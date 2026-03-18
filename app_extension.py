@@ -1,4 +1,4 @@
-print("FILE LOADED", flush=True)
+
 from datetime import date, datetime
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, request, g
@@ -10,7 +10,7 @@ import os
 import logging
 import mysql.connector as connector
 from mysql.connector import pooling
-
+from flask_cors import CORS
         
 app = Flask(__name__)
 app.secret_key = 'plp_secure_key_2026'  # Required for session management
@@ -18,8 +18,6 @@ app.secret_key = 'plp_secure_key_2026'  # Required for session management
 app.logger.setLevel(logging.DEBUG)
 app.logger.addHandler(logging.StreamHandler())
 app.logger.addHandler(logging.FileHandler('logs/app.log'))
-
-from flask_cors import CORS
 
 allowed_origins = [
     "http://localhost:5000",
@@ -100,6 +98,9 @@ def user_authenticate():
         role = user_data['role']
         current_status = user_data['current_status']
 
+        full_name = user_data.get('full_name', 'Unknown User')
+        affiliation = user_data.get('affiliation', 'N/A')
+
         print(f"User found: ID {user_id}, Role: {role}, Status: {current_status}")
 
         # 3. CHANGE STATUS
@@ -114,13 +115,13 @@ def user_authenticate():
         log_type = 'Entry' if new_status == 'Inside' else 'Exit'
         gate = 'Gate 1' if new_status == 'Inside' else 'Gate 2'
 
-        violation = db_status_result['forgot_to_timeout']
+        violation = db_status_result.get('forgot_to_timeout', False)
 
         # ==========================================
         # SMTP: EMAILING MODULE FOR VIOLATION (optional)
         # ==========================================
 
-        if forgot_to_checkout:
+        if violation:
             # Code goes through here
             pass            
 
@@ -137,7 +138,10 @@ def user_authenticate():
             "success": True, 
             "message": f"User authenticated. Status updated to {new_status}.", 
             "status": "found",
-            "attendance_status": log_type
+            "attendance_status": log_type,
+            "name": full_name,
+            "affiliation": affiliation,
+            "log_type": log_type
         }), 200
 
     except Exception as e:

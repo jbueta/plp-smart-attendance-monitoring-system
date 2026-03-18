@@ -1,24 +1,9 @@
-print("FILE LOADED", flush=True)
 from datetime import date, datetime
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, request, g
-from datetime import datetime
-from db_connect import Database
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 
-import json
-import os
-import logging
-import mysql.connector as connector
-from mysql.connector import pooling
-
-        
 app = Flask(__name__)
 app.secret_key = 'plp_secure_key_2026'  # Required for session management
-
-app.logger.setLevel(logging.DEBUG)
-app.logger.addHandler(logging.StreamHandler())
-app.logger.addHandler(logging.FileHandler('logs/app.log'))
-
 
 # ==============================================================================
 # MOCK DATA (Prototype State)
@@ -51,25 +36,37 @@ VISITORS = []
 MOCK_DASHBOARD_STATS = {
     "total_entries": "14,520",
     "entries_trend": "+12%",
-    "flag_ceremony_compliance": "87.5%",
-    "flag_ceremony_raw": "2,450 / 2,800",
+    "event_attendance_rate": "89.5%",
+    "event_attendance_raw": "2,506 / 2,800 Attendees",
     "currently_inside": "3,412",
+    "avg_dwell_time": "5 hrs 45 mins",
+    "peak_hour": "07:30 AM",
     "traffic_chart": [450, 2100, 1800, 1200, 900, 600, 1100, 1400, 800, 600, 1500, 900],
+    "dept_distribution": [35, 25, 20, 15, 5], # Percentages for top 5 depts
     "alerts": [
         {"type": "warning", "icon": "exclamation-triangle-fill", "title": "High Density: North Gate", "time": "15 minutes ago"},
-        {"type": "danger", "icon": "slash-circle-fill", "title": "Flag Ceremony < 70%", "time": "College of Arts"}
+        {"type": "info", "icon": "info-circle-fill", "title": "Peak Hour Detected", "time": "07:30 AM"}
     ]
 }
 
 MOCK_EMPLOYEE_STATS = {
-    "attendance_data": [60, 15, 15, 10], 
-    "tardiness_data": [15, 12, 5, 8, 25, 18, 10]
+    "attendance_data": [75, 20, 5], 
+    "tardiness_data": [15, 12, 5, 8, 25, 18, 10],
+    "dept_participation": [
+        {"name": "College of Education", "value": 85},
+        {"name": "College of Engineering", "value": 92},
+        {"name": "College of Nursing", "value": 78},
+        {"name": "Arts & Sciences", "value": 88},
+        {"name": "Business Admin", "value": 90}
+    ],
+    "avg_tardiness": "12 mins",
+    "on_time_rate": "88%"
 }
 
 MOCK_EMPLOYEE_LOGS = [
     {"initials": "JD", "name": "Juan Dela Cruz", "dept": "Civil Engineering", "in": "07:45 AM", "out": "05:00 PM", "status": "Present", "status_class": "success"},
     {"initials": "MS", "name": "Maria Santos", "dept": "College of Nursing", "in": "08:15 AM", "out": "--:--", "status": "Late +15m", "status_class": "warning"},
-    {"initials": "JR", "name": "Jose Rizal", "dept": "Arts & Letters", "in": "--:--", "out": "--:--", "status": "Absent", "status_class": "danger"}
+    {"initials": "AL", "name": "Antonio Luna", "dept": "Arts & Letters", "in": "08:30 AM", "out": "04:30 PM", "status": "Late", "status_class": "warning"}
 ]
 
 MOCK_STUDENT_STATS = {
@@ -80,8 +77,15 @@ MOCK_STUDENT_STATS = {
     "currently_inside": "3,120",
     "avg_stay": "6.5 Hrs",
     "curfew_trigger": "09:40:00 PM",
-    "watchlist": []  # Empty for clear state
+    "watchlist": [],
+    "hourly_traffic": [300, 1800, 1500, 900, 700, 500, 900, 1200, 600, 400, 1200, 700]
 }
+
+MOCK_STUDENT_LOGS = [
+    {"id": "2026-0001", "name": "Juan Dela Cruz", "course": "BSCS", "time_in": "07:30 AM", "time_out": "05:00 PM", "status": "Out", "status_class": "secondary"},
+    {"id": "2026-0089", "name": "Maria Clara", "course": "BSN", "time_in": "08:15 AM", "time_out": "--:--", "status": "Inside", "status_class": "success"},
+    {"id": "2026-0152", "name": "Jose Rizal", "course": "BSA", "time_in": "07:45 AM", "time_out": "05:15 PM", "status": "Out", "status_class": "secondary"}
+]
 
 MOCK_KIOSK_DATA = {
     "bulletin": {
@@ -156,11 +160,16 @@ def index():
     session.pop('logged_in', None)  # Auto-logout admin if they return to home
     return render_template('index.html')
 
-@app.route('/kiosk/student')
-def kiosk_student():
+@app.route('/kiosk/entrance')
+def kiosk_entrance():
     session.pop('logged_in', None)
     active_visitors = [v for v in VISITORS if v['status'] == 'Checked In']
-    return render_template('kiosk_student.html', active_visitors=active_visitors, kiosk_data=MOCK_KIOSK_DATA)
+    return render_template('kiosk_entrance.html', active_visitors=active_visitors, kiosk_data=MOCK_KIOSK_DATA)
+
+@app.route('/kiosk/exit')
+def kiosk_exit():
+    session.pop('logged_in', None)
+    return render_template('kiosk_exit.html', kiosk_data=MOCK_KIOSK_DATA)
 
 @app.route('/kiosk/employee/select-event')
 def kiosk_employee_select_event():
@@ -210,12 +219,12 @@ def visitor_checkin():
     else:
         flash('Check-in failed. Name and Purpose are required.', 'danger')
         
-    return redirect(url_for(source if source else 'kiosk_visitor'))
+    return redirect(url_for(source if source else 'kiosk_entrance'))
 
 @app.route('/api/visitor/checkout/<int:visitor_id>', methods=['POST'])
 def visitor_checkout(visitor_id):
     visitor = next((v for v in VISITORS if v['id'] == visitor_id), None)
-    source = request.args.get('source', 'kiosk_visitor')
+    source = request.args.get('source', 'kiosk_entrance')
     
     if visitor:
         visitor['status'] = 'Checked Out'
@@ -233,12 +242,28 @@ def visitor_checkout(visitor_id):
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    return render_template('dashboard.html', events=EVENTS, stats=MOCK_DASHBOARD_STATS)
+    # Pass structured stats for different tabs
+    return render_template('dashboard.html', 
+                           events=EVENTS, 
+                           overall_stats=MOCK_DASHBOARD_STATS,
+                           student_stats=MOCK_STUDENT_STATS,
+                           employee_stats=MOCK_EMPLOYEE_STATS,
+                           logs=MOCK_EMPLOYEE_LOGS)
 
 @app.route('/events')
 @login_required
 def manage_events():
     return render_template('events.html', events=EVENTS)
+
+@app.route('/admin/students')
+@login_required
+def admin_students():
+    return render_template('student_logs.html', logs=MOCK_STUDENT_LOGS)
+
+@app.route('/admin/employees')
+@login_required
+def admin_employees():
+    return render_template('employee_logs.html', logs=MOCK_EMPLOYEE_LOGS)
 
 @app.route('/admin/visitors')
 @login_required
@@ -248,17 +273,22 @@ def admin_visitors():
 @app.route('/analytics/employee')
 @login_required
 def analytics_employee():
-    return render_template('analytics_employee.html', events=EVENTS, stats=MOCK_EMPLOYEE_STATS, logs=MOCK_EMPLOYEE_LOGS)
+    return redirect(url_for('admin_employees'))
 
 @app.route('/analytics/students')
 @login_required
 def analytics_students():
-    return render_template('analytics_students.html', stats=MOCK_STUDENT_STATS)
+    return redirect(url_for('admin_students'))
 
 @app.route('/reports')
 @login_required
 def reports():
     return render_template('reports.html', events=EVENTS, reports=MOCK_REPORTS)
+
+@app.route('/reports/sample')
+@login_required
+def sample_report():
+    return render_template('sample_report.html', current_date=datetime.now().strftime('%B %d, %Y - %I:%M %p'))
 
 # ==============================================================================
 # ADMIN MANAGEMENT API
@@ -269,9 +299,24 @@ def reports():
 def add_event():
     name = request.form.get('name')
     etype = request.form.get('type')
-    dept = request.form.get('dept')
+    dept_list = request.form.getlist('dept')
+    custom_depts_raw = request.form.getlist('custom_dept')
     edate = request.form.get('date')
     time = request.form.get('time')
+    
+    # Format department string
+    if not dept_list or 'All Departments' in dept_list:
+        dept_str = 'All Departments'
+    else:
+        dept_str = ', '.join(dept_list)
+        
+    custom_depts = [c.strip() for c in custom_depts_raw if c.strip()]
+    if custom_depts:
+        custom_str = ', '.join(custom_depts)
+        if dept_str == 'All Departments':
+            dept_str = f"All Departments, {custom_str}"
+        else:
+            dept_str = f"{dept_str}, {custom_str}"
     
     if name and etype and edate and time:
         new_id = max([e['id'] for e in EVENTS]) + 1 if EVENTS else 1
@@ -279,7 +324,7 @@ def add_event():
             'id': new_id,
             'name': name,
             'type': etype,
-            'dept': dept or 'All Departments',
+            'dept': dept_str,
             'date': edate,
             'time': time
         })
@@ -366,123 +411,5 @@ def check_student_status():
 # MAIN ENTRY POINT
 # ==============================================================================
 
-pool = None
-def create_pool():
-    print("Creating database connection pool...")
-    dbconfig = {
-        'host': 'localhost',
-        'user': 'root',
-        'password': '',
-        'database': 'smart_monitoring',
-        'use_pure': True
-    }
-    try:
-        pool = pooling.MySQLConnectionPool (pool_name="main_entry_exit", pool_size=20, autocommit=True, **dbconfig)
-        print("Database connection pool created.")
-        return pool
-    except SystemExit as e:
-        print(f"S`ystemExit caught: {e}", flush=True)
-    except BaseException as e:
-        print(f"BaseException caught: {type(e).__name__}: {e}", flush=True)
-    except Exception as err:
-        print(f"Warning: Could not connect to database: {err}")
-        print("App will run in mock/offline mode.")
-
-def connect_db():
-    if 'db' not in g:        
-        try:
-            c_pool = create_pool()
-            if c_pool is None:
-                g.db = None
-            else:
-                g.db = c_pool.get_connection()
-        except Exception as err:
-            print(f"Pool exhausted or error: {err}")
-            g.db = None
-    return g.db
-
-@app.teardown_appcontext
-def close_db(error):
-    db = g.pop('db', None)
-    if db is not None:
-        # It simply returns used connection to the 'attendance_pool' so another request can use it.
-        db.close()
-
-@app.route('/authenticate', methods=['POST'])
-def authenticate():
-    try:
-        print("Authenticating...")
-        data = request.get_json()
-        # data = json.loads(data)
-
-        if not data:
-            return jsonify({"error": "No JSON data provided"}), 400
-
-        event = data.get('event') 
-        if not event:
-            return jsonify({"error": "Event is required"}), 400
-        
-        student_id = data.get('student_id')
-        if not student_id:
-            return jsonify({"error": "Student ID is required"}), 400
-        
-        conn = connect_db()
-        if not conn:
-            return jsonify({"success": False, "message": "Database offline"}), 500
-
-        now = datetime.now()
-        formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")
-        date = now.strftime("%Y-%m-%d")
-        parameter = (student_id,)
-        print(parameter)
-        db = Database(conn, parameter)
-        result = db.authenticate_user()
-
-        if not result or len(result) == 0:
-            return jsonify({"Invalid": "Student does not found!"}), 404
-        elif result and len(result) > 0:
-
-            # =========================================================
-            # # CHECKING LOGS FOR STUDENT STATUS
-            # =========================================================
-            print("Getting student status...")
-
-            status = result[0]['status']
-            db_status_param = (student_id, status)
-            db_status = Database(conn, db_status_param)
-
-            # =========================================================
-            # # CHANGING STUDENT STATUS
-            # =========================================================
-            try:
-                db_status_result = db_status.change_status()
-            except Exception as e:
-                return jsonify({"success": False, "message": f"Error changing status: {e}"}), 500  # Internal Server Error status 
-                
-            if db_status_result['status'] == 'Inside':
-                log_type = 'Entry'
-                gate = 'Gate 1'
-            elif db_status_result['status'] == 'Outside':
-                log_type = 'Exit'
-                gate = 'Gate 2'
-
-            user_id = result[0]['user_id']
-            log_params = (user_id, formatted_time, log_type, gate)
-            db_insert_log = Database(conn, log_params)
-            print("Inserting log...")
-
-            try:
-                db_insert_log_result = db_insert_log.insert_general_log()
-            except Exception as e:
-                return jsonify({"success": False, "message": f"Error inserting log: {e}"}), 500  # Internal Server Error status 
-
-            return jsonify({"success": True, "message": "User authenticated and log updated"}), 200
-
-    except Exception as e:
-            return jsonify({"success": False, "message": f"Error during authentication: {str(e)}"}), 500
-    
 if __name__ == '__main__':
-    # ssl_context='adhoc' enables HTTPS so the browser allows camera access.
-    # Requires: pip install pyopenssl
-    # Access via: https://192.168.1.15:5000  (click Advanced → Proceed on the warning)
     app.run(debug=True, host='0.0.0.0', port=5000)

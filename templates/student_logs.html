@@ -2,7 +2,7 @@
 {% extends "base.html" %}
 
 <!-- Page title -->
-{% block title %}Visitor Logs - PLP Admin{% endblock %}
+{% block title %}Student Logs - PLP Admin{% endblock %}
 
 <!-- Page content -->
 {% block content %}
@@ -16,9 +16,9 @@
     <ul class="nav nav-pills flex-column mb-auto">
         <li><a href="{{ url_for('dashboard') }}" class="nav-link"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
         <li><a href="{{ url_for('manage_events') }}" class="nav-link"><i class="bi bi-calendar-event"></i> Events</a></li>
-        <li><a href="{{ url_for('admin_visitors') }}" class="nav-link active"><i class="bi bi-person-lines-fill"></i> Visitors</a></li>
+        <li><a href="{{ url_for('admin_visitors') }}" class="nav-link"><i class="bi bi-person-lines-fill"></i> Visitors</a></li>
         <li><a href="{{ url_for('admin_employees') }}" class="nav-link"><i class="bi bi-person-badge"></i> Employees</a></li>
-        <li><a href="{{ url_for('admin_students') }}" class="nav-link"><i class="bi bi-mortarboard"></i> Students</a></li>
+        <li><a href="{{ url_for('admin_students') }}" class="nav-link active"><i class="bi bi-mortarboard"></i> Students</a></li>
         <li><a href="{{ url_for('reports') }}" class="nav-link"><i class="bi bi-file-earmark-bar-graph"></i> Reports</a></li>
     </ul>
     <hr>
@@ -31,61 +31,62 @@
 
 <!-- Main Content -->
 <div class="main-content flex-grow-1">
-    <div
-        class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4 border-bottom border-secondary">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4 border-bottom border-secondary">
         <div>
-            <h1 class="h2">Visitor Logs</h1>
-            <p class="text-white-50 mb-0">Monitor guest entry and exit records.</p>
+            <h1 class="h2">Student Activity Logs</h1>
+            <p class="text-white-50 mb-0">Detailed list of student campus entry and exit records.</p>
         </div>
-        <div class="d-flex gap-2 mb-2 mb-md-0">
+        <div class="d-flex gap-2">
             <div class="input-group input-group-sm" style="width: 200px;">
                 <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
-                <input type="text" class="form-control bg-dark text-white border-secondary" placeholder="Search Visitor...">
+                <input type="text" class="form-control bg-dark text-white border-secondary" placeholder="Search ID or Name...">
             </div>
+            <select class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
+                <option selected>All Courses</option>
+                <option>BSCS</option>
+                <option>BSN</option>
+                <option>BSA</option>
+                <option>BSEd</option>
+            </select>
             <input type="date" class="form-control form-control-sm bg-dark text-white border-secondary w-auto">
             <button type="button" class="btn btn-sm btn-primary-gold px-3"><i class="bi bi-filter me-1"></i>Apply</button>
             <button type="button" class="btn btn-sm btn-outline-light"><i class="bi bi-download me-1"></i>Export</button>
         </div>
     </div>
 
-    <!-- Visitor Table -->
+    <!-- Student Logs Table -->
     <div class="card-glass p-0 mb-4 overflow-hidden">
         <div class="table-responsive">
             <table class="table table-dark-glass table-hover align-middle mb-0">
                 <thead>
                     <tr>
-                        <th class="ps-4">Visitor Name</th>
-                        <th>Purpose</th>
-                        <th>Details</th>
-                        <th>Date</th>
+                        <th class="ps-4">Student ID</th>
+                        <th>Name</th>
+                        <th>Course</th>
                         <th>Time In</th>
                         <th>Time Out</th>
                         <th class="text-end pe-4">Status</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for visitor in visitors %}
+                    {% for log in logs %}
                     <tr>
-                        <td class="fw-bold text-white ps-4">{{ visitor.name }}</td>
-                        <td>{{ visitor.purpose }}</td>
-                        <td class="text-white-50 small">{{ visitor.details }}</td>
-                        <td class="text-white-50 font-monospace small">{{ visitor.date }}</td>
-                        <td class="text-success font-monospace small">{{ visitor.time_in }}</td>
-                        <td class="text-danger font-monospace small">{{ visitor.time_out or '--:--' }}</td>
+                        <td class="font-monospace text-white-50 ps-4">{{ log.id }}</td>
+                        <td class="fw-bold text-white">{{ log.name }}</td>
+                        <td class="text-white-50">{{ log.course }}</td>
+                        <td class="text-success font-monospace small">{{ log.time_in }}</td>
+                        <td class="text-danger font-monospace small">{{ log.time_out }}</td>
                         <td class="text-end pe-4">
-                            {% if visitor.status == 'Checked In' %}
-                            <span
-                                class="badge bg-success bg-opacity-25 border border-success text-success">Active</span>
-                            {% else %}
-                            <span class="badge bg-secondary bg-opacity-25 border border-secondary">Completed</span>
-                            {% endif %}
+                            <span class="badge bg-{{ log.status_class }} bg-opacity-25 border border-{{ log.status_class }} text-{{ log.status_class }} rounded-pill px-3">
+                                {{ log.status }}
+                            </span>
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="7" class="text-center text-white-50 py-5">
-                            <i class="bi bi-clipboard-x display-4 d-block mb-3"></i>
-                            No visitor records found.
+                        <td colspan="6" class="text-center text-white-50 py-5">
+                            <i class="bi bi-inbox display-4 d-block mb-3"></i>
+                            No activity logs recorded for this period.
                         </td>
                     </tr>
                     {% endfor %}

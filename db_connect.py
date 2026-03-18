@@ -22,7 +22,9 @@ class Database:
             query = """ 
                 SELECT u.user_id, u.role, u.active,
                        COALESCE(s.student_id, e.employee_id, v.visitor_id) as scan_id,
-                       COALESCE(s.status, e.status, v.status) as current_status
+                       COALESCE(s.status, e.status, v.status) as current_status,
+                       COALESCE(CONCAT(s.first_name, ' ', s.last_name), CONCAT(e.first_name, ' ', e.last_name), v.name) as full_name,
+                       COALESCE(s.course, e.department, 'Visitor') as affiliation
                 FROM users u 
                 LEFT JOIN students s ON u.user_id = s.user_id 
                 LEFT JOIN employees e ON u.user_id = e.user_id

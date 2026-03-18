@@ -29,22 +29,22 @@
         <a href="{{ url_for('kiosk_employee', event_id=event.id) }}" class="text-decoration-none">
             <div class="card-glass p-4 h-100 transition-hover border-gold-subtle text-center">
                 <div class="mb-3">
-                    {% if event.type == 'Ceremony' %}
-                    <i class="bi bi-flag text-warning display-4"></i>
+                    {% if 'flag' in event.name|lower or 'ceremony' in event.name|lower or 'retreat' in event.name|lower %}
+                    <i class="bi bi-flag-fill text-info display-4"></i>
                     {% elif event.type == 'Meeting' %}
-                    <i class="bi bi-people text-info display-4"></i>
+                    <i class="bi bi-people-fill text-success display-4"></i>
                     {% elif event.type == 'Training' %}
-                    <i class="bi bi-easel text-primary display-4"></i>
+                    <i class="bi bi-easel2-fill text-primary display-4"></i>
                     {% elif event.type == 'Seminar' %}
-                    <i class="bi bi-mic text-danger display-4"></i>
+                    <i class="bi bi-mic-fill text-warning display-4"></i>
                     {% elif event.type == 'Workshop' %}
-                    <i class="bi bi-tools text-success display-4"></i>
+                    <i class="bi bi-tools text-secondary display-4"></i>
                     {% elif event.type == 'Drill' %}
-                    <i class="bi bi-exclamation-triangle text-warning display-4"></i>
+                    <i class="bi bi-megaphone-fill text-danger display-4"></i>
                     {% elif event.type == 'Activity' %}
-                    <i class="bi bi-emoji-smile text-secondary display-4"></i>
+                    <i class="bi bi-balloon-fill text-white display-4"></i>
                     {% else %}
-                    <i class="bi bi-calendar-event text-light display-4"></i>
+                    <i class="bi bi-calendar-event-fill text-success display-4"></i>
                     {% endif %}
                 </div>
                 <h3 class="h5 text-white fw-bold mb-2">{{ event.name }}</h3>
@@ -52,8 +52,9 @@
                 {% if event.date %}
                 <div class="text-white-50 small mb-1"><i class="bi bi-calendar-event me-2"></i>{{ event.date }}</div>
                 {% endif %}
-                {% if event.time %}
-                <div class="text-white-50 small"><i class="bi bi-clock me-2"></i>{{ event.time }}</div>
+                {% if event.time_start and event.time_end %}
+                <div class="text-white-50 small"><i class="bi bi-clock me-2"></i>{{ event.time_start }} Start</div>
+                <div class="text-white-50 small"><i class="bi bi-clock me-2"></i>{{ event.time_end }} End</div>
                 {% endif %}
                 <div class="text-white-50 small mb-0">
                     {% if event.dept and event.dept != 'All Departments' %}
@@ -69,7 +70,7 @@
 
 <!-- Back Button -->
 <div class="text-center mt-5">
-    <a href="{{ url_for('index') }}" class="btn btn-outline-light rounded-pill px-4">
+    <a href="{{ url_for('index') }}" class="btn btn-outline-light rounded-pill px-4 hover-text-dark">
         <i class="bi bi-arrow-left me-2"></i>Back to Main Menu
     </a>
 </div>
