@@ -178,14 +178,16 @@ class Database:
         try:
             if self.parameter[2] == 'WEEKLY':
                 query = """INSERT IGNORE INTO events 
-                           (event_name, event_type, frequency, day, start_date, 
-                           end_date, time_start, time_end, location, active) 
+                           (event_name, event_type, frequency, day, event_date,
+                            time_start, time_end, location, active) 
                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
-                params = (self.parameter[0], self.parameter[1], self.parameter[2], self.parameter[3], self.parameter[4], self.parameter[5], self.parameter[6], self.parameter[7], self.parameter[8], 1)
+                params = (self.parameter[0], self.parameter[1], self.parameter[2], self.parameter[3], self.parameter[4], self.parameter[5], self.parameter[6], self.parameter[7], 1)
 
             else:
-                query = """INSERT IGNORE INTO events (event_name, event_type, start_date, end_date, time_start, time_end, location, active) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
-                params = (self.parameter[0], self.parameter[1], self.parameter[4], self.parameter[5], self.parameter[6], self.parameter[7], self.parameter[8], 1)
+                query = """INSERT IGNORE INTO events 
+                           (event_name, event_type, frequency, event_date, time_start, time_end, location, active) 
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
+                params = (self.parameter[0], self.parameter[1], self.parameter[2], self.parameter[4], self.parameter[5], self.parameter[6], self.parameter[7], 1)
 
             self.cursor.execute(query, params)
             rows_affected = self.cursor.rowcount
@@ -352,7 +354,7 @@ class Database:
 
     def check_events(self):
             try:
-                query = """ SELECT event_id FROM events 
+                query = """ SELECT event_id, event_date FROM events 
                             WHERE active = 1 
                             AND (
                                 (frequency = 'WEEKLY' AND day = %s) 
