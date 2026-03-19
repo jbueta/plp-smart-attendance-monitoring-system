@@ -1,34 +1,3 @@
--- ==============================================================================
--- PLP Smart Monitoring System - Database Schema
--- ==============================================================================
-
--- ======================================================================
--- 1. BASE ENTITIES
--- ======================================================================
-
-CREATE TABLE IF NOT EXISTS courses (
-    course_id INT(11) NOT NULL,
-    course_name VARCHAR(100) NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (course_id)
-);
-
-CREATE TABLE IF NOT EXISTS departments (
-    department_id INT(11) NOT NULL,
-    name VARCHAR(100) NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (department_id)
-);
-
-CREATE TABLE IF NOT EXISTS reports (
-    report_id INT(11) NOT NULL,
-    report_name VARCHAR(100) NOT NULL,
-    generated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    generated_by INT(11) NOT NULL,
-    PRIMARY KEY (report_id),
-    FOREIGN KEY (generated_by) REFERENCES users(user_id)
-);
-
 -- ======================================================================
 -- 2. USER TABLES
 -- ======================================================================
@@ -150,4 +119,35 @@ CREATE TABLE IF NOT EXISTS general_log (
     gate ENUM('Gate 1','Gate 2','Gate 3') DEFAULT NULL,
     PRIMARY KEY (log_id),
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL
+);
+
+-- ==============================================================================
+-- PLP Smart Monitoring System - Database Schema
+-- ==============================================================================
+
+-- ======================================================================
+-- 1. BASE ENTITIES
+-- ======================================================================
+
+CREATE TABLE IF NOT EXISTS courses (
+    course_id INT(11) NOT NULL,
+    course_name VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (course_id)
+);
+
+CREATE TABLE IF NOT EXISTS departments (
+    department_id INT(11) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (department_id)
+);
+
+CREATE TABLE IF NOT EXISTS reports (
+    report_id INT(11) NOT NULL,
+    report_name VARCHAR(100) NOT NULL,
+    generated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    generated_by INT(11) NOT NULL,
+    PRIMARY KEY (report_id),
+    FOREIGN KEY (generated_by) REFERENCES users(user_id)
 );
