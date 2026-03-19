@@ -1,4 +1,4 @@
-print("FILE LOADED", flush=True)
+
 from datetime import date, datetime
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, request, g
@@ -10,7 +10,7 @@ import os
 import logging
 import mysql.connector as connector
 from mysql.connector import pooling
-
+from flask_cors import CORS
         
 app = Flask(__name__)
 app.secret_key = 'plp_secure_key_2026'  # Required for session management
@@ -18,8 +18,6 @@ app.secret_key = 'plp_secure_key_2026'  # Required for session management
 app.logger.setLevel(logging.DEBUG)
 app.logger.addHandler(logging.StreamHandler())
 app.logger.addHandler(logging.FileHandler('logs/app.log'))
-
-from flask_cors import CORS
 
 allowed_origins = [
     "http://localhost:5000",
@@ -56,7 +54,7 @@ def connect_db():
             if global_pool is None:
                 g.db = None
             else:
-                g.db = global_pool.get_connection() # Borrow from pool
+                g.db = global_pool.get_connection()
         except Exception as err:
             print(f"Pool exhausted or error: {err}")
             g.db = None
@@ -65,7 +63,6 @@ def connect_db():
 def close_db(error):
     db = g.pop('db', None)
     if db is not None:
-        # returns used connection to the pool.
         db.close()
 
 @app.route('/admin/user/authentication', methods=['POST'])
@@ -75,6 +72,7 @@ def user_authenticate():
         print("Authenticating...")
         data = request.get_json()
 
+        print(data)
         if not data or not data.get('id'):
             return jsonify({"error": "ID is required. No ID string attached"}), 400
         
@@ -100,10 +98,12 @@ def user_authenticate():
         role = user_data['role']
         current_status = user_data['current_status']
 
+        full_name = user_data.get('full_name', 'Unknown User')
+        affiliation = user_data.get('affiliation', 'N/A')
+
         print(f"User found: ID {user_id}, Role: {role}, Status: {current_status}")
 
         # 3. CHANGE STATUS
-        # We now pass user_id, current_status, and role so it updates the correct table
         db_status_param = (user_id, current_status, role)
         db_status = Database(conn, db_status_param)
         
@@ -111,10 +111,19 @@ def user_authenticate():
         if not db_status_result:
             return jsonify({"success": False, "message": "Failed to update user status in database."}), 500
 
-        # 4. DETERMINE LOG TYPE & INSERT LOG
         new_status = db_status_result['status']
         log_type = 'Entry' if new_status == 'Inside' else 'Exit'
         gate = 'Gate 1' if new_status == 'Inside' else 'Gate 2'
+
+        violation = db_status_result.get('forgot_to_timeout', False)
+
+        # ==========================================
+        # SMTP: EMAILING MODULE FOR VIOLATION (optional)
+        # ==========================================
+
+        if violation:
+            # Code goes through here
+            pass            
 
         log_params = (user_id, formatted_time, log_type, gate)
         db_insert_log = Database(conn, log_params)
@@ -125,13 +134,20 @@ def user_authenticate():
         if not db_insert_log_result:
             return jsonify({"success": False, "message": "Status changed, but failed to insert log."}), 500
 
-        return jsonify({"success": True, "message": f"User authenticated. Status updated to {new_status}."}), 200
+        return jsonify({
+            "success": True, 
+            "message": f"User authenticated. Status updated to {new_status}.", 
+            "status": "found",
+            "attendance_status": log_type,
+            "name": full_name,
+            "affiliation": affiliation,
+            "log_type": log_type
+        }), 200
 
     except Exception as e:
         return jsonify({"success": False, "message": f"Error during authentication: {str(e)}"}), 500
     
     finally:
-        # Always a good habit to close the connection if you are opening it per-route!
         if conn and conn.is_connected():
             conn.close()
 

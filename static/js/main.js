@@ -61,7 +61,7 @@ function showSuccessOverlay(type, manualData = null) {
         name = manualData.name || "Unknown User";
         id = manualData.id || "N/A";
         // Dept is mocked for manual entry for now
-        dept = "Manual Entry";
+        dept = manualData.affiliation
     }
 
     overlayName.innerText = name;

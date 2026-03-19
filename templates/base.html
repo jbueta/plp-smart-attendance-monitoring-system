@@ -17,6 +17,8 @@
 </head>
 
 <body class="{% block body_class %}{% endblock %}">
+    <!-- Overlay for background dimming -->
+    <div class="vignette-overlay"></div>
 
     <!-- Main Content Block - To be overridden by child templates -->
     {% block content %}{% endblock %}
@@ -29,7 +31,7 @@
     {% block extra_js %}{% endblock %}
     <!-- Custom Simulation -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- <script src="{{ url_for('static', filename='js/simulation.js') }}"></script> -->
+    <script src="{{ url_for('static', filename='js/simulation.js') }}"></script>
 </body>
 
 </html>
