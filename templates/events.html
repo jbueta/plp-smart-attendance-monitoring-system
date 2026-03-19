@@ -275,7 +275,6 @@
                         </div>
                     </div>
                     <div class="row g-3 mb-3">
-<<<<<<< Updated upstream
                         <div class="col-md-3">
                             <label class="form-label text-white-50" id="date-label">Event Date <span class="text-danger">*</span></label>
                             
@@ -308,28 +307,6 @@
                                 <option value="once">One-time</option>
                                 <option value="daily">Daily</option>
                                 <option value="weekly">Weekly</option>
-=======
-                        <!-- Date & Time Row -->
-                        <div class="col-md-4">
-                            <label class="form-label text-white-50">Event Date <span
-                                    class="text-danger">*</span></label>
-                            <input type="date" name="date" class="form-control bg-dark text-white border-secondary"
-                                required>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label text-white-50">Schedule Time <span
-                                    class="text-danger">*</span></label>
-                            <input type="time" name="time" class="form-control bg-dark text-white border-secondary"
-                                required>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label text-white-50">Frequency</label>
-                            <select name="frequency" class="form-select bg-dark text-white border-secondary">
-                                <option value="once">One-time</option>
-                                <option value="daily">Daily</option>
-                                <option value="weekly">Weekly</option>
-                                <option value="monthly">Monthly</option>
->>>>>>> Stashed changes
                             </select>
                         </div>
                     </div>
@@ -405,7 +382,6 @@
 <script src="{{ url_for('static', filename='js/events.js') }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-<<<<<<< Updated upstream
 
         // Dynamic Frequency / Date Toggle Logic
         const frequencySelect = document.getElementById('event-frequency');
@@ -460,8 +436,6 @@
             });
         }
 
-=======
->>>>>>> Stashed changes
         // Toggle logic for department checkboxes
         const allDeptCheck = document.getElementById('dept-all');
         const deptChecks = document.querySelectorAll('.dept-cb');

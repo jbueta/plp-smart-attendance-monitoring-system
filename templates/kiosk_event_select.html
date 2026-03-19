@@ -77,3 +77,98 @@
 
 </div>
 {% endblock %}
+
+{% block extra_js %}
+<script>
+    function fetchLiveEvents() {
+        fetch('/api/kiosk/live-events')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    updateEventsGrid(data.events);
+                }
+            })
+            .catch(error => console.error("Error fetching live events:", error));
+    }
+
+    function updateEventsGrid(events) {
+        // Find the container where the events are held
+        // Notice I added an ID 'events-grid-container' below. We need to add that to your HTML.
+        const gridContainer = document.getElementById('events-grid-container');
+        if (!gridContainer) return;
+
+        let htmlContent = '';
+
+        // If there are 2 or fewer events, show the info message
+        if (events.length <= 2) {
+            htmlContent += `
+                <div class="col-12 text-center mb-4">
+                    <div class="alert alert-info bg-opacity-10 border-info text-info d-inline-block px-4">
+                        <i class="bi bi-info-circle me-2"></i>No additional events scheduled at this time.
+                    </div>
+                </div>
+            `;
+        }
+
+        // Loop through the events and build the cards
+        events.forEach(event => {
+            // Determine the correct icon based on event name/type
+            let iconClass = 'bi-calendar-event-fill text-success'; // Default
+            const nameLower = event.name.toLowerCase();
+            
+            if (nameLower.includes('flag') || nameLower.includes('ceremony') || nameLower.includes('retreat')) {
+                iconClass = 'bi-flag-fill text-info';
+            } else if (event.type === 'Meeting') {
+                iconClass = 'bi-people-fill text-success';
+            } else if (event.type === 'Training') {
+                iconClass = 'bi-easel2-fill text-primary';
+            } else if (event.type === 'Seminar') {
+                iconClass = 'bi-mic-fill text-warning';
+            } else if (event.type === 'Workshop') {
+                iconClass = 'bi-tools text-secondary';
+            } else if (event.type === 'Drill') {
+                iconClass = 'bi-megaphone-fill text-danger';
+            } else if (event.type === 'Activity') {
+                iconClass = 'bi-balloon-fill text-white';
+            }
+
+            // Safely handle optional fields
+            const dateHtml = event.date ? `<div class="text-white-50 small mb-1"><i class="bi bi-calendar-event me-2"></i>${event.date}</div>` : '';
+            const timeStartHtml = event.time_start ? `<div class="text-white-50 small"><i class="bi bi-clock me-2"></i>${event.time_start} Start</div>` : '';
+            const timeEndHtml = event.time_end ? `<div class="text-white-50 small"><i class="bi bi-clock me-2"></i>${event.time_end} End</div>` : '';
+            const deptHtml = (event.dept && event.dept !== 'All Departments') ? `<span class="d-block mb-1 text-info">${event.dept}</span>` : '';
+
+            // Construct the card HTML
+            // Note: We need to reconstruct the url manually since url_for is a Jinja function that runs on the server.
+            const eventUrl = `/kiosk/employee?event_id=${event.id}`;
+
+            htmlContent += `
+                <div class="col-md-6 col-lg-4">
+                    <a href="${eventUrl}" class="text-decoration-none">
+                        <div class="card-glass p-4 h-100 transition-hover border-gold-subtle text-center">
+                            <div class="mb-3">
+                                <i class="bi ${iconClass} display-4"></i>
+                            </div>
+                            <h3 class="h5 text-white fw-bold mb-2">${event.name}</h3>
+                            <div class="badge bg-white bg-opacity-10 text-white border border-secondary mb-3">${event.type}</div>
+                            ${dateHtml}
+                            ${timeStartHtml}
+                            ${timeEndHtml}
+                            <div class="text-white-50 small mb-0">
+                                ${deptHtml}
+                                Click to enter attendance kiosk.
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            `;
+        });
+
+        // Inject the new HTML into the container
+        gridContainer.innerHTML = htmlContent;
+    }
+
+    // Check for new events every 5 seconds
+    setInterval(fetchLiveEvents, 5000);
+</script>
+{% endblock %}

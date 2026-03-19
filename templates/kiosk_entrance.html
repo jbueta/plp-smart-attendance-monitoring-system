@@ -303,10 +303,10 @@
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
-                            const logType = data.attendance_status?.toLowerCase() || 'entry';
+                            const logType = data.attendance_status ? data.attendance_status.toLowerCase() : 'exit';
+                            const bannerType = logType === 'entry' ? 'in' : 'out';
                             
                             if (typeof showScanBanner === 'function') {
-                                const bannerType = logType === 'entry' ? 'in' : 'out';
                                 showScanBanner(bannerType, {
                                     id: extractedId,
                                     name: data.name,

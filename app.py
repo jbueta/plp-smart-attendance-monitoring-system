@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 
 app = Flask(__name__)
 app.secret_key = 'plp_secure_key_2026'  # Required for session management
@@ -406,6 +406,18 @@ def check_student_status():
             'attendance_status': student['status']
         }
     return {'status': 'not_found'}
+
+
+# ==============================================================================
+# LIVE API ENDPOINT
+# ==============================================================================
+
+@app.route('/api/kiosk/live-events')
+def api_live_events():
+    return jsonify({
+        "status": "success",
+        "events": EVENTS
+    })
 
 # ==============================================================================
 # MAIN ENTRY POINT

@@ -303,19 +303,30 @@
                             id: extractedId,
                         })
                     })
-                    .then(response => response.json())
+                    .then(r => {
+                        if (!r.ok && r.status !== 404) throw new Error('Server error');
+                        return r.json();
+                    })
                     .then(data => {
                         if (data.success) {
-                            // Determine if it was an entry or exit based on DB response
-                            const logType = data.attendance_status?.toLowerCase() || 'entry';
+                            const logType = data.attendance_status ? data.attendance_status.toLowerCase() : 'entry';
+                            const bannerType = logType === 'exit' ? 'out' : 'in';
                             
+                            if (typeof showScanBanner === 'function') {
+                                showScanBanner(bannerType, {
+                                    id: extractedId,
+                                    name: data.name,
+                                    course: data.affiliation
+                                });
+                            }
+
                             showSuccessOverlay(logType, { 
                                 id: extractedId, 
                                 name: data.name, 
                                 affiliation: data.affiliation 
                             });
+                            
                         } else {
-                            // Rejected by Backend
                             frame.style.borderColor = '#ef4444'; 
                             feedText.innerText = data.message || "SCAN FAILED";
                         }

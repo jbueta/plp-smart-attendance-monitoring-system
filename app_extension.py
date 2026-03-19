@@ -141,15 +141,13 @@ def user_authenticate():
             "attendance_status": log_type,
             "name": full_name,
             "affiliation": affiliation,
-            "log_type": log_type
         }), 200
 
     except Exception as e:
         return jsonify({"success": False, "message": f"Error during authentication: {str(e)}"}), 500
     
     finally:
-        if conn and conn.is_connected():
-            conn.close()
+        close_db(conn)
 
 
 # ==============================================================================
@@ -168,7 +166,7 @@ def add_events():
         if not data:
             return jsonify({"error": "No JSON data provided"}), 400
 
-        required_fields = ['event_name', 'event_type', 'frequency', 'location', 'start_date', 'end_date', 'time_start', 'time_end', 'participants_type']
+        required_fields = ['event_name', 'event_type', 'frequency', 'location', 'event_date', 'time_start', 'time_end', 'participants_type']
         missing_fields = [field for field in required_fields if not data.get(field)]
         if missing_fields:
             return jsonify({"success": False, "error": f"Missing required fields: {', '.join(missing_fields)}"}), 400
@@ -193,16 +191,16 @@ def add_events():
             case _:
                 return jsonify({"success": False, "error": "Invalid participants type"}), 400
 
-        sd = data.get('start_date')
-        ed = data.get('end_date')
+        ed = data.get('event_date')
+        cd = date.today()
 
         try:
-            start_date_obj = datetime.strptime(sd, '%Y-%m-%d').date()
-            end_date_obj = datetime.strptime(ed, '%Y-%m-%d').date()
+            event_date = datetime.strptime(sd, '%Y-%m-%d').date()
+            current_date = datetime.strptime(cd, '%Y-%m-%d').date()
         except ValueError:
             return jsonify({"success": False, "error": "Invalid date format. Use YYYY-MM-DD"}), 400
             
-        if start_date_obj > end_date_obj:
+        if event_date > current_date:
             return jsonify({"success": False, "error": "Start Date cannot be after End Date"}), 400
 
         frequency = data.get('frequency')
@@ -217,13 +215,12 @@ def add_events():
         event_name = data.get('event_name')
         event_type = data.get('event_type')
         day = data.get('day')
-        start_date = data.get('start_date')
-        end_date = data.get('end_date')
+        event_date = data.get('event_date')
         time_start = data.get('time_start')
         time_end = data.get('time_end')
         location = data.get('location')
 
-        db = Database(conn, (event_name, event_type, frequency, day, start_date, end_date, time_start, time_end, location, participants, participants_type))
+        db = Database(conn, (event_name, event_type, frequency, day, event_date, time_start, time_end, location, participants, participants_type))
         db_result = db.add_event()
         
         if not db_result or db_result.get('success') is False:
@@ -242,13 +239,13 @@ def add_events():
 
 
 # ==========================================
-# ENDPOINT 1: The Weekly Generator (Triggered by Cron)
+# ENDPOINT 1: The Daily Instance Generator (Triggered by Cron at 00:00)
 # ==========================================
-@app.route("/admin/generate-weekly-instances", methods=["POST"])
-def generate_weekly_instances():
+@app.route("/admin/generate-daily-instances", methods=["POST"])
+def generate_daily_instances():
     """
-    Triggered every Sunday at 11:59 PM by a cron job or cloud scheduler.
-    Preps the database for the upcoming 7 days.
+    Triggered every midnight by a cron job or cloud scheduler.
+    Preps the database for the current day's events.
     """
     conn = None
     try:
@@ -257,29 +254,26 @@ def generate_weekly_instances():
             return jsonify({"success": False, "message": "Database offline"}), 500
 
         today = date.today()
+        day_name = today.strftime("%A") 
+
+        database = Database(conn, (day_name,))
+        events = database.check_events()
+
+        if not events:
+            return jsonify({"success": True, "message": f"No events scheduled for {today}"}), 200
         
-        # Loop through the next 7 days
-        for i in range(1, 8):
-            target_date = today + timedelta(days=i)
-            day_name = target_date.strftime("%A") # e.g., 'Monday'
+        for event in events:
+            event_id = event['event_id']
+            event_start_date = event['event_date'] 
 
-            database = Database(conn, (day_name,))
-            events = database.check_events()
-
-            if not events:
-                continue
-            
-            for event in events:
-                event_id = event['event_id']
-
-                new_db = Database(conn, (event_id, target_date))
+            if today >= event_start_date:
+                new_db = Database(conn, (event_id, today))
                 instance_result = new_db.add_event_instances()
 
                 if instance_result.get('success') == False:
-                    # Log the error, but don't kill the whole loop
                     print(f"Failed to add instance for Event {event_id}: {instance_result['message']}")
         
-        return jsonify({"success": True, "message": "Upcoming week generated successfully"}), 200
+        return jsonify({"success": True, "message": f"Daily instances generated for {today}"}), 200
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500

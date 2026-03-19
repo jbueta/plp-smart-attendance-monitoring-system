@@ -22,10 +22,14 @@ function submitManualEntry(type) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: id })
     })
-    .then(r => r.json())
+    .then(r => {
+        if (!r.ok && r.status !== 404) throw new Error('Server error');
+        return r.json();
+    })
     .then(data => {
-        if (data.status === 'found') {
-            const bannerType = data.log_type.toLowerCase() === 'entry' ? 'in' : 'out';
+        if (data.success) {
+            const logType = data.attendance_status.toLowerCase();
+            const bannerType = logType === 'entry' ? 'in' : 'out';
 
             if (typeof showScanBanner === 'function') {
                 showScanBanner(bannerType, {
@@ -36,7 +40,7 @@ function submitManualEntry(type) {
             }
 
             if (typeof showSuccessOverlay === 'function') {
-                showSuccessOverlay(data.log_type, { 
+                showSuccessOverlay(logType, { 
                     id: id, 
                     name: data.name,
                     affiliation: data.affiliation
@@ -44,15 +48,14 @@ function submitManualEntry(type) {
             }
 
         } else {
-            if (typeof showScanBanner === 'function') {
-                showScanBanner('error', { id: id });
-            }
+            alert(data.Invalid || "ID not found!");
+            if (typeof showScanBanner === 'function') showScanBanner('error', { id: id });
         }
     })
-    .catch(() => {
-        if (typeof showScanBanner === 'function') {
-            showScanBanner('error', { id: id });
-        }
+    .catch(err => {
+        console.error(err);
+        alert("Connection error. Please try again.");
+        if (typeof showScanBanner === 'function') showScanBanner('error', { id: id });
     });
 
     document.getElementById(idField).value = '';
