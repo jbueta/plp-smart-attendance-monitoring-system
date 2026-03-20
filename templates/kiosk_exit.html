@@ -75,15 +75,17 @@
                 <h4 class="h6 text-uppercase text-white-50 mb-3 border-bottom border-secondary pb-2">
                     <i class="bi bi-broadcast text-success me-2"></i>Live Feed
                 </h4>
-                <div class="vstack gap-2">
+                <div class="vstack gap-2" id="live-feed-list">
                     {% for log in kiosk_data.recent_student_logs %}
-                    <div class="d-flex align-items-center p-2 rounded" style="background: rgba(255,255,255,0.03);">
+                    <div class="d-flex align-items-center p-2 rounded live-feed-item" style="background: rgba(255,255,255,0.03);">
                         {% if log.type == 'in' %}
-                        <div class="rounded-circle bg-success bg-opacity-25 p-2 me-3 text-success"><i
-                                class="bi bi-check-lg"></i></div>
+                        <div class="rounded-circle bg-success bg-opacity-25 p-2 me-3 text-success">
+                            <i class="bi bi-check-lg"></i>
+                        </div>
                         {% else %}
-                        <div class="rounded-circle bg-secondary bg-opacity-25 p-2 me-3 text-white"><i
-                                class="bi bi-arrow-right"></i></div>
+                        <div class="rounded-circle bg-secondary bg-opacity-25 p-2 me-3 text-white">
+                            <i class="bi bi-arrow-right"></i>
+                        </div>
                         {% endif %}
                         <div class="flex-grow-1 lh-1">
                             <h6 class="mb-0 small">{{ log.name }}</h6>
@@ -234,6 +236,42 @@
         setInterval(updateClock, 1000);
         updateClock();
 
+        function appendToLiveFeed(name, course, logType) {
+            const feedContainer = document.getElementById('live-feed-list');
+            if (!feedContainer) return;
+
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+            const isEntry = (logType === 'entry');
+            const iconBg = isEntry ? 'bg-success text-success' : 'bg-secondary text-white';
+            const iconClass = isEntry ? 'bi-check-lg' : 'bi-arrow-right';
+            const badgeClass = isEntry ? 'bg-success text-success' : 'bg-secondary text-white';
+            const badgeText = isEntry ? 'TIME IN' : 'TIME OUT';
+
+            const logHtml = `
+                <div class="d-flex align-items-center p-2 rounded" style="background: rgba(255,255,255,0.03);">
+                    <div class="rounded-circle ${iconBg} bg-opacity-25 p-2 me-3">
+                        <i class="bi ${iconClass}"></i>
+                    </div>
+                    <div class="flex-grow-1 lh-1">
+                        <h6 class="mb-0 small">${name}</h6>
+                        <small class="text-white-50" style="font-size: 0.75rem">${course || 'N/A'}</small>
+                    </div>
+                    <div class="text-end">
+                        <div class="badge ${badgeClass} bg-opacity-10 mb-1">${badgeText}</div>
+                        <div class="font-monospace small text-white-50">${timeString}</div>
+                    </div>
+                </div>
+            `;
+
+            feedContainer.insertAdjacentHTML('afterbegin', logHtml);
+
+            if (feedContainer.children.length > 6) {
+                feedContainer.lastElementChild.remove();
+            }
+        }
+
         // --- 2. FLASHED MESSAGE HANDLER (VISITORS) ---
         {% with messages = get_flashed_messages(category_filter=["success"]) %}
             {% if messages %}
@@ -259,17 +297,14 @@
         let scanCooldown = false; // Prevents accidental double-scans
 
         document.addEventListener('keydown', function (e) {
-            // Ignore if currently typing in an input/textarea/modal
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
                 return;
             }
 
-            // Don't scan if we are in the 3-second cooldown
             if (scanCooldown) return;
 
             if (e.key === 'Enter') {
                 if (barcodeBuffer.length > 3) {
-                    // Extract data using Regex
                     const match = barcodeBuffer.match(/(.*?)\[(.*?)\](.*)/s);
 
                     if (!match) {
@@ -326,12 +361,12 @@
                                 affiliation: data.affiliation 
                             });
                             
+                            appendToLiveFeed(data.name, data.affiliation, logType);
                         } else {
                             frame.style.borderColor = '#ef4444'; 
                             feedText.innerText = data.message || "SCAN FAILED";
                         }
 
-                        // Reset UI after visibility delay
                         setTimeout(() => {
                             frame.style.borderColor = 'rgba(255, 255, 255, 0.2)';
                             frame.style.boxShadow = 'none';

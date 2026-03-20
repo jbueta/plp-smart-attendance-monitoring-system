@@ -529,3 +529,101 @@ class Database:
         except connector.Error as err:
             print(f"Error fetching attendance: {err}")
             return None
+
+    # ==============================================================================
+    # STATIC GETTER METHODS
+    # ==============================================================================
+
+    @staticmethod
+    def get_events_kiosk(conn):
+        try:
+            if conn:
+                cursor = conn.cursor(dictionary=True)
+            else:
+                raise Exception("Failed to connect to the database.")
+            query = """
+                        SELECT 
+                            ei.instance_id, 
+                            e.event_name AS name, 
+                            e.event_type AS type, 
+                            ei.event_date AS date, 
+                            e.time_start, 
+                            e.time_end, 
+                            e.location AS location
+                        FROM event_instances ei
+                        JOIN events e ON ei.event_id = e.event_id
+                        WHERE ei.event_date = CURDATE() 
+                        AND ei.status = 'Scheduled'
+                        AND e.active = 1
+                    """
+            cursor.execute(query)
+            result = cursor.fetchall()
+
+            if result:
+                for row in result:
+                    if row.get('date'):
+                        row['date'] = str(row['date'])
+                    if row.get('time_start'):
+                        row['time_start'] = str(row['time_start'])
+                    if row.get('time_end'):
+                        row['time_end'] = str(row['time_end'])
+                        
+            return result if result else []
+            
+        except connector.Error as err:
+            print(f"Error fetching events: {err}")
+            return None
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+
+    @staticmethod
+    def get_student_logs(conn, limit=6):
+        try:
+            if conn:
+                cursor = conn.cursor(dictionary=True)
+            else:
+                raise Exception("Failed to connect to the database.")
+
+            query = """
+                SELECT 
+                    gl.log_type, 
+                    u.name, 
+                    u.course, 
+                    gl.timestamp
+                FROM general_log gl
+                JOIN users u ON gl.user_id = u.id
+                ORDER BY gl.timestamp DESC
+                LIMIT %s
+            """
+            cursor.execute(query, (limit,))
+            result = cursor.fetchall()
+
+            formatted_logs = []
+
+            if result:
+                for row in result:
+                    mapped_type = "in" if row['log_type'] == "Entry" else "out"
+                    
+                    formatted_time = ""
+                    if row.get('timestamp'):
+                        if isinstance(row['timestamp'], datetime):
+                            formatted_time = row['timestamp'].strftime('%I:%M %p')
+                        else:
+                            dt_obj = datetime.strptime(str(row['timestamp']), '%Y-%m-%d %H:%M:%S')
+                            formatted_time = dt_obj.strftime('%I:%M %p')
+
+                    formatted_logs.append({
+                        "type": mapped_type,
+                        "name": row.get('name', 'Unknown User'),
+                        "course": row.get('course', 'N/A'),
+                        "time": formatted_time
+                    })
+
+            return formatted_logs
+        except connector.Error as err:
+            print(f"Error fetching recent student logs: {err}")
+            return None
+        finally:
+            if 'cursor' in locals():
+                cursor.close()

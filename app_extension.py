@@ -463,5 +463,58 @@ def get_instance_attendance(instance_id):
         if conn:
             close_db(conn)
 
+
+# ==============================================================================
+# LIVE DATA GETTER FUNCTIONS
+# ==============================================================================
+
+@app.route("/kiosk/employee/select-event", methods=["GET"])
+def live_events():
+    """
+        Fetches events scheduled on the same day.
+    """
+    conn = None
+    try:
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "message": "Database offline"}), 500
+
+        events = Database.get_events_kiosk(conn)
+
+        if events is None:
+            return jsonify({"success": False, "message": "Error fetching scheduled events"}), 500
+
+        return jsonify({"success": True, "events": events}), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        if conn:
+            close_db(conn)
+
+@app.route("/kiosk/students/student-logs", methods=["GET"])
+def live_student_logs():
+    """
+        Fetches recent student logs in current day.
+    """
+    conn = None
+    try:
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "message": "Database offline"}), 500
+
+        logs = Database.get_student_logs(conn)
+
+        if logs is None:
+            return jsonify({"success": False, "message": "Error fetching student_logs"}), 500
+
+        return jsonify({"success": True, "logs": logs}), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        if conn:
+            close_db(conn)
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)

@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+import requests
 
 app = Flask(__name__)
 app.secret_key = 'plp_secure_key_2026'  # Required for session management
@@ -11,25 +12,9 @@ app.secret_key = 'plp_secure_key_2026'  # Required for session management
 
 # Default events that cannot be deleted in this prototype
 DEFAULT_EVENTS = [
-    {
-        'id': 1, 
-        'name': 'Flag Ceremony Entrance/Exit', 
-        'type': 'Mandatory', 
-        'dept': 'All Departments', 
-        'time': '07:00 AM', 
-        'date': date.today().strftime('%Y-%m-%d')
-    },
-    {
-        'id': 2, 
-        'name': 'Flag Retreat', 
-        'type': 'Mandatory', 
-        'dept': 'All Departments', 
-        'time': '05:00 PM', 
-        'date': date.today().strftime('%Y-%m-%d')
-    }
+    {}
 ]
 
-EVENTS = list(DEFAULT_EVENTS)
 VISITORS = []
 
 # --- Database Transition Mock Models ---
@@ -164,17 +149,20 @@ def index():
 def kiosk_entrance():
     session.pop('logged_in', None)
     active_visitors = [v for v in VISITORS if v['status'] == 'Checked In']
-    return render_template('kiosk_entrance.html', active_visitors=active_visitors, kiosk_data=MOCK_KIOSK_DATA)
+    logs = live_student_logs()
+    return render_template('kiosk_entrance.html', active_visitors=active_visitors, kiosk_data=logs)
 
 @app.route('/kiosk/exit')
 def kiosk_exit():
     session.pop('logged_in', None)
-    return render_template('kiosk_exit.html', kiosk_data=MOCK_KIOSK_DATA)
+    logs = live_student_logs()
+    return render_template('kiosk_exit.html', kiosk_data=logs)
 
 @app.route('/kiosk/employee/select-event')
 def kiosk_employee_select_event():
     session.pop('logged_in', None)
-    return render_template('kiosk_event_select.html', events=EVENTS)
+    events = get_live_events()
+    return render_template('kiosk_event_select.html', events=events)
 
 @app.route('/kiosk/employee')
 def kiosk_employee():
@@ -406,18 +394,79 @@ def check_student_status():
             'attendance_status': student['status']
         }
     return {'status': 'not_found'}
-
-
+    
 # ==============================================================================
-# LIVE API ENDPOINT
+# STATIC/ROUTE BASED GETTER METHODS
 # ==============================================================================
-
 @app.route('/api/kiosk/live-events')
-def api_live_events():
-    return jsonify({
-        "status": "success",
-        "events": EVENTS
-    })
+def live_event():    
+    try:
+        response = requests.get("http://127.0.0.1:5001/kiosk/employee/select-event", timeout=5)
+        if response.status_code == 200:
+            return jsonify(response.json()) 
+            
+    except requests.exceptions.RequestException as e:
+        print(f"API Bridge Error: {e}")
+
+
+# ==============================================================================
+# HELPER
+# ==============================================================================
+
+def get_live_events():    
+    current_kiosk_events = list(DEFAULT_EVENTS)
+    
+    try:
+        response = requests.get("http://127.0.0.1:5001/kiosk/employee/select-event", timeout=5)
+        
+        if response.status_code == 200:
+            api_data = response.json()
+            
+            if api_data.get('success'):
+                real_events = []
+                for event in api_data.get('events', []):
+                    real_events.append({
+                        'instance_id': event.get('instance_id', ''),
+                        'name': event.get('name', 'Unknown'),
+                        'type': event.get('type', 'Unknown'),
+                        'date': event.get('date', 'Unknown'),
+                        'time_start': event.get('time_start', 'Unknown'),
+                        'time_end': event.get('time_end', 'Unknown'),
+                        'location': event.get('location', 'Unknown')
+                    })
+                
+                current_kiosk_events = real_events
+                
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Error: {e}")
+        
+    return current_kiosk_events 
+
+def live_student_logs():    
+    current_kiosk_data = dict(MOCK_KIOSK_DATA)
+    
+    try:
+        response = requests.get("http://127.0.0.1:5001/kiosk/students/student-logs", timeout=5)
+        
+        if response.status_code == 200:
+            api_data = response.json()
+            
+            if api_data.get('success'):
+                real_logs = []
+                for log in api_data.get('logs', []):
+                    real_logs.append({
+                        'type': 'in' if log.get('type') in ['in', 'entry'] else 'out',
+                        'name': log.get('name', 'Unknown'),
+                        'course': log.get('course', log.get('affiliation', '')),
+                        'time': log.get('time', '')
+                    })
+                
+                current_kiosk_data['recent_student_logs'] = real_logs
+                
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Error: {e}")
+        
+    return current_kiosk_data 
 
 # ==============================================================================
 # MAIN ENTRY POINT
