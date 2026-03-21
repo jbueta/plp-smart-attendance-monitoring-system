@@ -195,7 +195,7 @@ def add_events():
         cd = date.today()
 
         try:
-            event_date = datetime.strptime(sd, '%Y-%m-%d').date()
+            event_date = datetime.strptime(ed, '%Y-%m-%d').date()
             current_date = datetime.strptime(cd, '%Y-%m-%d').date()
         except ValueError:
             return jsonify({"success": False, "error": "Invalid date format. Use YYYY-MM-DD"}), 400
@@ -208,9 +208,6 @@ def add_events():
             day = data.get('day')
             if not day:
                 return jsonify({"success": False, "error": "Day is required"}), 400
-        elif frequency == 'ONCE':
-            if sd != ed:
-                return jsonify({"success": False, "error": "Start Date and End Date must be the same for one-time event"}), 400
             
         event_name = data.get('event_name')
         event_type = data.get('event_type')
