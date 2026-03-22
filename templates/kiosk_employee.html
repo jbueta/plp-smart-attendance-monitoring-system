@@ -1,200 +1,200 @@
-<!-- Load base layout -->
-{% extends "base.html" %}
+    <!-- Load base layout -->
+    {% extends "base.html" %}
 
-<!-- Page title -->
-{% block title %}Employee Attendance - PLP{% endblock %}
+    <!-- Page title -->
+    {% block title %}Employee Attendance - PLP{% endblock %}
 
-<!-- Page content -->
-{% block content %}
-<!-- Full Screen Scan Overlay (Hidden by default) -->
-<div id="scan-overlay"
-    class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-75 d-none align-items-center justify-content-center"
-    style="z-index: 2000; backdrop-filter: blur(10px);">
-    <div class="card-glass p-5 text-center shadow-lg" style="min-width: 400px; transform: scale(1.1);">
-        <div id="scan-ring" class="rounded-circle border border-5 border-success p-1 mb-3 d-inline-block">
-            <i class="bi bi-person-badge text-white display-1"></i>
-        </div>
-        <h2 id="scan-title" class="display-6 fw-bold text-success mb-2">ATTENDANCE LOGGED</h2>
-        <h3 id="scan-name" class="h2 text-white mb-0">Faculty Member</h3>
-        <p id="scan-id" class="text-white-50 font-monospace mb-3">ID: 2026-FAC-001</p>
-        <div class="badge bg-white bg-opacity-10 text-white px-3 py-2 rounded-pill">
-            <i class="bi bi-check-circle-fill me-2 text-success"></i><span id="scan-status">FLAG CEREMONY:
-                PRESENT</span>
-        </div>
-    </div>
-</div>
-
-<div class="container py-4 d-flex flex-column min-vh-100">
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <a href="{{ url_for('index') }}" class="btn btn-glass rounded-pill px-3">
-            <i class="bi bi-arrow-left me-2"></i>Switch Mode
-        </a>
-        <div class="text-end">
-            <h2 class="h4 text-gold mb-0">{{ event_name }}</h2>
-            <div class="live-clock badge bg-light bg-opacity-10 fw-normal py-2 px-3 mt-1">Connecting...</div>
+    <!-- Page content -->
+    {% block content %}
+    <!-- Full Screen Scan Overlay (Hidden by default) -->
+    <div id="scan-overlay"
+        class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-75 d-none align-items-center justify-content-center"
+        style="z-index: 2000; backdrop-filter: blur(10px);">
+        <div class="card-glass p-5 text-center shadow-lg" style="min-width: 400px; transform: scale(1.1);">
+            <div id="scan-ring" class="rounded-circle border border-5 border-success p-1 mb-3 d-inline-block">
+                <i class="bi bi-person-badge text-white display-1"></i>
+            </div>
+            <h2 id="scan-title" class="display-6 fw-bold text-success mb-2">ATTENDANCE LOGGED</h2>
+            <h3 id="scan-name" class="h2 text-white mb-0">Faculty Member</h3>
+            <p id="scan-id" class="text-white-50 font-monospace mb-3">ID: 2026-FAC-001</p>
+            <div class="badge bg-white bg-opacity-10 text-white px-3 py-2 rounded-pill">
+                <i class="bi bi-check-circle-fill me-2 text-success"></i><span id="scan-status">FLAG CEREMONY:
+                    PRESENT</span>
+            </div>
         </div>
     </div>
 
-    <div class="row g-4 flex-grow-1">
-        <!-- Left: Scanner Area -->
-        <div class="col-md-6">
-            <div class="card-glass p-5 text-center h-100 d-flex flex-column justify-content-center align-items-center border-gold-subtle"
-                style="border-color: rgba(245, 221, 0, 0.2);">
-                <div class="scanner-frame mb-4 border-warning" style="transition: all 0.3s ease;">
-
-                    <!-- Corner Decorations -->
-                    <div
-                        class="position-absolute top-0 start-0 border-top border-start border-warning border-3 w-25 h-25 rounded-top-start">
-                    </div>
-                    <div
-                        class="position-absolute top-0 end-0 border-top border-end border-warning border-3 w-25 h-25 rounded-top-end">
-                    </div>
-                    <div
-                        class="position-absolute bottom-0 start-0 border-bottom border-start border-warning border-3 w-25 h-25 rounded-bottom-start">
-                    </div>
-                    <div
-                        class="position-absolute bottom-0 end-0 border-bottom border-end border-warning border-3 w-25 h-25 rounded-bottom-end">
-                    </div>
-
-                    <div class="scan-laser gold"></div>
-                    <div id="scanner-text"
-                        class="position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-gold-50 small font-monospace">
-                        [QR CAMERA FEED]
-                    </div>
-                </div>
-
-                <h3 class="fw-normal mb-2">Present <span class="text-gold fw-bold">Employee QR</span></h3>
-                <p class="text-white-50 small mb-4">Scanner is active and ready</p>
-
-                <div class="mt-4">
-                    <button class="btn btn-outline-light rounded-pill px-4 text-white-50 small" data-bs-toggle="modal"
-                        data-bs-target="#manualEntryModal">
-                        <i class="bi bi-keyboard me-2"></i>Enter ID Manually
-                    </button>
-                </div>
+    <div class="container py-4 d-flex flex-column min-vh-100">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <a href="{{ url_for('index') }}" class="btn btn-glass rounded-pill px-3">
+                <i class="bi bi-arrow-left me-2"></i>Switch Mode
+            </a>
+            <div class="text-end">
+                <h2 class="h4 text-gold mb-0">{{ event_name }}</h2>
+                <div class="live-clock badge bg-light bg-opacity-10 fw-normal py-2 px-3 mt-1">Connecting...</div>
             </div>
         </div>
 
-        <!-- Right: Activity Feed -->
-        <div class="col-md-6">
-            <div class="card-glass p-4 h-100 d-flex flex-column">
-                <h4 class="h5 mb-4 d-flex align-items-center">
-                    <i class="bi bi-list-check text-gold me-2"></i>Live Logs
-                </h4>
+        <div class="row g-4 flex-grow-1">
+            <!-- Left: Scanner Area -->
+            <div class="col-md-6">
+                <div class="card-glass p-5 text-center h-100 d-flex flex-column justify-content-center align-items-center border-gold-subtle"
+                    style="border-color: rgba(245, 221, 0, 0.2);">
+                    <div class="scanner-frame mb-4 border-warning" style="transition: all 0.3s ease;">
 
-                <div class="vstack gap-3 overflow-auto flex-grow-1" style="max-height: 400px;">
-                    {% for log in kiosk_data.recent_employee_logs %}
-                    <div class="d-flex align-items-center p-3 rounded position-relative overflow-hidden"
-                        style="background: rgba(255,255,255,0.03);">
-                        <div class="position-absolute start-0 top-0 bottom-0 bg-{{ log.type }}" style="width: 4px;">
+                        <!-- Corner Decorations -->
+                        <div
+                            class="position-absolute top-0 start-0 border-top border-start border-warning border-3 w-25 h-25 rounded-top-start">
                         </div>
-                        <div class="rounded-circle bg-white bg-opacity-10 p-2 me-3 text-white"
-                            style="width: 40px; height: 40px; display:grid; place-items:center;">{{ log.initials }}
+                        <div
+                            class="position-absolute top-0 end-0 border-top border-end border-warning border-3 w-25 h-25 rounded-top-end">
                         </div>
-                        <div class="flex-grow-1">
-                            <h6 class="mb-0">{{ log.name }}</h6>
-                            <small class="text-white-50">{{ log.dept }}</small>
+                        <div
+                            class="position-absolute bottom-0 start-0 border-bottom border-start border-warning border-3 w-25 h-25 rounded-bottom-start">
                         </div>
-                        <span class="badge bg-{{ log.type }} bg-opacity-25 text-{{ log.type }}">{{ log.time }}</span>
-                    </div>
-                    {% endfor %}
-                </div>
+                        <div
+                            class="position-absolute bottom-0 end-0 border-bottom border-end border-warning border-3 w-25 h-25 rounded-bottom-end">
+                        </div>
 
-                <!-- Bulletin for Employees -->
-                <div class="mt-3 pt-3 border-top border-secondary">
-                    <div class="d-flex align-items-center mb-1">
-                        <i class="bi bi-info-circle-fill text-info me-2"></i>
-                        <small class="fw-bold text-info">HR MEMO</small>
+                        <div class="scan-laser gold"></div>
+                        <div id="scanner-text"
+                            class="position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-gold-50 small font-monospace">
+                            [QR CAMERA FEED]
+                        </div>
                     </div>
-                    <p class="small text-white-50 mb-0">Submission of IPCR is due on Friday. Please coordinate with your
-                        department heads.</p>
+
+                    <h3 class="fw-normal mb-2">Present <span class="text-gold fw-bold">Employee QR</span></h3>
+                    <p class="text-white-50 small mb-4">Scanner is active and ready</p>
+
+                    <div class="mt-4">
+                        <button class="btn btn-outline-light rounded-pill px-4 text-white-50 small" data-bs-toggle="modal"
+                            data-bs-target="#manualEntryModal">
+                            <i class="bi bi-keyboard me-2"></i>Enter ID Manually
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Activity Feed -->
+            <div class="col-md-6">
+                <div class="card-glass p-4 h-100 d-flex flex-column">
+                    <h4 class="h5 mb-4 d-flex align-items-center">
+                        <i class="bi bi-list-check text-gold me-2"></i>Live Logs
+                    </h4>
+
+                    <div class="vstack gap-3 overflow-auto flex-grow-1" style="max-height: 400px;">
+                        {% for log in kiosk_data.recent_employee_logs %}
+                        <div class="d-flex align-items-center p-3 rounded position-relative overflow-hidden"
+                            style="background: rgba(255,255,255,0.03);">
+                            <div class="position-absolute start-0 top-0 bottom-0 bg-{{ log.type }}" style="width: 4px;">
+                            </div>
+                            <div class="rounded-circle bg-white bg-opacity-10 p-2 me-3 text-white"
+                                style="width: 40px; height: 40px; display:grid; place-items:center;">{{ log.initials }}
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-0">{{ log.name }}</h6>
+                                <small class="text-white-50">{{ log.dept }}</small>
+                            </div>
+                            <span class="badge bg-{{ log.type }} bg-opacity-25 text-{{ log.type }}">{{ log.time }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Bulletin for Employees -->
+                    <div class="mt-3 pt-3 border-top border-secondary">
+                        <div class="d-flex align-items-center mb-1">
+                            <i class="bi bi-info-circle-fill text-info me-2"></i>
+                            <small class="fw-bold text-info">HR MEMO</small>
+                        </div>
+                        <p class="small text-white-50 mb-0">Submission of IPCR is due on Friday. Please coordinate with your
+                            department heads.</p>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
-<!-- Manual Entry Modal -->
-<div class="modal fade" id="manualEntryModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content card-glass border-secondary">
-            <div class="modal-header border-secondary">
-                <h5 class="modal-title text-white">Manual Attendance Entry</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
-                    aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label for="manual-employee-id" class="form-label text-white-50">Employee ID Number</label>
-                    <input type="text" class="form-control bg-transparent text-white border-secondary"
-                        id="manual-employee-id" placeholder="e.g. 2026-FAC-001">
+    <!-- Manual Entry Modal -->
+    <div class="modal fade" id="manualEntryModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content card-glass border-secondary">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-white">Manual Attendance Entry</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Close"></button>
                 </div>
-                <div class="d-grid gap-2">
-                    <button type="button" class="btn btn-primary-gold" onclick="submitManualEntry('employee')">Log
-                        Attendance</button>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="manual-employee-id" class="form-label text-white-50">Employee ID Number</label>
+                        <input type="text" class="form-control bg-transparent text-white border-secondary"
+                            id="manual-employee-id" placeholder="e.g. 2026-FAC-001">
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-primary-gold" onclick="submitManualEntry('employee')">Log
+                            Attendance</button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
-{% endblock %}
+    {% endblock %}
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/kiosk.js') }}"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        // Live Clock
-        function updateClock() {
-            const now = new Date();
-            const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            const dateString = now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-            document.querySelectorAll('.live-clock').forEach(el => {
-                el.innerHTML = `<i class="bi bi-clock me-2"></i>${timeString} <span class="ms-2 opacity-50">| ${dateString}</span>`;
-            });
-        }
-        setInterval(updateClock, 1000);
-        updateClock();
+    window.currentEventId = JSON.parse('{{ event_id|tojson|safe }}');
+    window.currentInstanceId = JSON.parse('{{ instance_id|tojson|safe }}');
 
-        // Always Open Global Scanner listener
-        let barcodeBuffer = "";
-        let scanTimeout = null;
-
-        document.addEventListener('keydown', function (e) {
-            // Ignore if currently typing in an input/textarea/modal
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
-                return;
-            }
-
-            if (e.key === 'Enter') {
-                if (barcodeBuffer.length > 3) {
-                    // Activate simulated read
-                    const feedText = document.getElementById('scanner-text');
-                    const frame = document.querySelector('.scanner-frame');
-                    frame.style.borderColor = '#F5DD00';
-                    frame.style.boxShadow = '0 0 30px rgba(245, 221, 0, 0.3)';
-                    feedText.innerText = "VERIFYING EMPLOYEE ID...";
-                    feedText.className = "position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-gold font-monospace fw-bold scanning-text";
-
-                    setTimeout(() => {
-                        showSuccessOverlay('employee', { id: barcodeBuffer, name: "Employee Verify" }); // Using main.js overlay
-
-                        // Reset
-                        frame.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-                        frame.style.boxShadow = 'none';
-                        feedText.innerText = "[QR CAMERA FEED]";
-                        feedText.className = "position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-gold-50 small font-monospace";
-                    }, 500);
-                }
-                barcodeBuffer = "";
-                if (scanTimeout) clearTimeout(scanTimeout);
-            } else if (e.key.length === 1) {
-                barcodeBuffer += e.key;
-                if (scanTimeout) clearTimeout(scanTimeout);
-                scanTimeout = setTimeout(() => { barcodeBuffer = ""; }, 50);
-            }
+    // Live clock (unchanged)
+    function updateClock() {
+        const now = new Date();
+        const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const dateString = now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+        document.querySelectorAll('.live-clock').forEach(el => {
+            el.innerHTML = `<i class="bi bi-clock me-2"></i>${timeString} <span class="ms-2 opacity-50">| ${dateString}</span>`;
         });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Scanner variables
+    let barcodeBuffer = "";
+    let scanTimeout = null;
+
+    document.addEventListener('keydown', function (e) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+            return;
+        }
+
+        if (e.key === 'Enter') {
+            if (barcodeBuffer.length > 3) {
+                const feedText = document.getElementById('scanner-text');
+                const frame = document.querySelector('.scanner-frame');
+                frame.style.borderColor = '#F5DD00';
+                frame.style.boxShadow = '0 0 30px rgba(245, 221, 0, 0.3)';
+                feedText.innerText = "VERIFYING EMPLOYEE ID...";
+                feedText.className = "position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-gold font-monospace fw-bold scanning-text";
+
+                setTimeout(() => {
+                    submitManualEntry('employee', barcodeBuffer);
+                    frame.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                    frame.style.boxShadow = 'none';
+                    feedText.innerText = "[QR CAMERA FEED]";
+                    feedText.className = "position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-gold-50 small font-monospace";
+                }, 500);
+            }
+            barcodeBuffer = "";
+            if (scanTimeout) clearTimeout(scanTimeout);
+        } else if (e.key.length === 1) {
+            barcodeBuffer += e.key;
+            if (scanTimeout) clearTimeout(scanTimeout);
+            scanTimeout = setTimeout(() => { barcodeBuffer = ""; }, 50);
+        }
     });
 
-
+    // Load real attendance data if we have a valid instance_id
+    if (window.currentInstanceId && window.currentInstanceId !== null) {
+        loadEventAttendance(window.currentInstanceId);
+    }
 </script>
 {% endblock %}
