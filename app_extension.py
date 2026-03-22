@@ -65,6 +65,10 @@ def close_db(error):
     if db is not None:
         db.close()
 
+@app.teardown_appcontext
+def teardown_db(error):
+    close_db(error)
+
 @app.route('/admin/user/authentication', methods=['POST'])
 def user_authenticate():
     conn = None
@@ -146,15 +150,14 @@ def user_authenticate():
     except Exception as e:
         return jsonify({"success": False, "message": f"Error during authentication: {str(e)}"}), 500
     
-    finally:
-        close_db(conn)
+    
 
 
 # ==============================================================================
 # EVENTS ENDPOINT
 # ==============================================================================
 
-@app.route('/admin/add-events', methods=['POST'])
+@app.route('/admin/dashboard/add-events', methods=['POST'])
 def add_events():
     conn = None
     try:
@@ -196,12 +199,12 @@ def add_events():
 
         try:
             event_date = datetime.strptime(ed, '%Y-%m-%d').date()
-            current_date = datetime.strptime(cd, '%Y-%m-%d').date()
+            current_date = cd
         except ValueError:
             return jsonify({"success": False, "error": "Invalid date format. Use YYYY-MM-DD"}), 400
             
-        if event_date > current_date:
-            return jsonify({"success": False, "error": "Start Date cannot be after End Date"}), 400
+        if event_date < current_date:
+            return jsonify({"success": False, "error": "Event Date cannot be in the past"}), 400
 
         frequency = data.get('frequency')
         if frequency == 'WEEKLY':
@@ -231,8 +234,7 @@ def add_events():
                        }), 200
     except Exception as e:
         return jsonify({"success": False, "message": f"Error adding event: {str(e)}"}), 500
-    finally:
-        close_db(conn)
+    
 
 
 # ==========================================
@@ -274,8 +276,7 @@ def generate_daily_instances():
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
-    finally:
-        close_db(conn)
+    
 
 # ==========================================
 # ENDPOINT 2: The Gate Swipe Webhook
@@ -324,8 +325,7 @@ def events_authentication():
 
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
-    finally:
-        close_db(conn)
+    
 
 # ====================================================
 # ENDPOINT 3: Status Update for Excused Individuals
@@ -364,9 +364,6 @@ def update_attendance():
 
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
-    finally:
-        if conn:
-            close_db(conn)
 
 # ====================================================
 # ENDPOINT 4: Update Event Status (Completed or Cancelled)
@@ -399,74 +396,19 @@ def update_event_status():
 
         events = db.get_all_events()
         return jsonify({"success": True, 
-                        "message": f"Event satus updated to {status}.",
-                        "date": events.get('data')
+                        "message": f"Event status updated to {status}.",
+                        "data": events.get('data')
                       }), 200
 
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
-    finally:
-        if conn:
-            close_db(conn)
-
-# ====================================================
-# ENDPOINT 5: Get All Events
-# ====================================================
-@app.route("/admin/get-events", methods=["GET"])
-def get_all_events():
-    conn = None
-    try:
-        conn = connect_db()
-        if not conn:
-            return jsonify({"success": False, "message": "Database offline"}), 500
-
-        db = Database(conn)
-        events = db.get_all_events()
-
-        return jsonify({"success": True, "data": events}), 200
-
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
-    finally:
-        if conn:
-            close_db(conn)
-
-# ====================================================
-# ENDPOINT 6: Get Roster & Attendance for an Instance
-# ====================================================
-@app.route("/admin/instances/<int:instance_id>/get-attendance", methods=["GET"])
-def get_instance_attendance(instance_id):
-    """
-    Fetches the complete roster for a specific event date (instance_id),
-    including user names, IDs, and attendance statuses.
-    """
-    conn = None
-    try:
-        conn = connect_db()
-        if not conn:
-            return jsonify({"success": False, "message": "Database offline"}), 500
-
-        db = Database(conn, (instance_id,))
-        roster = db.get_instance_attendance()
-
-        if roster is None:
-            return jsonify({"success": False, "message": "Error fetching roster"}), 500
-
-        return jsonify({"success": True, "data": roster}), 200
-
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
-    finally:
-        if conn:
-            close_db(conn)
-
 
 # ==============================================================================
 # LIVE DATA GETTER FUNCTIONS
 # ==============================================================================
 
 @app.route("/kiosk/employee/select-event", methods=["GET"])
-def live_events():
+def kiosk_live_events():
     """
         Fetches events scheduled on the same day.
     """
@@ -485,9 +427,31 @@ def live_events():
 
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
-    finally:
-        if conn:
-            close_db(conn)
+    
+
+
+@app.route("/admin/dashboard/live-events", methods=["GET"])
+def admin_live_events():
+    """
+        Fetches events scheduled on the same day.
+    """
+    conn = None
+    try:
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "message": "Database offline"}), 500
+
+        events = Database.get_events_dashboard(conn)
+
+        if events is None:
+            return jsonify({"success": False, "message": "Error fetching events"}), 500
+
+        return jsonify({"success": True, "events": events}), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+    
+
 
 @app.route("/kiosk/students/student-logs", methods=["GET"])
 def live_student_logs():
@@ -509,9 +473,73 @@ def live_student_logs():
 
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
-    finally:
-        if conn:
-            close_db(conn)
+    
+
+
+@app.route("/admin/dashboard/events/live-departments", methods=["GET"])
+def live_departments():
+    """
+        Fetches departments registered in the database.
+    """
+    conn = None
+    try:
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "message": "Database offline"}), 500
+
+        depts = Database.get_admin_departments(conn)
+
+        if depts is None:
+            return jsonify({"success": False, "message": "Error fetching departments"}), 500
+
+        return jsonify({"success": True, "departments": depts}), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+    
+
+@app.route("/admin/instances/<int:instance_id>/get-attendance", methods=["GET"])
+def get_instance_attendance(instance_id):
+    """
+    Fetches the complete roster for a specific event date (instance_id),
+    including user names, IDs, and attendance statuses.
+    """
+    conn = None
+    try:
+        conn = connect_db()
+        if not conn:
+            return jsonify([]), 500
+
+        roster = Database.get_instance_attendance(conn, instance_id)
+
+        if roster is None:
+            return jsonify([]), 500
+
+        return jsonify(roster), 200
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return jsonify([]), 500
+    
+
+
+@app.route("/admin/event/<int:event_id>/instances", methods=["GET"])
+def get_event_instances(event_id):
+    conn = None
+    try:
+        conn = connect_db()
+        if not conn:
+            return jsonify([]), 500
+
+        events = Database.get_event_instances(conn, event_id)
+
+        return jsonify(events), 200
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return jsonify([]), 500
+
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)
