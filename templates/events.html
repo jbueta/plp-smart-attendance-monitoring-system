@@ -15,17 +15,11 @@
     <hr>
     <ul class="nav nav-pills flex-column mb-auto">
         <li><a href="{{ url_for('dashboard') }}" class="nav-link"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
-        <li><a href="{{ url_for('manage_events') }}" class="nav-link active"><i class="bi bi-calendar-event"></i>
-                Events</a></li>
-        <li><a href="{{ url_for('admin_visitors') }}" class="nav-link"><i class="bi bi-person-lines-fill"></i>
-                Visitors</a>
-        </li>
-        <li><a href="{{ url_for('analytics_employee') }}" class="nav-link"><i class="bi bi-people"></i> Employees</a>
-        </li>
-        <li><a href="{{ url_for('analytics_students') }}" class="nav-link"><i class="bi bi-mortarboard"></i>
-                Students</a></li>
-        <li><a href="{{ url_for('reports') }}" class="nav-link"><i class="bi bi-file-earmark-bar-graph"></i> Reports</a>
-        </li>
+        <li><a href="{{ url_for('manage_events') }}" class="nav-link active"><i class="bi bi-calendar-event"></i> Events</a></li>
+        <li><a href="{{ url_for('admin_visitors') }}" class="nav-link"><i class="bi bi-person-lines-fill"></i> Visitors</a></li>
+        <li><a href="{{ url_for('admin_employees') }}" class="nav-link"><i class="bi bi-person-badge"></i> Employees</a></li>
+        <li><a href="{{ url_for('admin_students') }}" class="nav-link"><i class="bi bi-mortarboard"></i> Students</a></li>
+        <li><a href="{{ url_for('reports') }}" class="nav-link"><i class="bi bi-file-earmark-bar-graph"></i> Reports</a></li>
     </ul>
     <hr>
     <div>
@@ -38,19 +32,36 @@
 <!-- Main Content -->
 <div class="main-content flex-grow-1">
     <div
-        class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4 border-bottom border-secondary">
+        class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom border-secondary">
         <div>
             <h1 class="h2">Event Management</h1>
             <p class="text-white-50 mb-0">Schedule and manage campus events for employee attendance.</p>
         </div>
-        <div class="btn-toolbar mb-2 mb-md-0">
-            <button type="button" id="select-mode-btn" class="btn btn-outline-light me-2"
+        <div class="d-flex gap-2 mb-2 mb-md-0">
+            <button type="button" id="select-mode-btn" class="btn btn-outline-light btn-sm"
                 onclick="toggleSelectionMode()">
-                <i class="bi bi-check2-square me-2"></i>Select
+                <i class="bi bi-check2-square me-2"></i>Select Rows
             </button>
-            <button type="button" class="btn btn-primary-gold" data-bs-toggle="modal" data-bs-target="#addEventModal">
+            <button type="button" class="btn btn-primary-gold btn-sm" data-bs-toggle="modal" data-bs-target="#addEventModal">
                 <i class="bi bi-plus-lg me-2"></i>Add New Event
             </button>
+        </div>
+    </div>
+
+    <!-- Filter Toolbar Row -->
+    <div class="d-flex justify-content-start align-items-center gap-2 mb-4">
+        <div class="input-group input-group-sm shadow-sm" style="width: 250px;">
+            <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control bg-dark text-white border-secondary" placeholder="Search events...">
+        </div>
+        <div class="input-group input-group-sm shadow-sm" style="width: 180px;">
+            <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-calendar-event"></i></span>
+            <input type="date" class="form-control bg-dark text-white border-secondary">
+        </div>
+        <button type="button" class="btn btn-sm btn-primary-gold px-4 shadow-sm"><i class="bi bi-filter me-1"></i>Apply Filters</button>
+        
+        <div class="ms-auto text-white-50 small">
+            <i class="bi bi-info-circle me-1"></i> Viewing all scheduled events
         </div>
     </div>
 
@@ -88,8 +99,8 @@
                         {% for event in events %}
                         <tr>
                             <td class="selection-col d-none text-center">
-                                {% if event.id > 2 %}
-                                <input type="checkbox" name="event_ids" value="{{ event.id }}"
+                                {% if event.event_id > 2 %}
+                                <input type="checkbox" name="event_ids" value="{{ event.event_id }}"
                                     class="form-check-input bg-dark border-secondary event-checkbox"
                                     onclick="updateDeleteButton()">
                                 {% else %}
@@ -101,15 +112,23 @@
                                     }}</span></td>
                             <td class="text-white-50 small">{{ event.dept }}</td>
                             <td class="text-white-50 font-monospace small">{{ event.date }}</td>
-                            <td class="text-white-50 font-monospace small">{{ event.time }}</td>
+                            <td class="text-white-50 font-monospace small">{{ event.time_start + ' - ' + event.time_end }}</td>
                             <td class="text-end pe-4">
-                                {% if event.id > 2 %}
-                                <button type="button" class="btn btn-sm btn-outline-danger" title="Delete Event"
-                                    onclick="if(confirm('Delete this event?')) { document.getElementById('delete-form-{{ event.id }}').submit(); }">
+                                <button type="button" 
+                                        class="btn btn-sm btn-info text-white me-1" 
+                                        title="View Event Info" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#viewEventModal" 
+                                        onclick="openViewModal('{{ event.event_id }}', '{{ event.name }}', '{{ event.type }}', '{{ event.date }}', '{{ event.time }}', '{{ event.dept }}');">
+                                    <i class="bi bi-eye me-1"></i> View
+                                </button>
+                                {% if event.event_id > 2 %}
+                                <button type="button" class="btn btn-sm btn-danger" title="Delete Event"
+                                    onclick="if(confirm('Delete this event?')) { document.getElementById('delete-form-{{ event.event_id }}').submit(); }">
                                     <i class="bi bi-trash"></i>
                                 </button>
                                 {% else %}
-                                <span class="text-white-50 small fst-italic">Default</span>
+                                <span class="text-white-50 small fst-italic ms-2">Default</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -127,8 +146,8 @@
         </div>
         <!-- Individual Delete Forms (Hidden) -->
         {% for event in events %}
-        {% if event.id > 2 %}
-        <form id="delete-form-{{ event.id }}" action="{{ url_for('delete_event', event_id=event.id) }}" method="POST"
+        {% if event.event_id > 2 %}
+        <form id="delete-form-{{ event.event_id }}" action="{{ url_for('delete_event', event_id=event.event_id) }}" method="POST"
             class="d-none"></form>
         {% endif %}
         {% endfor %}
@@ -137,22 +156,23 @@
 
 <!-- Add Event Modal -->
 <div class="modal fade" id="addEventModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content card-glass border-secondary">
             <div class="modal-header border-secondary">
                 <h5 class="modal-title text-white">Add New Event</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
                     aria-label="Close"></button>
             </div>
-            <form action="{{ url_for('add_event') }}" method="POST">
+            <form action="{{ url_for('add_event') }}" method="POST" enctype="multipart/form-data">
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label text-white-50">Event Name <span class="text-danger">*</span></label>
-                        <input type="text" name="name" class="form-control bg-dark text-white border-secondary" required
-                            placeholder="e.g. Annual Faculty Meeting">
-                    </div>
-                    <div class="row g-2 mb-3">
-                        <div class="col-6">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-8">
+                            <label class="form-label text-white-50">Event Name <span
+                                    class="text-danger">*</span></label>
+                            <input type="text" name="name" class="form-control bg-dark text-white border-secondary"
+                                required placeholder="e.g. Annual Faculty Meeting">
+                        </div>
+                        <div class="col-md-4">
                             <label class="form-label text-white-50">Type <span class="text-danger">*</span></label>
                             <select name="type" class="form-select bg-dark text-white border-secondary" required>
                                 <option>Meeting</option>
@@ -161,28 +181,102 @@
                                 <option>Workshop</option>
                                 <option>Drill</option>
                                 <option>Activity</option>
-                            </select>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label text-white-50">Department</label>
-                            <select name="dept" class="form-select bg-dark text-white border-secondary">
-                                <option value="All Departments">All Departments</option>
-                                <option value="College of Engineering">Engineering</option>
-                                <option value="College of Nursing">Nursing</option>
-                                <option value="Arts & Letters">Arts & Letters</option>
+                                <option>Flag Ceremony</option>
+                                <option>Other</option>
                             </select>
                         </div>
                     </div>
+
                     <div class="mb-3">
-                        <label class="form-label text-white-50">Event Date <span class="text-danger">*</span></label>
-                        <input type="date" name="date" class="form-control bg-dark text-white border-secondary"
-                            required>
+                        <label class="form-label text-white-50">Target Department(s)</label>
+                        <div class="card-glass p-3 border-secondary" style="max-height: 200px; overflow-y: auto;">
+                            <!-- Option 1: All Departments -->
+                            <div class="form-check mb-2 pb-2 border-bottom border-secondary">
+                                <input class="form-check-input bg-dark border-secondary" type="checkbox" name="dept"
+                                    value="All Departments" id="dept-all">
+                                <label class="form-check-label text-white fw-bold" for="dept-all">
+                                    All Departments
+                                </label>
+                            </div>
+                            <!-- Grid of other departments -->
+                            <div class="row g-2">
+                                {% for dept in departments %}
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input bg-dark border-secondary dept-cb" type="checkbox"
+                                            name="dept" value="{{ dept.department_id }}" id="dept-{{ dept.department_id }}">
+                                        
+                                        <label class="form-check-label text-white-50 small" for="dept-{{ dept.department_id }}">
+                                            {{ dept.department_name }}
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>  
+                        </div>
+                        <div class="mt-3 border-top border-secondary pt-3">
+                            <label class="form-label text-white-50 small mb-2">Upload Specific Target Roster (Excel/CSV)</label>
+                            <input class="form-control bg-dark text-white border-secondary form-control-sm mb-3" type="file" name="roster_file" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
+                            
+                            <label class="form-label text-white-50 small mb-2">External / Custom Participants</label>
+                            <div id="custom-participants-container" class="vstack gap-2">
+                                <div class="d-flex align-items-center">
+                                    <input type="text" name="custom_dept"
+                                        class="form-control bg-dark text-white border-secondary form-control-sm"
+                                        placeholder="e.g. Guest Speakers">
+                                    <button type="button" class="btn btn-sm btn-outline-danger ms-2 remove-custom-btn"
+                                        style="display: none;" title="Remove">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <button type="button" id="add-custom-participant-btn"
+                                class="btn btn-sm btn-link text-info text-decoration-none p-0 mt-2">
+                                <i class="bi bi-plus-circle me-1"></i>Add another participant group
+                            </button>
+                        </div>
                     </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label text-white-50" id="date-label">Event Date <span class="text-danger">*</span></label>
+                            
+                            <input type="date" name="event_date" id="event-date-input" class="form-control bg-dark text-white border-secondary" required>
+                            
+                            <select name="day_of_week" id="event-day-select" class="form-select bg-dark text-white border-secondary d-none">
+                                <option value="Monday">Monday</option>
+                                <option value="Tuesday">Tuesday</option>
+                                <option value="Wednesday">Wednesday</option>
+                                <option value="Thursday">Thursday</option>
+                                <option value="Friday">Friday</option>
+                                <option value="Saturday">Saturday</option>
+                                <option value="Sunday">Sunday</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <label class="form-label text-white-50">Start Time <span class="text-danger">*</span></label>
+                            <input type="time" name="time_start" class="form-control bg-dark text-white border-secondary" required>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <label class="form-label text-white-50">End Time <span class="text-danger">*</span></label>
+                            <input type="time" name="time_end" class="form-control bg-dark text-white border-secondary" required>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label text-white-50">Frequency</label>
+                            <select name="frequency" id="event-frequency" class="form-select bg-dark text-white border-secondary">
+                                <option value="once">One-time</option>
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                            </select>
+                        </div>
+                    </div>
+                    
                     <div class="mb-3">
-                        <label class="form-label text-white-50">Schedule Time <span class="text-danger">*</span></label>
-                        <input type="time" name="time" class="form-control bg-dark text-white border-secondary"
-                            required>
-                        <div class="form-text text-white-50 opacity-50">Please specify the start time.</div>
+                        <label class="form-label text-white-50">Location</label>
+                        <input type="text" name="location" class="form-control bg-dark text-white border-secondary"
+                            placeholder="e.g. Main Hall, Room 101, Activity Center">
                     </div>
                 </div>
                 <div class="modal-footer border-secondary">
@@ -193,9 +287,424 @@
         </div>
     </div>
 </div>
+
+<!-- View Event Modal -->
+<div class="modal fade" id="viewEventModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg"> <div class="modal-content card-glass border-info">
+            <div class="modal-header border-info bg-info bg-opacity-10 py-2">
+                <h5 class="modal-title text-white d-flex align-items-center">
+                    <i class="bi bi-calendar-check me-2 text-info"></i> Event Portal
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <div class="modal-body p-0">
+                <ul class="nav nav-tabs border-secondary bg-dark bg-opacity-50 px-3 pt-2" id="eventViewTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active text-white fw-bold bg-transparent border-0 border-bottom border-info border-3" id="details-tab" data-bs-toggle="tab" data-bs-target="#details-pane" type="button" role="tab">
+                            <i class="bi bi-info-circle me-1"></i> Details
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link text-white-50 bg-transparent border-0" id="attendance-tab" data-bs-toggle="tab" data-bs-target="#attendance-pane" type="button" role="tab">
+                            <i class="bi bi-people me-1"></i> Attendance
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content p-3" id="eventViewTabsContent">
+                    
+                    <div class="tab-pane fade show active" id="details-pane" role="tabpanel">
+                        <div class="mb-4 text-center mt-2">
+                            <h4 class="text-white mb-1" id="view-event-title">Event Title</h4>
+                            <span class="badge bg-secondary bg-opacity-25 border border-secondary" id="view-event-type">Type</span>
+                        </div>
+                        
+                        <div class="card bg-dark bg-opacity-50 border-secondary mb-3">
+                            <div class="card-body py-2">
+                                <div class="d-flex justify-content-between mb-2 pb-2 border-bottom border-secondary">
+                                    <span class="text-white-50 small"><i class="bi bi-calendar3 me-2"></i>Date</span>
+                                    <span class="text-white font-monospace small" id="view-event-date">Date</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-white-50 small"><i class="bi bi-clock me-2"></i>Time</span>
+                                    <span class="text-white font-monospace small" id="view-event-time">Time</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <h6 class="text-white-50 small mb-2 text-uppercase">Target Departments / Groups</h6>
+                            <div class="p-2 border border-secondary rounded bg-dark" id="view-event-depts">
+                                </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="attendance-pane" role="tabpanel">
+                        <div class="mb-3">
+                            <div class="mb-3" id="instanceSelectionContainer" style="display: none;">
+                                <label for="instanceSelect" class="form-label small text-white-50 mb-1">Select Event Instance</label>
+                                <select class="form-select form-select-sm bg-dark text-white border-secondary" id="instanceSelect">
+                                    </select>
+                            </div>
+                            <div class="d-flex justify-content-between small text-white-50 mb-1">
+                                <span>Attendance Overview</span>
+                                <span id="attendance-total">0 Participants</span>
+                            </div>
+                            <div class="progress" style="height: 10px; background-color: #2b2b2b;">
+                                <div id="bar-present" class="progress-bar bg-success" style="width: 0%" title="Present"></div>
+                                <div id="bar-excused" class="progress-bar bg-warning" style="width: 0%" title="Excused"></div>
+                                <div id="bar-absent" class="progress-bar bg-danger" style="width: 0%" title="Absent"></div>
+                            </div>
+                            <div class="d-flex gap-3 mt-2 small text-white-50 justify-content-center">
+                                <span><i class="bi bi-circle-fill text-success small me-1"></i> <span id="count-present">0</span> Present</span>
+                                <span><i class="bi bi-circle-fill text-warning small me-1"></i> <span id="count-excused">0</span> Excused</span>
+                                <span><i class="bi bi-circle-fill text-danger small me-1"></i> <span id="count-absent">0</span> Absent</span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary w-50" id="attendance-search" placeholder="Search name...">
+                            <button class="btn btn-sm btn-outline-info" onclick="fetchAttendanceData(currentInstanceId)"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+                        </div>
+
+                        <div class="table-responsive border border-secondary rounded" style="max-height: 350px; overflow-y: auto;">
+                            <table class="table table-dark table-hover table-sm mb-0 align-middle" style="font-size: 0.9rem;">
+                                <thead class="table-dark text-white-50 sticky-top">
+                                    <tr>
+                                        <th class="ps-3">Participant</th>
+                                        <th>In/Out</th>
+                                        <th class="text-end pe-3">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="attendance-table-body">
+                                    <tr><td colspan="3" class="text-center py-4 text-white-50">Loading attendance data...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-outline-secondary w-100" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/events.js') }}"></script>
+<script>
+    // ==========================================
+    // GLOBAL VARIABLES & FUNCTIONS FOR VIEW MODAL
+    // ==========================================
+    var currentEventId = null;
+    var currentInstanceId = null; // New variable to track the active instance
+
+    function openViewModal(eventId, name, type, date, time, deptsStr) {
+        currentEventId = eventId;
+        
+        // 1. Reset tabs to Details tab by default
+        const detailsTabEl = document.querySelector('#details-tab');
+        if (detailsTabEl) {
+            const detailsTab = new bootstrap.Tab(detailsTabEl);
+            detailsTab.show();
+        }
+
+        // 2. Set Basic Info
+        document.getElementById('view-event-title').innerText = name;
+        document.getElementById('view-event-type').innerText = type;
+        document.getElementById('view-event-date').innerText = date;
+        document.getElementById('view-event-time').innerText = time;
+
+        // 3. Handle Departments Badges
+        const deptsContainer = document.getElementById('view-event-depts');
+        deptsContainer.innerHTML = ''; 
+        if (deptsStr && deptsStr.trim() !== '') {
+            const deptsArray = deptsStr.split(', ');
+            deptsArray.forEach(dept => {
+                const badge = document.createElement('span');
+                badge.className = 'badge bg-primary-gold bg-opacity-25 text-gold border border-gold mb-1 me-1';
+                badge.innerText = dept;
+                deptsContainer.appendChild(badge);
+            });
+        } else {
+            deptsContainer.innerHTML = '<span class="text-white-50 small fst-italic">No departments specified</span>';
+        }
+
+        // 4. Trigger fetching of Instances first
+        fetchEventInstances(eventId);
+    }
+
+    function fetchEventInstances(eventId) {
+        const selectContainer = document.getElementById('instanceSelectionContainer');
+        const selectElement = document.getElementById('instanceSelect');
+        const tbody = document.getElementById('attendance-table-body');
+        
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-white-50"><div class="spinner-border spinner-border-sm text-info me-2"></div> Loading instances...</td></tr>';
+        
+        fetch(`http://127.0.0.1:5001/admin/event/${eventId}/instances`)
+            .then(response => response.json())
+            .then(instances => {
+                console.log("Fetched instances:", instances);
+                selectElement.innerHTML = ''; // Clear previous options
+
+                if (instances && instances.length > 0) {
+                    selectContainer.style.display = 'block';
+                    
+                    instances.forEach(inst => {
+                        let option = document.createElement('option');
+                        option.value = inst.instance_id;
+                        option.textContent = `${inst.event_date} (${inst.status})`; 
+                        selectElement.appendChild(option);
+                    });
+
+                    currentInstanceId = instances[0].instance_id;
+                    fetchAttendanceData(currentInstanceId);
+                } else {
+                    selectContainer.style.display = 'none';
+                    tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-white-50">No instances found for this event.</td></tr>';
+                    updateAttendanceVisuals([]); // Reset visuals to 0
+                }
+            })
+            .catch(error => {
+                console.error("Error fetching instances:", error);
+                selectContainer.style.display = 'none';
+                tbody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-danger">Failed to load event data.</td></tr>`;
+            });
+    }
+
+    function fetchAttendanceData(instanceId) {
+        if (!instanceId) return;
+        
+        const tbody = document.getElementById('attendance-table-body');
+        if (!tbody) return;
+        
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-white-50"><div class="spinner-border spinner-border-sm text-info me-2"></div> Loading attendance...</td></tr>';
+
+        // NOTE: Make sure this URL matches the new Flask route you created!
+        fetch(`http://127.0.0.1:5001/admin/instances/${instanceId}/get-attendance`)
+            .then(response => response.json())
+            .then(data => {
+                console.log("Fetched attendance:", data);
+                renderAttendanceTable(data);
+                updateAttendanceVisuals(data);
+            })
+            .catch(error => {
+                console.error("Error fetching attendance:", error);
+                tbody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-danger">Failed to load attendance. Check backend connection.</td></tr>`;
+            });
+    }
+
+    function renderAttendanceTable(participants) {
+        const tbody = document.getElementById('attendance-table-body');
+        tbody.innerHTML = '';
+
+        if (!participants || participants.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-white-50">No participants found.</td></tr>';
+            return;
+        }
+
+        participants.forEach(p => {
+            const statusColors = {
+                'Present': 'text-success',
+                'Absent': 'text-danger',
+                'Late': 'text-warning',
+                'Excused': 'text-warning'
+            };
+            const activeColor = statusColors[p.status] || 'text-white';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="ps-3">
+                    <div class="fw-bold text-white">${p.user_name}</div>
+                    <div class="text-white-50" style="font-size: 0.75rem;">${p.department || 'N/A'}</div>
+                </td>
+                <td class="font-monospace text-white-50 small">
+                    In: ${p.first_in ? p.first_in : '--:--'}<br>
+                    Out: ${p.last_out ? p.last_out : '--:--'}
+                </td>
+                <td class="text-end pe-3">
+                    <select class="form-select form-select-sm bg-dark border-secondary ${activeColor} d-inline-block w-auto" 
+                            onchange="updateStatus(${p.attendance_id}, this.value, this)">
+                        <option value="Present" class="text-success" ${p.status === 'Present' ? 'selected' : ''}>Present</option>
+                        <option value="Late" class="text-warning" ${p.status === 'Late' ? 'selected' : ''}>Late</option>
+                        <option value="Excused" class="text-warning" ${p.status === 'Excused' ? 'selected' : ''}>Excused</option>
+                        <option value="Absent" class="text-danger" ${p.status === 'Absent' ? 'selected' : ''}>Absent</option>
+                    </select>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function updateAttendanceVisuals(participants) {
+        if (!participants) return;
+        
+        let total = participants.length;
+        let present = 0, absent = 0, excused = 0, late = 0;
+
+        participants.forEach(p => {
+            if (p.status === 'Present') present++;
+            else if (p.status === 'Absent') absent++;
+            else if (p.status === 'Excused') excused++;
+            else if (p.status === 'Late') late++;
+        });
+
+        document.getElementById('attendance-total').innerText = `${total} Total`;
+        // Grouping Late with Present for the overall progress bar
+        document.getElementById('count-present').innerText = present + late; 
+        document.getElementById('count-excused').innerText = excused;
+        document.getElementById('count-absent').innerText = absent;
+
+        let pPct = total > 0 ? ((present + late) / total) * 100 : 0;
+        let ePct = total > 0 ? (excused / total) * 100 : 0;
+        let aPct = total > 0 ? (absent / total) * 100 : 0;
+
+        document.getElementById('bar-present').style.width = pPct + '%';
+        document.getElementById('bar-excused').style.width = ePct + '%';
+        document.getElementById('bar-absent').style.width = aPct + '%';
+    }
+
+    function updateStatus(attendanceId, newStatus, selectElement) {
+        selectElement.className = `form-select form-select-sm bg-dark border-secondary d-inline-block w-auto text-${newStatus === 'Present' ? 'success' : newStatus === 'Absent' ? 'danger' : 'warning'}`;
+
+        fetch(`/api/attendance/update`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ attendance_id: attendanceId, status: newStatus })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if(data.success) {
+                fetchAttendanceData(currentInstanceId); 
+            } else {
+                alert('Failed to update status.');
+            }
+        })
+        .catch(error => console.error("Update Error:", error));
+    }
+
+
+    // ==========================================
+    // DOM CONTENT LOADED (EVENT LISTENERS)
+    // ==========================================
+    document.addEventListener('DOMContentLoaded', function () {
+
+        const tabs = document.querySelectorAll('#eventViewTabs .nav-link');
+        tabs.forEach(tab => {
+            tab.addEventListener('shown.bs.tab', function (event) {
+                tabs.forEach(t => {
+                    t.classList.remove('text-white', 'fw-bold', 'border-bottom', 'border-info', 'border-3');
+                    t.classList.add('text-white-50');
+                });
+                event.target.classList.remove('text-white-50');
+                event.target.classList.add('text-white', 'fw-bold', 'border-bottom', 'border-info', 'border-3');
+            });
+        });
+
+        const frequencySelect = document.getElementById('event-frequency');
+        const dateInput = document.getElementById('event-date-input');
+        const daySelect = document.getElementById('event-day-select');
+        const dateLabel = document.getElementById('date-label');
+
+        if (frequencySelect) {
+            frequencySelect.addEventListener('change', function () {
+                if (this.value === 'weekly') {
+                    dateInput.classList.add('d-none');
+                    dateInput.removeAttribute('required');
+                    dateInput.disabled = false;
+                    
+                    daySelect.classList.remove('d-none');
+                    daySelect.setAttribute('required', 'required');
+                    daySelect.disabled = false;
+                    
+                    dateLabel.innerHTML = 'Event Day <span class="text-danger">*</span>';
+                    
+                } else if (this.value === 'daily') {
+                    daySelect.classList.add('d-none');
+                    daySelect.removeAttribute('required');
+                    
+                    dateInput.classList.remove('d-none');
+                    dateInput.removeAttribute('required');
+                    dateInput.disabled = true;
+                    dateInput.value = ''; 
+                    
+                    dateLabel.innerHTML = 'Event Date <span class="text-white-50">(N/A)</span>';
+                    
+                } else {
+                    daySelect.classList.add('d-none');
+                    daySelect.removeAttribute('required');
+                    
+                    dateInput.classList.remove('d-none');
+                    dateInput.setAttribute('required', 'required');
+                    dateInput.disabled = false;
+                    
+                    dateLabel.innerHTML = 'Event Date <span class="text-danger">*</span>';
+                }
+            });
+        }
+
+        const allDeptCheck = document.getElementById('dept-all');
+        const deptChecks = document.querySelectorAll('.dept-cb');
+
+        if (allDeptCheck && deptChecks.length > 0) {
+            allDeptCheck.addEventListener('change', function () {
+                deptChecks.forEach(cb => cb.checked = this.checked);
+            });
+
+            deptChecks.forEach(cb => {
+                cb.addEventListener('change', function () {
+                    const allChecked = Array.from(deptChecks).every(c => c.checked);
+                    allDeptCheck.checked = allChecked;
+                });
+            });
+        }
+
+        const container = document.getElementById('custom-participants-container');
+        const addBtn = document.getElementById('add-custom-participant-btn');
+
+        if (container && addBtn) {
+            addBtn.addEventListener('click', function () {
+                const row = document.createElement('div');
+                row.className = 'd-flex align-items-center mt-2';
+                row.innerHTML = `
+                    <input type="text" name="custom_dept" class="form-control bg-dark text-white border-secondary form-control-sm" placeholder="e.g. Parents, Sponsors">
+                    <button type="button" class="btn btn-sm btn-outline-danger ms-2 remove-custom-btn" title="Remove">
+                        <i class="bi bi-x"></i>
+                    </button>
+                `;
+                container.appendChild(row);
+
+                updateRemoveButtons();
+
+                const removeBtn = row.querySelector('.remove-custom-btn');
+                removeBtn.addEventListener('click', function () {
+                    row.remove();
+                    updateRemoveButtons();
+                });
+            });
+
+            function updateRemoveButtons() {
+                const rows = container.querySelectorAll('.d-flex');
+                rows.forEach((row) => {
+                    const btn = row.querySelector('.remove-custom-btn');
+                    if (btn) {
+                        btn.style.display = rows.length > 1 ? 'block' : 'none';
+                    }
+                });
+            }
+        }
+        
+        const instanceSelect = document.getElementById('instanceSelect');
+        if (instanceSelect) {
+            instanceSelect.addEventListener('change', function(e) {
+                currentInstanceId = e.target.value;
+                fetchAttendanceData(currentInstanceId);
+            });
+        }
+    });
+</script>
 {% endblock %}
 {% endblock %}

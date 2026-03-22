@@ -1,6 +1,6 @@
 /* Event management functionality */
 
-let selectionMode = false;
+var selectionMode = false;
 
 function toggleSelectionMode() {
     selectionMode = !selectionMode;

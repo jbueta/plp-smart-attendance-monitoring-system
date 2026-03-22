@@ -22,7 +22,9 @@ class Database:
             query = """ 
                 SELECT u.user_id, u.role, u.active,
                        COALESCE(s.student_id, e.employee_id, v.visitor_id) as scan_id,
-                       COALESCE(s.status, e.status, v.status) as current_status
+                       COALESCE(s.status, e.status, v.status) as current_status,
+                       COALESCE(CONCAT(s.first_name, ' ', s.last_name), CONCAT(e.first_name, ' ', e.last_name), v.name) as full_name,
+                       COALESCE(s.course, e.department, 'Visitor') as affiliation
                 FROM users u 
                 LEFT JOIN students s ON u.user_id = s.user_id 
                 LEFT JOIN employees e ON u.user_id = e.user_id
@@ -44,20 +46,50 @@ class Database:
             current_status = self.parameter[1]
             role = self.parameter[2]
 
-            new_status = 'Outside' if current_status and current_status.lower() == 'inside' else 'Inside'
+            # check user last scanned
+            last_log_query = """
+                SELECT timestamp, log_type 
+                FROM general_log 
+                WHERE user_id = %s 
+                ORDER BY timestamp DESC LIMIT 1
+            """
+            self.cursor.execute(last_log_query, (user_id,))
+            last_log = self.cursor.fetchone()
+
+            new_status = 'Inside'
+            
+            now = datetime.now()
+            today_date = now.date()
+            forgot_to_timeout = False
+
+            if last_log:
+                last_time = last_log['timestamp']
+                last_type = last_log['log_type']
+                last_date = last_time.date()
+
+                if current_status.lower() == 'inside':
+                    if last_date < today_date:
+                        forgot_to_timeout = True
+                        new_status = 'Inside'
+                    else:
+                        new_status = 'Outside'
+                else:
+                    new_status = 'Inside'
+            else:
+                 new_status = 'Inside'
 
             if role == 'student':
                 query = "UPDATE students SET status = %s WHERE user_id = %s"
             elif role == 'employee':
                 query = "UPDATE employees SET status = %s WHERE user_id = %s"
             else:
-                query ="UPDATE visitors SET status = %s WHERE user_id = %s" 
+                query = "UPDATE visitors SET status = %s WHERE user_id = %s" 
 
             self.cursor.execute(query, (new_status, user_id))
             self.conn.commit()
 
             if self.cursor.rowcount > 0:
-                return {"message": "Status changed successfully!", "status": new_status}
+                return {"message": "Status changed successfully!", "status": new_status, "forgot_to_timeout": forgot_to_timeout}
             return None
             
         except connector.Error as err:
@@ -146,14 +178,16 @@ class Database:
         try:
             if self.parameter[2] == 'WEEKLY':
                 query = """INSERT IGNORE INTO events 
-                           (event_name, event_type, frequency, day, start_date, 
-                           end_date, time_start, time_end, location, active) 
+                           (event_name, event_type, frequency, day, event_date,
+                            time_start, time_end, location, active) 
                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
-                params = (self.parameter[0], self.parameter[1], self.parameter[2], self.parameter[3], self.parameter[4], self.parameter[5], self.parameter[6], self.parameter[7], self.parameter[8], 1)
+                params = (self.parameter[0], self.parameter[1], self.parameter[2], self.parameter[3], self.parameter[4], self.parameter[5], self.parameter[6], self.parameter[7], 1)
 
             else:
-                query = """INSERT IGNORE INTO events (event_name, event_type, start_date, end_date, time_start, time_end, location, active) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
-                params = (self.parameter[0], self.parameter[1], self.parameter[4], self.parameter[5], self.parameter[6], self.parameter[7], self.parameter[8], 1)
+                query = """INSERT IGNORE INTO events 
+                           (event_name, event_type, frequency, event_date, time_start, time_end, location, active) 
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
+                params = (self.parameter[0], self.parameter[1], self.parameter[2], self.parameter[4], self.parameter[5], self.parameter[6], self.parameter[7], 1)
 
             self.cursor.execute(query, params)
             rows_affected = self.cursor.rowcount
@@ -162,9 +196,9 @@ class Database:
 
                 event_id = int(self.cursor.lastrowid)
 
-                match (self.parameter[10]):
+                match (self.parameter[9]):
                     case 'grouped':
-                        departments = self.parameter[9]
+                        departments = self.parameter[8]
                         
                         if departments and isinstance(departments, list):
                             print(f"Retrieving user_ids for {len(departments)} departments...")
@@ -191,7 +225,7 @@ class Database:
                             else:
                                 print("Warning: No employees found in the provided departments.")
                     case 'custom':
-                        raw_ids = self.parameter[9]
+                        raw_ids = self.parameter[8]
                         if raw_ids and isinstance(raw_ids, list):
                             print(f"Translating {len(raw_ids)} raw IDs to user_ids...")
 
@@ -224,7 +258,7 @@ class Database:
                                 print("Warning: None of the provided IDs matched any users in the database.")
 
                     case 'hybrid':
-                        hybrid_data = self.parameter[9]
+                        hybrid_data = self.parameter[8]
                         
                         grouped_deps = hybrid_data.get('grouped_participants', [])
                         custom_raw_ids = hybrid_data.get('custom_participants', [])
@@ -320,7 +354,7 @@ class Database:
 
     def check_events(self):
             try:
-                query = """ SELECT event_id FROM events 
+                query = """ SELECT event_id, event_date FROM events 
                             WHERE active = 1 
                             AND (
                                 (frequency = 'WEEKLY' AND day = %s) 
@@ -425,7 +459,7 @@ class Database:
             self.conn.rollback()
             return {"success": False, "message": f"Database Error: {err}"}
 
-    def update_instance_status(self, instance_id, new_status):
+    def update_instance_status(self):
         """
         Updates the status of a specific event instance (e.g., to 'Completed' or 'Cancelled').
         Expected new_status values: 'Scheduled', 'Completed', 'Cancelled'
@@ -476,22 +510,245 @@ class Database:
             print(f"Error fetching events: {err}")
             return []
 
-    def get_instance_attendance(self):
+    # ==============================================================================
+    # STATIC GETTER METHODS
+    # ==============================================================================
+
+    @staticmethod
+    def get_events_dashboard(conn):
         try:
-            query = """ 
-                        SELECT ea.attendance_id, ea.user_id, ea.status, ea.first_in, ea.last_out, ea.remarks, u.name,
-                               s.student_id, e.employee_id
-                        FROM event_attendance ea
-                        LEFT JOIN users u ON ea.user_id = u.user_id
-                        LEFT JOIN students s ON u.user_id = s.user_id
-                        LEFT JOIN employees e ON u.user_id = e.user_id
-                        WHERE ea.instance_id = %s
-                        ORDER BY u.name ASC
+            if conn:
+                cursor = conn.cursor(dictionary=True)
+            else:
+                raise Exception("Failed to connect to the database.")
+            query = """
+                        SELECT 
+                            e.event_id AS event_id, 
+                            e.event_name AS name, 
+                            e.event_type AS type, 
+                            e.event_date AS date, 
+                            e.time_start, 
+                            e.time_end, 
+                            e.location AS location,
+                            GROUP_CONCAT(DISTINCT d.department_name SEPARATOR ', ') AS dept
+                        FROM event_participants ep
+                        JOIN events e ON ep.event_id = e.event_id
+                        JOIN employees emp ON ep.user_id = emp.user_id
+                        JOIN departments d ON emp.department_id = d.department_id
+                        GROUP BY e.event_id, e.event_name
+                        ORDER BY e.event_date DESC;
                     """
-            self.cursor.execute(query, self.parameter)
-            result = self.cursor.fetchall()
+
+            cursor.execute(query)
+            result = cursor.fetchall()
+
+            if result:
+                for row in result:
+                    if row.get('date'):
+                        row['date'] = str(row['date'])
+                    if row.get('time_start'):
+                        row['time_start'] = str(row['time_start'])
+                    if row.get('time_end'):
+                        row['time_end'] = str(row['time_end'])
+                        
+            return result if result else []
+            
+        except connector.Error as err:
+            print(f"Error fetching events: {err}")
+            return None
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+
+
+    @staticmethod
+    def get_events_kiosk(conn):
+        try:
+            if conn:
+                cursor = conn.cursor(dictionary=True)
+            else:
+                raise Exception("Failed to connect to the database.")
+            query = """
+                        SELECT 
+                            ei.instance_id AS instance_id, 
+                            e.event_name AS name, 
+                            e.event_type AS type, 
+                            ei.event_date AS date, 
+                            e.time_start, 
+                            e.time_end, 
+                            e.location AS location
+                        FROM event_instances ei
+                        JOIN events e ON ei.event_id = e.event_id
+                        WHERE ei.event_date = CURDATE() 
+                        AND ei.status = 'Scheduled'
+                        AND e.active = 1
+                    """
+            cursor.execute(query)
+            result = cursor.fetchall()
+
+            if result:
+                for row in result:
+                    if row.get('date'):
+                        row['date'] = str(row['date'])
+                    if row.get('time_start'):
+                        row['time_start'] = str(row['time_start'])
+                    if row.get('time_end'):
+                        row['time_end'] = str(row['time_end'])
+                        
+            return result if result else []
+            
+        except connector.Error as err:
+            print(f"Error fetching events: {err}")
+            return None
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+
+    @staticmethod
+    def get_admin_departments(conn):
+        try:
+            cursor = conn.cursor(dictionary=True)
+            query = """ 
+                SELECT 
+                    d.department_id AS dept_id, 
+                    d.department_name AS dept_name
+                FROM departments d
+            """
+            cursor.execute(query)
+            result = cursor.fetchall()
+            
             return result if result else []
             
         except connector.Error as err:
             print(f"Error fetching attendance: {err}")
+            return [] 
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+
+    @staticmethod
+    def get_student_logs(conn, limit=6):
+        try:
+            if conn:
+                cursor = conn.cursor(dictionary=True)
+            else:
+                raise Exception("Failed to connect to the database.")
+
+            query = """
+                SELECT 
+                    gl.log_type, 
+                    s.student_name, 
+                    c.course_name, 
+                    gl.timestamp
+                FROM general_log gl
+                JOIN users u ON gl.user_id = u.user_id
+                JOIN students s ON u.user_id = s.user_id
+                LEFT JOIN courses c ON s.course_id = c.course_id
+                ORDER BY gl.timestamp DESC
+                LIMIT %s
+            """
+            cursor.execute(query, (limit,))
+            result = cursor.fetchall()
+
+            formatted_logs = []
+
+            if result:
+                for row in result:
+                    mapped_type = "in" if row['log_type'] == "Entry" else "out"
+                    
+                    formatted_time = ""
+                    if row.get('timestamp'):
+                        if isinstance(row['timestamp'], datetime):
+                            formatted_time = row['timestamp'].strftime('%I:%M %p')
+                        else:
+                            dt_obj = datetime.strptime(str(row['timestamp']), '%Y-%m-%d %H:%M:%S')
+                            formatted_time = dt_obj.strftime('%I:%M %p')
+
+                    formatted_logs.append({
+                        "type": mapped_type,
+                        "name": row.get('student_name', 'Unknown User'),
+                        "course": row.get('course_name', 'N/A'),
+                        "time": formatted_time
+                    })
+
+            return formatted_logs
+        except connector.Error as err:
+            print(f"Error fetching recent student logs: {err}")
             return None
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+
+    @staticmethod
+    def get_event_instances(conn, event_id):
+        try:
+            cursor = conn.cursor(dictionary=True)
+            query = """ 
+                SELECT instance_id, event_date, status 
+                FROM event_instances 
+                WHERE event_id = %s 
+                ORDER BY event_date ASC 
+            """
+            cursor.execute(query, (event_id,))
+            result = cursor.fetchall()
+            
+            cleaned_instances = []
+            for row in result:
+                for key, val in row.items():
+                    if isinstance(val, (timedelta, date, datetime)):
+                        row[key] = str(val)
+                cleaned_instances.append(row)
+
+            return cleaned_instances
+            
+        except connector.Error as err:
+            print(f"Error fetching event instances: {err}")
+            return []
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+
+    @staticmethod
+    def get_instance_attendance(conn, instance_id):
+        try:
+            cursor = conn.cursor(dictionary=True)
+            query = """ 
+                SELECT 
+                    ea.attendance_id, ea.user_id, ea.status, 
+                    ea.first_in, ea.last_out, ea.remarks, 
+                    COALESCE(s.student_name, e.employee_name, u.user_name) AS user_name,
+                    COALESCE(d.department_name, 'N/A') AS department
+                FROM event_attendance ea
+                LEFT JOIN users u ON ea.user_id = u.user_id
+                LEFT JOIN students s ON u.user_id = s.user_id
+                LEFT JOIN employees e ON u.user_id = e.user_id
+                LEFT JOIN departments d ON (e.department_id = d.department_id)
+                WHERE ea.instance_id = %s
+                ORDER BY user_name ASC
+            """
+            cursor.execute(query, (instance_id,))
+            result = cursor.fetchall()
+            
+            cleaned_attendance = []
+            for row in result:
+                for key, val in row.items():
+                    if isinstance(val, (timedelta, date, datetime)):
+                        if isinstance(val, timedelta):
+                            total_seconds = int(val.total_seconds())
+                            hours = total_seconds // 3600
+                            minutes = (total_seconds % 3600) // 60
+                            row[key] = f"{hours:02d}:{minutes:02d}"
+                        else:
+                            row[key] = str(val)
+                cleaned_attendance.append(row)
+
+            return cleaned_attendance
+            
+        except connector.Error as err:
+            print(f"Error fetching attendance: {err}")
+            return [] 
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+
+        

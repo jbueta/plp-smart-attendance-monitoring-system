@@ -17,18 +17,13 @@
     <div class="row justify-content-center">
         <div class="col-md-8 col-lg-6">
             <div class="card-glass p-0 overflow-hidden">
-                <!-- Tabs -->
+                <!-- Single Tab -->
                 <ul class="nav nav-pills nav-fill bg-dark bg-opacity-50" id="visitorTabs" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active rounded-0 py-3 fw-bold text-uppercase" id="checkin-tab"
-                            data-bs-toggle="tab" data-bs-target="#checkin" type="button" role="tab">
-                            <i class="bi bi-box-arrow-in-right me-2"></i>Check In
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link rounded-0 py-3 fw-bold text-uppercase" id="checkout-tab"
-                            data-bs-toggle="tab" data-bs-target="#checkout" type="button" role="tab">
-                            <i class="bi bi-box-arrow-left me-2"></i>Check Out
+                            data-bs-toggle="tab" data-bs-target="#checkin" type="button" role="tab"
+                            style="cursor: default;">
+                            <i class="bi bi-box-arrow-in-right me-2"></i>Visitor Check In
                         </button>
                     </li>
                 </ul>
@@ -70,33 +65,7 @@
                         </form>
                     </div>
 
-                    <!-- Check Out List -->
-                    <div class="tab-pane fade" id="checkout" role="tabpanel">
-                        {% if active_visitors %}
-                        <div class="list-group list-group-flush border-secondary rounded mb-3 max-vh-50 overflow-auto">
-                            {% for v in active_visitors %}
-                            <form action="{{ url_for('visitor_checkout', visitor_id=v.id) }}" method="POST">
-                                <button type="submit"
-                                    class="list-group-item list-group-item-action bg-transparent text-white border-secondary d-flex justify-content-between align-items-center p-3"
-                                    onclick="return confirm('Confirm check out for {{ v.name }}?')">
-                                    <div>
-                                        <h6 class="mb-1 fw-bold text-white">{{ v.name }}</h6>
-                                        <small class="text-white-50"><i class="bi bi-clock me-1"></i>Time In: {{
-                                            v.time_in }}</small>
-                                    </div>
-                                    <span class="badge bg-danger rounded-pill"><i
-                                            class="bi bi-box-arrow-left me-1"></i>Out</span>
-                                </button>
-                            </form>
-                            {% endfor %}
-                        </div>
-                        {% else %}
-                        <div class="text-center py-5 text-white-50">
-                            <i class="bi bi-person-check display-4 mb-3 d-block opacity-50"></i>
-                            <p>No active visitors found.</p>
-                        </div>
-                        {% endif %}
-                    </div>
+                    <!-- Check Out List removed as requested -->
                 </div>
             </div>
         </div>

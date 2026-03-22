@@ -1,0 +1,404 @@
+<!-- Load base layout -->
+{% extends "base.html" %}
+
+<!-- Page title -->
+{% block title %}Entrance Kiosk - PLP{% endblock %}
+
+<!-- Page content -->
+{% block content %}
+<!-- Full Screen Scan Overlay (Hidden by default) -->
+<div id="scan-overlay"
+    class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-75 d-none align-items-center justify-content-center"
+    style="z-index: 2000; backdrop-filter: blur(10px);">
+    <div class="card-glass p-5 text-center shadow-lg" style="min-width: 400px; transform: scale(1.1);">
+        <div id="scan-ring" class="rounded-circle border border-5 border-success p-1 mb-3 d-inline-block">
+            <i class="bi bi-person-circle text-white display-1"></i>
+        </div>
+        <h2 id="scan-title" class="display-6 fw-bold text-success mb-2">ACCESS GRANTED</h2>
+        <h3 id="scan-name" class="h2 text-white mb-0">Juan Dela Cruz</h3>
+        <p id="scan-id" class="text-white-50 font-monospace mb-3">ID: 2026-01234</p>
+        <div class="badge bg-white bg-opacity-10 text-white px-3 py-2 rounded-pill">
+            <i class="bi bi-check-circle-fill me-2 text-success"></i><span id="scan-status">ENTRY RECORDED</span>
+        </div>
+    </div>
+</div>
+
+<div class="container py-4 d-flex flex-column min-vh-100">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <a href="{{ url_for('index') }}" class="btn btn-glass rounded-pill px-3">
+            <i class="bi bi-arrow-left me-2"></i>Main Menu
+        </a>
+        <div class="text-end">
+            <h2 class="h1 text-gold fw-bold mb-0 tracking-wider">Student Entrance</h2>
+            <div class="live-clock fs-5 badge bg-light bg-opacity-10 fw-normal py-2 px-3 mt-1">Connecting...</div>
+        </div>
+    </div>
+
+    <div class="row g-4 flex-grow-1 align-items-center justify-content-center">
+        <!-- Left: Scanner -->
+        <div class="col-lg-5">
+            <div class="card-glass p-5 text-center border-gold-subtle position-relative overflow-hidden">
+
+                <!-- Scanner Frame -->
+                <div class="scanner-frame mb-4 mx-auto" style="border-width: 2px; transition: all 0.3s ease;">
+
+                    <!-- Scan Line -->
+                    <div class="scan-laser"></div>
+
+                    <!-- Feed Text -->
+                    <div id="scanner-text"
+                        class="position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-white-50 small font-monospace">
+                        [CAMERA FEED]
+                    </div>
+                </div>
+
+                <h3 class="h5 mb-2">Scan Digital ID</h3>
+                <p class="text-white-50 small mb-4">Scanner is active and ready</p>
+
+                <!-- Hidden Input to catch exact scanner focus (optional, but global key listener added later) -->
+
+                <div class="mt-4 d-grid gap-2 d-md-flex justify-content-center">
+                    <button class="btn btn-outline-light rounded-pill px-4 hover-text-dark small" data-bs-toggle="modal"
+                        data-bs-target="#manualEntryModal">
+                        <i class="bi bi-keyboard me-2"></i>Enter ID Manually
+                    </button>
+                    <button class="btn btn-outline-info rounded-pill px-4 text-info small" data-bs-toggle="modal"
+                        data-bs-target="#visitorModal">
+                        <i class="bi bi-person-lines-fill me-2"></i>Visitor Log
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Info Panel & Bulletin -->
+        <div class="col-lg-6">
+            <!-- Student Search tracking removed as requested -->
+            <!-- Recent Activity -->
+            <div class="card-glass p-4 mb-4">
+                <h4 class="h6 text-uppercase text-white-50 mb-3 border-bottom border-secondary pb-2">
+                    <i class="bi bi-broadcast text-success me-2"></i>Live Feed
+                </h4>
+                <div class="vstack gap-2" id="live-feed-list">
+                    {% for log in kiosk_data.recent_student_logs %}
+                    <div class="d-flex align-items-center p-2 rounded live-feed-item" style="background: rgba(255,255,255,0.03);">
+                        {% if log.type == 'in' %}
+                        <div class="rounded-circle bg-success bg-opacity-25 p-2 me-3 text-success">
+                            <i class="bi bi-check-lg"></i>
+                        </div>
+                        {% else %}
+                        <div class="rounded-circle bg-secondary bg-opacity-25 p-2 me-3 text-white">
+                            <i class="bi bi-arrow-right"></i>
+                        </div>
+                        {% endif %}
+                        <div class="flex-grow-1 lh-1">
+                            <h6 class="mb-0 small">{{ log.name }}</h6>
+                            <small class="text-white-50" style="font-size: 0.75rem">{{ log.course }}</small>
+                        </div>
+                        <div class="text-end">
+                            {% if log.type == 'in' %}
+                            <div class="badge bg-success bg-opacity-10 text-success mb-1">TIME IN</div>
+                            {% else %}
+                            <div class="badge bg-secondary bg-opacity-10 text-white mb-1">TIME OUT</div>
+                            {% endif %}
+                            <div class="font-monospace small text-white-50">{{ log.time }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- NEW: Campus Bulletin -->
+            <div class="card-glass p-4 bg-gradient"
+                style="background: linear-gradient(135deg, rgba(11, 125, 63, 0.4), rgba(5, 26, 16, 0.8));">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="badge bg-warning text-dark me-2">{{ kiosk_data.bulletin.tag }}</span>
+                    <small class="text-white-50">{{ kiosk_data.bulletin.author }}</small>
+                </div>
+                <h5 class="fw-bold mb-1">{{ kiosk_data.bulletin.title }}</h5>
+                <p class="small text-white-50 mb-0">{{ kiosk_data.bulletin.body }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- Manual Entry Modal -->
+<div class="modal fade" id="manualEntryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content card-glass border-secondary" style="background: rgba(10, 20, 15, 0.95); backdrop-filter: blur(20px);">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title text-white">Manual Entry</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="manual-student-id" class="form-label text-white-50">Student ID Number</label>
+                    <input type="text" class="form-control text-white border-secondary"
+                        id="manual-student-id" placeholder="e.g. 2026-0001" style="background: rgba(0,0,0,0.5);">
+                </div>
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-success" onclick="submitManualEntry('student')">Time In</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- Visitor Entry Modal -->
+<div class="modal fade" id="visitorModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content card-glass portal-card border-info" style="background: rgba(10, 20, 15, 0.98); backdrop-filter: blur(20px);">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title text-info"><i class="bi bi-person-lines-fill me-2"></i>Visitor Logging</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <!-- Tabs (Single tab now, for visuals) -->
+                <ul class="nav nav-pills nav-fill bg-dark bg-opacity-50 border-bottom border-secondary" id="visitorTabs"
+                    role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active rounded-0 py-3 fw-bold text-uppercase" id="v-checkin-tab"
+                            data-bs-toggle="tab" data-bs-target="#v-checkin" type="button" role="tab"
+                            style="cursor: default;">
+                            <i class="bi bi-box-arrow-in-right me-2"></i>Visitor Check In
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content p-4">
+                    <!-- Check In Form -->
+                    <div class="tab-pane fade show active" id="v-checkin" role="tabpanel">
+                        <form action="{{ url_for('visitor_checkin') }}" method="POST">
+                            <input type="hidden" name="source" value="kiosk_entrance">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label text-white-50">Full Name <span
+                                            class="text-danger">*</span></label>
+                                    <input type="text" name="name"
+                                        class="form-control bg-dark text-white border-secondary" required
+                                        placeholder="Last Name, First Name">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-white-50">Purpose <span
+                                            class="text-danger">*</span></label>
+                                    <select name="purpose" class="form-select bg-dark text-white border-secondary"
+                                        required>
+                                        <option value="" selected disabled>Select Purpose</option>
+                                        <option>Official Business</option>
+                                        <option>Document Submission</option>
+                                        <option>Inquiry</option>
+                                        <option>Meeting</option>
+                                        <option>Delivery</option>
+                                        <option>Other</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label text-white-50">Person/Office to Visit</label>
+                                    <input type="text" name="details"
+                                        class="form-control bg-dark text-white border-secondary"
+                                        placeholder="e.g. Registrar's Office">
+                                </div>
+                                <div class="col-12 mt-4">
+                                    <div class="d-grid">
+                                        <button type="submit"
+                                            class="btn btn-info p-3 fw-bold text-uppercase text-white">
+                                            Confirm Check In
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Check Out List Removed as requested -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/kiosk.js') }}"></script>
+<script>
+
+    document.addEventListener('DOMContentLoaded', function () {
+        // --- 1. LIVE CLOCK LOGIC ---
+        function updateClock() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const dateString = now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+            document.querySelectorAll('.live-clock').forEach(el => {
+                el.innerHTML = `<i class="bi bi-clock me-2"></i>${timeString} <span class="ms-2 opacity-50">| ${dateString}</span>`;
+            });
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        function appendToLiveFeed(name, course, logType) {
+            const feedContainer = document.getElementById('live-feed-list');
+            if (!feedContainer) return;
+
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+            const isEntry = (logType === 'entry');
+            const iconBg = isEntry ? 'bg-success text-success' : 'bg-secondary text-white';
+            const iconClass = isEntry ? 'bi-check-lg' : 'bi-arrow-right';
+            const badgeClass = isEntry ? 'bg-success text-success' : 'bg-secondary text-white';
+            const badgeText = isEntry ? 'TIME IN' : 'TIME OUT';
+
+            const logHtml = `
+                <div class="d-flex align-items-center p-2 rounded" style="background: rgba(255,255,255,0.03);">
+                    <div class="rounded-circle ${iconBg} bg-opacity-25 p-2 me-3">
+                        <i class="bi ${iconClass}"></i>
+                    </div>
+                    <div class="flex-grow-1 lh-1">
+                        <h6 class="mb-0 small">${name}</h6>
+                        <small class="text-white-50" style="font-size: 0.75rem">${course || 'N/A'}</small>
+                    </div>
+                    <div class="text-end">
+                        <div class="badge ${badgeClass} bg-opacity-10 mb-1">${badgeText}</div>
+                        <div class="font-monospace small text-white-50">${timeString}</div>
+                    </div>
+                </div>
+            `;
+
+            feedContainer.insertAdjacentHTML('afterbegin', logHtml);
+
+            if (feedContainer.children.length > 6) {
+                feedContainer.lastElementChild.remove();
+            }
+        }
+
+        // --- 2. FLASHED MESSAGE HANDLER (VISITORS) ---
+        {% with messages = get_flashed_messages(category_filter=["success"]) %}
+            {% if messages %}
+                {% for message in messages %}
+                setTimeout(() => {
+                    const msg = "{{ message }}";
+                    if (msg.includes("Check-in successful")) {
+                        let name = "Visitor";
+                        const nameMatch = msg.match(/Welcome, (.*?)\./);
+                        if (nameMatch && nameMatch[1]) {
+                            name = nameMatch[1];
+                        }
+                        showSuccessOverlay('entry', { id: 'VISITOR', name: name });
+                    }
+                }, 100);
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        // --- 3. GLOBAL SCANNER LOGIC ---
+        let barcodeBuffer = "";
+        let scanTimeout = null;
+        let scanCooldown = false; // Prevents accidental double-scans
+
+        document.addEventListener('keydown', function (e) {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+                return;
+            }
+
+            if (scanCooldown) return;
+
+            if (e.key === 'Enter') {
+                if (barcodeBuffer.length > 3) {
+                    const match = barcodeBuffer.match(/(.*?)\[(.*?)\](.*)/s);
+
+                    if (!match) {
+                        console.warn("Invalid QR format scanned:", barcodeBuffer);
+                        barcodeBuffer = "";
+                        return; 
+                    }
+
+                    const extractedName = match[1].trim();   // e.g., "SALVADOR, JERICHO PAUL D."
+                    const extractedId = match[2].trim();     // e.g., "23-00312"
+                    const extractedCourse = match[3].trim(); // e.g., "BSCS"
+
+                    scanCooldown = true;
+                    setTimeout(() => { scanCooldown = false; }, 3000);
+
+                    const feedText = document.getElementById('scanner-text');
+                    const frame = document.querySelector('.scanner-frame');
+                    
+                    frame.style.borderColor = '#10B981';
+                    frame.style.boxShadow = '0 0 30px rgba(16, 185, 129, 0.3)';
+                    feedText.innerText = "READING ID...";
+                    feedText.className = "position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-warning font-monospace fw-bold scanning-text";
+
+                    fetch('http://127.0.0.1:5001/admin/user/authentication', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            id: extractedId,
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            const logType = data.attendance_status ? data.attendance_status.toLowerCase() : 'exit';
+                            const bannerType = logType === 'entry' ? 'in' : 'out';
+                            
+                            if (typeof showScanBanner === 'function') {
+                                showScanBanner(bannerType, {
+                                    id: extractedId,
+                                    name: data.name,
+                                    course: data.affiliation
+                                });
+                            }
+
+                            showSuccessOverlay(logType, { 
+                                id: extractedId, 
+                                name: data.name, 
+                                affiliation: data.affiliation 
+                            });
+                            
+                            appendToLiveFeed(data.name, data.affiliation, logType);
+                        } else {
+                            frame.style.borderColor = '#ef4444'; 
+                            feedText.innerText = data.message || "SCAN FAILED";
+
+                            if (typeof showScanBanner === 'function') {
+                                showScanBanner('error', { id: extractedId });
+                            }
+                        }
+
+                        setTimeout(() => {
+                            frame.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                            frame.style.boxShadow = 'none';
+                            feedText.innerText = "[CAMERA FEED]";
+                            feedText.className = "position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-white-50 small font-monospace";
+                        }, 2500);
+                    })
+                    .catch(error => {
+                        console.error('Server Error:', error);
+                        feedText.innerText = "SERVER ERROR";
+                        frame.style.borderColor = '#ef4444';
+
+                        if (typeof showScanBanner === 'function') {
+                            showScanBanner('error', { id: extractedId });
+                        }
+                    });
+                }
+                
+                barcodeBuffer = "";
+                if (scanTimeout) clearTimeout(scanTimeout);
+
+            } else if (e.key.length === 1) { 
+                barcodeBuffer += e.key;
+                
+                if (scanTimeout) clearTimeout(scanTimeout);
+                scanTimeout = setTimeout(() => { barcodeBuffer = ""; }, 100); 
+            }
+
+        });
+    });
+
+</script>
+{% endblock %}
