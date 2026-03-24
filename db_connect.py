@@ -21,14 +21,16 @@ class Database:
         try:
             query = """ 
                 SELECT u.user_id, u.role, u.active,
-                       COALESCE(s.student_id, e.employee_id, v.visitor_id) as scan_id,
+                       COALESCE(s.student_id, e.employee_id, CAST(v.visitor_id AS CHAR)) as scan_id,
                        COALESCE(s.status, e.status, v.status) as current_status,
-                       COALESCE(CONCAT(s.first_name, ' ', s.last_name), CONCAT(e.first_name, ' ', e.last_name), v.name) as full_name,
-                       COALESCE(s.course, e.department, 'Visitor') as affiliation
+                       COALESCE(s.student_name, e.employee_name, v.visitor_name) as full_name,
+                       COALESCE(c.course_name, d.department_name, 'Visitor') as affiliation
                 FROM users u 
                 LEFT JOIN students s ON u.user_id = s.user_id 
                 LEFT JOIN employees e ON u.user_id = e.user_id
                 LEFT JOIN visitors v ON u.user_id = v.user_id
+                LEFT JOIN courses c ON s.course_id = c.course_id
+                LEFT JOIN departments d ON e.department_id = d.department_id
 
                 WHERE s.student_id = %s OR e.employee_id = %s OR v.visitor_id = %s
             """

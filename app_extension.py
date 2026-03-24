@@ -36,6 +36,7 @@ dbconfig = {
     'user': 'root',
     'password': '',
     'database': 'smart_monitoring',
+    'port': 3307,
     'use_pure': True
 }
 
@@ -45,7 +46,9 @@ try:
     global_pool = pooling.MySQLConnectionPool(pool_name="main_entry_exit", pool_size=20, autocommit=True, **dbconfig)
     print("Database connection pool created.")
 except Exception as err:
-    print(f"Warning: Could not connect to database: {err}")
+    print(f"CRITICAL ERROR: Could not connect to MySQL database 'smart_monitoring'.")
+    print(f"Error details: {err}")
+    print("Please ensure XAMPP/MySQL is running and the database exists.")
     global_pool = None
 
 def connect_db():
