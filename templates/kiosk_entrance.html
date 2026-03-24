@@ -282,23 +282,23 @@
         }
 
         // --- 2. FLASHED MESSAGE HANDLER (VISITORS) ---
-        {% with messages = get_flashed_messages(category_filter = ["success"]) %}
-        {% if messages %}
-        {% for message in messages %}
-        setTimeout(() => {
-            const msg = "{{ message }}";
-            if (msg.includes("Check-in successful")) {
-                let name = "Visitor";
-                const nameMatch = msg.match(/Welcome, (.*?)\./);
-                if (nameMatch && nameMatch[1]) {
-                    name = nameMatch[1];
-                }
-                showSuccessOverlay('entry', { id: 'VISITOR', name: name });
-            }
-        }, 100);
-        {% endfor %}
-        {% endif %}
-        {% endwith %}
+        // {% with messages = get_flashed_messages(category_filter = ["success"]) %}
+        // {% if messages %}
+        // {% for message in messages %}
+        // setTimeout(() => {
+        //     const msg = "{{ message }}";
+        //     if (msg.includes("Check-in successful")) {
+        //         let name = "Visitor";
+        //         const nameMatch = msg.match(/Welcome, (.*?)\./);
+        //         if (nameMatch && nameMatch[1]) {
+        //             name = nameMatch[1];
+        //         }
+        //         showSuccessOverlay('entry', { id: 'VISITOR', name: name });
+        //     }
+        // }, 100);
+        // {% endfor %}
+        // {% endif %}
+        // {% endwith %}
 
         // --- 3. GLOBAL SCANNER LOGIC ---
         let barcodeBuffer = "";
