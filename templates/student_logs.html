@@ -1,10 +1,7 @@
-<!-- Load base layout -->
 {% extends "base.html" %}
 
-<!-- Page title -->
 {% block title %}Student Logs - PLP Admin{% endblock %}
 
-<!-- Page content -->
 {% block content %}
 <!-- Sidebar -->
 <div class="sidebar d-flex flex-column flex-shrink-0 p-3">
@@ -39,23 +36,23 @@
         <div class="d-flex gap-2">
             <div class="input-group input-group-sm" style="width: 200px;">
                 <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
-                <input type="text" class="form-control bg-dark text-white border-secondary" placeholder="Search ID or Name...">
+                <input type="text" id="searchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search ID or Name...">
             </div>
-            <select class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
-                <option selected>All Courses</option>
-                <option>BSCS</option>
-                <option>BSN</option>
-                <option>BSA</option>
-                <option>BSEd</option>
+            <select id="courseFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
+                <option value="">All Courses</option>
+                <option value="BSCS">BSCS</option>
+                <option value="BSN">BSN</option>
+                <option value="BSA">BSA</option>
+                <option value="BSEd">BSEd</option>
             </select>
-            <input type="date" class="form-control form-control-sm bg-dark text-white border-secondary w-auto">
-            <button type="button" class="btn btn-sm btn-primary-gold px-3"><i class="bi bi-filter me-1"></i>Apply</button>
-            <button type="button" class="btn btn-sm btn-outline-light"><i class="bi bi-download me-1"></i>Export</button>
+            <input type="date" id="dateFilter" class="form-control form-control-sm bg-dark text-white border-secondary w-auto">
+            <button type="button" id="applyBtn" class="btn btn-sm btn-primary-gold px-3"><i class="bi bi-filter me-1"></i>Apply</button>
+            <button type="button" id="exportBtn" class="btn btn-sm btn-outline-light"><i class="bi bi-download me-1"></i>Export</button>
         </div>
     </div>
 
     <!-- Student Logs Table -->
-    <div class="card-glass p-0 mb-4 overflow-hidden">
+    <div class="card-glass p-0 mb-4 overflow-hidden" id="tableCard">
         <div class="table-responsive">
             <table class="table table-dark-glass table-hover align-middle mb-0">
                 <thead>
@@ -68,9 +65,13 @@
                         <th class="text-end pe-4">Status</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="studentTableBody">
                     {% for log in logs %}
-                    <tr>
+                    <tr class="student-row"
+                        data-id="{{ log.id | lower }}"
+                        data-name="{{ log.name | lower }}"
+                        data-course="{{ log.course }}"
+                        data-date="{{ log.date }}">
                         <td class="font-monospace text-white-50 ps-4">{{ log.id }}</td>
                         <td class="fw-bold text-white">{{ log.name }}</td>
                         <td class="text-white-50">{{ log.course }}</td>
@@ -83,7 +84,7 @@
                         </td>
                     </tr>
                     {% else %}
-                    <tr>
+                    <tr id="emptyRow">
                         <td colspan="6" class="text-center text-white-50 py-5">
                             <i class="bi bi-inbox display-4 d-block mb-3"></i>
                             No activity logs recorded for this period.
@@ -94,5 +95,97 @@
             </table>
         </div>
     </div>
+
+    <!-- No results (shown only when filters return nothing) -->
+    <div id="noResults" style="display: none;" class="card-glass text-center text-white-50 py-5 mb-4">
+        <i class="bi bi-search display-4 d-block mb-3"></i>
+        <p class="mb-0">No records found matching your search criteria.</p>
+    </div>
+
+    <!-- Result count -->
+    <p id="resultCount" class="text-white-50 small ms-1"></p>
 </div>
+
+<script>
+(function () {
+    const searchInput  = document.getElementById('searchInput');
+    const courseFilter = document.getElementById('courseFilter');
+    const dateFilter   = document.getElementById('dateFilter');
+    const applyBtn     = document.getElementById('applyBtn');
+    const exportBtn    = document.getElementById('exportBtn');
+    const tableCard    = document.getElementById('tableCard');
+    const noResults    = document.getElementById('noResults');
+    const resultCount  = document.getElementById('resultCount');
+    const rows         = document.querySelectorAll('.student-row');
+
+    function applyFilters() {
+        const search = searchInput.value.trim().toLowerCase();
+        const course = courseFilter.value;
+        const date   = dateFilter.value; // YYYY-MM-DD
+
+        let visible = 0;
+
+        rows.forEach(function (row) {
+            const matchSearch = !search ||
+                row.dataset.id.includes(search) ||
+                row.dataset.name.includes(search);
+            const matchCourse = !course || row.dataset.course === course;
+            const matchDate   = !date   || row.dataset.date === date;
+
+            if (matchSearch && matchCourse && matchDate) {
+                row.style.display = '';
+                visible++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        const hasFilters = search || course || date;
+
+        if (rows.length > 0) {
+            if (visible === 0 && hasFilters) {
+                tableCard.style.display  = 'none';
+                noResults.style.display  = 'block';
+                resultCount.textContent  = '';
+            } else {
+                tableCard.style.display  = '';
+                noResults.style.display  = 'none';
+                resultCount.textContent  = hasFilters
+                    ? 'Showing ' + visible + ' of ' + rows.length + ' record' + (rows.length !== 1 ? 's' : '')
+                    : '';
+            }
+        }
+    }
+
+    // Apply on button click
+    applyBtn.addEventListener('click', applyFilters);
+
+    // Live search while typing
+    searchInput.addEventListener('input', applyFilters);
+
+    // Export visible rows as CSV
+    exportBtn.addEventListener('click', function () {
+        const headers = ['Student ID', 'Name', 'Course', 'Time In', 'Time Out', 'Status'];
+        const csvRows = [headers.join(',')];
+
+        rows.forEach(function (row) {
+            if (row.style.display !== 'none') {
+                const cells  = row.querySelectorAll('td');
+                const values = Array.from(cells).map(function (td) {
+                    return '"' + td.innerText.replace(/"/g, '""').trim() + '"';
+                });
+                csvRows.push(values.join(','));
+            }
+        });
+
+        const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = 'student_logs_' + (dateFilter.value || 'all') + '.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+})();
+</script>
 {% endblock %}
