@@ -122,7 +122,6 @@
         </div>
     </div>
 </div>
-</div>
 
 <!-- Manual Entry Modal -->
 <div class="modal fade" id="manualEntryModal" tabindex="-1" aria-hidden="true">
@@ -148,7 +147,6 @@
             </div>
         </div>
     </div>
-</div>
 </div>
 
 <!-- Visitor Entry Modal -->
@@ -225,13 +223,11 @@
         </div>
     </div>
 </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/kiosk.js') }}"></script>
 <script>
-
     document.addEventListener('DOMContentLoaded', function () {
         // --- 1. LIVE CLOCK LOGIC ---
         function updateClock() {
@@ -281,24 +277,24 @@
             }
         }
 
-        // --- 2. FLASHED MESSAGE HANDLER (VISITORS) ---
-        // {% with messages = get_flashed_messages(category_filter = ["success"]) %}
-        // {% if messages %}
-        // {% for message in messages %}
-        // setTimeout(() => {
-        //     const msg = "{{ message }}";
-        //     if (msg.includes("Check-in successful")) {
-        //         let name = "Visitor";
-        //         const nameMatch = msg.match(/Welcome, (.*?)\./);
-        //         if (nameMatch && nameMatch[1]) {
-        //             name = nameMatch[1];
-        //         }
-        //         showSuccessOverlay('entry', { id: 'VISITOR', name: name });
-        //     }
-        // }, 100);
-        // {% endfor %}
-        // {% endif %}
-        // {% endwith %}
+        //--- 2. FLASHED MESSAGE HANDLER (VISITORS) ---
+        {% with messages = get_flashed_messages(category_filter = ["success"]) %}
+        {% if messages %}
+        {% for message in messages %}
+        setTimeout(() => {
+            const msg = "{{ message | tojson }}";
+            if (msg.includes("Check-in successful")) {
+                let name = "Visitor";
+                const nameMatch = msg.match(/Welcome, (.*?)\./);
+                if (nameMatch && nameMatch[1]) {
+                    name = nameMatch[1];
+                }
+                showSuccessOverlay('entry', { id: 'VISITOR', name: name });
+            }
+        }, 100);
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
 
         // --- 3. GLOBAL SCANNER LOGIC ---
         let barcodeBuffer = "";
@@ -407,6 +403,5 @@
 
         });
     });
-
 </script>
 {% endblock %}
