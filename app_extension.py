@@ -542,7 +542,215 @@ def get_event_instances(event_id):
         print(f"Error: {e}")
         return jsonify([]), 500
 
+# ==============================================================================
+# NEW ENDPOINT – MANUAL EVENT ENTRY
+# ==============================================================================
+@app.route("/api/events/manual_entry", methods=["POST"])
+def manual_event_entry():
+    """
+    Accepts employee_id and event_id, logs attendance for the event.
+    Also toggles the general status (Inside/Outside) and inserts a record in general_log.
+    Returns user details and the new log entry for live feed update.
+    """
+    conn = None
+    try:
+        data = request.get_json()
+        if not data or 'employee_id' not in data or 'event_id' not in data:
+            return jsonify({"success": False, "message": "Missing employee_id or event_id"}), 400
 
+        employee_id = data['employee_id']
+        event_id = data['event_id']
+
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "message": "Database offline"}), 500
+
+        cursor = conn.cursor(dictionary=True)
+
+        # 1. Look up user_id from employee_id
+        query = """
+            SELECT u.user_id, u.role, e.employee_name, d.department_name as department
+            FROM users u
+            JOIN employees e ON u.user_id = e.user_id
+            LEFT JOIN departments d ON e.department_id = d.department_id
+            WHERE e.employee_id = %s
+        """
+        cursor.execute(query, (employee_id,))
+        user = cursor.fetchone()
+        if not user:
+            return jsonify({"success": False, "message": "Employee ID not found"}), 404
+
+        user_id = user['user_id']
+        employee_name = user['employee_name']
+        department = user['department'] or 'N/A'
+
+        # 2. Determine entry or exit based on last swipe for this event today
+        params = (user_id, event_id)
+        db = Database(conn, params)
+        last_log = db.check_last_swipe()
+
+        if isinstance(last_log, dict) and last_log.get('success') is False:
+            return jsonify({"success": False, "message": last_log['message']}), 500
+
+        if not last_log or last_log.get('log_type') == 'Exit':
+            log_type = 'Entry'
+        else:
+            log_type = 'Exit'
+
+        # 3. Insert event log and update event attendance
+        insert_params = (user_id, event_id, log_type)
+        db2 = Database(conn, insert_params)
+        result = db2.events_authentication()
+
+        if not result or result.get('success') is False:
+            return jsonify({"success": False, "message": result.get('message', 'Unknown error')}), 500
+
+        # 4. Retrieve attendance with pre‑formatted times
+        cursor.execute("""
+            SELECT ea.status, 
+                   DATE_FORMAT(ea.first_in, '%h:%i %p') as first_in_formatted,
+                   DATE_FORMAT(ea.last_out, '%h:%i %p') as last_out_formatted
+            FROM event_attendance ea
+            JOIN event_instances ei ON ea.instance_id = ei.instance_id
+            WHERE ea.user_id = %s AND ei.event_id = %s AND ea.event_date = CURDATE()
+        """, (user_id, event_id))
+        attendance = cursor.fetchone()
+
+        if not attendance:
+            return jsonify({"success": False, "message": "Attendance record not found for this user/event."}), 404
+
+        status = attendance['status']
+        if log_type == 'Entry':
+            time_str = attendance['first_in_formatted'] or ''
+        else:
+            time_str = attendance['last_out_formatted'] or ''
+        # Remove leading zero (e.g., "08:15 AM" → "8:15 AM")
+        if time_str.startswith('0'):
+            time_str = time_str[1:]
+
+        # 5. Update general status (employees table) and insert general_log
+        new_general_status = 'Inside' if log_type == 'Entry' else 'Outside'
+        gate = 'Gate 1' if log_type == 'Entry' else 'Gate 2'
+
+        cursor.execute("UPDATE employees SET status = %s WHERE user_id = %s", (new_general_status, user_id))
+        now = datetime.now()
+        formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute(
+            "INSERT INTO general_log (user_id, timestamp, log_type, gate) VALUES (%s, %s, %s, %s)",
+            (user_id, formatted_time, log_type, gate)
+        )
+        conn.commit()
+
+        # 6. Determine status type for UI (success for Present, warning for Late, etc.)
+        status_type = "success" if status == 'Present' else "warning" if status == 'Late' else "secondary"
+        # Generate initials from employee name (first letters of first two words)
+        name_parts = employee_name.split()[:2]
+        initials = ''.join(part[0] for part in name_parts).upper()
+
+        # 7. Return data needed to update live feed
+        return jsonify({
+            "success": True,
+            "log_type": log_type,
+            "log": {
+                "name": employee_name,
+                "dept": department,
+                "time": time_str,
+                "status": status,
+                "type": status_type,
+                "initials": initials
+            },
+            "message": f"{log_type} logged successfully. General status now {new_general_status}."
+        }), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        if conn:
+            close_db(conn)
+
+# ==============================================================================
+# ENDPOINT: Get Today's Attendance for All Employees (For Admin Dashboard)
+# ==============================================================================
+
+@app.route("/admin/employees/attendance", methods=["GET"])
+def get_employee_attendance():
+    """
+    Returns today's attendance for all employees: entry time, exit time, status.
+    """
+    conn = None
+    try:
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "message": "Database offline"}), 500
+
+        cursor = conn.cursor(dictionary=True)
+
+        query = """
+            SELECT 
+                e.user_id,
+                e.employee_name,
+                e.employee_id,
+                d.department_name as department,
+                MIN(CASE WHEN gl.log_type = 'Entry' THEN gl.timestamp END) as time_in,
+                MAX(CASE WHEN gl.log_type = 'Exit' THEN gl.timestamp END) as time_out
+            FROM employees e
+            LEFT JOIN departments d ON e.department_id = d.department_id
+            LEFT JOIN general_log gl ON e.user_id = gl.user_id AND DATE(gl.timestamp) = CURDATE()
+            GROUP BY e.user_id
+            ORDER BY e.employee_name ASC
+        """
+        cursor.execute(query)
+        rows = cursor.fetchall()
+
+        result = []
+        for row in rows:
+            name = row['employee_name']
+            name_parts = name.split()[:2]
+            initials = ''.join(part[0] for part in name_parts).upper()
+            dept = row['department'] or 'N/A'
+            time_in = row['time_in']
+            time_out = row['time_out']
+
+            # Format times
+            in_str = time_in.strftime("%I:%M %p") if time_in else '--:--'
+            out_str = time_out.strftime("%I:%M %p") if time_out else '--:--'
+            if in_str.startswith('0'): in_str = in_str[1:]
+            if out_str.startswith('0'): out_str = out_str[1:]
+
+            # Determine status
+            if not time_in:
+                status = "Absent"
+                status_class = "secondary"
+            else:
+                threshold = datetime.strptime("08:00:00", "%H:%M:%S").time()
+                entry_time = time_in.time()
+                if entry_time > threshold:
+                    delta = datetime.combine(date.today(), entry_time) - datetime.combine(date.today(), threshold)
+                    minutes_late = int(delta.total_seconds() // 60)
+                    status = f"Late +{minutes_late}m" if minutes_late > 0 else "Late"
+                    status_class = "warning"
+                else:
+                    status = "Present"
+                    status_class = "success"
+
+            result.append({
+                "initials": initials,
+                "name": name,
+                "dept": dept,
+                "in": in_str,
+                "out": out_str,
+                "status": status,
+                "status_class": status_class
+            })
+
+        return jsonify({"success": True, "logs": result}), 200
+
+    except Exception as e:
+        print(f"Error in get_employee_attendance: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        if conn:
+            close_db(conn)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)

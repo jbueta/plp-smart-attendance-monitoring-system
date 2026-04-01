@@ -6,7 +6,7 @@
 
 <!-- Page content -->
 {% block content %}
-<!-- Sidebar -->
+<!-- Sidebar (unchanged) -->
 <div class="sidebar d-flex flex-column flex-shrink-0 p-3">
     <a href="#" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
         <i class="bi bi-bank2 fs-4 text-gold me-2"></i>
@@ -39,7 +39,7 @@
         <div class="d-flex gap-2">
             <div class="input-group input-group-sm" style="width: 200px;">
                 <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
-                <input type="text" class="form-control bg-dark text-white border-secondary" placeholder="Search Employee...">
+                <input type="text" id="searchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search Employee...">
             </div>
             <select class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
                 <option selected>All Departments</option>
@@ -101,4 +101,44 @@
         </div>
     </div>
 </div>
+
+<script>
+    // Client‑side search filter (by name or department)
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('keyup', function() {
+            const searchTerm = this.value.trim().toLowerCase();
+            const rows = document.querySelectorAll('table tbody tr');
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                // Skip the "no records" placeholder row (it has colspan)
+                if (row.cells.length === 1) return;
+
+                const nameCell = row.cells[0];
+                const deptCell = row.cells[1];
+
+                if (!nameCell || !deptCell) return;
+
+                const name = nameCell.innerText.trim().toLowerCase();
+                const dept = deptCell.innerText.trim().toLowerCase();
+
+                if (searchTerm === '' || name.includes(searchTerm) || dept.includes(searchTerm)) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            // Optionally show/hide the "no results" message
+            const noDataRow = document.querySelector('table tbody tr td[colspan="5"]');
+            if (noDataRow) {
+                // If there's a placeholder row, it's only shown when logs list is empty
+                // We'll hide it if visibleCount > 0
+                noDataRow.parentElement.style.display = visibleCount === 0 ? '' : 'none';
+            }
+        });
+    }
+</script>
 {% endblock %}
