@@ -36,7 +36,7 @@ dbconfig = {
     'user': 'root',
     'password': '',
     'database': 'smart_monitoring',
-    'port': 3307,
+    'port': 3306,
     'use_pure': True
 }
 
