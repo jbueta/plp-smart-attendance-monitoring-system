@@ -95,7 +95,7 @@ function showSuccessOverlay(type, manualData = null) {
     setTimeout(() => {
         overlay.classList.remove('d-flex');
         overlay.classList.add('d-none');
-    }, 3000);
+    }, 1500);
 }
 
 function initAnimations() {

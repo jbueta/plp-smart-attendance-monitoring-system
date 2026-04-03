@@ -12,6 +12,20 @@ class Database:
         else:
             raise Exception("Failed to connect to the database.")
         
+
+    #============================================================
+    # ADMIN LOGIN AUTHENTICATION
+    # =============================================================
+    def admin_login(self):
+        try:
+            query = """SELECT * FROM admin WHERE username = %s AND password = %s AND active = 1"""
+            self.cursor.execute(query, self.parameter)
+            result = self.cursor.fetchone()
+            return result if result else []
+            
+        except connector.Error as err:
+            print(f"Error: {err}")
+            return None
     
     # =============================================================
     # GENERAL ENTRY/EXIT MODEL LOGIC
@@ -19,11 +33,26 @@ class Database:
 
     def authenticate_user(self):
         try:
+            # query = """ 
+            #     SELECT u.user_id, u.role, u.active,
+            #         COALESCE(s.student_id, e.employee_id, CAST(v.visitor_id AS CHAR)) as scan_id,
+            #         COALESCE(s.status, e.status, v.status) as current_status,
+            #         COALESCE(CONCAT(s.first_name, ' ', s.last_name), CONCAT(e.first_name, ' ', e.last_name), v.name) as full_name,
+            #         COALESCE(c.course_name, d.department_name, 'Visitor') as affiliation
+            #     FROM users u 
+            #     LEFT JOIN students s ON u.user_id = s.user_id 
+            #     LEFT JOIN employees e ON u.user_id = e.user_id
+            #     LEFT JOIN visitors v ON u.user_id = v.user_id
+            #     LEFT JOIN courses c ON s.course_id = c.course_id
+            #     LEFT JOIN departments d ON e.department_id = d.department_id
+            #     WHERE s.student_id = %s OR e.employee_id = %s OR v.visitor_id = %s
+            # """
+            
             query = """ 
                 SELECT u.user_id, u.role, u.active,
                     COALESCE(s.student_id, e.employee_id, CAST(v.visitor_id AS CHAR)) as scan_id,
                     COALESCE(s.status, e.status, v.status) as current_status,
-                    COALESCE(CONCAT(s.first_name, ' ', s.last_name), CONCAT(e.first_name, ' ', e.last_name), v.name) as full_name,
+                    COALESCE(s.student_name, e.employee_name, v.visitor_name) as full_name,
                     COALESCE(c.course_name, d.department_name, 'Visitor') as affiliation
                 FROM users u 
                 LEFT JOIN students s ON u.user_id = s.user_id 
@@ -145,8 +174,6 @@ class Database:
             insert_log_query = """INSERT INTO general_log (user_id, timestamp, log_type, gate) VALUES (%s, %s, %s, %s)"""
             self.cursor.execute(insert_log_query, self.parameter)
             self.conn.commit()
-            
-            if self.cursor.rowcount > 0:
             
             if self.cursor.rowcount > 0:
                 return "Log inserted successfully!"
@@ -546,13 +573,39 @@ class Database:
             self.conn.rollback()
             return {"message": f"Database Error: {err}", "success": False}
 
+    def delete_event(self):
+        """
+        Soft deletion of events to prevent data loss if needed
+        """
+        try: 
+            query = "UPDATE events SET active = 0 WHERE event_id = %s"
+            self.cursor.execute(query, self.parameter)
+            self.conn.commit()
+            return {"message": "Event deleted successfully!", "success": True}
+        except connector.Error as err:
+            self.conn.rollback()
+            return {"message": f"Database Error: {err}", "success": False}
+
+    def delete_bulk_events(self):
+        """
+        Soft deletion of events to prevent data loss if needed
+        """
+        try: 
+            query = "UPDATE events SET active = 0 WHERE event_id = %s"
+            self.cursor.execute(query, self.parameter)
+            self.conn.commit()
+            return {"message": "Event deleted successfully!", "success": True}
+        except connector.Error as err:
+            self.conn.rollback()
+            return {"message": f"Database Error: {err}", "success": False}
+
     # =============================================================
     # GET (READ) METHODS
     # =============================================================
 
     def get_all_events(self):
         try:
-            query = """ SELECT * FROM events ORDER BY event_id DESC """
+            query = """ SELECT * FROM events ORDER BY event_id DESC WHERE active = 1 """
             self.cursor.execute(query)
             result = self.cursor.fetchall()
             cleaned_events = []
@@ -574,249 +627,6 @@ class Database:
         except connector.Error as err:
             print(f"Error fetching events: {err}")
             return []
-
-    # ==============================================================================
-    # STATIC GETTER METHODS
-    # ==============================================================================
-
-    @staticmethod
-    def get_events_dashboard(conn):
-        try:
-            if conn:
-                cursor = conn.cursor(dictionary=True)
-            else:
-                raise Exception("Failed to connect to the database.")
-            query = """
-                        SELECT 
-                            e.event_id AS event_id, 
-                            e.event_name AS name, 
-                            e.event_type AS type, 
-                            e.event_date AS date, 
-                            e.time_start, 
-                            e.time_end, 
-                            e.location AS location,
-                            GROUP_CONCAT(DISTINCT d.department_name SEPARATOR ', ') AS dept
-                        FROM event_participants ep
-                        JOIN events e ON ep.event_id = e.event_id
-                        JOIN employees emp ON ep.user_id = emp.user_id
-                        JOIN departments d ON emp.department_id = d.department_id
-                        GROUP BY e.event_id, e.event_name
-                        ORDER BY e.event_date DESC;
-                    """
-
-            cursor.execute(query)
-            result = cursor.fetchall()
-
-            if result:
-                for row in result:
-                    if row.get('date'):
-                        row['date'] = str(row['date'])
-                    if row.get('time_start'):
-                        row['time_start'] = str(row['time_start'])
-                    if row.get('time_end'):
-                        row['time_end'] = str(row['time_end'])
-                        
-            return result if result else []
-            
-        except connector.Error as err:
-            print(f"Error fetching events: {err}")
-            return None
-        finally:
-            if 'cursor' in locals():
-                cursor.close()
-
-
-    @staticmethod
-    def get_events_kiosk(conn):
-        try:
-            if conn:
-                cursor = conn.cursor(dictionary=True)
-            else:
-                raise Exception("Failed to connect to the database.")
-            query = """
-                        SELECT 
-                            ei.instance_id AS instance_id, 
-                            e.event_name AS name, 
-                            e.event_type AS type, 
-                            ei.event_date AS date, 
-                            e.time_start, 
-                            e.time_end, 
-                            e.location AS location
-                        FROM event_instances ei
-                        JOIN events e ON ei.event_id = e.event_id
-                        WHERE ei.event_date = CURDATE() 
-                        AND ei.status = 'Scheduled'
-                        AND e.active = 1
-                    """
-            cursor.execute(query)
-            result = cursor.fetchall()
-
-            if result:
-                for row in result:
-                    if row.get('date'):
-                        row['date'] = str(row['date'])
-                    if row.get('time_start'):
-                        row['time_start'] = str(row['time_start'])
-                    if row.get('time_end'):
-                        row['time_end'] = str(row['time_end'])
-                        
-            return result if result else []
-            
-        except connector.Error as err:
-            print(f"Error fetching events: {err}")
-            return None
-        finally:
-            if 'cursor' in locals():
-                cursor.close()
-
-    @staticmethod
-    def get_admin_departments(conn):
-        try:
-            cursor = conn.cursor(dictionary=True)
-            query = """ 
-                SELECT 
-                    d.department_id AS dept_id, 
-                    d.department_name AS dept_name
-                FROM departments d
-            """
-            cursor.execute(query)
-            result = cursor.fetchall()
-            
-            return result if result else []
-            
-        except connector.Error as err:
-            print(f"Error fetching attendance: {err}")
-            return [] 
-        finally:
-            if 'cursor' in locals():
-                cursor.close()
-
-    @staticmethod
-    def get_student_logs(conn, limit=6):
-        try:
-            if conn:
-                cursor = conn.cursor(dictionary=True)
-            else:
-                raise Exception("Failed to connect to the database.")
-
-            query = """
-                SELECT 
-                    gl.log_type, 
-                    s.student_name, 
-                    c.course_name, 
-                    gl.timestamp
-                FROM general_log gl
-                JOIN users u ON gl.user_id = u.user_id
-                JOIN students s ON u.user_id = s.user_id
-                LEFT JOIN courses c ON s.course_id = c.course_id
-                ORDER BY gl.timestamp DESC
-                LIMIT %s
-            """
-            cursor.execute(query, (limit,))
-            result = cursor.fetchall()
-
-            formatted_logs = []
-
-            if result:
-                for row in result:
-                    mapped_type = "in" if row['log_type'] == "Entry" else "out"
-                    
-                    formatted_time = ""
-                    if row.get('timestamp'):
-                        if isinstance(row['timestamp'], datetime):
-                            formatted_time = row['timestamp'].strftime('%I:%M %p')
-                        else:
-                            dt_obj = datetime.strptime(str(row['timestamp']), '%Y-%m-%d %H:%M:%S')
-                            formatted_time = dt_obj.strftime('%I:%M %p')
-
-                    formatted_logs.append({
-                        "type": mapped_type,
-                        "name": row.get('student_name', 'Unknown User'),
-                        "course": row.get('course_name', 'N/A'),
-                        "time": formatted_time
-                    })
-
-            return formatted_logs
-        except connector.Error as err:
-            print(f"Error fetching recent student logs: {err}")
-            return None
-        finally:
-            if 'cursor' in locals():
-                cursor.close()
-
-    @staticmethod
-    def get_event_instances(conn, event_id):
-        try:
-            cursor = conn.cursor(dictionary=True)
-            query = """ 
-                SELECT instance_id, event_date, status 
-                FROM event_instances 
-                WHERE event_id = %s 
-                ORDER BY event_date ASC 
-            """
-            cursor.execute(query, (event_id,))
-            result = cursor.fetchall()
-            
-            cleaned_instances = []
-            for row in result:
-                for key, val in row.items():
-                    if isinstance(val, (timedelta, date, datetime)):
-                        row[key] = str(val)
-                cleaned_instances.append(row)
-
-            return cleaned_instances
-            
-        except connector.Error as err:
-            print(f"Error fetching event instances: {err}")
-            return []
-        finally:
-            if 'cursor' in locals():
-                cursor.close()
-
-    @staticmethod
-    def get_instance_attendance(conn, instance_id):
-        try:
-            cursor = conn.cursor(dictionary=True)
-            query = """ 
-                SELECT 
-                    ea.attendance_id, ea.user_id, ea.status, 
-                    ea.first_in, ea.last_out, ea.remarks, 
-                    COALESCE(s.student_name, e.employee_name, u.user_name) AS user_name,
-                    COALESCE(d.department_name, 'N/A') AS department
-                FROM event_attendance ea
-                LEFT JOIN users u ON ea.user_id = u.user_id
-                LEFT JOIN students s ON u.user_id = s.user_id
-                LEFT JOIN employees e ON u.user_id = e.user_id
-                LEFT JOIN departments d ON (e.department_id = d.department_id)
-                WHERE ea.instance_id = %s
-                ORDER BY user_name ASC
-            """
-            cursor.execute(query, (instance_id,))
-            result = cursor.fetchall()
-            
-            cleaned_attendance = []
-            for row in result:
-                for key, val in row.items():
-                    if isinstance(val, (timedelta, date, datetime)):
-                        if isinstance(val, timedelta):
-                            total_seconds = int(val.total_seconds())
-                            hours = total_seconds // 3600
-                            minutes = (total_seconds % 3600) // 60
-                            row[key] = f"{hours:02d}:{minutes:02d}"
-                        else:
-                            row[key] = str(val)
-                cleaned_attendance.append(row)
-
-            return cleaned_attendance
-            
-        except connector.Error as err:
-            print(f"Error fetching attendance: {err}")
-            return [] 
-        finally:
-            if 'cursor' in locals():
-                cursor.close()
-
-        
 
 
     # =============================================================
@@ -1130,35 +940,6 @@ class Database:
             self.conn.rollback()
             return {"message": f"Database Error: {err}", "success": False}
 
-    # =============================================================
-    # GET (READ) METHODS
-    # =============================================================
-
-    def get_all_events(self):
-        try:
-            query = """ SELECT * FROM events ORDER BY event_id DESC """
-            self.cursor.execute(query)
-            result = self.cursor.fetchall()
-            cleaned_events = []
-            for row in result:
-                if isinstance(row, dict):
-                    for key, val in row.items():
-                        if isinstance(val, (timedelta, date, datetime)):
-                            row[key] = str(val)
-                    cleaned_events.append(row)
-                else:
-                    cleaned_row = tuple(
-                        str(val) if isinstance(val, (timedelta, date, datetime)) else val 
-                        for val in row
-                    )
-                    cleaned_events.append(cleaned_row)
-
-            return cleaned_events
-            
-        except connector.Error as err:
-            print(f"Error fetching events: {err}")
-            return []
-
     # ==============================================================================
     # STATIC GETTER METHODS
     # ==============================================================================
@@ -1170,20 +951,22 @@ class Database:
                 cursor = conn.cursor(dictionary=True)
             else:
                 raise Exception("Failed to connect to the database.")
+            
             query = """
                         SELECT 
                             e.event_id AS event_id, 
                             e.event_name AS name, 
                             e.event_type AS type, 
-                            e.event_date AS date, 
-                            e.time_start, 
-                            e.time_end, 
+                            DATE_FORMAT(e.event_date, '%b %e, %Y') AS date,
+                            TRIM(DATE_FORMAT(e.time_start, '%l:%i %p')) AS time_start, 
+                            TRIM(DATE_FORMAT(e.time_end, '%l:%i %p')) AS time_end, 
                             e.location AS location,
                             GROUP_CONCAT(DISTINCT d.department_name SEPARATOR ', ') AS dept
                         FROM event_participants ep
                         JOIN events e ON ep.event_id = e.event_id
                         JOIN employees emp ON ep.user_id = emp.user_id
                         JOIN departments d ON emp.department_id = d.department_id
+                        WHERE e.active = 1
                         GROUP BY e.event_id, e.event_name
                         ORDER BY e.event_date DESC;
                     """
@@ -1191,15 +974,9 @@ class Database:
             cursor.execute(query)
             result = cursor.fetchall()
 
-            if result:
-                for row in result:
-                    if row.get('date'):
-                        row['date'] = str(row['date'])
-                    if row.get('time_start'):
-                        row['time_start'] = str(row['time_start'])
-                    if row.get('time_end'):
-                        row['time_end'] = str(row['time_end'])
-                        
+            # The python loop checking row.get('date') etc. is completely removed
+            # because the SQL query already returns the exact string formats you need.
+
             return result if result else []
             
         except connector.Error as err:
@@ -1333,7 +1110,10 @@ class Database:
         try:
             cursor = conn.cursor(dictionary=True)
             query = """ 
-                SELECT instance_id, event_date, status 
+                SELECT 
+                    instance_id,
+                    DATE_FORMAT(event_date, '%b %e, %Y') AS event_date, 
+                    status 
                 FROM event_instances 
                 WHERE event_id = %s 
                 ORDER BY event_date ASC 

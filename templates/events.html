@@ -52,14 +52,18 @@
     <div class="d-flex justify-content-start align-items-center gap-2 mb-4">
         <div class="input-group input-group-sm shadow-sm" style="width: 250px;">
             <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
-            <input type="text" class="form-control bg-dark text-white border-secondary" placeholder="Search events...">
+            <input type="text" id="searchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search events..." onkeyup="filterEvents()">
         </div>
-        <div class="input-group input-group-sm shadow-sm" style="width: 180px;">
+        <div class="input-group input-group-sm shadow-sm date-filter-wrapper" style="width: 180px;">
             <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-calendar-event"></i></span>
-            <input type="date" class="form-control bg-dark text-white border-secondary">
+            <input type="date" id="dateFilter" class="form-control bg-dark text-white border-secondary" onchange="filterEvents()">
         </div>
-        <button type="button" class="btn btn-sm btn-primary-gold px-4 shadow-sm"><i class="bi bi-filter me-1"></i>Apply Filters</button>
-        
+
+        <!-- OPTIONAL FILTER BUTTON -->
+        <button type="button" class="btn btn-sm btn-primary-gold px-4 shadow-sm" onclick="filterEvents()">
+            <i class="bi bi-filter me-1"></i>Apply Filters
+        </button>
+
         <div class="ms-auto text-white-50 small">
             <i class="bi bi-info-circle me-1"></i> Viewing all scheduled events
         </div>
@@ -70,8 +74,8 @@
         class="d-none mb-3 bg-danger bg-opacity-10 p-3 rounded border border-danger d-flex align-items-center justify-content-between">
         <span class="text-danger small"><i class="bi bi-info-circle me-2"></i>Select events to delete. Default events
             cannot be removed.</span>
-        <button type="submit" form="bulk-delete-form" class="btn btn-sm btn-danger" id="delete-selected-btn" disabled>
-            <i class="bi bi-trash me-1"></i>Delete Selected (<span id="selected-count">0</span>)
+        <button id="delete-selected-btn" class="btn btn-danger" onclick="deleteSelectedEvents()" disabled>
+            <i class="bi bi-trash"></i> Delete Selected (<span id="selected-count">0</span>)
         </button>
     </div>
 
@@ -97,12 +101,10 @@
                     </thead>
                     <tbody>
                         {% for event in events %}
-                        <tr>
+                        <tr id="event-row-{{ event.event_id }}">
                             <td class="selection-col d-none text-center">
                                 {% if event.event_id > 2 %}
-                                <input type="checkbox" name="event_ids" value="{{ event.event_id }}"
-                                    class="form-check-input bg-dark border-secondary event-checkbox"
-                                    onclick="updateDeleteButton()">
+                                <input type="checkbox" class="form-check-input event-checkbox" value="{{ event.event_id }}" onchange="updateDeleteButton()">
                                 {% else %}
                                 <i class="bi bi-lock-fill text-white-50 small" title="Protected"></i>
                                 {% endif %}
@@ -119,12 +121,12 @@
                                         title="View Event Info" 
                                         data-bs-toggle="modal" 
                                         data-bs-target="#viewEventModal" 
-                                        onclick="openViewModal('{{ event.event_id }}', '{{ event.name }}', '{{ event.type }}', '{{ event.date }}', '{{ event.time }}', '{{ event.dept }}');">
+                                        onclick="openViewModal('{{ event.event_id }}', '{{ event.name }}', '{{ event.type }}', '{{ event.date }}', '{{ event.time_start }} - {{ event.time_end }}', '{{ event.dept }}');">
                                     <i class="bi bi-eye me-1"></i> View
                                 </button>
                                 {% if event.event_id > 2 %}
                                 <button type="button" class="btn btn-sm btn-danger" title="Delete Event"
-                                    onclick="if(confirm('Delete this event?')) { document.getElementById('delete-form-{{ event.event_id }}').submit(); }">
+                                    onclick="deleteSingleEvent('{{ event.event_id }}')">
                                     <i class="bi bi-trash"></i>
                                 </button>
                                 {% else %}
@@ -144,13 +146,6 @@
                 </table>
             </form>
         </div>
-        <!-- Individual Delete Forms (Hidden) -->
-        {% for event in events %}
-        {% if event.event_id > 2 %}
-        <form id="delete-form-{{ event.event_id }}" action="{{ url_for('delete_event', event_id=event.event_id) }}" method="POST"
-            class="d-none"></form>
-        {% endif %}
-        {% endfor %}
     </div>
 </div>
 
@@ -395,316 +390,5 @@
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/events.js') }}"></script>
-<script>
-    // ==========================================
-    // GLOBAL VARIABLES & FUNCTIONS FOR VIEW MODAL
-    // ==========================================
-    var currentEventId = null;
-    var currentInstanceId = null; // New variable to track the active instance
-
-    function openViewModal(eventId, name, type, date, time, deptsStr) {
-        currentEventId = eventId;
-        
-        // 1. Reset tabs to Details tab by default
-        const detailsTabEl = document.querySelector('#details-tab');
-        if (detailsTabEl) {
-            const detailsTab = new bootstrap.Tab(detailsTabEl);
-            detailsTab.show();
-        }
-
-        // 2. Set Basic Info
-        document.getElementById('view-event-title').innerText = name;
-        document.getElementById('view-event-type').innerText = type;
-        document.getElementById('view-event-date').innerText = date;
-        document.getElementById('view-event-time').innerText = time;
-
-        // 3. Handle Departments Badges
-        const deptsContainer = document.getElementById('view-event-depts');
-        deptsContainer.innerHTML = ''; 
-        if (deptsStr && deptsStr.trim() !== '') {
-            const deptsArray = deptsStr.split(', ');
-            deptsArray.forEach(dept => {
-                const badge = document.createElement('span');
-                badge.className = 'badge bg-primary-gold bg-opacity-25 text-gold border border-gold mb-1 me-1';
-                badge.innerText = dept;
-                deptsContainer.appendChild(badge);
-            });
-        } else {
-            deptsContainer.innerHTML = '<span class="text-white-50 small fst-italic">No departments specified</span>';
-        }
-
-        // 4. Trigger fetching of Instances first
-        fetchEventInstances(eventId);
-    }
-
-    function fetchEventInstances(eventId) {
-        const selectContainer = document.getElementById('instanceSelectionContainer');
-        const selectElement = document.getElementById('instanceSelect');
-        const tbody = document.getElementById('attendance-table-body');
-        
-        tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-white-50"><div class="spinner-border spinner-border-sm text-info me-2"></div> Loading instances...</td></tr>';
-        
-        fetch(`http://127.0.0.1:5001/admin/event/${eventId}/instances`)
-            .then(response => response.json())
-            .then(instances => {
-                console.log("Fetched instances:", instances);
-                selectElement.innerHTML = ''; // Clear previous options
-
-                if (instances && instances.length > 0) {
-                    selectContainer.style.display = 'block';
-                    
-                    instances.forEach(inst => {
-                        let option = document.createElement('option');
-                        option.value = inst.instance_id;
-                        option.textContent = `${inst.event_date} (${inst.status})`; 
-                        selectElement.appendChild(option);
-                    });
-
-                    currentInstanceId = instances[0].instance_id;
-                    fetchAttendanceData(currentInstanceId);
-                } else {
-                    selectContainer.style.display = 'none';
-                    tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-white-50">No instances found for this event.</td></tr>';
-                    updateAttendanceVisuals([]); // Reset visuals to 0
-                }
-            })
-            .catch(error => {
-                console.error("Error fetching instances:", error);
-                selectContainer.style.display = 'none';
-                tbody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-danger">Failed to load event data.</td></tr>`;
-            });
-    }
-
-    function fetchAttendanceData(instanceId) {
-        if (!instanceId) return;
-        
-        const tbody = document.getElementById('attendance-table-body');
-        if (!tbody) return;
-        
-        tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-white-50"><div class="spinner-border spinner-border-sm text-info me-2"></div> Loading attendance...</td></tr>';
-
-        // NOTE: Make sure this URL matches the new Flask route you created!
-        fetch(`http://127.0.0.1:5001/admin/instances/${instanceId}/get-attendance`)
-            .then(response => response.json())
-            .then(data => {
-                console.log("Fetched attendance:", data);
-                renderAttendanceTable(data);
-                updateAttendanceVisuals(data);
-            })
-            .catch(error => {
-                console.error("Error fetching attendance:", error);
-                tbody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-danger">Failed to load attendance. Check backend connection.</td></tr>`;
-            });
-    }
-
-    function renderAttendanceTable(participants) {
-        const tbody = document.getElementById('attendance-table-body');
-        tbody.innerHTML = '';
-
-        if (!participants || participants.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-white-50">No participants found.</td></tr>';
-            return;
-        }
-
-        participants.forEach(p => {
-            const statusColors = {
-                'Present': 'text-success',
-                'Absent': 'text-danger',
-                'Late': 'text-warning',
-                'Excused': 'text-warning'
-            };
-            const activeColor = statusColors[p.status] || 'text-white';
-
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td class="ps-3">
-                    <div class="fw-bold text-white">${p.user_name}</div>
-                    <div class="text-white-50" style="font-size: 0.75rem;">${p.department || 'N/A'}</div>
-                </td>
-                <td class="font-monospace text-white-50 small">
-                    In: ${p.first_in ? p.first_in : '--:--'}<br>
-                    Out: ${p.last_out ? p.last_out : '--:--'}
-                </td>
-                <td class="text-end pe-3">
-                    <select class="form-select form-select-sm bg-dark border-secondary ${activeColor} d-inline-block w-auto" 
-                            onchange="updateStatus(${p.attendance_id}, this.value, this)">
-                        <option value="Present" class="text-success" ${p.status === 'Present' ? 'selected' : ''}>Present</option>
-                        <option value="Late" class="text-warning" ${p.status === 'Late' ? 'selected' : ''}>Late</option>
-                        <option value="Excused" class="text-warning" ${p.status === 'Excused' ? 'selected' : ''}>Excused</option>
-                        <option value="Absent" class="text-danger" ${p.status === 'Absent' ? 'selected' : ''}>Absent</option>
-                    </select>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
-    }
-
-    function updateAttendanceVisuals(participants) {
-        if (!participants) return;
-        
-        let total = participants.length;
-        let present = 0, absent = 0, excused = 0, late = 0;
-
-        participants.forEach(p => {
-            if (p.status === 'Present') present++;
-            else if (p.status === 'Absent') absent++;
-            else if (p.status === 'Excused') excused++;
-            else if (p.status === 'Late') late++;
-        });
-
-        document.getElementById('attendance-total').innerText = `${total} Total`;
-        // Grouping Late with Present for the overall progress bar
-        document.getElementById('count-present').innerText = present + late; 
-        document.getElementById('count-excused').innerText = excused;
-        document.getElementById('count-absent').innerText = absent;
-
-        let pPct = total > 0 ? ((present + late) / total) * 100 : 0;
-        let ePct = total > 0 ? (excused / total) * 100 : 0;
-        let aPct = total > 0 ? (absent / total) * 100 : 0;
-
-        document.getElementById('bar-present').style.width = pPct + '%';
-        document.getElementById('bar-excused').style.width = ePct + '%';
-        document.getElementById('bar-absent').style.width = aPct + '%';
-    }
-
-    function updateStatus(attendanceId, newStatus, selectElement) {
-        selectElement.className = `form-select form-select-sm bg-dark border-secondary d-inline-block w-auto text-${newStatus === 'Present' ? 'success' : newStatus === 'Absent' ? 'danger' : 'warning'}`;
-
-        fetch(`/api/attendance/update`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ attendance_id: attendanceId, status: newStatus })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if(data.success) {
-                fetchAttendanceData(currentInstanceId); 
-            } else {
-                alert('Failed to update status.');
-            }
-        })
-        .catch(error => console.error("Update Error:", error));
-    }
-
-
-    // ==========================================
-    // DOM CONTENT LOADED (EVENT LISTENERS)
-    // ==========================================
-    document.addEventListener('DOMContentLoaded', function () {
-
-        const tabs = document.querySelectorAll('#eventViewTabs .nav-link');
-        tabs.forEach(tab => {
-            tab.addEventListener('shown.bs.tab', function (event) {
-                tabs.forEach(t => {
-                    t.classList.remove('text-white', 'fw-bold', 'border-bottom', 'border-info', 'border-3');
-                    t.classList.add('text-white-50');
-                });
-                event.target.classList.remove('text-white-50');
-                event.target.classList.add('text-white', 'fw-bold', 'border-bottom', 'border-info', 'border-3');
-            });
-        });
-
-        const frequencySelect = document.getElementById('event-frequency');
-        const dateInput = document.getElementById('event-date-input');
-        const daySelect = document.getElementById('event-day-select');
-        const dateLabel = document.getElementById('date-label');
-
-        if (frequencySelect) {
-            frequencySelect.addEventListener('change', function () {
-                if (this.value === 'weekly') {
-                    dateInput.classList.add('d-none');
-                    dateInput.removeAttribute('required');
-                    dateInput.disabled = false;
-                    
-                    daySelect.classList.remove('d-none');
-                    daySelect.setAttribute('required', 'required');
-                    daySelect.disabled = false;
-                    
-                    dateLabel.innerHTML = 'Event Day <span class="text-danger">*</span>';
-                    
-                } else if (this.value === 'daily') {
-                    daySelect.classList.add('d-none');
-                    daySelect.removeAttribute('required');
-                    
-                    dateInput.classList.remove('d-none');
-                    dateInput.removeAttribute('required');
-                    dateInput.disabled = true;
-                    dateInput.value = ''; 
-                    
-                    dateLabel.innerHTML = 'Event Date <span class="text-white-50">(N/A)</span>';
-                    
-                } else {
-                    daySelect.classList.add('d-none');
-                    daySelect.removeAttribute('required');
-                    
-                    dateInput.classList.remove('d-none');
-                    dateInput.setAttribute('required', 'required');
-                    dateInput.disabled = false;
-                    
-                    dateLabel.innerHTML = 'Event Date <span class="text-danger">*</span>';
-                }
-            });
-        }
-
-        const allDeptCheck = document.getElementById('dept-all');
-        const deptChecks = document.querySelectorAll('.dept-cb');
-
-        if (allDeptCheck && deptChecks.length > 0) {
-            allDeptCheck.addEventListener('change', function () {
-                deptChecks.forEach(cb => cb.checked = this.checked);
-            });
-
-            deptChecks.forEach(cb => {
-                cb.addEventListener('change', function () {
-                    const allChecked = Array.from(deptChecks).every(c => c.checked);
-                    allDeptCheck.checked = allChecked;
-                });
-            });
-        }
-
-        const container = document.getElementById('custom-participants-container');
-        const addBtn = document.getElementById('add-custom-participant-btn');
-
-        if (container && addBtn) {
-            addBtn.addEventListener('click', function () {
-                const row = document.createElement('div');
-                row.className = 'd-flex align-items-center mt-2';
-                row.innerHTML = `
-                    <input type="text" name="custom_dept" class="form-control bg-dark text-white border-secondary form-control-sm" placeholder="e.g. Parents, Sponsors">
-                    <button type="button" class="btn btn-sm btn-outline-danger ms-2 remove-custom-btn" title="Remove">
-                        <i class="bi bi-x"></i>
-                    </button>
-                `;
-                container.appendChild(row);
-
-                updateRemoveButtons();
-
-                const removeBtn = row.querySelector('.remove-custom-btn');
-                removeBtn.addEventListener('click', function () {
-                    row.remove();
-                    updateRemoveButtons();
-                });
-            });
-
-            function updateRemoveButtons() {
-                const rows = container.querySelectorAll('.d-flex');
-                rows.forEach((row) => {
-                    const btn = row.querySelector('.remove-custom-btn');
-                    if (btn) {
-                        btn.style.display = rows.length > 1 ? 'block' : 'none';
-                    }
-                });
-            }
-        }
-        
-        const instanceSelect = document.getElementById('instanceSelect');
-        if (instanceSelect) {
-            instanceSelect.addEventListener('change', function(e) {
-                currentInstanceId = e.target.value;
-                fetchAttendanceData(currentInstanceId);
-            });
-        }
-    });
-</script>
 {% endblock %}
 {% endblock %}
