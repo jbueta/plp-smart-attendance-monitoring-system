@@ -98,4 +98,32 @@ document.addEventListener('DOMContentLoaded', function () {
     if (categorySelect) {
         categorySelect.addEventListener('change', updateOptions);
     }
+
+
+    // =====================================================================================
+    // BACKEND FUCTIONALITY
+    // =====================================================================================
+
+    async function authenticateRequest(studentId) {
+        const url = "http://localhost:5000/authenticate";
+        const data = { student_id: studentId,
+                       date: new Date().toISOString().split('T')[0],
+                       time: new Date().toISOString().split('T')[1].split('.')[0],
+                       ip_address: "127.0.0.1"
+         };
+        const options = {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        };
+
+        try {
+            const response = await fetch(url, options);
+            const result = await response.json();
+            return result;
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
 });

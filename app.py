@@ -1,6 +1,9 @@
 from datetime import date, datetime
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+import requests
+import csv
+import io
 
 app = Flask(__name__)
 app.secret_key = 'plp_secure_key_2026'  # Required for session management
@@ -11,26 +14,14 @@ app.secret_key = 'plp_secure_key_2026'  # Required for session management
 
 # Default events that cannot be deleted in this prototype
 DEFAULT_EVENTS = [
-    {
-        'id': 1, 
-        'name': 'Flag Ceremony Entrance/Exit', 
-        'type': 'Mandatory', 
-        'dept': 'All Departments', 
-        'time': '07:00 AM', 
-        'date': date.today().strftime('%Y-%m-%d')
-    },
-    {
-        'id': 2, 
-        'name': 'Flag Retreat', 
-        'type': 'Mandatory', 
-        'dept': 'All Departments', 
-        'time': '05:00 PM', 
-        'date': date.today().strftime('%Y-%m-%d')
-    }
+    {}
 ]
 
-EVENTS = list(DEFAULT_EVENTS)
 VISITORS = []
+
+LIVE_DEPARTMENTS = [
+    {}
+]
 
 # --- Database Transition Mock Models ---
 MOCK_DASHBOARD_STATS = {
@@ -48,6 +39,8 @@ MOCK_DASHBOARD_STATS = {
         {"type": "info", "icon": "info-circle-fill", "title": "Peak Hour Detected", "time": "07:30 AM"}
     ]
 }
+
+EVENTS = list(DEFAULT_EVENTS)
 
 MOCK_EMPLOYEE_STATS = {
     "attendance_data": [75, 20, 5], 
@@ -164,23 +157,27 @@ def index():
 def kiosk_entrance():
     session.pop('logged_in', None)
     active_visitors = [v for v in VISITORS if v['status'] == 'Checked In']
-    return render_template('kiosk_entrance.html', active_visitors=active_visitors, kiosk_data=MOCK_KIOSK_DATA)
+    logs = helper_kiosk_live_student_logs()
+    return render_template('kiosk_entrance.html', active_visitors=active_visitors, kiosk_data=logs)
 
 @app.route('/kiosk/exit')
 def kiosk_exit():
     session.pop('logged_in', None)
-    return render_template('kiosk_exit.html', kiosk_data=MOCK_KIOSK_DATA)
+    logs = helper_kiosk_live_student_logs()
+    return render_template('kiosk_exit.html', kiosk_data=logs)
 
 @app.route('/kiosk/employee/select-event')
 def kiosk_employee_select_event():
     session.pop('logged_in', None)
-    return render_template('kiosk_event_select.html', events=EVENTS)
+    events = helper_kiosk_live_events()
+    return render_template('kiosk_event_select.html', events=events)
 
 @app.route('/kiosk/employee')
 def kiosk_employee():
     session.pop('logged_in', None)
-    event_id = request.args.get('event_id', type=int)
-    selected_event = next((e for e in EVENTS if e['id'] == event_id), None)
+    instance_id = request.args.get('instance_id', type=int)
+    events = helper_kiosk_live_events()
+    selected_event = next((e for e in events if e['instance_id'] == instance_id), None)
     event_name = selected_event['name'] if selected_event else "General Attendance"
     return render_template('kiosk_employee.html', event_name=event_name, kiosk_data=MOCK_KIOSK_DATA)
 
@@ -242,18 +239,25 @@ def visitor_checkout(visitor_id):
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    overall_stats   = helper_dashboard_overall_stats()
+    student_stats   = helper_dashboard_student_stats()
+    employee_stats  = helper_dashboard_employee_stats()
+
+    events = helper_admin_live_events()
     # Pass structured stats for different tabs
     return render_template('dashboard.html', 
-                           events=EVENTS, 
-                           overall_stats=MOCK_DASHBOARD_STATS,
-                           student_stats=MOCK_STUDENT_STATS,
-                           employee_stats=MOCK_EMPLOYEE_STATS,
-                           logs=MOCK_EMPLOYEE_LOGS)
+                        events=events, 
+                        overall_stats=overall_stats,
+                        student_stats=student_stats,
+                        employee_stats=employee_stats,
+                        logs=MOCK_EMPLOYEE_LOGS)
 
 @app.route('/events')
 @login_required
 def manage_events():
-    return render_template('events.html', events=EVENTS)
+    events = helper_admin_live_events()
+    departments = helper_admin_live_departments()
+    return render_template('events.html', events=events, departments=departments)
 
 @app.route('/admin/students')
 @login_required
@@ -264,6 +268,16 @@ def admin_students():
 @login_required
 def admin_employees():
     return render_template('employee_logs.html', logs=MOCK_EMPLOYEE_LOGS)
+
+# @app.route('/admin/students')
+# @login_required
+# def admin_students():
+#     return render_template('student_logs.html', logs=MOCK_STUDENT_LOGS)
+
+# @app.route('/admin/employees')
+# @login_required
+# def admin_employees():
+#     return render_template('employee_logs.html', logs=MOCK_EMPLOYEE_LOGS)
 
 @app.route('/admin/visitors')
 @login_required
@@ -299,39 +313,95 @@ def sample_report():
 def add_event():
     name = request.form.get('name')
     etype = request.form.get('type')
-    dept_list = request.form.getlist('dept')
-    custom_depts_raw = request.form.getlist('custom_dept')
-    edate = request.form.get('date')
-    time = request.form.get('time')
+
+    edate = request.form.get('event_date')
+    eday = request.form.get('day_of_week')
+    time_start = request.form.get('time_start')
+    time_end = request.form.get('time_end')
+    location = request.form.get('location')
     
-    # Format department string
-    if not dept_list or 'All Departments' in dept_list:
-        dept_str = 'All Departments'
-    else:
-        dept_str = ', '.join(dept_list)
-        
-    custom_depts = [c.strip() for c in custom_depts_raw if c.strip()]
-    if custom_depts:
-        custom_str = ', '.join(custom_depts)
-        if dept_str == 'All Departments':
-            dept_str = f"All Departments, {custom_str}"
+    dept_ids = request.form.getlist('dept')
+    custom_depts_file = request.files.get('roster_file')
+    
+    frequency = request.form.get('frequency').upper()
+    participants_type = ''
+
+    if frequency == 'ONE-TIME':
+        frequency = 'ONCE'
+        if edate is None:
+            flash('Failed to add event. For one time events, date is required.', 'danger')
+            return redirect(url_for('manage_events'))
+    elif frequency == 'WEEKLY':
+        if eday is None:
+            flash('Failed to add event. For weekly events, day of week is required.', 'danger')
+            return redirect(url_for('manage_events'))
+
+    has_file = bool(custom_depts_file and custom_depts_file.filename != '')
+
+    if not dept_ids and not has_file:
+        flash('Failed to add event. At least one department is required or upload a custom roster file.', 'danger')
+        return redirect(url_for('manage_events'))
+    
+    if dept_ids and has_file:
+        participants_type = 'hybrid'
+    elif dept_ids and not has_file:
+        participants_type = 'grouped'
+    elif not dept_ids and has_file:
+        participants_type = 'custom'
+
+    extracted_custom_participants = []
+    
+    if has_file:
+        if custom_depts_file.filename.endswith('.csv'):
+            try:
+                file_contents = custom_depts_file.read().decode('utf-8-sig')
+                csv_stream = io.StringIO(file_contents)
+                csv_reader = csv.DictReader(csv_stream)
+                target_column = 'ID' 
+                for row in csv_reader:
+                    if target_column in row and row[target_column].strip():
+                        extracted_custom_participants.append(row[target_column].strip())
+                csv_stream.close()            
+            except Exception as e:
+                flash(f"Failed to process the CSV file: {str(e)}", "danger")
+                return redirect(url_for('manage_events'))
         else:
-            dept_str = f"{dept_str}, {custom_str}"
-    
-    if name and etype and edate and time:
-        new_id = max([e['id'] for e in EVENTS]) + 1 if EVENTS else 1
-        EVENTS.append({
-            'id': new_id,
-            'name': name,
-            'type': etype,
-            'dept': dept_str,
-            'date': edate,
-            'time': time
-        })
-        flash(f'Event "{name}" added successfully.', 'success')
-    else:
-        flash('Failed to add event. All fields are required.', 'danger')
+            flash("Please upload a valid .csv file.", "warning")
+            return redirect(url_for('manage_events'))
+
+    try:
+        event_payload = {
+            "event_name": name,
+            "event_type": etype,
+            "frequency": frequency,
+            "location": location,
+            "event_date": edate,
+            "time_start": time_start,
+            "time_end": time_end,
+            "day": eday,
+            "participants_type": participants_type, 
+            "grouped_participants": dept_ids,
+            "custom_participants": extracted_custom_participants
+        }
+
+        api_url = "http://127.0.0.1:5001/admin/dashboard/add-events"
+        response = requests.post(api_url, json=event_payload, timeout=5)
         
+        if response.status_code in [200, 201]:
+            api_data = response.json()
+            
+            if api_data.get('success'):
+                flash(f'Event "{name}" added successfully.', 'success')
+            else:
+                error_msg = api_data.get('message', 'Unknown API error')
+                flash(f'Failed to add event: {error_msg}', 'danger')
+        else:
+            flash(f'Server error. Status code: {response.status_code}', 'danger')
+                
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Connection Error: {e}")
+        flash(f'Event "{name}" failed to add. Could not connect to the database.', 'danger')
+
     return redirect(url_for('manage_events'))
 
 @app.route('/admin/events/delete/<int:event_id>', methods=['POST'])
@@ -406,6 +476,194 @@ def check_student_status():
             'attendance_status': student['status']
         }
     return {'status': 'not_found'}
+    
+# ==============================================================================
+# STATIC/ROUTE BASED GETTER METHODS
+# ==============================================================================
+@app.route('/api/kiosk/live-events')
+def kiosk_live_event():    
+    try:
+        response = requests.get("http://127.0.0.1:5001/kiosk/employee/select-event", timeout=5)
+        if response.status_code == 200:
+            return jsonify(response.json()) 
+            
+    except requests.exceptions.RequestException as e:
+        print(f"API Bridge Error: {e}")
+
+
+@app.route('/api/admin/live-events')
+def admin_live_event():    
+    try:
+        response = requests.get("http://127.0.0.1:5001/admin/dashboard/live-events", timeout=5)
+        if response.status_code == 200:
+            return jsonify(response.json()) 
+            
+    except requests.exceptions.RequestException as e:
+        print(f"API Bridge Error: {e}")
+
+@app.route('/api/admin/live-departments')
+def admin_live_departments():    
+    try:
+        response = requests.get("http://127.0.0.1:5001/admin/dashboard/events/live-departments", timeout=5)
+        if response.status_code == 200:
+            return jsonify(response.json()) 
+            
+    except requests.exceptions.RequestException as e:
+        print(f"API Bridge Error: {e}")
+
+
+# ==============================================================================
+# HELPER
+# ==============================================================================
+
+def helper_admin_live_events():    
+    current_kiosk_events = list(DEFAULT_EVENTS)
+    
+    try:
+        response = requests.get("http://127.0.0.1:5001/admin/dashboard/live-events", timeout=5)
+        
+        if response.status_code == 200:
+            api_data = response.json()
+            
+            if api_data.get('success'):
+                real_events = []
+                for event in api_data.get('events', []):
+                    real_events.append({
+                        'event_id': event.get('event_id', ''),
+                        'name': event.get('name', 'Unknown'),
+                        'type': event.get('type', 'Unknown'),
+                        'date': event.get('date', 'Unknown'),
+                        'dept': event.get('dept', 'Unknown'),
+                        'time_start': event.get('time_start', 'Unknown'),
+                        'time_end': event.get('time_end', 'Unknown'),
+                        'location': event.get('location', 'Unknown')
+                    })
+                
+                current_kiosk_events = real_events
+                
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Error: {e}")
+        
+    return current_kiosk_events 
+
+
+def helper_kiosk_live_events():    
+    current_kiosk_events = list(DEFAULT_EVENTS)
+    
+    try:
+        response = requests.get("http://127.0.0.1:5001/kiosk/employee/select-event", timeout=5)
+        
+        if response.status_code == 200:
+            api_data = response.json()
+            
+            if api_data.get('success'):
+                real_events = []
+                for event in api_data.get('events', []):
+                    real_events.append({
+                        'instance_id': event.get('instance_id', ''),
+                        'name': event.get('name', 'Unknown'),
+                        'type': event.get('type', 'Unknown'),
+                        'date': event.get('date', 'Unknown'),
+                        'time_start': event.get('time_start', 'Unknown'),
+                        'time_end': event.get('time_end', 'Unknown'),
+                        'location': event.get('location', 'Unknown')
+                    })
+                
+                current_kiosk_events = real_events
+                
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Error: {e}")
+        
+    return current_kiosk_events 
+
+def helper_kiosk_live_student_logs():    
+    current_kiosk_data = dict(MOCK_KIOSK_DATA)
+    
+    try:
+        response = requests.get("http://127.0.0.1:5001/kiosk/students/student-logs", timeout=5)
+        
+        if response.status_code == 200:
+            api_data = response.json()
+            
+            if api_data.get('success'):
+                real_logs = []
+                for log in api_data.get('logs', []):
+                    real_logs.append({
+                        'type': 'in' if log.get('type') in ['in', 'entry'] else 'out',
+                        'name': log.get('name', 'Unknown'),
+                        'course': log.get('course', 'Unknown'),
+                        'time': log.get('time', '')
+                    })
+                
+                current_kiosk_data['recent_student_logs'] = real_logs
+                
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Error: {e}")
+        
+    return current_kiosk_data 
+
+def helper_admin_live_departments(): 
+    current_live_departments = list(LIVE_DEPARTMENTS)
+    
+    try:
+        response = requests.get("http://127.0.0.1:5001/admin/dashboard/events/live-departments", timeout=5)
+        
+        if response.status_code == 200:
+            api_data = response.json()
+            
+            if api_data.get('success'):
+                real_departments = []
+                for dept in api_data.get('departments', []):
+                    real_departments.append({
+                        'department_id': dept.get('dept_id', ''),
+                        'department_name': dept.get('dept_name', 'Unknown')
+                    })
+                
+                current_live_departments = real_departments
+                
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Error: {e}")
+        
+    return current_live_departments 
+
+
+def helper_dashboard_overall_stats():
+    stats = dict(MOCK_DASHBOARD_STATS)  
+    try:
+        response = requests.get("http://127.0.0.1:5001/admin/dashboard/analytics/overall", timeout=5)
+        if response.status_code == 200:
+            api_data = response.json()
+            if api_data.get('success'):
+                stats = api_data['data']
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Error (overall stats): {e}")
+    return stats
+
+
+def helper_dashboard_student_stats():
+    stats = dict(MOCK_STUDENT_STATS)
+    try:
+        response = requests.get("http://127.0.0.1:5001/admin/dashboard/analytics/students", timeout=5)
+        if response.status_code == 200:
+            api_data = response.json()
+            if api_data.get('success'):
+                stats = api_data['data']
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Error (student stats): {e}")
+    return stats
+
+
+def helper_dashboard_employee_stats():
+    stats = dict(MOCK_EMPLOYEE_STATS)
+    try:
+        response = requests.get("http://127.0.0.1:5001/admin/dashboard/analytics/employees", timeout=5)
+        if response.status_code == 200:
+            api_data = response.json()
+            if api_data.get('success'):
+                stats = api_data['data']
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Error (employee stats): {e}")
+    return stats
 
 # ==============================================================================
 # MAIN ENTRY POINT

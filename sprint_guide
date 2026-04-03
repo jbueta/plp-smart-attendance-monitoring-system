@@ -1,0 +1,236 @@
+##################################################################################
+##################################################################################
+##################################################################################
+
+=============================================================================
+                        EVENTS (Ron Alexander Inocencio)
+=============================================================================
+
+-----------------------------------------------------------------------------
+1. SPRINT 1 
+-----------------------------------------------------------------------------
+[EVENTS MANAGEMENT w/ Database Connection: 
+
+    ** EVENT CRUD ENDPOINTS
+    - Develop POST endpoint to create new events
+    - Develop PUT/PATCH endpoints to update event details
+    - Develop DELETE endpoint for event removal (soft removal, PS: just change active attribute to false dont delete query)
+
+    ** EVENT RETRIEVAL & SQL LOGIC
+    - Develop GET endpoints to serve event data as JSON
+    - Implement complex SQL queries to handle both static dates and weekly recurring events (using DAYNAME() logic)
+    - Build endpoint to fetch specific event details by event_id
+
+]
+
+-----------------------------------------------------------------------------
+2. SPRINT 2 
+-----------------------------------------------------------------------------
+[FUNCTIONALITY ERROR HANDLING AND TESTING
+
+    ** GLOBAL ROBUSTNESS
+    - Global Error Handling: Implement Try-Catch blocks on all endpoints to return proper HTTP status codes (400, 404, 500) and standardized JSON error messages instead of server crashes.
+    - Data Validation: Sanitize and validate all incoming POST/PUT request bodies (e.g., ensure dates are valid formats, prevent SQL injection).
+    - Unit/Integration Testing: Test database connection pools and endpoint reliability.
+
+]
+
+
+
+##################################################################################
+##################################################################################
+##################################################################################
+
+=============================================================================
+                        VISITORS (Pagsuyuin Warren)
+=============================================================================
+
+-----------------------------------------------------------------------------
+1. SPRINT 1 
+-----------------------------------------------------------------------------
+[VISITORS TABLE READING/VIEWING
+
+    ** VISITOR ENDPOINTS
+    - Develop POST endpoint for logging new visitor entries/exits
+    - Develop GET endpoint to retrieve paginated visitor history logs
+    - Create specific GET endpoint to fetch deep-dive data for a single visitor_id
+
+]
+
+-----------------------------------------------------------------------------
+2. SPRINT 2 
+-----------------------------------------------------------------------------
+[FUNCTIONALITY ERROR HANDLING AND TESTING
+
+    ** GLOBAL ROBUSTNESS
+    - Global Error Handling: Ensure bad API requests return standard JSON error schemas. 
+    - Validation Logic: Ensure required visitor fields (ID, Name, Purpose) are present before executing database inserts.
+    - Testing: Simulate high-traffic database writes to ensure no dropped visitor logs.
+
+]
+
+
+##################################################################################
+##################################################################################
+##################################################################################
+
+=============================================================================
+                      EMPLOYEES (RON ALEXANDER INOCENCIO)
+=============================================================================
+
+-----------------------------------------------------------------------------
+1. SPRINT 1 
+-----------------------------------------------------------------------------
+[EMPLOYEE DIRECTORY REST API
+
+    ** CRUD ENDPOINTS FOR EMPLOYEES
+    - Develop secure endpoints (GET, POST, PUT, DELETE) for employee records. (soft removal/deletion, PS: just change active attribute to false dont delete query)
+    - Implement secure data handling (e.g., hashing passwords if applicable, or securely storing sensitive employee info).
+
+]
+
+-----------------------------------------------------------------------------
+2. SPRINT 2 
+-----------------------------------------------------------------------------
+[FUNCTIONALITY ERROR HANDLING AND TESTING
+
+    ** GLOBAL ROBUSTNESS
+    - Global Error Handling: Ensure bad API requests return standard JSON error schemas. 
+    - Validation Logic: Ensure required employee fields (employeeID, Name, Department, position) are present before executing database inserts.
+    - Testing: Simulate high-traffic database writes to ensure no dropped visitor logs.
+
+]
+
+
+##################################################################################
+##################################################################################
+##################################################################################
+
+=============================================================================
+                      STUDENTS (CARL VINCENT VENTURA)
+=============================================================================
+
+-----------------------------------------------------------------------------
+1. SPRINT 1 (7 DAYS)
+-----------------------------------------------------------------------------
+[INFORMATION VIEWING AND RENDERING
+
+
+    ** LIVE DATA ENDPOINTS
+    - Build endpoints to calculate and return real-time metrics (total entries, currently inside, peak hour stats).
+    - Build GET endpoints for live student status (inside vs. exited).
+   
+    ** COMPLEX SEARCH QUERIES
+    - Develop secure endpoints (GET, POST, PUT, DELETE) for student records. (soft removal/deletion, PS: just change active attribute to false dont delete query)
+    - Develop a dynamic search endpoint accepting multiple query parameters (?name=X, ?id=Y, ?course=Z, ?year=W).
+    - Optimize backend SQL logic (e.g., using LIKE or FULLTEXT search) for fast retrieval.
+
+]
+
+-----------------------------------------------------------------------------
+2. SPRINT 2 (3 DAYS)
+-----------------------------------------------------------------------------
+[CURFEW WATCHLIST MANAGEMENT (EXTENDED FUNCTIONALITY)
+
+    ** REAL-TIME CURFEW ENGINE
+    - Write a background script/Cron job that queries the database every minute to find students inside past curfew.
+    - Develop an internal trigger function to pass curfew violator data to the Emailing Module.
+    - Build GET endpoint to serve the active "Curfew Watchlist" to the frontend.
+
+]
+
+-----------------------------------------------------------------------------
+3. SPRINT 3 (3 DAYS)
+-----------------------------------------------------------------------------
+[FUNCTIONALITY ERROR HANDLING AND TESTING
+
+    ** GLOBAL ROBUSTNESS
+    - Ensure background curfew jobs do not lock up the database (optimize queries).
+    - Validate all search parameters to prevent database strain.
+    - Ensure failed email triggers do not crash the curfew monitoring loop.
+
+]
+
+
+##################################################################################
+##################################################################################
+##################################################################################
+
+=============================================================================
+                           REPORTS (JASON JAY RECTO)
+=============================================================================
+
+-----------------------------------------------------------------------------
+1. SPRINT 1 (7 DAYS)
+-----------------------------------------------------------------------------
+[REPORTS MANAGEMENT FUNCTIONALITY
+
+    ** DATA FILTERING LOGIC
+    - Build complex SQL queries (JOINs, GROUP BY) to aggregate report data filtered by Category, Specificity, Department, and Date Range.
+    - Serve aggregated JSON data to the frontend for previewing.
+
+    ** FILE GENERATION
+    - Integrate backend libraries (e.g., PDFKit, SheetJS/ExcelJS) to generate PDF and Excel files on the server.
+    - Build an endpoint that returns the generated file stream or a secure download link.
+
+]
+
+-----------------------------------------------------------------------------
+2. SPRINT 2 (3 DAYS)
+-----------------------------------------------------------------------------
+[FUNCTIONALITY ERROR HANDLING AND TESTING
+
+    - Optimize heavy report queries so they don't bottleneck the main database.
+    - Implement error handling for file generation timeouts or empty data sets (return 404 or specific error instead of a broken file).
+
+]
+
+
+##################################################################################
+##################################################################################
+##################################################################################
+
+=============================================================================
+                         MACHINE LEARNING MODULE
+=============================================================================
+-----------------------------------------------------------------------------
+1. SPRINT 1 GOAL
+-----------------------------------------------------------------------------
+[Write 1-2 sentences explaining the main objective of this sprint. 
+Example: "Successfully integrate the YOLO object detection model to extract 
+signatures from scanned documents."]
+
+-----------------------------------------------------------------------------
+2. SPRINT 2 GOAL
+-----------------------------------------------------------------------------
+[Write 1-2 sentences explaining the main objective of this sprint. 
+Example: "Successfully integrate the YOLO object detection model to extract 
+signatures from scanned documents."]
+
+
+##################################################################################
+##################################################################################
+##################################################################################
+
+=============================================================================
+                            EMAILING MODULE
+=============================================================================
+-----------------------------------------------------------------------------
+1. SPRINT 1 GOAL
+-----------------------------------------------------------------------------
+[SMTP INTEGRATION & CORE FUNCTIONS
+
+    - Configure the SMTP server or 3rd-party API (SendGrid, NodeMailer).
+    - Write the core backend `sendEmail()` utility function that other modules (like Curfew Watchlist) can import and call.
+
+]
+
+-----------------------------------------------------------------------------
+2. SPRINT 2 GOAL
+-----------------------------------------------------------------------------
+[DYNAMIC HTML TEMPLATING
+
+    - Build backend functions to inject dynamic database variables (Student Name, Time of Violation) into HTML email templates before dispatching.
+    - Implement retry logic for failed email dispatches.
+
+]
