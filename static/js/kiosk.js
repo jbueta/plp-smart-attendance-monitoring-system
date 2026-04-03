@@ -30,6 +30,10 @@ function submitManualEntry(type) {
         if (data.success) {
             const logType = data.attendance_status.toLowerCase();
             const bannerType = logType === 'entry' ? 'in' : 'out';
+            
+            if (typeof appendToLiveFeed === 'function') {
+                appendToLiveFeed(data.name, data.affiliation, logType);
+            }
 
             if (typeof showScanBanner === 'function') {
                 showScanBanner(bannerType, {

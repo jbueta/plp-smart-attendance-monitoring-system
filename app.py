@@ -127,13 +127,24 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         
-        # Hardcoded credentials for prototype demonstration
-        if username == 'admin' and password == 'admin123':
+        if username is None or password is None:
+            flash('Please enter a username and password.', 'danger')
+
+        if username == "admin" and password == "admin123":
             session['logged_in'] = True
-            flash('Welcome back, Admin.', 'success')
+            flash("Welcome back, Admin.", 'success')
+            return redirect(url_for('dashboard'))
+        
+        result = helper_admin_login(username, password)
+        if result and result.get('success'):
+            data = result.get('data') or {}
+            user_name = data.get('user_name') or 'Admin'
+            session['logged_in'] = True
+            flash(f"Welcome back, {user_name}.", 'success')
             return redirect(url_for('dashboard'))
         else:
-            flash('Invalid credentials. Please try again.', 'danger')
+            message = result.get('message') if result else 'Could not connect to the database. Please try again.'
+            flash(message, 'danger')
             
     return render_template('login.html')
 
@@ -239,18 +250,17 @@ def visitor_checkout(visitor_id):
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    overall_stats   = helper_dashboard_overall_stats()
-    student_stats   = helper_dashboard_student_stats()
-    employee_stats  = helper_dashboard_employee_stats()
-
     events = helper_admin_live_events()
+    overall_stats = helper_dashboard_overall_stats()
+    student_stats = helper_dashboard_student_stats()
+    employee_stats = helper_dashboard_employee_stats()
     # Pass structured stats for different tabs
     return render_template('dashboard.html', 
-                        events=events, 
-                        overall_stats=overall_stats,
-                        student_stats=student_stats,
-                        employee_stats=employee_stats,
-                        logs=MOCK_EMPLOYEE_LOGS)
+                           events=events, 
+                           overall_stats=overall_stats,
+                           student_stats=student_stats,
+                           employee_stats=employee_stats,
+                           logs=MOCK_EMPLOYEE_LOGS)
 
 @app.route('/events')
 @login_required
@@ -269,16 +279,6 @@ def admin_students():
 def admin_employees():
     return render_template('employee_logs.html', logs=MOCK_EMPLOYEE_LOGS)
 
-# @app.route('/admin/students')
-# @login_required
-# def admin_students():
-#     return render_template('student_logs.html', logs=MOCK_STUDENT_LOGS)
-
-# @app.route('/admin/employees')
-# @login_required
-# def admin_employees():
-#     return render_template('employee_logs.html', logs=MOCK_EMPLOYEE_LOGS)
-
 @app.route('/admin/visitors')
 @login_required
 def admin_visitors():
@@ -287,12 +287,21 @@ def admin_visitors():
 @app.route('/analytics/employee')
 @login_required
 def analytics_employee():
-    return redirect(url_for('admin_employees'))
+    events = helper_admin_live_events()
+    stats = helper_dashboard_employee_stats()
+    return render_template('analytics_employee.html',
+                           events=events,
+                           stats=stats,
+                           logs=MOCK_EMPLOYEE_LOGS,
+                           today=datetime.now().strftime('%b %d, %Y'))
 
 @app.route('/analytics/students')
 @login_required
 def analytics_students():
-    return redirect(url_for('admin_students'))
+    stats = helper_dashboard_student_stats()
+    return render_template('analytics_students.html',
+                           stats=stats,
+                           logs=MOCK_STUDENT_LOGS)
 
 @app.route('/reports')
 @login_required
@@ -408,43 +417,38 @@ def add_event():
 @login_required
 def delete_event(event_id):
     if event_id <= 2:
-        flash('Cannot delete default system events.', 'warning')
-        return redirect(url_for('dashboard'))
+        return jsonify({'success': False, 'message': 'Cannot delete default system events.'}), 403
 
-    global EVENTS
-    EVENTS = [e for e in EVENTS if e['id'] != event_id]
-    flash('Event deleted successfully.', 'info')
-    return redirect(url_for('manage_events'))
+    result = helper_admin_delete_events(event_id, 'single')
 
-@app.route('/admin/events/delete/bulk', methods=['POST'])
+    if result and result.get('success'):
+        return jsonify({'success': True, 'message': result.get('message', 'Event deleted successfully.')}), 200
+    else:
+        return jsonify({'success': False, 'message': result.get('message', 'Failed to delete event.')}), 500
+
+@app.route('/admin/events/bulk-delete', methods=['POST'])
 @login_required
 def bulk_delete_events():
-    event_ids = request.form.getlist('event_ids')
-    
+    data = request.get_json()
+    event_ids = data.get('event_ids', [])
+
     if not event_ids:
-        flash('No events selected for deletion.', 'warning')
-        return redirect(url_for('manage_events'))
+        return jsonify({'success': False, 'message': 'No events selected.'}), 400
+
+    # Protect default system events from bulk deletion
+    valid_ids = [str(eid) for eid in event_ids if int(eid) > 2]
+    
+    if not valid_ids:
+        return jsonify({'success': False, 'message': 'Cannot delete default system events.'}), 403
 
     try:
-        event_ids = [int(eid) for eid in event_ids]
-    except ValueError:
-        flash('Invalid event IDs provided.', 'danger')
-        return redirect(url_for('manage_events'))
-
-    safe_ids = [eid for eid in event_ids if eid > 2]
-    skipped_count = len(event_ids) - len(safe_ids)
-
-    global EVENTS
-    initial_count = len(EVENTS)
-    EVENTS = [e for e in EVENTS if e['id'] not in safe_ids]
-    deleted_count = initial_count - len(EVENTS)
-
-    msg = f'{deleted_count} events deleted successfully.'
-    if skipped_count > 0:
-        msg += f' {skipped_count} default events were protected.'
-    
-    flash(msg, 'info')
-    return redirect(url_for('manage_events'))
+        helper_admin_delete_events(valid_ids, 'bulk')
+            
+        return jsonify({'success': True, 'message': f'{len(valid_ids)} events deleted successfully.'}), 200
+        
+    except Exception as e:
+        print(f"Bulk delete error: {e}")
+        return jsonify({'success': False, 'message': 'An error occurred during bulk deletion.'}), 500
 
 @app.route('/admin/profile/update', methods=['POST'])
 @login_required
@@ -516,36 +520,18 @@ def admin_live_departments():
 # HELPER
 # ==============================================================================
 
-def helper_admin_live_events():    
-    current_kiosk_events = list(DEFAULT_EVENTS)
-    
-    try:
-        response = requests.get("http://127.0.0.1:5001/admin/dashboard/live-events", timeout=5)
-        
-        if response.status_code == 200:
-            api_data = response.json()
-            
-            if api_data.get('success'):
-                real_events = []
-                for event in api_data.get('events', []):
-                    real_events.append({
-                        'event_id': event.get('event_id', ''),
-                        'name': event.get('name', 'Unknown'),
-                        'type': event.get('type', 'Unknown'),
-                        'date': event.get('date', 'Unknown'),
-                        'dept': event.get('dept', 'Unknown'),
-                        'time_start': event.get('time_start', 'Unknown'),
-                        'time_end': event.get('time_end', 'Unknown'),
-                        'location': event.get('location', 'Unknown')
-                    })
-                
-                current_kiosk_events = real_events
-                
-    except requests.exceptions.RequestException as e:
-        print(f"Backend API Error: {e}")
-        
-    return current_kiosk_events 
+def helper_admin_login(username, password):
+    url = "http://127.0.0.1:5001/admin/login/auth"
+    headers = {"Content-Type": "application/json"}
+    payload = {"username": username, "password": password}   
 
+    try:
+        response = requests.put(url, headers=headers, json=payload, timeout=5)
+        response.raise_for_status()
+        return response.json()
+            
+    except requests.exceptions.RequestException as e:
+        print(f"API for admin authentication bridge error: {e}")
 
 def helper_kiosk_live_events():    
     current_kiosk_events = list(DEFAULT_EVENTS)
@@ -626,6 +612,56 @@ def helper_admin_live_departments():
         
     return current_live_departments 
 
+def helper_admin_live_events():    
+    current_kiosk_events = list(DEFAULT_EVENTS)
+    
+    try:
+        response = requests.get("http://127.0.0.1:5001/admin/dashboard/live-events", timeout=5)
+        
+        if response.status_code == 200:
+            api_data = response.json()
+            
+            if api_data.get('success'):
+                real_events = []
+                for event in api_data.get('events', []):
+                    real_events.append({
+                        'event_id': event.get('event_id', ''),
+                        'name': event.get('name', 'Unknown'),
+                        'type': event.get('type', 'Unknown'),
+                        'date': event.get('date', 'Unknown'),
+                        'dept': event.get('dept', 'Unknown'),
+                        'time_start': event.get('time_start', 'Unknown'),
+                        'time_end': event.get('time_end', 'Unknown'),
+                        'location': event.get('location', 'Unknown')
+                    })
+                
+                current_kiosk_events = real_events
+                
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Error: {e}")
+        
+    return current_kiosk_events 
+
+
+def helper_admin_delete_events(event_id, delete_type):
+    """
+    Call the backend API to soft‑delete an event.
+    Returns the JSON response from the backend.
+    """
+    if delete_type == 'single':
+        url = "http://127.0.0.1:5001/admin/events/delete-event"
+    elif delete_type == 'bulk':
+        url = "http://127.0.0.1:5001/admin/events/delete-events"
+    headers = {"Content-Type": "application/json"}
+    payload = {"event_id": str(event_id)}   
+
+    try:
+        response = requests.put(url, headers=headers, json=payload, timeout=5)
+        response.raise_for_status()          
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Error: {e}")
+        return {"success": False, "message": f"Backend error: {e}"}
 
 def helper_dashboard_overall_stats():
     stats = dict(MOCK_DASHBOARD_STATS)  
@@ -664,7 +700,6 @@ def helper_dashboard_employee_stats():
     except requests.exceptions.RequestException as e:
         print(f"Backend API Error (employee stats): {e}")
     return stats
-
 # ==============================================================================
 # MAIN ENTRY POINT
 # ==============================================================================
