@@ -134,7 +134,7 @@ def login():
         if result and result.get('success'):
             data = result.get('data')
             session['logged_in'] = True
-            flash(f"Welcome back, {data.}.", 'success')
+            flash(f"Welcome back, {data.get('user_name')}.", 'success')
             return redirect(url_for('dashboard'))
         else:
             flash(f"{result.get('message')}", 'danger')
