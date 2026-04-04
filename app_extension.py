@@ -101,7 +101,7 @@ def teardown_db(error):
 # ADMIN AUTHENTICATION
 # ==============================================================================
 
-@app.route('/admin/login/auth', methods=['GET'])
+@app.route('/admin/login/auth', methods=['POST'])
 def login():
     conn = None
     try:
@@ -124,6 +124,7 @@ def login():
         if not result or len(result) == 0:
             return jsonify({"success": False, "message": "Incorrect username or password."}), 500
 
+        print(result.get('data'))
         return jsonify({"success": True, "message": "Authentication successful", "data": result}), 200
 
     except Exception as e:

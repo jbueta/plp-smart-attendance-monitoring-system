@@ -18,11 +18,11 @@ class Database:
     # =============================================================
     def admin_login(self):
         try:
-            query = """SELECT * FROM admin WHERE username = %s AND password = %s AND active = 1"""
+            query = """ SELECT * FROM admin WHERE username = %s AND password = %s LIMIT 1 """
             self.cursor.execute(query, self.parameter)
             result = self.cursor.fetchone()
             return result if result else []
-            
+
         except connector.Error as err:
             print(f"Error: {err}")
             return None
@@ -957,6 +957,7 @@ class Database:
                             e.event_id AS event_id, 
                             e.event_name AS name, 
                             e.event_type AS type, 
+                            e.frequency AS frequency,
                             DATE_FORMAT(e.event_date, '%b %e, %Y') AS date,
                             TRIM(DATE_FORMAT(e.time_start, '%l:%i %p')) AS time_start, 
                             TRIM(DATE_FORMAT(e.time_end, '%l:%i %p')) AS time_end, 
@@ -973,10 +974,8 @@ class Database:
 
             cursor.execute(query)
             result = cursor.fetchall()
-
-            # The python loop checking row.get('date') etc. is completely removed
-            # because the SQL query already returns the exact string formats you need.
-
+            
+            print(result)
             return result if result else []
             
         except connector.Error as err:
@@ -1149,6 +1148,7 @@ class Database:
                     COALESCE(d.department_name, 'N/A') AS department
                 FROM event_attendance ea
                 LEFT JOIN users u ON ea.user_id = u.user_id
+                
                 LEFT JOIN students s ON u.user_id = s.user_id
                 LEFT JOIN employees e ON u.user_id = e.user_id
                 LEFT JOIN departments d ON (e.department_id = d.department_id)
@@ -1179,5 +1179,52 @@ class Database:
         finally:
             if 'cursor' in locals():
                 cursor.close()
+
+    @staticmethod
+    def generate_report(conn,):
+        try:
+            cursor = conn.cursor(dictionary=True)
+            if category == 'event':
+                query = """
+                    SELECT 
+                        e.employee_name, 
+                        d.department_name, 
+                        TIME_FORMAT(ea.first_in, '%h:%i %p') AS time_in, 
+                        ea.status, 
+                        ea.remarks
+                    FROM event_attendance ea
+                    JOIN event_instances ei ON ea.instance_id = ei.instance_id
+                    JOIN users u ON ea.user_id = u.user_id
+                    JOIN employees e ON u.user_id = e.user_id
+                    JOIN departments d ON e.department_id = d.department_id
+                    WHERE ei.event_date BETWEEN %s AND %s
+                    ORDER BY ea.first_in ASC
+                """
+            cursor.execute(query, (start_date, end_date))
+            result = cursor.fetchall()
+            
+            cleaned_attendance = []
+            for row in result:
+                for key, val in row.items():
+                    if isinstance(val, (timedelta, date, datetime)):
+                        if isinstance(val, timedelta):
+                            total_seconds = int(val.total_seconds())
+                            hours = total_seconds // 3600
+                            minutes = (total_seconds % 3600) // 60
+                            row[key] = f"{hours:02d}:{minutes:02d}"
+                        else:
+                            row[key] = str(val)
+                cleaned_attendance.append(row)
+
+            return cleaned_attendance
+            
+        except connector.Error as err:
+            print(f"Error fetching attendance: {err}")
+            return [] 
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+
+        
 
         
