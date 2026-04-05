@@ -1231,8 +1231,8 @@ class Database:
     # =============================================================
 
     @staticmethod
-    def get_report_queries(conn, category, report_type, start_date, end_date):
-        """Fetches raw report data based on the category."""
+    def get_report_queries(conn, category, report_type, department_filter, start_date, end_date):
+        """Fetches raw report data based on the category with optional department filtering."""
         cursor = conn.cursor(dictionary=True) 
         
         # Normalize category values from form
@@ -1253,21 +1253,30 @@ class Database:
         total_present = 0
 
         try:
+            # Build department filter condition
+            dept_condition = ""
+            dept_params = []
+            
+            if department_filter and department_filter.lower() != 'all':
+                dept_condition = "AND d.department_id = %s"
+                dept_params = [department_filter]
+            
             match normalized_category: 
                 case 'Event Attendance':
                     report_title = "Event Attendance Report"
-                    col_headers = ["Participant Name", "Role / Affiliation", "Time In", "Status", "Remarks"]
+                    col_headers = ["Participant Name", "Role / Affiliation", "Time In", "Time Out", "Status", "Remarks"]
                     
                     cursor.execute("SELECT event_name FROM events WHERE event_id = %s", (report_type,))
                     event_info = cursor.fetchone()
                     if event_info:
                         event_name_display = event_info['event_name']
                     
-                    query = """
+                    query = f"""
                         SELECT 
                             COALESCE(e.employee_name, s.student_name, v.visitor_name, a.username, 'Unknown User') AS name,
                             CONCAT(UPPER(u.role), ' - ', COALESCE(d.department_name, c.course_name, v.purpose, 'N/A')) AS detail,
-                            TIME_FORMAT(ea.first_in, '%h:%i %p') AS time,
+                            TIME_FORMAT(ea.first_in, '%h:%i %p') AS time_in,
+                            TIME_FORMAT(ea.last_out, '%h:%i %p') AS time_out,
                             ea.status AS status,
                             COALESCE(ea.remarks, 'N/A') AS remarks
                         FROM event_attendance ea
@@ -1279,10 +1288,10 @@ class Database:
                         LEFT JOIN courses c ON s.course_id = c.course_id
                         LEFT JOIN visitors v ON u.user_id = v.user_id
                         LEFT JOIN admin a ON u.user_id = a.user_id
-                        WHERE ei.event_id = %s AND ei.event_date BETWEEN %s AND %s
+                        WHERE ei.event_id = %s AND ei.event_date BETWEEN %s AND %s {dept_condition}
                         ORDER BY ea.first_in ASC
                     """
-                    cursor.execute(query, (report_type, start_date, end_date))
+                    cursor.execute(query, [report_type, start_date, end_date] + dept_params)
                     raw_logs = cursor.fetchall()
                     
                     cursor.execute("SELECT COUNT(*) as count FROM event_participants WHERE event_id = %s", (report_type,))
@@ -1295,7 +1304,7 @@ class Database:
                     event_name_display = "Campus Gates Entry/Exit"
                     col_headers = ["User Name", "Role / Affiliation", "Time", "Action", "Gate"]
                     
-                    query = """
+                    query = f"""
                         SELECT 
                             COALESCE(e.employee_name, s.student_name, v.visitor_name, a.username, 'Unknown User') AS name,
                             CONCAT(UPPER(u.role), ' - ', COALESCE(d.department_name, c.course_name, v.purpose, 'N/A')) AS detail,
@@ -1310,10 +1319,10 @@ class Database:
                         LEFT JOIN courses c ON s.course_id = c.course_id
                         LEFT JOIN visitors v ON u.user_id = v.user_id
                         LEFT JOIN admin a ON u.user_id = a.user_id
-                        WHERE DATE(gl.timestamp) BETWEEN %s AND %s
+                        WHERE DATE(gl.timestamp) BETWEEN %s AND %s {dept_condition}
                         ORDER BY gl.timestamp DESC
                     """
-                    cursor.execute(query, (start_date, end_date))
+                    cursor.execute(query, [start_date, end_date] + dept_params)
                     raw_logs = cursor.fetchall()
                     
                     total_present = len(raw_logs)
