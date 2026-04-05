@@ -146,6 +146,36 @@ function populateReportTypes(category) {
     typeSelect.dispatchEvent(new Event('change'));
 }
 
+function fetch_departments() {
+    fetch('http://127.0.0.1:5000/api/retrieve/departments')
+        .then(response => response.json())
+        .then(data => {
+            populateDepartmentTypes(data);
+        })
+        .catch(error => console.error("Error fetching departments:", error));
+}
+
+function populateDepartmentTypes(departments) {
+    const filterSelect = document.getElementById('report-filter');
+    filterSelect.innerHTML = ''; 
+
+    const defaultOption = document.createElement('option');
+    defaultOption.value = 'All'; 
+    defaultOption.textContent = 'All Departments';
+    filterSelect.appendChild(defaultOption);
+
+    if (departments && departments.length > 0) {
+        departments.forEach(dept => {
+            const option = document.createElement('option');
+            
+            option.value = dept.department_id; 
+            option.textContent = 'College of ' + dept.department_name;
+            
+            filterSelect.appendChild(option);
+        });
+    }
+}
+
 function handleDateConstraint() {
     const typeSelect = document.getElementById('report-type');
     const selectedOption = typeSelect.options[typeSelect.selectedIndex];
@@ -185,6 +215,7 @@ function handleDateConstraint() {
 
 document.addEventListener('DOMContentLoaded', () => {
     
+    fetch_departments();
     fetch_events();
 
     const categorySelect = document.getElementById('report-category');

@@ -587,6 +587,7 @@ def helper_kiosk_live_student_logs():
         
     return current_kiosk_data 
 
+@app.route('/api/retrieve/departments')
 def helper_admin_live_departments(): 
     current_live_departments = list(LIVE_DEPARTMENTS)
     

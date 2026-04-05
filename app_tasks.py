@@ -14,7 +14,7 @@ def fetch_report_data(category, report_type, filter_val, start_date, end_date):
         if not conn:
             return {"error": "Database offline"}
     
-        data = Database.get_report_queries(conn, category, report_type, start_date, end_date)
+        data = Database.get_report_queries(conn, category, report_type, filter_val, start_date, end_date)
         print(f"[REPORT DEBUG] Query returned: {data}")
         
         if not data:
