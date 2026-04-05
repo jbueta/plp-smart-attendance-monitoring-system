@@ -30,6 +30,15 @@ function generateReport() {
             alert("Please select a date range.");
             return;
         }
+        
+        // Validate that start date is not after end date
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        
+        if (start > end) {
+            alert("Invalid date range: 'From' date cannot be after 'To' date.\n\nExample of invalid range: From April 1, 2025 to March 31, 2025");
+            return;
+        }
     }
 
     const params = new URLSearchParams({
@@ -38,7 +47,7 @@ function generateReport() {
         filter: filter,
         start: startDate,
         end: endDate,
-        autoprint: 'true'
+        // autoprint: 'true'
     });
 
     // Open the generated report in a new tab

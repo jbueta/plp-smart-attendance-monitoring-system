@@ -6,8 +6,15 @@ import csv
 import io
 import uuid
 
+from app_tasks import fetch_report_data     #reports generator
+from extensions import cache
+
 app = Flask(__name__)
 app.secret_key = 'plp_secure_key_2026'  # Required for session management
+
+# Configure and initialize cache (SimpleCache for development)
+app.config['CACHE_TYPE'] = 'SimpleCache'
+cache.init_app(app)
 
 # ==============================================================================
 # MOCK DATA (Prototype State)
@@ -125,26 +132,24 @@ def login_required(f):
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+        data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "message": "Invalid request."}), 400
+            
+        username = data.get('username')
+        password = data.get('password')
         
-        if username is None or password is None:
-            flash('Please enter a username and password.', 'danger')
+        if not username or not password:
+            return jsonify({"success": False, "message": "Please enter a username and password."})
 
-        # BYPASS
-        # if username == 'admin' and password == 'admin123':
-        #     session['logged_in'] = True
-        #     flash(f"Welcome back, Admin.", 'success')
-        #     return redirect(url_for('dashboard'))
-        
         result = helper_admin_login(username, password)
+        
         if result and result.get('success'):
             data = result.get('data')
             session['logged_in'] = True
-            return redirect(url_for('dashboard', user=data.get('username')))
+            return jsonify({ "success": True, "redirect_url": url_for('dashboard', user=data.get('username')) })
         else:
-            print(result)
-            flash(f"{result.get('message')}", 'danger')
+            return jsonify({"success": False, "message": result.get('message')})
             
     return render_template('login.html')
 
@@ -520,10 +525,10 @@ def helper_admin_login(username, password):
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=5)
         response.raise_for_status()
-        return response.json()
-            
+        return response.json()   
     except requests.exceptions.RequestException as e:
         print(f"API for admin authentication bridge error: {e}")
+        return {"success": False, "message": f"Authentication service unavailable: {str(e)}"}
 
 @app.route('/api/retrieve/events')
 def helper_kiosk_live_events():    
@@ -669,174 +674,33 @@ def generate_report():
     start_date = request.args.get('start')
     end_date = request.args.get('end')
     
-    conn = connect_db()
-    cursor = conn.cursor(dictionary=True)
+    # Validate date range
+    if start_date and end_date:
+        try:
+            from datetime import datetime as dt
+            start = dt.strptime(start_date, '%Y-%m-%d')
+            end = dt.strptime(end_date, '%Y-%m-%d')
+            
+            if start > end:
+                error_msg = f"Invalid date range: 'From' date ({start_date}) cannot be after 'To' date ({end_date})."
+                return f"<h1>Report Error</h1><p>{error_msg}</p>", 400
+        except ValueError as e:
+            return f"<h1>Report Error</h1><p>Invalid date format. Please use YYYY-MM-DD format.</p>", 400
     
-    raw_logs = []
-    total_expected = 0
-    total_present = 0
-    report_title = "System Report"
-    event_name_display = "Campus Activity"
-    col_headers = ["Name", "Detail", "Time", "Status", "Remarks"] # Dynamic Headers fallback
+    report_results = fetch_report_data(category, report_type, filter_val, start_date, end_date)
     
-    # ==========================================
-    # BRANCH 1: EVENT ATTENDANCE REPORTS
-    # ==========================================
-    match category:
-        case 'Event Attendance':
-            report_title = "Event Attendance Report"
-            col_headers = ["Participant Name", "Role / Affiliation", "Time In", "Status", "Remarks"]
-            
-            cursor.execute("SELECT event_name FROM events WHERE event_id = %s", (report_type,))
-            event_info = cursor.fetchone()
-            if event_info:
-                event_name_display = event_info['event_name']
-            
-            query = """
-                SELECT 
-                    COALESCE(e.employee_name, s.student_name, v.visitor_name, a.username, 'Unknown User') AS name,
-                    CONCAT(
-                        UPPER(u.role), ' - ', 
-                        COALESCE(d.department_name, c.course_name, v.purpose, 'N/A')
-                    ) AS detail,
-                    TIME_FORMAT(ea.first_in, '%h:%i %p') AS time,
-                    ea.status AS status,
-                    COALESCE(ea.remarks, 'N/A') AS remarks
-                FROM event_attendance ea
-                JOIN event_instances ei ON ea.instance_id = ei.instance_id
-                JOIN users u ON ea.user_id = u.user_id
-                LEFT JOIN employees e ON u.user_id = e.user_id
-                LEFT JOIN departments d ON e.department_id = d.department_id
-                LEFT JOIN students s ON u.user_id = s.user_id
-                LEFT JOIN courses c ON s.course_id = c.course_id
-                LEFT JOIN visitors v ON u.user_id = v.user_id
-                LEFT JOIN admin a ON u.user_id = a.user_id
-                WHERE ei.event_id = %s AND ei.event_date BETWEEN %s AND %s
-                ORDER BY ea.first_in ASC
-            """
-            cursor.execute(query, (report_type, start_date, end_date))
-            raw_logs = cursor.fetchall()
-            
-            cursor.execute("SELECT COUNT(*) as count FROM event_participants WHERE event_id = %s", (report_type,))
-            expected_result = cursor.fetchone()
-            total_expected = expected_result['count'] if expected_result else 0
-            
-            # Count actual presence
-            total_present = sum(1 for log in raw_logs if log['status'] in ['Present', 'Late'])
-
-        # ==========================================
-        # BRANCH 2: GENERAL CAMPUS LOG REPORTS
-        # ==========================================
-        case 'General Logs':
-            report_title = "General Campus Access Logs"
-            event_name_display = "Campus Gates Entry/Exit"
-            col_headers = ["User Name", "Role / Affiliation", "Time", "Action", "Gate"]
-            
-            query = """
-                SELECT 
-                    COALESCE(e.employee_name, s.student_name, v.visitor_name, a.username, 'Unknown User') AS name,
-                    CONCAT(
-                        UPPER(u.role), ' - ', 
-                        COALESCE(d.department_name, c.course_name, v.purpose, 'N/A')
-                    ) AS detail,
-                    TIME_FORMAT(gl.timestamp, '%h:%i %p') AS time,
-                    gl.log_type AS status,
-                    COALESCE(gl.gate, 'Main Gate') AS remarks
-                FROM general_log gl
-                JOIN users u ON gl.user_id = u.user_id
-                LEFT JOIN employees e ON u.user_id = e.user_id
-                LEFT JOIN departments d ON e.department_id = d.department_id
-                LEFT JOIN students s ON u.user_id = s.user_id
-                LEFT JOIN courses c ON s.course_id = c.course_id
-                LEFT JOIN visitors v ON u.user_id = v.user_id
-                LEFT JOIN admin a ON u.user_id = a.user_id
-                WHERE DATE(gl.timestamp) BETWEEN %s AND %s
-                ORDER BY gl.timestamp DESC
-            """
-            cursor.execute(query, (start_date, end_date))
-            raw_logs = cursor.fetchall()
-            
-            total_present = len(raw_logs)
-            total_expected = len(raw_logs) 
-
-        # ==========================================
-        # BRANCH 3: GENERAL CAMPUS LOG REPORTS
-        # ==========================================
-        case 'Visitor Logs':
-            report_title = "General Campus Access Logs"
-            event_name_display = "Campus Gates Entry/Exit"
-            col_headers = ["User Name", "Role / Affiliation", "Time", "Action", "Gate"]
-            
-            # Mixed-Role Access Log Query
-            query = """
-                SELECT 
-                    COALESCE(e.employee_name, s.student_name, v.visitor_name, a.username, 'Unknown User') AS name,
-                    CONCAT(
-                        UPPER(u.role), ' - ', 
-                        COALESCE(d.department_name, c.course_name, v.purpose, 'N/A')
-                    ) AS detail,
-                    TIME_FORMAT(gl.timestamp, '%h:%i %p') AS time,
-                    gl.log_type AS status,
-                    COALESCE(gl.gate, 'Main Gate') AS remarks
-                FROM general_log gl
-                JOIN users u ON gl.user_id = u.user_id
-                LEFT JOIN employees e ON u.user_id = e.user_id
-                LEFT JOIN departments d ON e.department_id = d.department_id
-                LEFT JOIN students s ON u.user_id = s.user_id
-                LEFT JOIN courses c ON s.course_id = c.course_id
-                LEFT JOIN visitors v ON u.user_id = v.user_id
-                LEFT JOIN admin a ON u.user_id = a.user_id
-                WHERE DATE(gl.timestamp) BETWEEN %s AND %s
-                ORDER BY gl.timestamp DESC
-            """
-            cursor.execute(query, (start_date, end_date))
-            raw_logs = cursor.fetchall()
-            
-            # For general logs, traffic is the metric
-            total_present = len(raw_logs)
-            total_expected = len(raw_logs) # Expected is equal to actual for general logs
-
-    # 3. Process Logs & Assign Row Numbers (for log.id in the loop)
-    logs = []
-    for index, row in enumerate(raw_logs, start=1):
-        row['id'] = index
-        logs.append(row)
+    # 3. Handle any errors returned by the service
+    if "error" in report_results:
+        return f"<h1>Report Error</h1><p>{report_results['error']}</p>", 500
         
-    # 4. Calculate Attendance Rate / Metric safely
-    attendance_rate = "0.0"
-    if total_expected > 0:
-        attendance_rate = str(round((total_present / total_expected) * 100, 1))
-    elif category == 'general':
-        attendance_rate = "100.0" # Default for general logs
-
-    # 5. Build Context Dictionaries for Jinja rendering
-    report_data = {
-        "title": report_title,
-        "reference_id": f"PLP-{category[:3].upper()}-{uuid.uuid4().hex[:6].upper()}",
-        "event_name": event_name_display,
-        "department": filter_val,
-        "date_range": f"{start_date} to {end_date}",
-        "headers": col_headers
-    }
-    
-    metrics_data = {
-        "expected": total_expected,
-        "present": total_present,
-        "rate": f"{attendance_rate}%"
-    }
-    
-    # 6. Cleanup & Render
-    cursor.close()
-    conn.close()
-
+    # 4. Render the template using the clean dictionaries returned by tasks.py
     return render_template(
-        'print_report.html',
+        'sample_report.html',
         current_date=datetime.now().strftime('%B %d, %Y - %I:%M %p'),
-        report=report_data,
-        metrics=metrics_data,
-        logs=logs
+        report=report_results['report_data'],
+        metrics=report_results['metrics_data'],
+        logs=report_results['logs']
     )
-
     
 # ==============================================================================
 # MAIN ENTRY POINT
