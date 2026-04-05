@@ -3,7 +3,9 @@ from datetime import date, datetime
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, request, g
 from datetime import date, timedelta, datetime
+
 from db_connect import Database
+from database import init_db_pool, connect_db, close_db
 
 import json
 import os
@@ -32,69 +34,15 @@ allowed_origins = [
 ]
 
 CORS(app, origins=allowed_origins)
+
 # ==============================================================================
-# MAIN ENTRY POINT
+# DATABASE INITIALIZATION
 # ==============================================================================
 
-# 1. Database Configuration
-dbconfig = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '',
-    'database': 'smart_monitoring',
-    'port': 3306,
-    'use_pure': True
-}
+with app.app_context():
+    init_db_pool()
 
-global_pool = None
-
-def init_db_pool():
-    """Attempts to create the database pool."""
-    global global_pool
-    try:
-        app.logger.info("Creating database connection pool...")
-        global_pool = pooling.MySQLConnectionPool(
-            pool_name="main_entry_exit", 
-            pool_size=20, 
-            autocommit=True, 
-            **dbconfig
-        )
-        app.logger.info("Database connection pool created.")
-        return True
-    except Exception as err:
-        app.logger.critical(f"CRITICAL ERROR: Could not connect to MySQL database. Details: {err}")
-        global_pool = None
-        return False
-
-# Attempt to initialize on startup
-init_db_pool()
-
-def connect_db():
-    """Gets a connection, retrying pool creation if it failed previously."""
-    if 'db' not in g:        
-        # AUTO-REBOOT LOGIC
-        if global_pool is None:
-            app.logger.warning("Pool is offline. Attempting auto-reconnect...")
-            init_db_pool()
-
-        if global_pool is None:
-            g.db = None 
-        else:
-            try:
-                g.db = global_pool.get_connection()
-            except Exception as err:
-                app.logger.error(f"Pool exhausted or connection error: {err}")
-                g.db = None
-    return g.db
-
-def close_db(error):
-    db = g.pop('db', None)
-    if db is not None:
-        db.close()
-
-@app.teardown_appcontext
-def teardown_db(error):
-    close_db(error)
+app.teardown_appcontext(close_db)
 
 
 # ==============================================================================
@@ -122,9 +70,8 @@ def login():
         result = db.admin_login()
 
         if not result or len(result) == 0:
-            return jsonify({"success": False, "message": "Incorrect username or password."}), 500
+            return jsonify({"success": False, "message": "Incorrect username or password."}), 200
 
-        print(result.get('data'))
         return jsonify({"success": True, "message": "Authentication successful", "data": result}), 200
 
     except Exception as e:

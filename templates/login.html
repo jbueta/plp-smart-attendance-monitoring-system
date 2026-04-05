@@ -36,8 +36,9 @@
                     {% endif %}
                     {% endwith %}
 
+                    <div id="flash-container"></div>
                     <!-- Login Form -->
-                    <form action="{{ url_for('login') }}" method="POST">
+                    <form id="login-form" action="{{ url_for('login') }}" method="POST">
                         <div class="mb-3">
                             <label for="username" class="form-label text-white-50 small text-uppercase">Username</label>
                             <div class="input-group">
@@ -57,7 +58,7 @@
                             </div>
                         </div>
                         <div class="d-grid">
-                            <button type="submit" class="btn btn-primary-gold py-2">
+                            <button id="login-btn" type="submit" class="btn btn-primary-gold py-2">
                                 <i class="bi bi-box-arrow-in-right me-2"></i>Access Dashboard
                             </button>
                         </div>
@@ -81,5 +82,7 @@
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
+
+<script src="{{ url_for('static', filename='js/login.js') }}"></script>
 
 </html>

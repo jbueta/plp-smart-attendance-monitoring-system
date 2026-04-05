@@ -34,7 +34,8 @@
 
     <div class="report-header d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center">
-            <div class="logo-placeholder me-3">PLP</div>
+            <div class="logo-placeholder me-3">
+                <img src="{{ url_for('static', filename='images/plp_logo.png') }}" alt="PLP Logo" style="max-width: 100%; max-height: 100%; object-fit: contain;"></div>
             <div>
                 <div class="report-title">Pamantasan ng Lungsod ng Pasig</div>
                 <div class="text-secondary">Official Data Monitoring System</div>
@@ -103,8 +104,12 @@
                 <td>{{ log.dept }}</td>
                 <td>{{ log.time }}</td>
                 <td>
-                    {% if log.status == 'Present' %}
+                    {% if log.status in ['Present', 'Entry'] %}
                         <strong class="text-success">{{ log.status }}</strong>
+                    {% elif log.status in ['Exit', 'Absent'] %}
+                        <strong class="text-danger">{{ log.status }}</strong>
+                    {% elif log.status == 'Excused' %}
+                        <strong style="color: #FF9800;">{{ log.status }}</strong>
                     {% elif log.status == 'Late' %}
                         <strong class="text-warning text-dark">{{ log.status }}</strong>
                     {% else %}
@@ -132,15 +137,5 @@
         <span>Page 1 of 1</span>
     </div>
 
-    <script>
-        window.addEventListener('load', function () {
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('autoprint') === 'true') {
-                setTimeout(() => {
-                    window.print();
-                }, 500);
-            }
-        });
-    </script>
 </body>
 </html>
