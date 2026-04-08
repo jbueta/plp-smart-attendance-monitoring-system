@@ -301,3 +301,7 @@ CREATE TABLE `admin` (
   `username` varchar(100) not null unique,
   `password` varchar(100) not null,
   FOREIGN KEY (`user_id`) references `users`(`user_id`) on delete cascade on update cascade );
+
+ALTER TABLE `admin` 
+MODIFY `username` VARCHAR(255) COLLATE utf8mb4_bin,
+MODIFY `password` VARCHAR(255) COLLATE utf8mb4_bin;

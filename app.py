@@ -193,6 +193,7 @@ def kiosk_employee():
     session.pop('logged_in', None)
     instance_id = request.args.get('instance_id', type=int)
     events = helper_kiosk_live_events()
+    print(events)
     selected_event = next((e for e in events if e['instance_id'] == instance_id), None)
     event_name = selected_event['name'] if selected_event else "General Attendance"
     return render_template('kiosk_employee.html', event_name=event_name, kiosk_data=MOCK_KIOSK_DATA)
@@ -535,7 +536,7 @@ def helper_kiosk_live_events():
     current_kiosk_events = list(DEFAULT_EVENTS)
     
     try:
-        response = requests.get("http://127.0.0.1:5001//admin/dashboard/live-events", timeout=5)
+        response = requests.get("http://127.0.0.1:5001/kiosk/employee/select-event", timeout=5)
         
         if response.status_code == 200:
             api_data = response.json()
@@ -678,9 +679,8 @@ def generate_report():
     # Validate date range
     if start_date and end_date:
         try:
-            from datetime import datetime as dt
-            start = dt.strptime(start_date, '%Y-%m-%d')
-            end = dt.strptime(end_date, '%Y-%m-%d')
+            start = datetime.strptime(start_date, '%Y-%m-%d')
+            end = datetime.strptime(end_date, '%Y-%m-%d')
             
             if start > end:
                 error_msg = f"Invalid date range: 'From' date ({start_date}) cannot be after 'To' date ({end_date})."

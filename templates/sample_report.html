@@ -64,66 +64,263 @@
     </div>
 
     <div class="row g-3 mb-4">
-        <div class="col-4">
-            <div class="summary-metric border rounded bg-light">
-                <div class="text-secondary text-uppercase small fw-bold mb-1">Total Expected</div>
-                <h3>{{ metrics.expected }}</h3>
-            </div>
-        </div>
-        <div class="col-4">
-            <div class="summary-metric border rounded bg-light">
-                <div class="text-secondary text-uppercase small fw-bold mb-1">Total Present</div>
-                <h3 style="color: #198754;">{{ metrics.present }}</h3>
-            </div>
-        </div>
-        <div class="col-4">
-            <div class="summary-metric border rounded bg-light">
-                <div class="text-secondary text-uppercase small fw-bold mb-1">Attendance Rate</div>
-                <h3>{{ metrics.rate }}</h3>
-            </div>
-        </div>
-    </div>
+        {% set category = request.args.get('category', '').lower() %}
+        {% set type = request.args.get('type', '').lower() %}
+        
+        {% if category == 'general' %}
+            {% if type == 'student_entry_exit' %}
+                <!-- General Logs for Daily Student Entry/Exit Logs Metrics -->
+                <div class="col-4">
+                    <div class="summary-metric border rounded bg-light">
+                        <div class="text-secondary text-uppercase small fw-bold mb-1">Total Entry</div>
+                        <h3>{{ metrics.total_entry }}</h3>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="summary-metric border rounded bg-light">
+                        <div class="text-secondary text-uppercase small fw-bold mb-1">Peak Time Hour</div>
+                        <h3 style="color: #FF9800;">{{ metrics.peak_hour }}</h3>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="summary-metric border rounded bg-light">
+                        <div class="text-secondary text-uppercase small fw-bold mb-1">Avg Time Spent</div>
+                        <h3>{{ metrics.avg_time_spent }}</h3>
+                    </div>
+                </div>
+            {% elif type == 'daily_traffic' %}
+                <!-- General Logs for Daily Traffic Analysis Metrics -->
+                    <div class="col-4">
+                        <div class="summary-metric border rounded bg-light">
+                            <div class="text-secondary text-uppercase small fw-bold mb-1">Total Entry</div>
+                            <!-- <h3>{{ metrics.total_entry }}</h3> -->
+                             <h3>{{ metrics.total_entry }}</h3>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="summary-metric border rounded bg-light">
+                            <div class="text-secondary text-uppercase small fw-bold mb-1">Total Foot Traffic</div>
+                            <!-- <h3 style="color: #FF9800;">{{ metrics.total_foot_traffic }}</h3> -->
+                             <h3>{{ metrics.peak_hour }}</h3>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="summary-metric border rounded bg-light">
+                            <div class="text-secondary text-uppercase small fw-bold mb-1">Net Campus Population</div>
+                            <!-- <h3>{{ metrics.campus_population }}</h3> -->
+                            <h3>{{ metrics.avg_time_spent }}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="row g-3 mb-4">
+                    <div class="col-4">
+                        <div class="summary-metric border rounded bg-light">
+                            <div class="text-secondary text-uppercase small fw-bold mb-1">Faculty/Staff Footprint</div>
+                            <h3>{{ metrics.total_entry }}</h3>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="summary-metric border rounded bg-light">
+                            <div class="text-secondary text-uppercase small fw-bold mb-1">Student Footprint</div>
+                            <h3 style="color: #FF9800;">{{ metrics.peak_hour }}</h3>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="summary-metric border rounded bg-light">
+                            <div class="text-secondary text-uppercase small fw-bold mb-1">Visitor Footprint</div>
+                            <h3>{{ metrics.avg_time_spent }}</h3>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
 
+        {% elif category == 'visitor' %}
+            <!-- General Logs for Daily Student Entry/Exit Logs Metrics -->
+            <div class="col-4">
+                <div class="summary-metric border rounded bg-light">
+                    <div class="text-secondary text-uppercase small fw-bold mb-1">Total Entry</div>
+                    <h3>{{ metrics.total_entry }}</h3>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="summary-metric border rounded bg-light">
+                    <div class="text-secondary text-uppercase small fw-bold mb-1">Peak Time Hour</div>
+                    <h3 style="color: #FF9800;">{{ metrics.peak_hour }}</h3>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="summary-metric border rounded bg-light">
+                    <div class="text-secondary text-uppercase small fw-bold mb-1">Avg Time Spent</div>
+                    <h3>{{ metrics.avg_time_spent }}</h3>
+                </div>
+            </div>
+        {% elif category == 'event' %}
+        
+        {% elif category == 'violation' %}
+
+        {% else %}
+            <!-- Standard Event/Visitor Metrics -->
+            <div class="col-4">
+                <div class="summary-metric border rounded bg-light">
+                    <div class="text-secondary text-uppercase small fw-bold mb-1">Total Expected</div>
+                    <h3>{{ metrics.expected }}</h3>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="summary-metric border rounded bg-light">
+                    <div class="text-secondary text-uppercase small fw-bold mb-1">Total Present</div>
+                    <h3 style="color: #198754;">{{ metrics.present }}</h3>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="summary-metric border rounded bg-light">
+                    <div class="text-secondary text-uppercase small fw-bold mb-1">Attendance Rate</div>
+                    <h3>{{ metrics.rate }}</h3>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+    
     <h5 class="mb-3 text-uppercase">Detailed Action Logs</h5>
     <table class="table table-bordered table-striped" style="border-color: #dee2e6;">
         <thead>
-            <tr>
-                <th>#</th>
-                <th>Employee Name</th>
-                <th>Department</th>
-                <th>Time In</th>
-                <th>Time Out</th>
-                <th>Status</th>
-            </tr>
+            {% set category = request.args.get('category', '').lower() %}
+
+            {% if category == 'general' %}
+                <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Role / Affiliation</th>
+                    <th>Time In</th>
+                    <th>Time Out</th>
+                    <th>Status</th>
+                    <th>Gate</th>
+                </tr>
+            {% elif category == 'visitor' %}
+                <tr>
+                    <th>#</th>
+                    <th>Visitor Name</th>
+                    <th>Purpose</th>
+                    <th>Time In</th>
+                    <th>Time Out</th>
+                    <th>Status</th>
+                </tr>
+            {% elif category == 'event' %}
+                <tr>
+                    <th>#</th>
+                    <th>Participant Name</th>
+                    <th>Role / Affiliation</th>
+                    <th>Time In</th>
+                    <th>Time Out</th>
+                    <th>Status</th>
+                    <th>Remarks</th>
+                </tr>
+            {% else %}
+                <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Detail</th>
+                    <th>Time In</th>
+                    <th>Time Out</th>
+                    <th>Status</th>
+                    <th>Remarks</th>
+                </tr>
+            {% endif %}
         </thead>
         <tbody>
-            {% for log in logs %}
-            <tr>
-                <td>{{ log.id }}</td>
-                <td>{{ log.name }}</td>
-                <td>{{ log.dept }}</td>
-                <td>{{ log.time_in }}</td>
-                <td>{{ log.time_out }}</td>
-                <td>
-                    {% if log.status in ['Present', 'Entry'] %}
-                        <strong class="text-success">{{ log.status }}</strong>
-                    {% elif log.status in ['Exit', 'Absent'] %}
-                        <strong class="text-danger">{{ log.status }}</strong>
-                    {% elif log.status == 'Excused' %}
-                        <strong style="color: #FF9800;">{{ log.status }}</strong>
-                    {% elif log.status == 'Late' %}
-                        <strong class="text-warning text-dark">{{ log.status }}</strong>
-                    {% else %}
-                        <strong class="text-info">{{ log.status }}</strong>
-                    {% endif %}
-                </td>
-            </tr>
+            {% if logs %}
+                {% if category == 'general' %}
+                    {% for log in logs %}
+                    <tr>
+                        <td>{{ log.id }}</td>
+                        <td>{{ log.name }}</td>
+                        <td>{{ log.detail }}</td>
+                        <td>{{ log.time_in }}</td>
+                        <td>{{ log.time_out }}</td>
+                        <td>
+                            {% if log.status in ['Present', 'Entry'] %}
+                                <strong class="text-success">{{ log.status }}</strong>
+                            {% elif log.status in ['Exit', 'Absent'] %}
+                                <strong class="text-danger">{{ log.status }}</strong>
+                            {% elif log.status == 'In Progress' %}
+                                <strong class="text-warning text-dark">In Progress</strong>
+                            {% else %}
+                                <strong class="text-info">{{ log.status }}</strong>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.remarks }}</td>
+                    </tr>
+                    {% endfor %}
+                    
+                {% elif category == 'visitor' %}
+                    {% for log in logs %}
+                    <tr>
+                        <td>{{ log.id }}</td>
+                        <td>{{ log.name }}</td>
+                        <td>{{ log.detail }}</td>
+                        <td>{{ log.time_in }}</td>
+                        <td>{{ log.time_out }}</td>
+                        <td>
+                            {% if log.status in ['Present', 'Entry'] %}
+                                <strong class="text-success">{{ log.status }}</strong>
+                            {% elif log.status in ['Exit', 'Absent'] %}
+                                <strong class="text-danger">{{ log.status }}</strong>
+                            {% else %}
+                                <strong class="text-info">{{ log.status }}</strong>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    
+                {% elif category == 'event' %}
+                    {% for log in logs %}
+                    <tr>
+                        <td>{{ log.id }}</td>
+                        <td>{{ log.name }}</td>
+                        <td>{{ log.detail }}</td>
+                        <td>{{ log.time_in }}</td>
+                        <td>{{ log.time_out }}</td>
+                        <td>
+                            {% if log.status in ['Present', 'Late'] %}
+                                <strong class="text-success">{{ log.status }}</strong>
+                            {% elif log.status in ['Absent', 'Excused'] %}
+                                <strong class="text-danger">{{ log.status }}</strong>
+                            {% else %}
+                                <strong class="text-info">{{ log.status }}</strong>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.remarks }}</td>
+                    </tr>
+                    {% endfor %}
+                    
+                {% else %}
+                    {% for log in logs %}
+                    <tr>
+                        <td>{{ log.id }}</td>
+                        <td>{{ log.name }}</td>
+                        <td>{{ log.detail }}</td>
+                        <td>{{ log.time_in if log.time_in else 'N/A' }}</td>
+                        <td>{{ log.time_out if log.time_out else 'N/A' }}</td>
+                        <td>
+                            {% if log.status in ['Present', 'Late'] %}
+                                <strong class="text-success">{{ log.status }}</strong>
+                            {% elif log.status in ['Absent', 'Exit'] %}
+                                <strong class="text-danger">{{ log.status }}</strong>
+                            {% else %}
+                                <strong class="text-info">{{ log.status }}</strong>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.remarks }}</td>
+                    </tr>
+                    {% endfor %}
+                    
+                {% endif %}
             {% else %}
-            <tr>
-                <td colspan="6" class="text-center py-3">No records found for this date range.</td>
-            </tr>
-            {% endfor %}
-            </tbody>
+                <tr>
+                    <td colspan="8" class="text-center py-3">No records found for this date range.</td>
+                </tr>
+            {% endif %}
+        </tbody>
     </table>
 
     <div class="mt-5">

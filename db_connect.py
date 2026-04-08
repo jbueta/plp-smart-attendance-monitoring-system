@@ -1144,11 +1144,11 @@ class Database:
                 SELECT 
                     ea.attendance_id, ea.user_id, ea.status, 
                     ea.first_in, ea.last_out, ea.remarks, 
-                    COALESCE(s.student_name, e.employee_name, u.user_name) AS user_name,
+                    COALESCE(s.student_name, e.employee_name, v.visitor_name) AS user_name,
                     COALESCE(d.department_name, 'N/A') AS department
                 FROM event_attendance ea
                 LEFT JOIN users u ON ea.user_id = u.user_id
-                
+                LEFT JOIN visitors v ON u.user_id = v.user_id
                 LEFT JOIN students s ON u.user_id = s.user_id
                 LEFT JOIN employees e ON u.user_id = e.user_id
                 LEFT JOIN departments d ON (e.department_id = d.department_id)
@@ -1301,29 +1301,55 @@ class Database:
 
                 case 'General Logs' | 'Visitor Logs':
                     report_title = "General Campus Access Logs"
-                    event_name_display = "Campus Gates Entry/Exit"
-                    col_headers = ["User Name", "Role / Affiliation", "Time", "Action", "Gate"]
-                    
-                    query = f"""
-                        SELECT 
-                            COALESCE(e.employee_name, s.student_name, v.visitor_name, a.username, 'Unknown User') AS name,
-                            CONCAT(UPPER(u.role), ' - ', COALESCE(d.department_name, c.course_name, v.purpose, 'N/A')) AS detail,
-                            TIME_FORMAT(gl.timestamp, '%h:%i %p') AS time,
-                            gl.log_type AS status,
-                            COALESCE(gl.gate, 'Main Gate') AS remarks
-                        FROM general_log gl
-                        JOIN users u ON gl.user_id = u.user_id
-                        LEFT JOIN employees e ON u.user_id = e.user_id
-                        LEFT JOIN departments d ON e.department_id = d.department_id
-                        LEFT JOIN students s ON u.user_id = s.user_id
-                        LEFT JOIN courses c ON s.course_id = c.course_id
-                        LEFT JOIN visitors v ON u.user_id = v.user_id
-                        LEFT JOIN admin a ON u.user_id = a.user_id
-                        WHERE DATE(gl.timestamp) BETWEEN %s AND %s {dept_condition}
-                        ORDER BY gl.timestamp DESC
-                    """
-                    cursor.execute(query, [start_date, end_date] + dept_params)
-                    raw_logs = cursor.fetchall()
+
+                    if report_type == 'student_entry_exit':
+                        event_name_display = "Campus Gates Entry/Exit"
+                        col_headers = ["User Name", "Role / Affiliation", "Time", "Action", "Gate"]
+                        
+                        query = f"""
+                            SELECT 
+                                COALESCE(e.employee_name, s.student_name, v.visitor_name, a.username, 'Unknown User') AS name,
+                                CONCAT(UPPER(u.role), ' - ', COALESCE(d.department_name, c.course_name, v.purpose, 'N/A')) AS detail,
+                                TIME_FORMAT(gl.timestamp, '%h:%i %p') AS time,
+                                gl.log_type AS status,
+                                COALESCE(gl.gate, 'Main Gate') AS remarks
+                            FROM general_log gl
+                            JOIN users u ON gl.user_id = u.user_id
+                            LEFT JOIN employees e ON u.user_id = e.user_id
+                            LEFT JOIN departments d ON e.department_id = d.department_id
+                            LEFT JOIN students s ON u.user_id = s.user_id
+                            LEFT JOIN courses c ON s.course_id = c.course_id
+                            LEFT JOIN visitors v ON u.user_id = v.user_id
+                            LEFT JOIN admin a ON u.user_id = a.user_id
+                            WHERE DATE(gl.timestamp) BETWEEN %s AND %s {dept_condition}
+                            ORDER BY gl.timestamp DESC
+                        """
+                        cursor.execute(query, [start_date, end_date] + dept_params)
+                        raw_logs = cursor.fetchall()
+                    elif report_type == 'daily_traffic':
+                        event_name_display = "Daily Traffic Analysis"
+                        col_headers = ["Hour Time", "Role / Affiliation", "Time", "Action", "Gate"]
+                        
+                        query = f"""
+                            SELECT 
+                                COALESCE(e.employee_name, s.student_name, v.visitor_name, a.username, 'Unknown User') AS name,
+                                CONCAT(UPPER(u.role), ' - ', COALESCE(d.department_name, c.course_name, v.purpose, 'N/A')) AS detail,
+                                TIME_FORMAT(gl.timestamp, '%h:%i %p') AS time,
+                                gl.log_type AS status,
+                                COALESCE(gl.gate, 'Main Gate') AS remarks
+                            FROM general_log gl
+                            JOIN users u ON gl.user_id = u.user_id
+                            LEFT JOIN employees e ON u.user_id = e.user_id
+                            LEFT JOIN departments d ON e.department_id = d.department_id
+                            LEFT JOIN students s ON u.user_id = s.user_id
+                            LEFT JOIN courses c ON s.course_id = c.course_id
+                            LEFT JOIN visitors v ON u.user_id = v.user_id
+                            LEFT JOIN admin a ON u.user_id = a.user_id
+                            WHERE DATE(gl.timestamp) BETWEEN %s AND %s {dept_condition}
+                            ORDER BY gl.timestamp DESC
+                        """
+                        cursor.execute(query, [start_date, end_date] + dept_params)
+                        raw_logs = cursor.fetchall()
                     
                     total_present = len(raw_logs)
                     total_expected = len(raw_logs)
