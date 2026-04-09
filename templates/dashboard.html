@@ -139,7 +139,7 @@
                 <!-- Main Chart Placeholder -->
                 <!-- Main Chart -->
                 <div class="col-lg-8">
-                    <div class="card-glass p-4 h-100">
+                    <div class="card-glass p-4" style="height: 400px;">
                         <div class="d-flex justify-content-between align-items-center mb-4">
                             <h5 class="card-title text-white mb-0">Hourly Traffic Volume</h5>
                             <div class="badge bg-primary-gold text-dark">
@@ -157,7 +157,7 @@
 
                 <!-- Alerts -->
                 <div class="col-lg-4">
-                    <div class="card-glass p-4 h-100">
+                    <div class="card-glass p-4" style="height: 400px; overflow-y: auto;">
                         <h5 class="card-title text-white mb-3">System Alerts</h5>
                         {% for alert in overall_stats.alerts %}
                         <div class="alert alert-{{ alert.type }} d-flex align-items-center border-0 bg-{{ alert.type }} bg-opacity-10 text-{{ alert.type }} mb-2"
@@ -254,7 +254,7 @@
                 <div class="row g-4 mb-4">
                     <!-- Student Hourly Traffic Chart -->
                     <div class="col-md-8">
-                        <div class="card-glass p-4 h-100">
+                        <div class="card-glass p-4" style="height: 400px;">
                             <div class="d-flex justify-content-between align-items-center mb-4">
                                 <h5 class="mb-0 text-white"><i class="bi bi-graph-up me-2 text-primary"></i>Student Hourly Entry Volume</h5>
                                 <div class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">Real-time Data</div>
@@ -266,7 +266,7 @@
                     </div>
                     <!-- Curfew Watchlist -->
                     <div class="col-md-4">
-                        <div class="card-glass p-4 h-100 border-danger border-opacity-25">
+                        <div class="card-glass p-4 border-danger border-opacity-25" style="height: 400px; overflow-y: auto;">
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h5 class="mb-0 text-white"><i class="bi bi-shield-exclamation me-2 text-danger"></i>Curfew Watchlist</h5>
                                 <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 pulse-animation" style="font-size: 0.6rem;">LIVE</span>
@@ -365,7 +365,7 @@
                 <div class="row g-4 mb-4">
                     <!-- Participation by Department Chart -->
                     <div class="col-md-7">
-                        <div class="card-glass p-4 h-100">
+                        <div class="card-glass p-4" style="height: 350px;">
                             <div class="d-flex justify-content-between align-items-center mb-4">
                                 <h5 class="mb-0 text-white"><i class="bi bi-pie-chart-fill me-2 text-primary-gold"></i>Participation by Department</h5>
                                 <div class="badge bg-gold bg-opacity-10 text-gold border border-gold border-opacity-25">Event Data</div>
@@ -378,7 +378,7 @@
 
                     <!-- Tardiness Heatmap / Bar -->
                     <div class="col-md-5">
-                        <div class="card-glass p-4 h-100">
+                        <div class="card-glass p-4" style="height: 350px;">
                             <div class="d-flex justify-content-between align-items-center mb-4">
                                 <h5 class="mb-0 text-white"><i class="bi bi-bar-chart-steps me-2 text-danger"></i>Tardiness Heatmap</h5>
                                 <select class="form-select form-select-sm bg-dark text-white border-secondary w-auto">

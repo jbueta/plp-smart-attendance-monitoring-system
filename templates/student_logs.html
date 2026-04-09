@@ -54,7 +54,7 @@
     <!-- Student Logs Table -->
     <div class="card-glass p-0 mb-4 overflow-hidden" id="tableCard">
         <div class="table-responsive">
-            <table class="table table-dark-glass table-hover align-middle mb-0">
+            <table class="table table-dark-glass table-hover align-middle mb-0" id="studentTable">
                 <thead>
                     <tr>
                         <th class="ps-4">Student ID</th>
@@ -116,6 +116,13 @@
 
     <!-- Result count -->
     <p id="resultCount" class="text-white-50 small ms-1"></p>
+
+    <!-- Pagination Footer -->
+    <div id="paginationContainer" class="pagination-footer" style="display: none;">
+        <nav aria-label="Page navigation">
+            <ul id="paginationList" class="pagination pagination-custom mb-0 gap-1"></ul>
+        </nav>
+    </div>
 </div>
 
 <div id="editOverlay" class="d-none position-fixed top-0 start-0 w-100 h-100" style="background: rgba(10, 12, 20, 0.56); backdrop-filter: blur(8px); z-index: 1080;">
@@ -173,10 +180,103 @@
     border-radius: 50% !important;
     color: #fff !important;
 }
+/* Fixed table card height for 7 records */
+#tableCard .table-responsive {
+    overflow: visible;
+}
+/* Pagination Footer */
+.pagination-footer {
+    display: none;
+    position: fixed;
+    bottom: 1rem;
+    left: 60%;
+    transform: translateX(-50%);
+    justify-content: center;
+    pointer-events: none;
+    z-index: 1100;
+    width: auto;
+    max-width: 90vw;
+    padding: 0 0.5rem;
+}
+
+.pagination-footer.show {
+    display: flex !important;
+}
+
+.pagination-footer .pagination {
+    pointer-events: auto;
+    background: transparent;
+}
+
+/* Add bottom padding to main content when pagination is visible */
+.main-content {
+    padding-bottom: 4rem;
+}
+
+/* Pagination Styling */
+.pagination-custom {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+}
+.pagination-custom .page-item {
+    margin: 0;
+}
+.pagination-custom .page-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.75rem;
+    height: 2.75rem;
+    padding: 0 0.85rem;
+    color: #fff;
+    background-color: transparent;
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+.pagination-custom .page-link:hover:not(:disabled) {
+    background-color: rgba(212, 175, 55, 0.18);
+    color: #fff;
+    transform: translateY(-1px);
+}
+.pagination-custom .page-link.active {
+    background-color: rgba(212, 175, 55, 0.25);
+    color: #ffffff;
+    font-weight: 700;
+}
+.pagination-custom .page-link:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    background-color: transparent;
+}
+.pagination-custom .page-link.page-number-separator {
+    cursor: default;
+    pointer-events: none;
+    background-color: transparent;
+    border-color: transparent;
+    color: #b6b6b6;
+}
+.pagination-custom .page-link.page-prev,
+.pagination-custom .page-link.page-next {
+    min-width: auto;
+    padding: 0.4rem 0.9rem;
+    font-size: 0.9rem;
+}
+.pagination-custom .page-link.page-prev i,
+.pagination-custom .page-link.page-next i {
+    font-size: 1rem;
+}
 </style>
 
 <script>
-(function () {
+document.addEventListener('DOMContentLoaded', function () {
     const searchInput  = document.getElementById('searchInput');
     const courseFilter = document.getElementById('courseFilter');
     const dateFilter   = document.getElementById('dateFilter');
@@ -185,12 +285,152 @@
     const tableCard    = document.getElementById('tableCard');
     const noResults    = document.getElementById('noResults');
     const resultCount  = document.getElementById('resultCount');
+    const paginationContainer = document.getElementById('paginationContainer');
+    const paginationList = document.getElementById('paginationList');
     const getRows      = () => document.querySelectorAll('.student-row');
+
+    // Pagination settings
+    const ITEMS_PER_PAGE = 7;
+    let currentPage = 1;
+
+    function renderPagination(visibleCount) {
+        const totalPages = Math.ceil(visibleCount / ITEMS_PER_PAGE);
+        paginationList.innerHTML = '';
+
+        if (totalPages <= 1) {
+            paginationContainer.classList.remove('show');
+            paginationContainer.style.display = 'none';
+            return;
+        }
+
+        paginationContainer.classList.add('show');
+        paginationContainer.style.display = 'flex';
+
+        const prevLi = document.createElement('li');
+        prevLi.className = 'page-item';
+        const prevBtn = document.createElement('button');
+        prevBtn.type = 'button';
+        prevBtn.className = 'page-link page-prev';
+        prevBtn.innerHTML = '<i class="bi bi-chevron-left me-1"></i>Previous';
+        prevLi.appendChild(prevBtn);
+        paginationList.appendChild(prevLi);
+
+        // Determine which pages to show (simplified logic: show max 5 page numbers)
+        let startPage = 1;
+        let endPage = totalPages;
+
+        if (totalPages > 5) {
+            startPage = Math.max(1, currentPage - 2);
+            endPage = Math.min(totalPages, startPage + 4);
+            if (endPage - startPage < 4) {
+                startPage = Math.max(1, endPage - 4);
+            }
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            const li = document.createElement('li');
+            li.className = 'page-item';
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = `page-link page-number ${i === currentPage ? 'active' : ''}`;
+            button.textContent = i;
+            button.dataset.page = i;
+            button.addEventListener('click', () => goToPage(i, visibleCount));
+            li.appendChild(button);
+            paginationList.appendChild(li);
+        }
+
+        if (endPage < totalPages) {
+            const separatorLi = document.createElement('li');
+            separatorLi.className = 'page-item';
+            const separatorSpan = document.createElement('span');
+            separatorSpan.className = 'page-link page-number-separator';
+            separatorSpan.textContent = '...';
+            separatorLi.appendChild(separatorSpan);
+            paginationList.appendChild(separatorLi);
+
+            const lastLi = document.createElement('li');
+            lastLi.className = 'page-item';
+            const lastButton = document.createElement('button');
+            lastButton.type = 'button';
+            lastButton.className = 'page-link page-number';
+            lastButton.textContent = totalPages;
+            lastButton.dataset.page = totalPages;
+            lastButton.addEventListener('click', () => goToPage(totalPages, visibleCount));
+            lastLi.appendChild(lastButton);
+            paginationList.appendChild(lastLi);
+        }
+
+        const nextLi = document.createElement('li');
+        nextLi.className = 'page-item';
+        const nextBtn = document.createElement('button');
+        nextBtn.type = 'button';
+        nextBtn.className = 'page-link page-next';
+        nextBtn.innerHTML = 'Next <i class="bi bi-chevron-right ms-1"></i>';
+        nextLi.appendChild(nextBtn);
+        paginationList.appendChild(nextLi);
+
+        updatePrevNextButtons(totalPages);
+    }
+
+    function goToPage(page, visibleCount) {
+        const totalPages = Math.ceil(visibleCount / ITEMS_PER_PAGE);
+        if (page < 1 || page > totalPages) return;
+        
+        currentPage = page;
+        updateTableDisplay();
+        renderPagination(visibleCount);
+    }
+
+    function updatePrevNextButtons(totalPages) {
+        const prevBtn = paginationList.querySelector('.page-prev');
+        const nextBtn = paginationList.querySelector('.page-next');
+        
+        if (!prevBtn || !nextBtn) return;
+
+        prevBtn.disabled = currentPage === 1;
+        nextBtn.disabled = currentPage === totalPages;
+
+        prevBtn.onclick = () => {
+            if (currentPage > 1) {
+                goToPage(currentPage - 1, getVisibleRowCount());
+            }
+        };
+
+        nextBtn.onclick = () => {
+            if (currentPage < totalPages) {
+                goToPage(currentPage + 1, getVisibleRowCount());
+            }
+        };
+    }
+
+    function getVisibleRowCount() {
+        let count = 0;
+        getRows().forEach(row => {
+            if (row.dataset.filterVisible !== 'false') count++;
+        });
+        return count;
+    }
+
+    function updateTableDisplay() {
+        const visibleRows = Array.from(getRows()).filter(row => row.dataset.filterVisible !== 'false');
+        const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
+        const endIdx = startIdx + ITEMS_PER_PAGE;
+
+        getRows().forEach(row => {
+            if (row.dataset.filterVisible === 'false') {
+                row.style.display = 'none';
+                return;
+            }
+            const idx = visibleRows.indexOf(row);
+            row.style.display = (idx >= startIdx && idx < endIdx) ? '' : 'none';
+        });
+    }
 
     function applyFilters() {
         const search = searchInput.value.trim().toLowerCase();
         const course = courseFilter.value;
-        const date   = dateFilter.value; // YYYY-MM-DD
+        const date   = dateFilter.value;
 
         let visible = 0;
 
@@ -202,26 +442,34 @@
             const matchDate   = !date   || row.dataset.date === date;
 
             if (matchSearch && matchCourse && matchDate) {
+                row.dataset.filterVisible = 'true';
                 row.style.display = '';
                 visible++;
             } else {
+                row.dataset.filterVisible = 'false';
                 row.style.display = 'none';
             }
         });
 
+        currentPage = 1; // Reset to first page when filtering
         const hasFilters = search || course || date;
 
         if (getRows().length > 0) {
             if (visible === 0 && hasFilters) {
                 tableCard.style.display  = 'none';
+                paginationContainer.classList.remove('show');
+                paginationContainer.style.display = 'none';
                 noResults.style.display  = 'block';
                 resultCount.textContent  = '';
             } else {
                 tableCard.style.display  = '';
                 noResults.style.display  = 'none';
                 resultCount.textContent  = hasFilters
-                    ? 'Showing ' + visible + ' of ' + getRows().length + ' record' + (getRows().length !== 1 ? 's' : '')
+                    ? 'Showing up to ' + Math.min(ITEMS_PER_PAGE, visible) + ' of ' + visible + ' record' + (visible !== 1 ? 's' : '')
                     : '';
+                
+                updateTableDisplay();
+                renderPagination(visible);
             }
         }
     }
@@ -308,6 +556,7 @@
                     if (currentEditRow === row) {
                         hideEditCard();
                     }
+                    applyFilters(); // Refresh pagination
                 }
             });
         });
@@ -344,6 +593,16 @@
     });
 
     bindRowActions();
-})();
+
+    // Initialize pagination after the page is fully ready
+    setTimeout(() => {
+        const initialVisibleCount = getVisibleRowCount();
+        if (initialVisibleCount > 0) {
+            currentPage = 1;
+            updateTableDisplay();
+            renderPagination(initialVisibleCount);
+        }
+    }, 50);
+});
 </script>
 {% endblock %}
