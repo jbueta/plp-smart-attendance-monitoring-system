@@ -61,7 +61,7 @@ function showSuccessOverlay(type, manualData = null) {
         name = manualData.name || "Unknown User";
         id = manualData.id || "N/A";
         // Dept is mocked for manual entry for now
-        dept = "Manual Entry";
+        dept = manualData.affiliation
     }
 
     overlayName.innerText = name;
@@ -95,7 +95,7 @@ function showSuccessOverlay(type, manualData = null) {
     setTimeout(() => {
         overlay.classList.remove('d-flex');
         overlay.classList.add('d-none');
-    }, 3000);
+    }, 1500);
 }
 
 function initAnimations() {

@@ -75,15 +75,17 @@
                 <h4 class="h6 text-uppercase text-white-50 mb-3 border-bottom border-secondary pb-2">
                     <i class="bi bi-broadcast text-success me-2"></i>Live Feed
                 </h4>
-                <div class="vstack gap-2">
+                <div class="vstack gap-2" id="live-feed-list">
                     {% for log in kiosk_data.recent_student_logs %}
-                    <div class="d-flex align-items-center p-2 rounded" style="background: rgba(255,255,255,0.03);">
+                    <div class="d-flex align-items-center p-2 rounded live-feed-item" style="background: rgba(255,255,255,0.03);">
                         {% if log.type == 'in' %}
-                        <div class="rounded-circle bg-success bg-opacity-25 p-2 me-3 text-success"><i
-                                class="bi bi-check-lg"></i></div>
+                        <div class="rounded-circle bg-success bg-opacity-25 p-2 me-3 text-success">
+                            <i class="bi bi-check-lg"></i>
+                        </div>
                         {% else %}
-                        <div class="rounded-circle bg-secondary bg-opacity-25 p-2 me-3 text-white"><i
-                                class="bi bi-arrow-right"></i></div>
+                        <div class="rounded-circle bg-secondary bg-opacity-25 p-2 me-3 text-white">
+                            <i class="bi bi-arrow-right"></i>
+                        </div>
                         {% endif %}
                         <div class="flex-grow-1 lh-1">
                             <h6 class="mb-0 small">{{ log.name }}</h6>
@@ -115,7 +117,6 @@
         </div>
     </div>
 </div>
-</div>
 
 <!-- Manual Entry Modal -->
 <div class="modal fade" id="manualEntryModal" tabindex="-1" aria-hidden="true">
@@ -129,17 +130,17 @@
             <div class="modal-body">
                 <div class="mb-3">
                     <label for="manual-student-id" class="form-label text-white-50">Student ID Number</label>
-                    <input type="text" class="form-control text-white border-secondary"
-                        id="manual-student-id" placeholder="e.g. 2026-0001" style="background: rgba(0,0,0,0.5);">
+                    <input type="text" class="form-control text-black border-secondary"
+                        id="manual-student-id" 
+                        placeholder="e.g. 23-00312" pattern="[0-9]{2}-[0-9]{5}" title="Format: 00-00000">
                 </div>
                 <div class="d-grid gap-2">
-                    <button type="button" class="btn btn-secondary" onclick="submitManualEntry('exit')">Time
+                    <button type="button" class="btn btn-secondary" onclick="submitManualEntry('student')">Time
                         Out</button>
                 </div>
             </div>
         </div>
     </div>
-</div>
 </div>
 
 <!-- Visitor Entry Modal -->
@@ -215,14 +216,13 @@
         </div>
     </div>
 </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/kiosk.js') }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // Live Clock specific to Student Kiosk
+        // --- 1. LIVE CLOCK LOGIC ---
         function updateClock() {
             const now = new Date();
             const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -234,42 +234,163 @@
         setInterval(updateClock, 1000);
         updateClock();
 
-        // Always Open Global Scanner listener
+        function appendToLiveFeed(name, course, logType) {
+            const feedContainer = document.getElementById('live-feed-list');
+            if (!feedContainer) return;
+
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+            const isEntry = (logType === 'entry');
+            const iconBg = isEntry ? 'bg-success text-success' : 'bg-secondary text-white';
+            const iconClass = isEntry ? 'bi-check-lg' : 'bi-arrow-right';
+            const badgeClass = isEntry ? 'bg-success text-success' : 'bg-secondary text-white';
+            const badgeText = isEntry ? 'TIME IN' : 'TIME OUT';
+
+            const logHtml = `
+                <div class="d-flex align-items-center p-2 rounded" style="background: rgba(255,255,255,0.03);">
+                    <div class="rounded-circle ${iconBg} bg-opacity-25 p-2 me-3">
+                        <i class="bi ${iconClass}"></i>
+                    </div>
+                    <div class="flex-grow-1 lh-1">
+                        <h6 class="mb-0 small">${name}</h6>
+                        <small class="text-white-50" style="font-size: 0.75rem">${course || 'N/A'}</small>
+                    </div>
+                    <div class="text-end">
+                        <div class="badge ${badgeClass} bg-opacity-10 mb-1">${badgeText}</div>
+                        <div class="font-monospace small text-white-50">${timeString}</div>
+                    </div>
+                </div>
+            `;
+
+            feedContainer.insertAdjacentHTML('afterbegin', logHtml);
+
+            if (feedContainer.children.length > 6) {
+                feedContainer.lastElementChild.remove();
+            }
+        }
+
+        // --- 2. FLASHED MESSAGE HANDLER (VISITORS) ---
+        {% with messages = get_flashed_messages(category_filter=["success"]) %}
+            {% if messages %}
+                {% for message in messages %}
+                setTimeout(() => {
+                    const msg = "{{ message }}";
+                    if (msg.includes("Check-in successful")) {
+                        let name = "Visitor";
+                        const nameMatch = msg.match(/Welcome, (.*?)\./);
+                        if (nameMatch && nameMatch[1]) {
+                            name = nameMatch[1];
+                        }
+                        showSuccessOverlay('entry', { id: 'VISITOR', name: name });
+                    }
+                }, 100);
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        // --- 3. GLOBAL SCANNER LOGIC ---
         let barcodeBuffer = "";
         let scanTimeout = null;
+        let scanCooldown = false; // Prevents accidental double-scans
 
         document.addEventListener('keydown', function (e) {
-            // Ignore if currently typing in an input/textarea/modal
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
                 return;
             }
 
+            if (scanCooldown) return;
+
             if (e.key === 'Enter') {
                 if (barcodeBuffer.length > 3) {
-                    // Activate simulated read
+                    const match = barcodeBuffer.match(/(.*?)\[(.*?)\](.*)/s);
+
+                    if (!match) {
+                        console.warn("Invalid QR format scanned:", barcodeBuffer);
+                        barcodeBuffer = "";
+                        return; 
+                    }
+
+                    const extractedName = match[1].trim();   // e.g., "SALVADOR, JERICHO PAUL D."
+                    const extractedId = match[2].trim();     // e.g., "23-00312"
+                    const extractedCourse = match[3].trim(); // e.g., "BSCS"
+
+                    // Start Cooldown
+                    scanCooldown = true;
+                    setTimeout(() => { scanCooldown = false; }, 3000);
+
+                    // Update UI feedback
                     const feedText = document.getElementById('scanner-text');
                     const frame = document.querySelector('.scanner-frame');
+                    
                     frame.style.borderColor = '#10B981';
                     frame.style.boxShadow = '0 0 30px rgba(16, 185, 129, 0.3)';
-                    feedText.innerText = "DETECTING ID (EXIT)...";
-                    feedText.className = "position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-white font-monospace fw-bold scanning-text";
+                    feedText.innerText = "READING ID...";
+                    feedText.className = "position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-warning font-monospace fw-bold scanning-text";
 
-                    setTimeout(() => {
-                        showSuccessOverlay('exit', { id: barcodeBuffer, name: "Student Exit" }); // Using main.js overlay
+                    // Hit the Backend API
+                    fetch('http://127.0.0.1:5001/admin/user/authentication', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            id: extractedId,
+                        })
+                    })
+                    .then(r => {
+                        if (!r.ok && r.status !== 404) throw new Error('Server error');
+                        return r.json();
+                    })
+                    .then(data => {
+                        if (data.success) {
+                            const logType = data.attendance_status ? data.attendance_status.toLowerCase() : 'entry';
+                            const bannerType = logType === 'exit' ? 'out' : 'in';
+                            
+                            if (typeof showScanBanner === 'function') {
+                                showScanBanner(bannerType, {
+                                    id: extractedId,
+                                    name: data.name,
+                                    course: data.affiliation
+                                });
+                            }
 
-                        // Reset
-                        frame.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-                        frame.style.boxShadow = 'none';
-                        feedText.innerText = "[CAMERA FEED]";
-                        feedText.className = "position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-white-50 small font-monospace";
-                    }, 500);
+                            showSuccessOverlay(logType, { 
+                                id: extractedId, 
+                                name: data.name, 
+                                affiliation: data.affiliation 
+                            });
+                            
+                            appendToLiveFeed(data.name, data.affiliation, logType);
+                        } else {
+                            frame.style.borderColor = '#ef4444'; 
+                            feedText.innerText = data.message || "SCAN FAILED";
+                        }
+
+                        setTimeout(() => {
+                            frame.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                            frame.style.boxShadow = 'none';
+                            feedText.innerText = "[CAMERA FEED]";
+                            feedText.className = "position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-white-50 small font-monospace";
+                        }, 2500);
+                    })
+                    .catch(error => {
+                        console.error('Server Error:', error);
+                            feedText.innerText = "BACKEND OFFLINE";
+                            frame.style.borderColor = '#ef4444';
+
+                            console.warn("Please ensure 'python app_extension.py' is running on port 5001.");
+                    });
                 }
+                
                 barcodeBuffer = "";
                 if (scanTimeout) clearTimeout(scanTimeout);
-            } else if (e.key.length === 1) { // Normal char
+
+            } else if (e.key.length === 1) { 
+                // Append character to buffer
                 barcodeBuffer += e.key;
+                
+                // Clear buffer if typing is too slow (not a scanner)
                 if (scanTimeout) clearTimeout(scanTimeout);
-                scanTimeout = setTimeout(() => { barcodeBuffer = ""; }, 50); // Timeout if not rapid scan
+                scanTimeout = setTimeout(() => { barcodeBuffer = ""; }, 100); 
             }
         });
     });

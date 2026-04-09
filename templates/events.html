@@ -52,14 +52,18 @@
     <div class="d-flex justify-content-start align-items-center gap-2 mb-4">
         <div class="input-group input-group-sm shadow-sm" style="width: 250px;">
             <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
-            <input type="text" class="form-control bg-dark text-white border-secondary" placeholder="Search events...">
+            <input type="text" id="searchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search events..." onkeyup="filterEvents()">
         </div>
-        <div class="input-group input-group-sm shadow-sm" style="width: 180px;">
+        <div class="input-group input-group-sm shadow-sm date-filter-wrapper" style="width: 180px;">
             <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-calendar-event"></i></span>
-            <input type="date" class="form-control bg-dark text-white border-secondary">
+            <input type="date" id="dateFilter" class="form-control bg-dark text-white border-secondary" onchange="filterEvents()">
         </div>
-        <button type="button" class="btn btn-sm btn-primary-gold px-4 shadow-sm"><i class="bi bi-filter me-1"></i>Apply Filters</button>
-        
+
+        <!-- OPTIONAL FILTER BUTTON -->
+        <button type="button" class="btn btn-sm btn-primary-gold px-4 shadow-sm" onclick="filterEvents()">
+            <i class="bi bi-filter me-1"></i>Apply Filters
+        </button>
+
         <div class="ms-auto text-white-50 small">
             <i class="bi bi-info-circle me-1"></i> Viewing all scheduled events
         </div>
@@ -70,8 +74,8 @@
         class="d-none mb-3 bg-danger bg-opacity-10 p-3 rounded border border-danger d-flex align-items-center justify-content-between">
         <span class="text-danger small"><i class="bi bi-info-circle me-2"></i>Select events to delete. Default events
             cannot be removed.</span>
-        <button type="submit" form="bulk-delete-form" class="btn btn-sm btn-danger" id="delete-selected-btn" disabled>
-            <i class="bi bi-trash me-1"></i>Delete Selected (<span id="selected-count">0</span>)
+        <button id="delete-selected-btn" class="btn btn-danger" onclick="deleteSelectedEvents()" disabled>
+            <i class="bi bi-trash"></i> Delete Selected (<span id="selected-count">0</span>)
         </button>
     </div>
 
@@ -97,12 +101,10 @@
                     </thead>
                     <tbody>
                         {% for event in events %}
-                        <tr>
+                        <tr id="event-row-{{ event.event_id }}">
                             <td class="selection-col d-none text-center">
-                                {% if event.id > 2 %}
-                                <input type="checkbox" name="event_ids" value="{{ event.id }}"
-                                    class="form-check-input bg-dark border-secondary event-checkbox"
-                                    onclick="updateDeleteButton()">
+                                {% if event.event_id > 2 %}
+                                <input type="checkbox" class="form-check-input event-checkbox" value="{{ event.event_id }}" onchange="updateDeleteButton()">
                                 {% else %}
                                 <i class="bi bi-lock-fill text-white-50 small" title="Protected"></i>
                                 {% endif %}
@@ -112,15 +114,19 @@
                                     }}</span></td>
                             <td class="text-white-50 small">{{ event.dept }}</td>
                             <td class="text-white-50 font-monospace small">{{ event.date }}</td>
-                            <td class="text-white-50 font-monospace small">{{ event.time }}</td>
+                            <td class="text-white-50 font-monospace small">{{ event.time_start + ' - ' + event.time_end }}</td>
                             <td class="text-end pe-4">
-                                <button type="button" class="btn btn-sm btn-info text-white me-1" title="View Event Info" data-bs-toggle="modal" data-bs-target="#viewEventModal"
-                                    onclick="document.getElementById('view-event-title').innerText = '{{ event.name }}'; document.getElementById('view-event-type').innerText = '{{ event.type }}'; document.getElementById('view-event-date').innerText = '{{ event.date }}'; document.getElementById('view-event-time').innerText = '{{ event.time }}';">
+                                <button type="button" 
+                                        class="btn btn-sm btn-info text-white me-1" 
+                                        title="View Event Info" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#viewEventModal" 
+                                        onclick="openViewModal('{{ event.event_id }}', '{{ event.name }}', '{{ event.type }}', '{{ event.date }}', '{{ event.time_start }} - {{ event.time_end }}', '{{ event.dept }}');">
                                     <i class="bi bi-eye me-1"></i> View
                                 </button>
-                                {% if event.id > 2 %}
+                                {% if event.event_id > 2 %}
                                 <button type="button" class="btn btn-sm btn-danger" title="Delete Event"
-                                    onclick="if(confirm('Delete this event?')) { document.getElementById('delete-form-{{ event.id }}').submit(); }">
+                                    onclick="deleteSingleEvent('{{ event.event_id }}')">
                                     <i class="bi bi-trash"></i>
                                 </button>
                                 {% else %}
@@ -140,13 +146,6 @@
                 </table>
             </form>
         </div>
-        <!-- Individual Delete Forms (Hidden) -->
-        {% for event in events %}
-        {% if event.id > 2 %}
-        <form id="delete-form-{{ event.id }}" action="{{ url_for('delete_event', event_id=event.id) }}" method="POST"
-            class="d-none"></form>
-        {% endif %}
-        {% endfor %}
     </div>
 </div>
 
@@ -159,7 +158,7 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
                     aria-label="Close"></button>
             </div>
-            <form action="{{ url_for('add_event') }}" method="POST">
+            <form action="{{ url_for('add_event') }}" method="POST" enctype="multipart/form-data">
                 <div class="modal-body">
                     <div class="row g-3 mb-3">
                         <div class="col-md-8">
@@ -177,6 +176,8 @@
                                 <option>Workshop</option>
                                 <option>Drill</option>
                                 <option>Activity</option>
+                                <option>Flag Ceremony</option>
+                                <option>Other</option>
                             </select>
                         </div>
                     </div>
@@ -187,70 +188,26 @@
                             <!-- Option 1: All Departments -->
                             <div class="form-check mb-2 pb-2 border-bottom border-secondary">
                                 <input class="form-check-input bg-dark border-secondary" type="checkbox" name="dept"
-                                    value="All Departments" id="dept-all" checked>
+                                    value="All Departments" id="dept-all">
                                 <label class="form-check-label text-white fw-bold" for="dept-all">
                                     All Departments
                                 </label>
                             </div>
                             <!-- Grid of other departments -->
                             <div class="row g-2">
+                                {% for dept in departments %}
                                 <div class="col-md-6">
                                     <div class="form-check">
                                         <input class="form-check-input bg-dark border-secondary dept-cb" type="checkbox"
-                                            name="dept" value="College of Engineering" id="dept-1">
-                                        <label class="form-check-label text-white-50 small" for="dept-1">College of
-                                            Engineering</label>
+                                            name="dept" value="{{ dept.department_id }}" id="dept-{{ dept.department_id }}">
+                                        
+                                        <label class="form-check-label text-white-50 small" for="dept-{{ dept.department_id }}">
+                                            {{ dept.department_name }}
+                                        </label>
                                     </div>
                                 </div>
-                                <div class="col-md-6">
-                                    <div class="form-check">
-                                        <input class="form-check-input bg-dark border-secondary dept-cb" type="checkbox"
-                                            name="dept" value="College of Nursing" id="dept-2">
-                                        <label class="form-check-label text-white-50 small" for="dept-2">College of
-                                            Nursing</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-check">
-                                        <input class="form-check-input bg-dark border-secondary dept-cb" type="checkbox"
-                                            name="dept" value="College of Computer Studies" id="dept-3">
-                                        <label class="form-check-label text-white-50 small" for="dept-3">Computer
-                                            Studies</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-check">
-                                        <input class="form-check-input bg-dark border-secondary dept-cb" type="checkbox"
-                                            name="dept" value="College of Business & Accountancy" id="dept-4">
-                                        <label class="form-check-label text-white-50 small" for="dept-4">Business &
-                                            Accountancy</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-check">
-                                        <input class="form-check-input bg-dark border-secondary dept-cb" type="checkbox"
-                                            name="dept" value="College of Education" id="dept-5">
-                                        <label class="form-check-label text-white-50 small" for="dept-5">College of
-                                            Education</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-check">
-                                        <input class="form-check-input bg-dark border-secondary dept-cb" type="checkbox"
-                                            name="dept" value="College of Arts & Sciences" id="dept-6">
-                                        <label class="form-check-label text-white-50 small" for="dept-6">Arts &
-                                            Sciences</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-check">
-                                        <input class="form-check-input bg-dark border-secondary dept-cb" type="checkbox"
-                                            name="dept" value="Non-Teaching Staff" id="dept-7">
-                                        <label class="form-check-label text-white-50 small" for="dept-7">Non-Teaching
-                                            Staff</label>
-                                    </div>
-                                </div>
-                            </div>
+                                {% endfor %}
+                            </div>  
                         </div>
                         <div class="mt-3 border-top border-secondary pt-3">
                             <label class="form-label text-white-50 small mb-2">Upload Specific Target Roster (Excel/CSV)</label>
@@ -275,26 +232,38 @@
                         </div>
                     </div>
                     <div class="row g-3 mb-3">
-                        <!-- Date & Time Row -->
-                        <div class="col-md-4">
-                            <label class="form-label text-white-50">Event Date <span
-                                    class="text-danger">*</span></label>
-                            <input type="date" name="date" class="form-control bg-dark text-white border-secondary"
-                                required>
+                        <div class="col-md-3">
+                            <label class="form-label text-white-50" id="date-label">Event Date <span class="text-danger">*</span></label>
+                            
+                            <input type="date" name="event_date" id="event-date-input" class="form-control bg-dark text-white border-secondary" required>
+                            
+                            <select name="day_of_week" id="event-day-select" class="form-select bg-dark text-white border-secondary d-none">
+                                <option value="Monday">Monday</option>
+                                <option value="Tuesday">Tuesday</option>
+                                <option value="Wednesday">Wednesday</option>
+                                <option value="Thursday">Thursday</option>
+                                <option value="Friday">Friday</option>
+                                <option value="Saturday">Saturday</option>
+                                <option value="Sunday">Sunday</option>
+                            </select>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label text-white-50">Schedule Time <span
-                                    class="text-danger">*</span></label>
-                            <input type="time" name="time" class="form-control bg-dark text-white border-secondary"
-                                required>
+                        
+                        <div class="col-md-3">
+                            <label class="form-label text-white-50">Start Time <span class="text-danger">*</span></label>
+                            <input type="time" name="time_start" class="form-control bg-dark text-white border-secondary" required>
                         </div>
-                        <div class="col-md-4">
+                        
+                        <div class="col-md-3">
+                            <label class="form-label text-white-50">End Time <span class="text-danger">*</span></label>
+                            <input type="time" name="time_end" class="form-control bg-dark text-white border-secondary" required>
+                        </div>
+
+                        <div class="col-md-3">
                             <label class="form-label text-white-50">Frequency</label>
-                            <select name="frequency" class="form-select bg-dark text-white border-secondary">
+                            <select name="frequency" id="event-frequency" class="form-select bg-dark text-white border-secondary">
                                 <option value="once">One-time</option>
                                 <option value="daily">Daily</option>
                                 <option value="weekly">Weekly</option>
-                                <option value="monthly">Monthly</option>
                             </select>
                         </div>
                     </div>
@@ -316,51 +285,104 @@
 
 <!-- View Event Modal -->
 <div class="modal fade" id="viewEventModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content card-glass border-info">
-            <div class="modal-header border-info bg-info bg-opacity-10">
+    <div class="modal-dialog modal-dialog-centered modal-lg"> <div class="modal-content card-glass border-info">
+            <div class="modal-header border-info bg-info bg-opacity-10 py-2">
                 <h5 class="modal-title text-white d-flex align-items-center">
-                    <i class="bi bi-calendar-check me-2 text-info"></i> Event Details
+                    <i class="bi bi-calendar-check me-2 text-info"></i> Event Portal
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
-                    aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <div class="mb-4 text-center">
-                    <h4 class="text-white mb-1" id="view-event-title">Annual Faculty Meeting</h4>
-                    <span class="badge bg-secondary bg-opacity-25 border border-secondary" id="view-event-type">Meeting</span>
-                </div>
-                
-                <div class="card bg-dark bg-opacity-50 border-secondary mb-3">
-                    <div class="card-body py-2">
-                        <div class="d-flex justify-content-between mb-2 pb-2 border-bottom border-secondary">
-                            <span class="text-white-50 small"><i class="bi bi-calendar3 me-2"></i>Date</span>
-                            <span class="text-white font-monospace small" id="view-event-date">Oct 15, 2026</span>
-                        </div>
-                        <div class="d-flex justify-content-between">
-                            <span class="text-white-50 small"><i class="bi bi-clock me-2"></i>Time</span>
-                            <span class="text-white font-monospace small" id="view-event-time">09:00 AM</span>
-                        </div>
-                    </div>
-                </div>
+            
+            <div class="modal-body p-0">
+                <ul class="nav nav-tabs border-secondary bg-dark bg-opacity-50 px-3 pt-2" id="eventViewTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active text-white fw-bold bg-transparent border-0 border-bottom border-info border-3" id="details-tab" data-bs-toggle="tab" data-bs-target="#details-pane" type="button" role="tab">
+                            <i class="bi bi-info-circle me-1"></i> Details
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link text-white-50 bg-transparent border-0" id="attendance-tab" data-bs-toggle="tab" data-bs-target="#attendance-pane" type="button" role="tab">
+                            <i class="bi bi-people me-1"></i> Attendance
+                        </button>
+                    </li>
+                </ul>
 
-                <div class="mb-3">
-                    <h6 class="text-white-50 small mb-2 text-uppercase">Target Departments / Groups</h6>
-                    <div class="p-2 border border-secondary rounded bg-dark" id="view-event-depts">
-                        <span class="badge bg-primary-gold bg-opacity-25 text-gold border border-gold mb-1 me-1">College of Engineering</span>
-                        <span class="badge bg-primary-gold bg-opacity-25 text-gold border border-gold mb-1 me-1">Computer Studies</span>
+                <div class="tab-content p-3" id="eventViewTabsContent">
+                    
+                    <div class="tab-pane fade show active" id="details-pane" role="tabpanel">
+                        <div class="mb-4 text-center mt-2">
+                            <h4 class="text-white mb-1" id="view-event-title">Event Title</h4>
+                            <span class="badge bg-secondary bg-opacity-25 border border-secondary" id="view-event-type">Type</span>
+                        </div>
+                        
+                        <div class="card bg-dark bg-opacity-50 border-secondary mb-3">
+                            <div class="card-body py-2">
+                                <div class="d-flex justify-content-between mb-2 pb-2 border-bottom border-secondary">
+                                    <span class="text-white-50 small"><i class="bi bi-calendar3 me-2"></i>Date</span>
+                                    <span class="text-white font-monospace small" id="view-event-date">Date</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-white-50 small"><i class="bi bi-clock me-2"></i>Time</span>
+                                    <span class="text-white font-monospace small" id="view-event-time">Time</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <h6 class="text-white-50 small mb-2 text-uppercase">Target Departments / Groups</h6>
+                            <div class="p-2 border border-secondary rounded bg-dark" id="view-event-depts">
+                                </div>
+                        </div>
                     </div>
-                </div>
-                
-                <div class="mb-3">
-                    <h6 class="text-white-50 small mb-2 text-uppercase">External Participants</h6>
-                    <div class="p-2 border border-secondary rounded bg-dark" id="view-event-externals">
-                        <span class="badge bg-light bg-opacity-10 text-white border border-light mb-1 me-1">Guest Speakers</span>
+
+                    <div class="tab-pane fade" id="attendance-pane" role="tabpanel">
+                        <div class="mb-3">
+                            <div class="mb-3" id="instanceSelectionContainer" style="display: none;">
+                                <label for="instanceSelect" class="form-label small text-white-50 mb-1">Select Event Instance</label>
+                                <select class="form-select form-select-sm bg-dark text-white border-secondary" id="instanceSelect">
+                                    </select>
+                            </div>
+                            <div class="d-flex justify-content-between small text-white-50 mb-1">
+                                <span>Attendance Overview</span>
+                                <span id="attendance-total">0 Participants</span>
+                            </div>
+                            <div class="progress" style="height: 10px; background-color: #2b2b2b;">
+                                <div id="bar-present" class="progress-bar bg-success" style="width: 0%" title="Present"></div>
+                                <div id="bar-excused" class="progress-bar bg-warning" style="width: 0%" title="Excused"></div>
+                                <div id="bar-absent" class="progress-bar bg-danger" style="width: 0%" title="Absent"></div>
+                            </div>
+                            <div class="d-flex gap-3 mt-2 small text-white-50 justify-content-center">
+                                <span><i class="bi bi-circle-fill text-success small me-1"></i> <span id="count-present">0</span> Present</span>
+                                <span><i class="bi bi-circle-fill text-warning small me-1"></i> <span id="count-excused">0</span> Excused</span>
+                                <span><i class="bi bi-circle-fill text-danger small me-1"></i> <span id="count-absent">0</span> Absent</span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary w-50" id="attendance-search" placeholder="Search name...">
+                            <button class="btn btn-sm btn-outline-info" onclick="fetchAttendanceData(currentInstanceId)"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+                        </div>
+
+                        <div class="table-responsive border border-secondary rounded" style="max-height: 350px; overflow-y: auto;">
+                            <table class="table table-dark table-hover table-sm mb-0 align-middle" style="font-size: 0.9rem;">
+                                <thead class="table-dark text-white-50 sticky-top">
+                                    <tr>
+                                        <th class="ps-3">Participant</th>
+                                        <th>In/Out</th>
+                                        <th class="text-end pe-3">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="attendance-table-body">
+                                    <tr><td colspan="3" class="text-center py-4 text-white-50">Loading attendance data...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
+                    
                 </div>
             </div>
             <div class="modal-footer border-secondary">
-                <button type="button" class="btn btn-outline-info w-100" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-outline-secondary w-100" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -368,72 +390,5 @@
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/events.js') }}"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        // Toggle logic for department checkboxes
-        const allDeptCheck = document.getElementById('dept-all');
-        const deptChecks = document.querySelectorAll('.dept-cb');
-
-        if (allDeptCheck && deptChecks.length > 0) {
-            allDeptCheck.addEventListener('change', function () {
-                if (this.checked) {
-                    deptChecks.forEach(cb => cb.checked = false);
-                }
-            });
-
-            deptChecks.forEach(cb => {
-                cb.addEventListener('change', function () {
-                    if (this.checked) {
-                        allDeptCheck.checked = false;
-                    }
-
-                    // Re-check "All Departments" if everything gets manually unchecked
-                    const anyChecked = Array.from(deptChecks).some(c => c.checked);
-                    if (!anyChecked) {
-                        allDeptCheck.checked = true;
-                    }
-                });
-            });
-        }
-
-        // Dynamic Custom Participants Logic
-        const container = document.getElementById('custom-participants-container');
-        const addBtn = document.getElementById('add-custom-participant-btn');
-
-        if (container && addBtn) {
-            addBtn.addEventListener('click', function () {
-                const row = document.createElement('div');
-                row.className = 'd-flex align-items-center mt-2';
-                row.innerHTML = `
-                    <input type="text" name="custom_dept" class="form-control bg-dark text-white border-secondary form-control-sm" placeholder="e.g. Parents, Sponsors">
-                    <button type="button" class="btn btn-sm btn-outline-danger ms-2 remove-custom-btn" title="Remove">
-                        <i class="bi bi-x"></i>
-                    </button>
-                `;
-                container.appendChild(row);
-
-                // Show all remove buttons if there is more than 1 row
-                updateRemoveButtons();
-
-                // Attach remove event
-                const removeBtn = row.querySelector('.remove-custom-btn');
-                removeBtn.addEventListener('click', function () {
-                    row.remove();
-                    updateRemoveButtons();
-                });
-            });
-
-            function updateRemoveButtons() {
-                const rows = container.querySelectorAll('.d-flex');
-                rows.forEach((row) => {
-                    const btn = row.querySelector('.remove-custom-btn');
-                    if (btn) {
-                        btn.style.display = rows.length > 1 ? 'block' : 'none';
-                    }
-                });
-            }
-        }
-    });
-</script>
 {% endblock %}
 {% endblock %}
