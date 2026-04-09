@@ -62,7 +62,8 @@
                         <th>Course</th>
                         <th>Time In</th>
                         <th>Time Out</th>
-                        <th class="text-end pe-4">Status</th>
+                        <th class="text-end" style="padding-right: 3rem;">Status</th>
+                        <th class="text-end pe-4">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="studentTableBody">
@@ -77,15 +78,26 @@
                         <td class="text-white-50">{{ log.course }}</td>
                         <td class="text-success font-monospace small">{{ log.time_in }}</td>
                         <td class="text-danger font-monospace small">{{ log.time_out }}</td>
-                        <td class="text-end pe-4">
+                        <td class="text-end" style="padding-right: 3rem;">
                             <span class="badge bg-{{ log.status_class }} bg-opacity-25 border border-{{ log.status_class }} text-{{ log.status_class }} rounded-pill px-3">
                                 {{ log.status }}
                             </span>
                         </td>
+                        <td class="text-center align-middle" style="width: 80px;">
+                            <div class="dropdown h-100 d-flex align-items-center justify-content-center">
+                                <button class="btn btn-sm btn-outline-light p-0 border-0 d-flex align-items-center justify-content-center fs-4" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    &hellip;
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end shadow-sm student-action-menu">
+                                    <li><button type="button" class="dropdown-item edit-student text-white" data-id="{{ log.id }}">Edit</button></li>
+                                    <li><button type="button" class="dropdown-item text-danger delete-student" data-id="{{ log.id }}">Delete</button></li>
+                                </ul>
+                            </div>
+                        </td>
                     </tr>
                     {% else %}
                     <tr id="emptyRow">
-                        <td colspan="6" class="text-center text-white-50 py-5">
+                        <td colspan="7" class="text-center text-white-50 py-5">
                             <i class="bi bi-inbox display-4 d-block mb-3"></i>
                             No activity logs recorded for this period.
                         </td>
@@ -106,6 +118,63 @@
     <p id="resultCount" class="text-white-50 small ms-1"></p>
 </div>
 
+<div id="editOverlay" class="d-none position-fixed top-0 start-0 w-100 h-100" style="background: rgba(10, 12, 20, 0.56); backdrop-filter: blur(8px); z-index: 1080;">
+    <div id="studentEditCard" class="card-glass p-4 position-absolute top-50 start-50 translate-middle" style="width: min(760px, 94%); border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 28px 80px rgba(0,0,0,0.35);">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h5 class="mb-1">Edit Student Record</h5>
+                <p class="text-white-50 small mb-0">Update the current student details and save the changes.</p>
+            </div>
+        </div>
+        <hr class="border-secondary opacity-25 my-3">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label text-white-50" for="editStudentId">Student ID</label>
+                <input id="editStudentId" class="form-control bg-dark text-white border-secondary" type="text" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label text-white-50" for="editStudentName">Student Name</label>
+                <input id="editStudentName" class="form-control bg-dark text-white border-secondary" type="text" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label text-white-50" for="editCourseId">Course ID</label>
+                <input id="editCourseId" class="form-control bg-dark text-white border-secondary" type="text" />
+            </div>
+        </div>
+        <div class="d-flex justify-content-end gap-2 mt-4">
+            <button id="cancelEditStudent" type="button" class="btn btn-outline-light">Cancel</button>
+            <button id="saveStudentEdit" type="button" class="btn btn-primary-gold">Update</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.student-action-menu {
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.15);
+}
+.student-action-menu .dropdown-item {
+    color: #fff;
+}
+.student-action-menu .dropdown-item:hover,
+.student-action-menu .dropdown-item:focus {
+    background: #d4af37;
+    color: #051a10;
+}
+.dropdown .btn {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+}
+.dropdown .btn:hover {
+    background: transparent !important;
+    border: 1px solid #fff !important;
+    border-radius: 50% !important;
+    color: #fff !important;
+}
+</style>
+
 <script>
 (function () {
     const searchInput  = document.getElementById('searchInput');
@@ -116,7 +185,7 @@
     const tableCard    = document.getElementById('tableCard');
     const noResults    = document.getElementById('noResults');
     const resultCount  = document.getElementById('resultCount');
-    const rows         = document.querySelectorAll('.student-row');
+    const getRows      = () => document.querySelectorAll('.student-row');
 
     function applyFilters() {
         const search = searchInput.value.trim().toLowerCase();
@@ -125,7 +194,7 @@
 
         let visible = 0;
 
-        rows.forEach(function (row) {
+        getRows().forEach(function (row) {
             const matchSearch = !search ||
                 row.dataset.id.includes(search) ||
                 row.dataset.name.includes(search);
@@ -142,7 +211,7 @@
 
         const hasFilters = search || course || date;
 
-        if (rows.length > 0) {
+        if (getRows().length > 0) {
             if (visible === 0 && hasFilters) {
                 tableCard.style.display  = 'none';
                 noResults.style.display  = 'block';
@@ -151,7 +220,7 @@
                 tableCard.style.display  = '';
                 noResults.style.display  = 'none';
                 resultCount.textContent  = hasFilters
-                    ? 'Showing ' + visible + ' of ' + rows.length + ' record' + (rows.length !== 1 ? 's' : '')
+                    ? 'Showing ' + visible + ' of ' + getRows().length + ' record' + (getRows().length !== 1 ? 's' : '')
                     : '';
             }
         }
@@ -168,9 +237,9 @@
         const headers = ['Student ID', 'Name', 'Course', 'Time In', 'Time Out', 'Status'];
         const csvRows = [headers.join(',')];
 
-        rows.forEach(function (row) {
+        getRows().forEach(function (row) {
             if (row.style.display !== 'none') {
-                const cells  = row.querySelectorAll('td');
+                const cells = row.querySelectorAll('td:not(:last-child)');
                 const values = Array.from(cells).map(function (td) {
                     return '"' + td.innerText.replace(/"/g, '""').trim() + '"';
                 });
@@ -186,6 +255,95 @@
         a.click();
         URL.revokeObjectURL(url);
     });
+
+    const editOverlay = document.getElementById('editOverlay');
+    const editCard = document.getElementById('studentEditCard');
+    const editStudentId = document.getElementById('editStudentId');
+    const editStudentName = document.getElementById('editStudentName');
+    const editCourseId = document.getElementById('editCourseId');
+    const saveStudentEdit = document.getElementById('saveStudentEdit');
+    const cancelEditStudent = document.getElementById('cancelEditStudent');
+    let currentEditRow = null;
+
+    function showEditCard(row) {
+        currentEditRow = row;
+        const studentId   = row.dataset.id || '';
+        const studentName = row.querySelector('td:nth-child(2)')?.textContent.trim() || '';
+        const course      = row.dataset.course || row.querySelector('td:nth-child(3)')?.textContent.trim() || '';
+
+        editStudentId.value   = studentId;
+        editStudentName.value = studentName;
+        editCourseId.value    = course;
+        editOverlay.classList.remove('d-none');
+        editCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function hideEditCard() {
+        currentEditRow = null;
+        editOverlay.classList.add('d-none');
+        editStudentId.value = '';
+        editStudentName.value = '';
+        editCourseId.value = '';
+    }
+
+    function bindRowActions() {
+        document.querySelectorAll('.edit-student').forEach(function (button) {
+            button.addEventListener('click', function (event) {
+                const row = event.target.closest('tr');
+                if (row) {
+                    showEditCard(row);
+                }
+            });
+        });
+
+        document.querySelectorAll('.delete-student').forEach(function (button) {
+            button.addEventListener('click', function (event) {
+                const row = event.target.closest('tr');
+                if (!row) {
+                    return;
+                }
+                const studentName = row.querySelector('td:nth-child(2)')?.textContent.trim() || 'this student';
+                if (confirm(`Delete ${studentName} from records?`)) {
+                    row.remove();
+                    if (currentEditRow === row) {
+                        hideEditCard();
+                    }
+                }
+            });
+        });
+    }
+
+    saveStudentEdit.addEventListener('click', function () {
+        if (!currentEditRow) {
+            return;
+        }
+
+        const newId   = editStudentId.value.trim();
+        const newName = editStudentName.value.trim();
+        const newCourse = editCourseId.value.trim();
+
+        if (!newId || !newName || !newCourse) {
+            alert('Please fill in all fields before updating.');
+            return;
+        }
+
+        currentEditRow.dataset.id = newId;
+        currentEditRow.dataset.name = newName.toLowerCase();
+        currentEditRow.dataset.course = newCourse;
+        currentEditRow.querySelector('td:nth-child(1)').textContent = newId;
+        currentEditRow.querySelector('td:nth-child(2)').textContent = newName;
+        currentEditRow.querySelector('td:nth-child(3)').textContent = newCourse;
+        hideEditCard();
+    });
+
+    cancelEditStudent.addEventListener('click', hideEditCard);
+    editOverlay.addEventListener('click', function (event) {
+        if (event.target === editOverlay) {
+            hideEditCard();
+        }
+    });
+
+    bindRowActions();
 })();
 </script>
 {% endblock %}

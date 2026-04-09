@@ -65,32 +65,48 @@
                         <th>Department</th>
                         <th>Time In</th>
                         <th>Time Out</th>
-                        <th class="text-end pe-4">Status</th>
+                        <th class="text-end" style="padding-right: 3rem;">Status</th>
+                        <th class="text-end pe-4">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for log in logs %}
-                    <tr>
+                    <tr class="employee-row"
+                        data-employee-id="{{ log.id | lower }}"
+                        data-employee-name="{{ log.name | lower }}"
+                        data-department="{{ log.dept }}"
+                        data-position="{{ log.position or '' }}">
                         <td class="fw-bold text-white ps-4">
                             <div class="d-flex align-items-center">
                                 <div class="rounded-circle bg-white bg-opacity-10 p-1 me-2"
                                     style="width: 32px; height: 32px; display:grid; place-items:center;">{{
                                     log.initials }}</div>
-                                {{ log.name }}
+                                <span>{{ log.name }}</span>
                             </div>
                         </td>
                         <td class="text-white-50">{{ log.dept }}</td>
                         <td class="text-success font-monospace small">{{ log.in or '--:--' }}</td>
                         <td class="text-danger font-monospace small">{{ log.out or '--:--' }}</td>
-                        <td class="text-end pe-4">
+                        <td class="text-end" style="padding-right: 3rem;">
                             <span class="badge bg-{{ log.status_class }} bg-opacity-25 text-{{ log.status_class }} border border-{{ log.status_class }} border-opacity-25 rounded-pill px-3">
                                 {{ log.status }}
                             </span>
                         </td>
+                        <td class="text-center align-middle" style="width: 80px;">
+                            <div class="dropdown h-100 d-flex align-items-center justify-content-center">
+                                <button class="btn btn-sm btn-outline-light p-0 border-0 d-flex align-items-center justify-content-center fs-4" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    &hellip;
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end shadow-sm employee-action-menu">
+                                    <li><button type="button" class="dropdown-item edit-employee text-white" data-id="{{ log.id }}">Edit</button></li>
+                                    <li><button type="button" class="dropdown-item text-danger delete-employee" data-id="{{ log.id }}">Delete</button></li>
+                                </ul>
+                            </div>
+                        </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="5" class="text-center text-white-50 py-5">
+                        <td colspan="6" class="text-center text-white-50 py-5">
                             <i class="bi bi-person-x display-4 d-block mb-3"></i>
                             No attendance records available for this period.
                         </td>
@@ -101,4 +117,163 @@
         </div>
     </div>
 </div>
+
+<div id="editOverlay" class="d-none position-fixed top-0 start-0 w-100 h-100" style="background: rgba(10, 12, 20, 0.56); backdrop-filter: blur(8px); z-index: 1080;">
+    <div id="employeeEditCard" class="card-glass p-4 position-absolute top-50 start-50 translate-middle" style="width: min(760px, 94%); border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 28px 80px rgba(0,0,0,0.35);">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h5 class="mb-1">Edit Employee Record</h5>
+                <p class="text-white-50 small mb-0">Update the employee details and save the changes.</p>
+            </div>
+        </div>
+        <hr class="border-secondary opacity-25 my-3">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label text-white-50" for="editEmployeeId">Employee ID</label>
+                <input id="editEmployeeId" class="form-control bg-dark text-white border-secondary" type="text" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label text-white-50" for="editEmployeeName">Employee Name</label>
+                <input id="editEmployeeName" class="form-control bg-dark text-white border-secondary" type="text" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label text-white-50" for="editDepartmentId">Department ID</label>
+                <input id="editDepartmentId" class="form-control bg-dark text-white border-secondary" type="text" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label text-white-50" for="editPosition">Position</label>
+                <input id="editPosition" class="form-control bg-dark text-white border-secondary" type="text" />
+            </div>
+        </div>
+        <div class="d-flex justify-content-end gap-2 mt-4">
+            <button id="cancelEditEmployee" type="button" class="btn btn-outline-light">Cancel</button>
+            <button id="saveEmployeeEdit" type="button" class="btn btn-primary-gold">Update</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.employee-action-menu {
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.15);
+}
+.employee-action-menu .dropdown-item {
+    color: #fff;
+}
+.employee-action-menu .dropdown-item:hover,
+.employee-action-menu .dropdown-item:focus {
+    background: #d4af37;
+    color: #051a10;
+}
+.dropdown .btn {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+}
+.dropdown .btn:hover {
+    background: transparent !important;
+    border: 1px solid #fff !important;
+    border-radius: 50% !important;
+    color: #fff !important;
+}
+</style>
+
+<script>
+(function () {
+    const editOverlay = document.getElementById('editOverlay');
+    const editCard = document.getElementById('employeeEditCard');
+    const editEmployeeId = document.getElementById('editEmployeeId');
+    const editEmployeeName = document.getElementById('editEmployeeName');
+    const editDepartmentId = document.getElementById('editDepartmentId');
+    const editPosition = document.getElementById('editPosition');
+    const saveEmployeeEdit = document.getElementById('saveEmployeeEdit');
+    const cancelEditEmployee = document.getElementById('cancelEditEmployee');
+    let currentEditRow = null;
+
+    function showEditCard(row) {
+        currentEditRow = row;
+        const employeeId = row.dataset.employeeId || '';
+        const employeeName = row.querySelector('td:nth-child(1) span')?.textContent.trim() || '';
+        const departmentId = row.dataset.department || '';
+        const position = row.dataset.position || '';
+
+        editEmployeeId.value = employeeId;
+        editEmployeeName.value = employeeName;
+        editDepartmentId.value = departmentId;
+        editPosition.value = position;
+        editOverlay.classList.remove('d-none');
+        editCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function hideEditCard() {
+        currentEditRow = null;
+        editOverlay.classList.add('d-none');
+        editEmployeeId.value = '';
+        editEmployeeName.value = '';
+        editDepartmentId.value = '';
+        editPosition.value = '';
+    }
+
+    function bindRowActions() {
+        document.querySelectorAll('.edit-employee').forEach(function (button) {
+            button.addEventListener('click', function (event) {
+                const row = event.target.closest('tr');
+                if (row) {
+                    showEditCard(row);
+                }
+            });
+        });
+
+        document.querySelectorAll('.delete-employee').forEach(function (button) {
+            button.addEventListener('click', function (event) {
+                const row = event.target.closest('tr');
+                if (!row) {
+                    return;
+                }
+                const employeeName = row.querySelector('td:nth-child(1) span')?.textContent.trim() || 'this employee';
+                if (confirm(`Delete ${employeeName} from records?`)) {
+                    row.remove();
+                    if (currentEditRow === row) {
+                        hideEditCard();
+                    }
+                }
+            });
+        });
+    }
+
+    saveEmployeeEdit.addEventListener('click', function () {
+        if (!currentEditRow) {
+            return;
+        }
+
+        const newId = editEmployeeId.value.trim();
+        const newName = editEmployeeName.value.trim();
+        const newDept = editDepartmentId.value.trim();
+        const newPosition = editPosition.value.trim();
+
+        if (!newId || !newName || !newDept || !newPosition) {
+            alert('Please fill in all fields before updating.');
+            return;
+        }
+
+        currentEditRow.dataset.employeeId = newId;
+        currentEditRow.dataset.employeeName = newName.toLowerCase();
+        currentEditRow.dataset.department = newDept;
+        currentEditRow.dataset.position = newPosition;
+        currentEditRow.querySelector('td:nth-child(1) span').textContent = newName;
+        currentEditRow.querySelector('td:nth-child(2)').textContent = newDept;
+        hideEditCard();
+    });
+
+    cancelEditEmployee.addEventListener('click', hideEditCard);
+    editOverlay.addEventListener('click', function (event) {
+        if (event.target === editOverlay) {
+            hideEditCard();
+        }
+    });
+
+    bindRowActions();
+})();
+</script>
 {% endblock %}

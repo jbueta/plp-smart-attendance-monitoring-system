@@ -58,7 +58,7 @@ function submitManualEntry(type) {
     })
     .catch(err => {
         console.error(err);
-        alert("Connection error. Please try again.");
+        alert("Connection error: " + err.message + ". Please try again.");
         if (typeof showScanBanner === 'function') showScanBanner('error', { id: id });
     });
 
