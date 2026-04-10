@@ -672,7 +672,7 @@ def manual_event_entry():
 @app.route("/admin/employees/attendance", methods=["GET"])
 def get_employee_attendance():
     """
-    Returns today's attendance for all employees: entry time, exit time, status.
+    Returns event attendance records for employees, including event name.
     """
     conn = None
     try:
@@ -684,17 +684,19 @@ def get_employee_attendance():
 
         query = """
             SELECT 
-                e.user_id,
                 e.employee_name,
-                e.employee_id,
                 d.department_name as department,
-                MIN(CASE WHEN gl.log_type = 'Entry' THEN gl.timestamp END) as time_in,
-                MAX(CASE WHEN gl.log_type = 'Exit' THEN gl.timestamp END) as time_out
-            FROM employees e
+                ev.event_name,
+                DATE_FORMAT(ea.first_in, '%h:%i %p') as time_in,
+                DATE_FORMAT(ea.last_out, '%h:%i %p') as time_out,
+                ea.status
+            FROM event_attendance ea
+            JOIN event_instances ei ON ea.instance_id = ei.instance_id
+            JOIN events ev ON ei.event_id = ev.event_id
+            JOIN employees e ON ea.user_id = e.user_id
             LEFT JOIN departments d ON e.department_id = d.department_id
-            LEFT JOIN general_log gl ON e.user_id = gl.user_id AND DATE(gl.timestamp) = CURDATE()
-            GROUP BY e.user_id
-            ORDER BY e.employee_name ASC
+            WHERE ea.first_in IS NOT NULL  -- only show employees who actually attended
+            ORDER BY ei.event_date DESC, e.employee_name ASC
         """
         cursor.execute(query)
         rows = cursor.fetchall()
@@ -704,38 +706,31 @@ def get_employee_attendance():
             name = row['employee_name']
             name_parts = name.split()[:2]
             initials = ''.join(part[0] for part in name_parts).upper()
+            
             dept = row['department'] or 'N/A'
-            time_in = row['time_in']
-            time_out = row['time_out']
-
-            # Format times
-            in_str = time_in.strftime("%I:%M %p") if time_in else '--:--'
-            out_str = time_out.strftime("%I:%M %p") if time_out else '--:--'
-            if in_str.startswith('0'): in_str = in_str[1:]
-            if out_str.startswith('0'): out_str = out_str[1:]
-
-            # Determine status
-            if not time_in:
-                status = "Absent"
-                status_class = "secondary"
+            event_name = row['event_name']
+            time_in = row['time_in'] or '--:--'
+            time_out = row['time_out'] or '--:--'
+            if time_in.startswith('0'): time_in = time_in[1:]
+            if time_out.startswith('0'): time_out = time_out[1:]
+            
+            status = row['status']
+            if status == 'Present':
+                status_class = 'success'
+            elif status == 'Late':
+                status_class = 'warning'
+            elif status == 'Excused':
+                status_class = 'info'
             else:
-                threshold = datetime.strptime("08:00:00", "%H:%M:%S").time()
-                entry_time = time_in.time()
-                if entry_time > threshold:
-                    delta = datetime.combine(date.today(), entry_time) - datetime.combine(date.today(), threshold)
-                    minutes_late = int(delta.total_seconds() // 60)
-                    status = f"Late +{minutes_late}m" if minutes_late > 0 else "Late"
-                    status_class = "warning"
-                else:
-                    status = "Present"
-                    status_class = "success"
-
+                status_class = 'secondary'
+            
             result.append({
                 "initials": initials,
                 "name": name,
-                "dept": dept,
-                "in": in_str,
-                "out": out_str,
+                "dept": dept,               # department only (not combined)
+                "event_name": event_name,   # new field
+                "in": time_in,
+                "out": time_out,
                 "status": status,
                 "status_class": status_class
             })
