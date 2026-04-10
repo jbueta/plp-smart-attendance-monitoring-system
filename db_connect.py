@@ -158,8 +158,8 @@ class Database:
 
             self.cursor.execute(query, (new_status, user_id))
             self.conn.commit()
-            
-            return None
+
+            return {'status': 'Status changed successfully!', 'new_status': new_status, 'forgot_to_timeout': forgot_to_timeout}
             
         except connector.Error as err:
             self.conn.rollback()
@@ -994,7 +994,6 @@ class Database:
             query = """
                         SELECT 
                             ei.instance_id AS instance_id, 
-                            e.event_id AS event_id,
                             e.event_name AS name, 
                             e.event_type AS type, 
                             ei.event_date AS date, 

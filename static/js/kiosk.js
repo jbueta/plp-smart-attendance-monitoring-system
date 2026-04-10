@@ -249,6 +249,5 @@ function submitManualEntry(type, manualId = null) {
             alert("Connection error. Please try again.");
             if (typeof showScanBanner === 'function') showScanBanner('error', { id: id });
         });
-        document.getElementById(idField).value = '';
     }
 }
