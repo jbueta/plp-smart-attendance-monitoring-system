@@ -549,6 +549,7 @@ def helper_kiosk_live_events():
                 real_events = []
                 for event in api_data.get('events', []):
                     real_events.append({
+                        'instance_id': event.get('instance_id', '1'),
                         'event_id': event.get('event_id', ''),
                         'name': event.get('name', 'Unknown'),
                         'type': event.get('type', 'Unknown'),

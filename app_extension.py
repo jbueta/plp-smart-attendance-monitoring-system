@@ -500,10 +500,11 @@ def kiosk_live_events():
             return jsonify({"success": False, "message": "Database offline"}), 500
 
         events = Database.get_events_kiosk(conn)
-
+        
         if events is None:
             return jsonify({"success": False, "message": "Error fetching scheduled events"}), 500
-
+            
+        print(events)
         return jsonify({"success": True, "events": events}), 200
 
     except Exception as e:

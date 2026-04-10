@@ -158,9 +158,7 @@ class Database:
 
             self.cursor.execute(query, (new_status, user_id))
             self.conn.commit()
-
-            if self.cursor.rowcount > 0:
-                return {"message": "Status changed successfully!", "status": new_status, "forgot_to_timeout": forgot_to_timeout}
+            
             return None
             
         except connector.Error as err:
