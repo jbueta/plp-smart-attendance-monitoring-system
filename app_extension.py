@@ -620,7 +620,55 @@ def get_event_instances(event_id):
         print(f"Error: {e}")
         return jsonify([]), 500
 
+@app.route("/admin/dashboard/analytics/overall", methods=["GET"])
+def dashboard_overall_stats():
+    conn = None
+    try:
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "message": "Database offline"}), 500
 
+        stats = Database.get_overall_dashboard_stats(conn)
+        if stats is None:
+            return jsonify({"success": False, "message": "Error fetching stats"}), 500
+
+        return jsonify({"success": True, "data": stats}), 200
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/admin/dashboard/analytics/students", methods=["GET"])
+def dashboard_student_stats():
+    conn = None
+    try:
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "message": "Database offline"}), 500
+
+        stats = Database.get_student_dashboard_stats(conn)
+        if stats is None:
+            return jsonify({"success": False, "message": "Error fetching student stats"}), 500
+
+        return jsonify({"success": True, "data": stats}), 200
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/admin/dashboard/analytics/employees", methods=["GET"])
+def dashboard_employee_stats():
+    conn = None
+    try:
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "message": "Database offline"}), 500
+
+        stats = Database.get_employee_dashboard_stats(conn)
+        if stats is None:
+            return jsonify({"success": False, "message": "Error fetching employee stats"}), 500
+
+        return jsonify({"success": True, "data": stats}), 200
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)

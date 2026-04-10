@@ -1368,3 +1368,292 @@ class Database:
             return None
         finally:
             cursor.close()
+
+# ==============================================================================
+    # ANALYTICS / DASHBOARD STATS
+    # ==============================================================================
+
+    @staticmethod
+    def get_overall_dashboard_stats(conn):
+        try:
+            cursor = conn.cursor(dictionary=True)
+            today = datetime.now().date()
+
+            cursor.execute("""
+                SELECT COUNT(*) AS total FROM general_log 
+                WHERE DATE(timestamp) = %s AND log_type = 'Entry'
+            """, (today,))
+            total_entries = cursor.fetchone()['total']
+
+            cursor.execute("""
+                SELECT 
+                    (SELECT COUNT(*) FROM students WHERE status = 'Inside') +
+                    (SELECT COUNT(*) FROM employees WHERE status = 'Inside') AS inside
+            """)
+            currently_inside = cursor.fetchone()['inside']
+
+            cursor.execute("""
+                SELECT AVG(TIMESTAMPDIFF(MINUTE, e.timestamp, x.timestamp)) AS avg_dwell
+                FROM general_log e
+                JOIN general_log x 
+                    ON e.user_id = x.user_id
+                    AND DATE(e.timestamp) = DATE(x.timestamp)
+                    AND e.log_type = 'Entry'
+                    AND x.log_type = 'Exit'
+                    AND x.timestamp > e.timestamp
+                WHERE DATE(e.timestamp) = %s
+            """, (today,))
+            avg_mins = cursor.fetchone()['avg_dwell'] or 0
+            avg_dwell = f"{int(avg_mins // 60)} hrs {int(avg_mins % 60)} mins"
+
+            cursor.execute("""
+                SELECT HOUR(timestamp) AS hr, COUNT(*) AS cnt
+                FROM general_log
+                WHERE DATE(timestamp) = %s AND log_type = 'Entry'
+                GROUP BY HOUR(timestamp)
+                ORDER BY cnt DESC
+                LIMIT 1
+            """, (today,))
+            peak_row = cursor.fetchone()
+            peak_hour = f"{peak_row['hr']:02d}:00" if peak_row else "N/A"
+
+            cursor.execute("""
+                SELECT HOUR(timestamp) AS hr, COUNT(*) AS cnt
+                FROM general_log
+                WHERE DATE(timestamp) = %s AND log_type = 'Entry'
+                GROUP BY HOUR(timestamp)
+            """, (today,))
+            hourly = {row['hr']: row['cnt'] for row in cursor.fetchall()}
+            traffic_chart = [hourly.get(h, 0) for h in range(6, 18)]
+
+            cursor.execute("""
+                SELECT 
+                    COUNT(*) AS total,
+                    SUM(status IN ('Present', 'Late')) AS attended
+                FROM event_attendance
+                WHERE event_date = %s
+            """, (today,))
+            event_row = cursor.fetchone()
+            total_invited = event_row['total'] or 0
+            total_attended = int(event_row['attended'] or 0)
+            rate = f"{round((total_attended / total_invited) * 100, 1)}%" if total_invited > 0 else "N/A"
+            raw = f"{total_attended:,} / {total_invited:,} Attendees"
+
+            cursor.execute("""
+                SELECT COUNT(*) AS total FROM general_log
+                WHERE DATE(timestamp) = %s AND log_type = 'Entry'
+            """, (today - timedelta(days=1),))
+            yesterday = cursor.fetchone()['total'] or 1
+            trend = f"+{round(((total_entries - yesterday) / yesterday) * 100)}%" if yesterday else "N/A"
+
+            cursor.execute("""
+                SELECT d.department_name, COUNT(*) AS cnt
+                FROM general_log gl
+                JOIN users u ON gl.user_id = u.user_id
+                JOIN employees emp ON u.user_id = emp.user_id
+                JOIN departments d ON emp.department_id = d.department_id
+                WHERE DATE(gl.timestamp) = %s AND gl.log_type = 'Entry'
+                GROUP BY d.department_name
+                ORDER BY cnt DESC
+                LIMIT 5
+            """, (today,))
+            dist_rows = cursor.fetchall()
+            total_dept_entries = sum(r['cnt'] for r in dist_rows) or 1
+            dept_distribution = [round((r['cnt'] / total_dept_entries) * 100) for r in dist_rows]
+
+            while len(dept_distribution) < 5:
+                dept_distribution.append(0)
+                
+            return {
+                "total_entries": f"{total_entries:,}",
+                "entries_trend": trend,
+                "currently_inside": f"{currently_inside:,}",
+                "avg_dwell_time": avg_dwell,
+                "peak_hour": peak_hour,
+                "traffic_chart": traffic_chart,
+                "event_attendance_rate": rate,
+                "event_attendance_raw": raw,
+                "dept_distribution": dept_distribution,
+                "alerts": []
+            }
+
+        except connector.Error as err:
+            print(f"Error fetching overall stats: {err}")
+            return None
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+
+
+    @staticmethod
+    def get_student_dashboard_stats(conn):
+        try:
+            cursor = conn.cursor(dictionary=True)
+            today = datetime.now().date()
+
+            cursor.execute("""
+                SELECT COUNT(*) AS total
+                FROM general_log gl
+                JOIN users u ON gl.user_id = u.user_id
+                WHERE u.role = 'student' AND DATE(gl.timestamp) = %s AND gl.log_type = 'Entry'
+            """, (today,))
+            total_entries = cursor.fetchone()['total']
+
+            cursor.execute("SELECT COUNT(*) AS inside FROM students WHERE status = 'Inside'")
+            currently_inside = cursor.fetchone()['inside']
+
+            cursor.execute("""
+                SELECT AVG(TIMESTAMPDIFF(MINUTE, e.timestamp, x.timestamp)) AS avg_stay
+                FROM general_log e
+                JOIN general_log x
+                    ON e.user_id = x.user_id
+                    AND DATE(e.timestamp) = DATE(x.timestamp)
+                    AND e.log_type = 'Entry'
+                    AND x.log_type = 'Exit'
+                    AND x.timestamp > e.timestamp
+                JOIN users u ON e.user_id = u.user_id
+                WHERE u.role = 'student' AND DATE(e.timestamp) = %s
+            """, (today,))
+            avg_mins = cursor.fetchone()['avg_stay'] or 0
+            avg_stay = f"{round(avg_mins / 60, 1)} Hrs"
+
+            cursor.execute("""
+                SELECT HOUR(gl.timestamp) AS hr, COUNT(*) AS cnt
+                FROM general_log gl
+                JOIN users u ON gl.user_id = u.user_id
+                WHERE u.role = 'student' AND DATE(gl.timestamp) = %s AND gl.log_type = 'Entry'
+                GROUP BY HOUR(gl.timestamp)
+                ORDER BY cnt DESC LIMIT 1
+            """, (today,))
+            peak_row = cursor.fetchone()
+            peak_hour = f"{peak_row['hr']:02d}:00 AM" if peak_row else "N/A"
+
+            cursor.execute("SELECT COUNT(*) AS total FROM students")
+            total_students = cursor.fetchone()['total'] or 1
+            peak_load = f"{round((currently_inside / total_students) * 100)}%"
+
+            cursor.execute("""
+                SELECT HOUR(gl.timestamp) AS hr, COUNT(*) AS cnt
+                FROM general_log gl
+                JOIN users u ON gl.user_id = u.user_id
+                WHERE u.role = 'student' AND DATE(gl.timestamp) = %s AND gl.log_type = 'Entry'
+                GROUP BY HOUR(gl.timestamp)
+            """, (today,))
+            hourly = {row['hr']: row['cnt'] for row in cursor.fetchall()}
+            hourly_traffic = [hourly.get(h, 0) for h in range(6, 18)]
+
+            cursor.execute("""
+                SELECT COUNT(*) AS total FROM general_log gl
+                JOIN users u ON gl.user_id = u.user_id
+                WHERE u.role = 'student' AND DATE(gl.timestamp) = %s AND gl.log_type = 'Entry'
+            """, (today - timedelta(days=1),))
+            yesterday = cursor.fetchone()['total'] or 1
+            trend = f"+{round(((total_entries - yesterday) / yesterday) * 100)}%" if yesterday else "N/A"
+
+            return {
+                "total_entries": f"{total_entries:,}",
+                "entries_trend": trend,
+                "peak_hour": peak_hour,
+                "peak_load": peak_load,
+                "currently_inside": f"{currently_inside:,}",
+                "avg_stay": avg_stay,
+                "hourly_traffic": hourly_traffic,
+                "watchlist": [],
+                "curfew_trigger": "09:40:00 PM"
+            }
+
+        except connector.Error as err:
+            print(f"Error fetching student stats: {err}")
+            return None
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+
+
+    @staticmethod
+    def get_employee_dashboard_stats(conn):
+        try:
+            cursor = conn.cursor(dictionary=True)
+            today = datetime.now().date()
+
+            cursor.execute("""
+                SELECT status, COUNT(*) AS cnt
+                FROM event_attendance
+                WHERE event_date = %s
+                GROUP BY status
+            """, (today,))
+            attendance_map = {row['status']: row['cnt'] for row in cursor.fetchall()}
+            attendance_data = [
+                attendance_map.get('Present', 0),
+                attendance_map.get('Late', 0),
+                attendance_map.get('Absent', 0)
+            ]
+
+            total_attendance = sum(attendance_data)
+            on_time = attendance_data[0]
+            on_time_rate = f"{round((on_time / total_attendance) * 100)}%" if total_attendance > 0 else "N/A"
+
+            cursor.execute("""
+                SELECT AVG(TIMESTAMPDIFF(MINUTE, 
+                    TIMESTAMP(ea.event_date, e.time_start), 
+                    ea.first_in
+                )) AS avg_late
+                FROM event_attendance ea
+                JOIN event_instances ei ON ea.instance_id = ei.instance_id
+                JOIN events e ON ei.event_id = e.event_id
+                WHERE ea.event_date = %s AND ea.status = 'Late'
+            """, (today,))
+            avg_late = cursor.fetchone()['avg_late'] or 0
+            avg_tardiness = f"{int(avg_late)} mins"
+
+            cursor.execute("""
+                SELECT d.department_name AS dept, 
+                       AVG(TIMESTAMPDIFF(MINUTE,
+                           TIMESTAMP(ea.event_date, e.time_start),
+                           ea.first_in
+                       )) AS avg_late
+                FROM event_attendance ea
+                JOIN event_instances ei ON ea.instance_id = ei.instance_id
+                JOIN events e ON ei.event_id = e.event_id
+                JOIN users u ON ea.user_id = u.user_id
+                JOIN employees emp ON u.user_id = emp.user_id
+                JOIN departments d ON emp.department_id = d.department_id
+                WHERE ea.event_date = %s AND ea.status = 'Late'
+                GROUP BY d.department_name
+                ORDER BY avg_late DESC
+                LIMIT 7
+            """, (today,))
+            tardiness_rows = cursor.fetchall()
+            tardiness_data = [round(row['avg_late'] or 0) for row in tardiness_rows]
+
+            cursor.execute("""
+                SELECT d.department_name AS name,
+                       ROUND(SUM(ea.status IN ('Present','Late')) / COUNT(*) * 100) AS value
+                FROM event_attendance ea
+                JOIN users u ON ea.user_id = u.user_id
+                JOIN employees emp ON u.user_id = emp.user_id
+                JOIN departments d ON emp.department_id = d.department_id
+                WHERE ea.event_date = %s
+                GROUP BY d.department_name
+                ORDER BY value DESC
+                LIMIT 5
+            """, (today,))
+            dept_participation = [
+                {"name": row['name'], "value": row['value']}
+                for row in cursor.fetchall()
+            ]
+
+            return {
+                "attendance_data": attendance_data,
+                "tardiness_data": tardiness_data if tardiness_data else [0] * 7,
+                "dept_participation": dept_participation,
+                "avg_tardiness": avg_tardiness,
+                "on_time_rate": on_time_rate
+            }
+
+        except connector.Error as err:
+            print(f"Error fetching employee stats: {err}")
+            return None
+        finally:
+            if 'cursor' in locals():
+                cursor.close()

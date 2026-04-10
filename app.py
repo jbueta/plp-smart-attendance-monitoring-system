@@ -260,12 +260,16 @@ def dashboard():
     USER_NAME = request.args.get('user', 'Admin')
 
     events = helper_admin_live_events()
+    overall_stats = helper_dashboard_overall_stats()
+    student_stats = helper_dashboard_student_stats()
+    employee_stats = helper_dashboard_employee_stats()
+
     # Pass structured stats for different tabs
     return render_template('dashboard.html', 
                            events=events, 
-                           overall_stats=MOCK_DASHBOARD_STATS,
-                           student_stats=MOCK_STUDENT_STATS,
-                           employee_stats=MOCK_EMPLOYEE_STATS,
+                           overall_stats=overall_stats,
+                           student_stats=student_stats,
+                           employee_stats=employee_stats,
                            logs=MOCK_EMPLOYEE_LOGS,
                            user=USER_NAME)
 
@@ -702,6 +706,44 @@ def generate_report():
         metrics=report_results['metrics_data'],
         logs=report_results['logs']
     )
+
+def helper_dashboard_overall_stats():
+    stats = dict(MOCK_DASHBOARD_STATS)  
+    try:
+        response = requests.get("http://127.0.0.1:5001/admin/dashboard/analytics/overall", timeout=5)
+        if response.status_code == 200:
+            api_data = response.json()
+            if api_data.get('success'):
+                stats = api_data['data']
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Error (overall stats): {e}")
+    return stats
+
+
+def helper_dashboard_student_stats():
+    stats = dict(MOCK_STUDENT_STATS)
+    try:
+        response = requests.get("http://127.0.0.1:5001/admin/dashboard/analytics/students", timeout=5)
+        if response.status_code == 200:
+            api_data = response.json()
+            if api_data.get('success'):
+                stats = api_data['data']
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Error (student stats): {e}")
+    return stats
+
+
+def helper_dashboard_employee_stats():
+    stats = dict(MOCK_EMPLOYEE_STATS)
+    try:
+        response = requests.get("http://127.0.0.1:5001/admin/dashboard/analytics/employees", timeout=5)
+        if response.status_code == 200:
+            api_data = response.json()
+            if api_data.get('success'):
+                stats = api_data['data']
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Error (employee stats): {e}")
+    return stats
     
 # ==============================================================================
 # MAIN ENTRY POINT
