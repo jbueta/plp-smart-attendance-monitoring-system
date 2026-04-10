@@ -196,7 +196,12 @@ def kiosk_employee():
     print(events)
     selected_event = next((e for e in events if e['instance_id'] == instance_id), None)
     event_name = selected_event['name'] if selected_event else "General Attendance"
-    return render_template('kiosk_employee.html', event_name=event_name, kiosk_data=MOCK_KIOSK_DATA)
+    event_id = selected_event.get('event_id') if selected_event else None  # Add this line
+    return render_template('kiosk_employee.html',
+                       event_name=event_name,
+                       event_id=event_id,
+                       instance_id=instance_id,          # Pass instance_id
+                       kiosk_data=MOCK_KIOSK_DATA)
 
 @app.route('/kiosk/visitor')
 def kiosk_visitor():
@@ -288,7 +293,8 @@ def admin_students():
 @app.route('/admin/employees')
 @login_required
 def admin_employees():
-    return render_template('employee_logs.html', logs=MOCK_EMPLOYEE_LOGS)
+    logs = helper_employee_attendance()
+    return render_template('employee_logs.html', logs=logs)
 
 @app.route('/admin/visitors')
 @login_required
@@ -565,7 +571,7 @@ def helper_kiosk_live_events():
     except requests.exceptions.RequestException as e:
         print(f"Backend API Error: {e}")
         
-    return current_kiosk_events 
+    return current_kiosk_events
 
 def helper_kiosk_live_student_logs():    
     current_kiosk_data = dict(MOCK_KIOSK_DATA)
@@ -746,6 +752,21 @@ def helper_dashboard_employee_stats():
         print(f"Backend API Error (employee stats): {e}")
     return stats
     
+
+# ==============================================================================
+# EMPLOYEE LOGS HELPER
+# ==============================================================================
+
+def helper_employee_attendance():
+    try:
+        response = requests.get("http://127.0.0.1:5001/admin/employees/attendance", timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('success'):
+                return data.get('logs', [])
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Error: {e}")
+    return []
 # ==============================================================================
 # MAIN ENTRY POINT
 # ==============================================================================
