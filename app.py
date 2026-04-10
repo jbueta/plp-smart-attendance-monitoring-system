@@ -1,9 +1,29 @@
 from datetime import date, datetime
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, g
+from db_connect import Database
+from mysql.connector import pooling
 
 app = Flask(__name__)
 app.secret_key = 'plp_secure_key_2026'  # Required for session management
+
+dbconfig = {
+    'host': 'localhost',
+    'user': 'root',
+    'password': '',
+    'database': 'smart_monitoring',
+    'use_pure': True
+}
+
+try:
+    global_pool = pooling.MySQLConnectionPool(
+        pool_name="visitor_frontend_pool",
+        pool_size=10,
+        autocommit=False,
+        **dbconfig
+    )
+except Exception:
+    global_pool = None
 
 # ==============================================================================
 # MOCK DATA (Prototype State)
@@ -110,6 +130,65 @@ MOCK_REPORTS = [
     {"icon": "file-earmark-pdf text-gold", "name": "Flag_Ceremony_Attendance.pdf", "time": "Generated Feb 03, 2026"}
 ]
 
+
+def connect_db():
+    if 'db' not in g:
+        try:
+            if global_pool is None:
+                g.db = None
+            else:
+                g.db = global_pool.get_connection()
+        except Exception:
+            g.db = None
+    return g.db
+
+
+@app.teardown_appcontext
+def close_db(error):
+    db = g.pop('db', None)
+    if db is not None:
+        db.close()
+
+
+def resolve_visitor_source(source, fallback='kiosk_entrance'):
+    if source and source in app.view_functions:
+        return source
+    return fallback
+
+
+def fetch_visitor_logs(status=None):
+    conn = connect_db()
+    if not conn:
+        return []
+
+    db = Database(conn)
+    logs = db.get_visitor_logs() or []
+
+    if status:
+        logs = [log for log in logs if log.get('status') == status]
+
+    return logs
+
+
+def build_recent_kiosk_feed(limit=6):
+    visitor_feed = []
+    for visitor in fetch_visitor_logs()[:limit]:
+        is_checked_in = visitor.get('status') == 'Checked In'
+        visitor_feed.append({
+            'type': 'in' if is_checked_in else 'out',
+            'name': visitor.get('name'),
+            'course': f"Visitor - {visitor.get('purpose', 'N/A')}",
+            'time': visitor.get('time_in') if is_checked_in else (visitor.get('time_out') or visitor.get('time_in'))
+        })
+
+    return (visitor_feed + list(MOCK_KIOSK_DATA['recent_student_logs']))[:limit]
+
+
+def get_kiosk_data_with_live_feed():
+    kiosk_data = dict(MOCK_KIOSK_DATA)
+    kiosk_data['recent_activity_logs'] = build_recent_kiosk_feed()
+    return kiosk_data
+
 # ==============================================================================
 # MIDDLEWARE / DECORATORS
 # ==============================================================================
@@ -163,13 +242,13 @@ def index():
 @app.route('/kiosk/entrance')
 def kiosk_entrance():
     session.pop('logged_in', None)
-    active_visitors = [v for v in VISITORS if v['status'] == 'Checked In']
-    return render_template('kiosk_entrance.html', active_visitors=active_visitors, kiosk_data=MOCK_KIOSK_DATA)
+    active_visitors = fetch_visitor_logs(status='Checked In')
+    return render_template('kiosk_entrance.html', active_visitors=active_visitors, kiosk_data=get_kiosk_data_with_live_feed())
 
 @app.route('/kiosk/exit')
 def kiosk_exit():
     session.pop('logged_in', None)
-    return render_template('kiosk_exit.html', kiosk_data=MOCK_KIOSK_DATA)
+    return render_template('kiosk_exit.html', kiosk_data=get_kiosk_data_with_live_feed())
 
 @app.route('/kiosk/employee/select-event')
 def kiosk_employee_select_event():
@@ -187,7 +266,7 @@ def kiosk_employee():
 @app.route('/kiosk/visitor')
 def kiosk_visitor():
     session.pop('logged_in', None)
-    active_visitors = [v for v in VISITORS if v['status'] == 'Checked In']
+    active_visitors = fetch_visitor_logs(status='Checked In')
     return render_template('kiosk_visitor.html', active_visitors=active_visitors)
 
 # ==============================================================================
@@ -196,42 +275,41 @@ def kiosk_visitor():
 
 @app.route('/api/visitor/checkin', methods=['POST'])
 def visitor_checkin():
-    name = request.form.get('name')
-    purpose = request.form.get('purpose')
+    name = (request.form.get('name') or '').strip()
+    purpose = (request.form.get('purpose') or '').strip()
     details = request.form.get('details')
-    source = request.form.get('source')
+    source = resolve_visitor_source(request.form.get('source'))
     
     if name and purpose:
-        new_id = len(VISITORS) + 1
-        now = datetime.now()
-        
-        VISITORS.append({
-            'id': new_id,
-            'name': name,
-            'purpose': purpose,
-            'details': details or 'N/A',
-            'time_in': now.strftime('%I:%M %p'),
-            'date': now.strftime('%Y-%m-%d'),
-            'time_out': None,
-            'status': 'Checked In'
-        })
-        flash(f'Welcome, {name}. Check-in successful.', 'success')
+        conn = connect_db()
+        if not conn:
+            flash('Check-in failed. Visitor database is unavailable.', 'danger')
+        else:
+            db = Database(conn, (name, purpose, 'Gate 1'))
+            result = db.add_visitor_log()
+            if result and result.get('success'):
+                flash(f'Welcome, {name}. Check-in successful.', 'success')
+            else:
+                flash(result.get('message', 'Check-in failed.') if result else 'Check-in failed.', 'danger')
     else:
         flash('Check-in failed. Name and Purpose are required.', 'danger')
         
-    return redirect(url_for(source if source else 'kiosk_entrance'))
+    return redirect(url_for(source))
 
 @app.route('/api/visitor/checkout/<int:visitor_id>', methods=['POST'])
 def visitor_checkout(visitor_id):
-    visitor = next((v for v in VISITORS if v['id'] == visitor_id), None)
-    source = request.args.get('source', 'kiosk_entrance')
+    source = resolve_visitor_source(request.args.get('source'), fallback='kiosk_entrance')
     
-    if visitor:
-        visitor['status'] = 'Checked Out'
-        visitor['time_out'] = datetime.now().strftime('%I:%M %p')
-        flash(f'Goodbye, {visitor["name"]}. Check-out successful.', 'success')
+    conn = connect_db()
+    if not conn:
+        flash('Check-out failed. Visitor database is unavailable.', 'danger')
     else:
-        flash('Visitor not found.', 'danger')
+        db = Database(conn, (visitor_id, 'Gate 2'))
+        result = db.checkout_visitor_log()
+        if result and result.get('success'):
+            flash(f'Goodbye, {result.get("name", "Visitor")}. Check-out successful.', 'success')
+        else:
+            flash(result.get('message', 'Visitor not found.') if result else 'Visitor not found.', 'danger')
         
     return redirect(url_for(source))
 
@@ -268,7 +346,7 @@ def admin_employees():
 @app.route('/admin/visitors')
 @login_required
 def admin_visitors():
-    return render_template('admin_visitors.html', visitors=VISITORS)
+    return render_template('admin_visitors.html', visitors=fetch_visitor_logs())
 
 @app.route('/analytics/employee')
 @login_required

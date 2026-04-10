@@ -3,7 +3,7 @@ from datetime import date, datetime, timedelta
 
 class Database:
     
-    def __init__(self, conn, parameter):
+    def __init__(self, conn, parameter=None):
         self.conn = conn
         self.parameter = parameter
 
@@ -168,6 +168,127 @@ class Database:
             self.conn.rollback()
             print(f"Error: {err}")
             return None
+
+    # =============================================================
+    # VISITOR MODEL LOGIC
+    # =============================================================
+
+    def add_visitor_log(self):
+        try:
+            visitor_name = (self.parameter[0] or '').strip()
+            purpose = (self.parameter[1] or '').strip()
+            gate = self.parameter[2] if len(self.parameter) > 2 else 'Gate 1'
+
+            if not visitor_name or not purpose:
+                return {"success": False, "message": "Visitor name and purpose are required."}
+
+            self.cursor.execute(
+                "INSERT INTO users (role, active) VALUES (%s, %s)",
+                ('visitor', 1)
+            )
+            user_id = int(self.cursor.lastrowid)
+
+            self.cursor.execute(
+                """
+                INSERT INTO visitors (user_id, visitor_name, purpose, status)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (user_id, visitor_name, purpose, 'Inside')
+            )
+            visitor_id = int(self.cursor.lastrowid)
+
+            self.cursor.execute(
+                """
+                INSERT INTO general_log (user_id, timestamp, log_type, gate)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (user_id, datetime.now(), 'Entry', gate)
+            )
+
+            self.conn.commit()
+            return {
+                "success": True,
+                "visitor_id": visitor_id,
+                "user_id": user_id,
+                "message": "Visitor logged successfully."
+            }
+        except connector.Error as err:
+            self.conn.rollback()
+            print(f"Error adding visitor log: {err}")
+            return {"success": False, "message": f"Database Error: {err}"}
+
+    def checkout_visitor_log(self):
+        try:
+            visitor_id = self.parameter[0]
+            gate = self.parameter[1] if len(self.parameter) > 1 else 'Gate 2'
+
+            self.cursor.execute(
+                """
+                SELECT visitor_id, user_id, visitor_name, status
+                FROM visitors
+                WHERE visitor_id = %s
+                LIMIT 1
+                """,
+                (visitor_id,)
+            )
+            visitor = self.cursor.fetchone()
+
+            if not visitor:
+                return {"success": False, "message": "Visitor not found."}
+
+            if visitor['status'] == 'Outside':
+                return {"success": False, "message": "Visitor is already checked out."}
+
+            self.cursor.execute(
+                "UPDATE visitors SET status = %s WHERE visitor_id = %s",
+                ('Outside', visitor_id)
+            )
+            self.cursor.execute(
+                """
+                INSERT INTO general_log (user_id, timestamp, log_type, gate)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (visitor['user_id'], datetime.now(), 'Exit', gate)
+            )
+
+            self.conn.commit()
+            return {
+                "success": True,
+                "name": visitor['visitor_name'],
+                "message": "Visitor checked out successfully."
+            }
+        except connector.Error as err:
+            self.conn.rollback()
+            print(f"Error checking out visitor: {err}")
+            return {"success": False, "message": f"Database Error: {err}"}
+
+    def get_visitor_logs(self):
+        try:
+            query = """
+                SELECT 
+                    v.visitor_id AS id,
+                    v.visitor_name AS name,
+                    COALESCE(NULLIF(TRIM(v.purpose), ''), 'N/A') AS purpose,
+                    'N/A' AS details,
+                    DATE_FORMAT(MIN(CASE WHEN gl.log_type = 'Entry' THEN gl.timestamp END), '%Y-%m-%d') AS date,
+                    DATE_FORMAT(MIN(CASE WHEN gl.log_type = 'Entry' THEN gl.timestamp END), '%h:%i %p') AS time_in,
+                    DATE_FORMAT(MAX(CASE WHEN gl.log_type = 'Exit' THEN gl.timestamp END), '%h:%i %p') AS time_out,
+                    CASE
+                        WHEN v.status = 'Inside' THEN 'Checked In'
+                        ELSE 'Checked Out'
+                    END AS status,
+                    MAX(gl.timestamp) AS last_activity
+                FROM visitors v
+                LEFT JOIN general_log gl ON gl.user_id = v.user_id
+                GROUP BY v.visitor_id, v.visitor_name, v.purpose, v.status
+                ORDER BY last_activity DESC, v.visitor_id DESC
+            """
+            self.cursor.execute(query)
+            result = self.cursor.fetchall()
+            return result if result else []
+        except connector.Error as err:
+            print(f"Error fetching visitor logs: {err}")
+            return []
 
 
     # =============================================================
