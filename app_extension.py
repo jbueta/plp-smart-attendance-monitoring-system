@@ -744,5 +744,70 @@ def get_employee_attendance():
         if conn:
             close_db(conn)
 
+# ==============================================================================
+# ENDPOINT: Time in/Time out Log in Kiosk Event
+# ==============================================================================
+
+@app.route("/admin/instances/<int:instance_id>/get-logs", methods=["GET"])
+def get_instance_logs(instance_id):
+    """
+    Returns all event_log entries for a specific event instance.
+    Each row corresponds to a single swipe (Entry or Exit).
+    """
+    conn = None
+    try:
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "message": "Database offline"}), 500
+
+        cursor = conn.cursor(dictionary=True)
+
+        query = """
+            SELECT 
+                el.log_id,
+                el.user_id,
+                el.log_type,
+                el.timestamp,
+                COALESCE(e.employee_name, s.student_name, 'Unknown') as user_name,
+                COALESCE(d.department_name, 'N/A') as department,
+                el.log_type as action
+            FROM event_log el
+            JOIN event_instances ei ON el.event_id = ei.event_id
+            LEFT JOIN employees e ON el.user_id = e.user_id
+            LEFT JOIN departments d ON e.department_id = d.department_id
+            LEFT JOIN students s ON el.user_id = s.user_id
+            WHERE ei.instance_id = %s
+            ORDER BY el.timestamp DESC
+        """
+        cursor.execute(query, (instance_id,))
+        rows = cursor.fetchall()
+
+        result = []
+        for row in rows:
+            name = row['user_name']
+            name_parts = name.split()[:2]
+            initials = ''.join(part[0] for part in name_parts).upper()
+            time_str = row['timestamp'].strftime("%I:%M %p")
+            if time_str.startswith('0'):
+                time_str = time_str[1:]
+
+            result.append({
+                "initials": initials,
+                "name": name,
+                "dept": row['department'],
+                "time": time_str,
+                "log_type": row['log_type'],   # "Entry" or "Exit"
+                "type": "success" if row['log_type'] == 'Entry' else "secondary"
+            })
+
+        return jsonify({"success": True, "logs": result}), 200
+
+    except Exception as e:
+        print(f"Error in get_instance_logs: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        if conn:
+            close_db(conn)
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)
