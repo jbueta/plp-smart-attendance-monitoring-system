@@ -951,22 +951,22 @@ class Database:
                 raise Exception("Failed to connect to the database.")
             
             query = """
-                        SELECT 
-                            e.event_id AS event_id, 
-                            e.event_name AS name, 
-                            e.event_type AS type, 
-                            e.frequency AS frequency,
+                        SELECT
+                            e.event_id AS event_id,
+                            e.event_name AS name,
+                            e.event_type AS type,
+                            e.frequency,
                             DATE_FORMAT(e.event_date, '%b %e, %Y') AS date,
-                            TRIM(DATE_FORMAT(e.time_start, '%l:%i %p')) AS time_start, 
-                            TRIM(DATE_FORMAT(e.time_end, '%l:%i %p')) AS time_end, 
-                            e.location AS location,
+                            TRIM(DATE_FORMAT(e.time_start, '%l:%i %p')) AS time_start,
+                            TRIM(DATE_FORMAT(e.time_end, '%l:%i %p')) AS time_end,
+                            e.location,
                             GROUP_CONCAT(DISTINCT d.department_name SEPARATOR ', ') AS dept
-                        FROM event_participants ep
-                        JOIN events e ON ep.event_id = e.event_id
-                        JOIN employees emp ON ep.user_id = emp.user_id
-                        JOIN departments d ON emp.department_id = d.department_id
+                        FROM events e
+                        LEFT JOIN event_participants ep ON e.event_id = ep.event_id
+                        LEFT JOIN employees emp ON ep.user_id = emp.user_id
+                        LEFT JOIN departments d ON emp.department_id = d.department_id
                         WHERE e.active = 1
-                        GROUP BY e.event_id, e.event_name
+                        GROUP BY e.event_id, e.event_name, e.event_type, e.frequency, e.event_date, e.time_start, e.time_end, e.location
                         ORDER BY e.event_date DESC;
                     """
 

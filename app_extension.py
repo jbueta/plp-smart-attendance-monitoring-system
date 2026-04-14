@@ -123,7 +123,7 @@ def user_authenticate():
         if not db_status_result:
             return jsonify({"success": False, "message": "Failed to update user status in database."}), 500
 
-        new_status = db_status_result['status']
+        new_status = db_status_result['new_status']
         log_type = 'Entry' if new_status == 'Inside' else 'Exit'
         gate = 'Gate 1' if new_status == 'Inside' else 'Gate 2'    
 
@@ -512,10 +512,10 @@ def kiosk_live_events():
     
 
 
-@app.route("/admin/dashboard/live-events", methods=["GET"])
-def admin_live_events():
+@app.route("/admin/dashboard/events", methods=["GET"])
+def admin_dashboard_events():
     """
-        Fetches events scheduled on the same day.
+        Fetches events.
     """
     conn = None
     try:

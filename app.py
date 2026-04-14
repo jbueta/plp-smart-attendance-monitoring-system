@@ -264,7 +264,7 @@ def dashboard():
 
     USER_NAME = request.args.get('user', 'Admin')
 
-    events = helper_admin_live_events()
+    events = helper_admin_events()
     overall_stats = helper_dashboard_overall_stats()
     student_stats = helper_dashboard_student_stats()
     employee_stats = helper_dashboard_employee_stats()
@@ -281,7 +281,7 @@ def dashboard():
 @app.route('/events')
 @login_required
 def manage_events():
-    events = helper_admin_live_events()
+    events = helper_admin_events()
     departments = helper_admin_live_departments()
     return render_template('events.html', events=events, departments=departments)
 
@@ -555,7 +555,7 @@ def helper_kiosk_live_events():
                 real_events = []
                 for event in api_data.get('events', []):
                     real_events.append({
-                        'instance_id': event.get('instance_id', '1'),
+                        'instance_id': event.get('instance_id', ''),
                         'event_id': event.get('event_id', ''),
                         'name': event.get('name', 'Unknown'),
                         'type': event.get('type', 'Unknown'),
@@ -624,11 +624,11 @@ def helper_admin_live_departments():
         
     return current_live_departments 
 
-def helper_admin_live_events():    
+def helper_admin_events():    
     current_kiosk_events = list(DEFAULT_EVENTS)
     
     try:
-        response = requests.get("http://127.0.0.1:5001/admin/dashboard/live-events", timeout=5)
+        response = requests.get("http://127.0.0.1:5001/admin/dashboard/events", timeout=5)
         
         if response.status_code == 200:
             api_data = response.json()
