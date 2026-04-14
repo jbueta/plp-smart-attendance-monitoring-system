@@ -72,6 +72,7 @@
                 <tbody>
                     {% for log in logs %}
                     <tr class="employee-row"
+                        data-attendance-id="{{ log.attendance_id }}"
                         data-employee-id="{{ log.id | lower }}"
                         data-employee-name="{{ log.name | lower }}"
                         data-department="{{ log.dept }}"
@@ -102,8 +103,7 @@
                                     &hellip;
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end shadow-sm employee-action-menu">
-                                    <li><button type="button" class="dropdown-item edit-employee text-white" data-id="{{ log.id }}">Edit</button></li>
-                                    <li><button type="button" class="dropdown-item text-danger delete-employee" data-id="{{ log.id }}">Delete</button></li>
+                                    <li><button type="button" class="dropdown-item text-danger delete-employee" data-id="{{ log.attendance_id }}">Delete</button></li>
                                 </ul>
                             </div>
                         </td>
@@ -135,41 +135,6 @@
         <nav aria-label="Page navigation">
             <ul id="paginationList" class="pagination pagination-custom mb-0 gap-1"></ul>
         </nav>
-    </div>
-</div>
-
-<!-- Edit Overlay -->
-<div id="editOverlay" class="d-none position-fixed top-0 start-0 w-100 h-100" style="background: rgba(10, 12, 20, 0.56); backdrop-filter: blur(8px); z-index: 1080;">
-    <div id="employeeEditCard" class="card-glass p-4 position-absolute top-50 start-50 translate-middle" style="width: min(760px, 94%); border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 28px 80px rgba(0,0,0,0.35);">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <div>
-                <h5 class="mb-1">Edit Employee Record</h5>
-                <p class="text-white-50 small mb-0">Update the employee details and save the changes.</p>
-            </div>
-        </div>
-        <hr class="border-secondary opacity-25 my-3">
-        <div class="row g-3">
-            <div class="col-md-3">
-                <label class="form-label text-white-50" for="editEmployeeId">Employee ID</label>
-                <input id="editEmployeeId" class="form-control bg-dark text-white border-secondary" type="text" />
-            </div>
-            <div class="col-md-3">
-                <label class="form-label text-white-50" for="editEmployeeName">Employee Name</label>
-                <input id="editEmployeeName" class="form-control bg-dark text-white border-secondary" type="text" />
-            </div>
-            <div class="col-md-3">
-                <label class="form-label text-white-50" for="editDepartmentId">Department ID</label>
-                <input id="editDepartmentId" class="form-control bg-dark text-white border-secondary" type="text" />
-            </div>
-            <div class="col-md-3">
-                <label class="form-label text-white-50" for="editPosition">Position</label>
-                <input id="editPosition" class="form-control bg-dark text-white border-secondary" type="text" />
-            </div>
-        </div>
-        <div class="d-flex justify-content-end gap-2 mt-4">
-            <button id="cancelEditEmployee" type="button" class="btn btn-outline-light">Cancel</button>
-            <button id="saveEmployeeEdit" type="button" class="btn btn-primary-gold">Update</button>
-        </div>
     </div>
 </div>
 
@@ -374,7 +339,7 @@ document.addEventListener('DOMContentLoaded', function () {
         nextBtn.className = 'page-link page-next';
         nextBtn.innerHTML = 'Next <i class="bi bi-chevron-right ms-1"></i>';
         nextLi.appendChild(nextBtn);
-        paginationList.appendChild(nextLi);
+        paginationList.appendChild(nextBtn);
 
         updatePrevNextButtons(totalPages);
     }
@@ -471,75 +436,61 @@ document.addEventListener('DOMContentLoaded', function () {
     departmentFilter.addEventListener('change', applyFilters);
     dateFilter.addEventListener('change', applyFilters);
 
-    // Edit / Delete logic
-    const editOverlay = document.getElementById('editOverlay');
-    const editEmployeeId = document.getElementById('editEmployeeId');
-    const editEmployeeName = document.getElementById('editEmployeeName');
-    const editDepartmentId = document.getElementById('editDepartmentId');
-    const editPosition = document.getElementById('editPosition');
-    const saveEmployeeEdit = document.getElementById('saveEmployeeEdit');
-    const cancelEditEmployee = document.getElementById('cancelEditEmployee');
-    let currentEditRow = null;
-
-    function showEditCard(row) {
-        currentEditRow = row;
-        editEmployeeId.value = row.dataset.employeeId || '';
-        editEmployeeName.value = row.querySelector('td:nth-child(1) span')?.textContent.trim() || '';
-        editDepartmentId.value = row.dataset.department || '';
-        editPosition.value = row.dataset.position || '';
-        editOverlay.classList.remove('d-none');
-    }
-
-    function hideEditCard() {
-        currentEditRow = null;
-        editOverlay.classList.add('d-none');
-    }
-
-    function bindRowActions() {
-        document.querySelectorAll('.edit-employee').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const row = e.target.closest('tr');
-                if (row) showEditCard(row);
-            });
-        });
+    // --- DELETE FUNCTIONALITY (AJAX) ---
+    function bindDeleteButtons() {
         document.querySelectorAll('.delete-employee').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const row = e.target.closest('tr');
-                if (!row) return;
-                const name = row.querySelector('td:nth-child(1) span')?.textContent.trim() || 'this employee';
-                if (confirm(`Delete ${name} from records?`)) {
-                    row.remove();
-                    if (currentEditRow === row) hideEditCard();
-                    applyFilters();
-                }
-            });
+            // Remove any existing listener to avoid duplicates
+            btn.removeEventListener('click', handleDelete);
+            btn.addEventListener('click', handleDelete);
         });
     }
 
-    saveEmployeeEdit.addEventListener('click', () => {
-        if (!currentEditRow) return;
-        const newId = editEmployeeId.value.trim();
-        const newName = editEmployeeName.value.trim();
-        const newDept = editDepartmentId.value.trim();
-        const newPosition = editPosition.value.trim();
-        if (!newId || !newName || !newDept || !newPosition) {
-            alert('Please fill in all fields before updating.');
+    async function handleDelete(event) {
+        const btn = event.currentTarget;
+        const attendanceId = btn.getAttribute('data-id');
+        const row = btn.closest('tr');
+        if (!row) return;
+
+        const employeeName = row.querySelector('td:nth-child(1) span')?.textContent.trim() || 'this employee';
+
+        if (!confirm(`Delete attendance record for ${employeeName}? This action cannot be undone.`)) {
             return;
         }
-        currentEditRow.dataset.employeeId = newId;
-        currentEditRow.dataset.employeeName = newName.toLowerCase();
-        currentEditRow.dataset.department = newDept;
-        currentEditRow.dataset.position = newPosition;
-        currentEditRow.querySelector('td:nth-child(1) span').textContent = newName;
-        currentEditRow.querySelector('td:nth-child(3)').textContent = newDept;
-        hideEditCard();
-    });
 
-    cancelEditEmployee.addEventListener('click', hideEditCard);
-    editOverlay.addEventListener('click', (e) => { if (e.target === editOverlay) hideEditCard(); });
+        try {
+            const response = await fetch(`http://localhost:5001/admin/attendance/${attendanceId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
 
-    bindRowActions();
-    applyFilters(); // initial render
+            const result = await response.json();
+
+            if (result.success) {
+                // Remove the row from the DOM
+                row.remove();
+                // Refresh filters and pagination (this also re-binds delete buttons)
+                applyFilters();
+
+                // Show temporary success message
+                const msgDiv = document.createElement('div');
+                msgDiv.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+                msgDiv.style.zIndex = '2000';
+                msgDiv.innerHTML = `Attendance record deleted successfully. <button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+                document.body.appendChild(msgDiv);
+                setTimeout(() => msgDiv.remove(), 3000);
+            } else {
+                alert('Failed to delete: ' + (result.message || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Delete error:', error);
+            alert('Network error while deleting record.');
+        }
+    }
+
+    bindDeleteButtons();
+    applyFilters();
 });
 </script>
 {% endblock %}

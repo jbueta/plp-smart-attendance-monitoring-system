@@ -684,6 +684,7 @@ def get_employee_attendance():
 
         query = """
             SELECT 
+                ea.attendance_id,
                 e.employee_name,
                 d.department_name as department,
                 ev.event_name,
@@ -726,6 +727,7 @@ def get_employee_attendance():
                 status_class = 'secondary'
             
             result.append({
+                "attendance_id": row['attendance_id'],
                 "initials": initials,
                 "name": name,
                 "dept": dept,               # department only (not combined)
@@ -741,6 +743,54 @@ def get_employee_attendance():
 
     except Exception as e:
         print(f"Error in get_employee_attendance: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        if conn:
+            close_db(conn)
+
+# ==============================================================================
+# ENDPOINT: Delete an Attendance Record (For Admin Corrections)
+# ==============================================================================
+
+@app.route("/admin/attendance/<int:attendance_id>", methods=["DELETE"])
+def delete_attendance_record(attendance_id):
+    """
+    Delete an attendance record from event_attendance table.
+    Also deletes associated event_log entries for that user and event instance on that day.
+    """
+    conn = None
+    try:
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "message": "Database offline"}), 500
+
+        cursor = conn.cursor(dictionary=True)
+
+        # First, get the user_id and instance_id to also delete event_log entries
+        cursor.execute("SELECT user_id, instance_id FROM event_attendance WHERE attendance_id = %s", (attendance_id,))
+        record = cursor.fetchone()
+        if not record:
+            return jsonify({"success": False, "message": "Attendance record not found"}), 404
+
+        user_id = record['user_id']
+        instance_id = record['instance_id']
+
+        # Delete from event_attendance
+        cursor.execute("DELETE FROM event_attendance WHERE attendance_id = %s", (attendance_id,))
+        
+        # Delete related event_log entries for this user and event instance
+        # Get event_id from instance
+        cursor.execute("SELECT event_id FROM event_instances WHERE instance_id = %s", (instance_id,))
+        event = cursor.fetchone()
+        if event:
+            event_id = event['event_id']
+            cursor.execute("DELETE FROM event_log WHERE user_id = %s AND event_id = %s", (user_id, event_id))
+        
+        conn.commit()
+        
+        return jsonify({"success": True, "message": "Attendance record deleted successfully"}), 200
+
+    except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
     finally:
         if conn:
