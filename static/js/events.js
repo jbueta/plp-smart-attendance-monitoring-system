@@ -474,3 +474,39 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 });
+
+function toggleDepts(button, hiddenCount) {
+    // Find the closest table cell (td) that contains the clicked button
+    const container = button.closest('td');
+    
+    // Find all the badges within this specific cell that we meant to hide/show
+    // We look for elements that have both 'dept-badge' and are technically our extra ones
+    // We can identify the extra ones because they are positioned after the 4th visible badge.
+    // A simpler way: we just toggle a class 'hidden-dept' on them.
+    
+    // Select all spans in this cell EXCEPT the badge-more button itself
+    const allBadges = container.querySelectorAll('.dept-badge:not(.badge-more)');
+    
+    // We know the first 4 are always visible. The rest are our togglable ones.
+    let isCurrentlyHidden = false;
+    
+    for (let i = 4; i < allBadges.length; i++) {
+        // If the first extra element has the hidden class, we know we need to show them
+        if (i === 4) {
+            isCurrentlyHidden = allBadges[i].classList.contains('hidden-dept');
+        }
+        
+        if (isCurrentlyHidden) {
+            allBadges[i].classList.remove('hidden-dept'); // Show them
+        } else {
+            allBadges[i].classList.add('hidden-dept');    // Hide them
+        }
+    }
+    
+    // Update the button text
+    if (isCurrentlyHidden) {
+        button.textContent = "Show Less";
+    } else {
+        button.textContent = "+" + hiddenCount;
+    }
+}

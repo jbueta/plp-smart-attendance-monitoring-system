@@ -112,7 +112,29 @@
                             <td class="fw-bold text-white ps-4">{{ event.name }}</td>
                             <td><span class="badge bg-secondary bg-opacity-25 border border-secondary">{{ event.type
                                     }}</span></td>
-                            <td class="text-white-50 small">{{ event.dept }}</td>
+                            <td class="small">
+                                {% if event.all_departments %}
+                                    <span class="dept-badge badge-all">All Departments</span>
+                                {% else %}
+                                    {% set dept_list = event.dept.split(', ') %}
+                                    {% set total_depts = dept_list | length %}
+                                    
+                                    {# Loop through ALL departments #}
+                                    {% for dept in dept_list %}
+                                        {% set clean_dept = dept | replace('College of ', '') | trim %}
+                                        
+                                        <span class="dept-badge {% if loop.index0 >= 3 %}hidden-dept{% endif %}" data-dept="{{ clean_dept }}">
+                                            {{ clean_dept }}
+                                        </span>
+                                    {% endfor %}
+                                    
+                                    {% if total_depts > 3 %}
+                                        <span class="dept-badge badge-more" onclick="toggleDepts(this, {{ total_depts - 3 }})">
+                                            +{{ total_depts - 3 }}
+                                        </span>
+                                    {% endif %}
+                                {% endif %}
+                            </td>
                             <td class="text-white-50 font-monospace small">{{ event.date }}</td>
                             <td class="text-white-50 font-monospace small">{{ event.time_start + ' - ' + event.time_end }}</td>
                             <td class="text-end pe-4">
@@ -188,7 +210,7 @@
                             <!-- Option 1: All Departments -->
                             <div class="form-check mb-2 pb-2 border-bottom border-secondary">
                                 <input class="form-check-input bg-dark border-secondary" type="checkbox" name="dept"
-                                    value="All Departments" id="dept-all">
+                                    id="dept-all">
                                 <label class="form-check-label text-white fw-bold" for="dept-all">
                                     All Departments
                                 </label>
