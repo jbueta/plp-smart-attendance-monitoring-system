@@ -687,6 +687,7 @@ def get_employee_attendance():
                 e.employee_name,
                 d.department_name as department,
                 ev.event_name,
+                ei.event_date,
                 DATE_FORMAT(ea.first_in, '%h:%i %p') as time_in,
                 DATE_FORMAT(ea.last_out, '%h:%i %p') as time_out,
                 ea.status
@@ -729,6 +730,7 @@ def get_employee_attendance():
                 "name": name,
                 "dept": dept,               # department only (not combined)
                 "event_name": event_name,   # new field
+                "date": row['event_date'].strftime('%Y-%m-%d') if row['event_date'] else '',
                 "in": time_in,
                 "out": time_out,
                 "status": status,
