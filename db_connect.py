@@ -1001,9 +1001,11 @@ class Database:
                 raise Exception("Failed to connect to the database.")
             query = """
                         SELECT 
-                            ei.instance_id AS instance_id, 
+                            ei.instance_id AS instance_id,
+                            e.event_id AS event_id,
                             e.event_name AS name, 
                             e.event_type AS type, 
+                            e.frequency AS frequency,
                             ei.event_date AS date, 
                             e.time_start, 
                             e.time_end, 
@@ -1149,7 +1151,9 @@ class Database:
             query = """ 
                 SELECT 
                     ea.attendance_id, ea.user_id, ea.status, 
-                    ea.first_in, ea.last_out, ea.remarks, 
+                    LOWER(TRIM(DATE_FORMAT(ea.first_in, '%l:%i %p'))) AS first_in,
+                    LOWER(TRIM(DATE_FORMAT(ea.last_out, '%l:%i %p'))) AS last_out,
+                    ea.remarks, 
                     COALESCE(s.student_name, e.employee_name, v.visitor_name) AS user_name,
                     COALESCE(d.department_name, 'N/A') AS department
                 FROM event_attendance ea
@@ -1166,15 +1170,6 @@ class Database:
             
             cleaned_attendance = []
             for row in result:
-                for key, val in row.items():
-                    if isinstance(val, (timedelta, date, datetime)):
-                        if isinstance(val, timedelta):
-                            total_seconds = int(val.total_seconds())
-                            hours = total_seconds // 3600
-                            minutes = (total_seconds % 3600) // 60
-                            row[key] = f"{hours:02d}:{minutes:02d}"
-                        else:
-                            row[key] = str(val)
                 cleaned_attendance.append(row)
 
             return cleaned_attendance
@@ -1195,7 +1190,7 @@ class Database:
                     SELECT 
                         e.employee_name, 
                         d.department_name, 
-                        TIME_FORMAT(ea.first_in, '%h:%i %p') AS time_in, 
+                        LOWER(TRIM(DATE_FORMAT(ea.first_in, '%l:%i %p'))) AS time_in, 
                         ea.status, 
                         ea.remarks
                     FROM event_attendance ea
@@ -1281,8 +1276,8 @@ class Database:
                         SELECT 
                             COALESCE(e.employee_name, s.student_name, v.visitor_name, a.username, 'Unknown User') AS name,
                             CONCAT(UPPER(u.role), ' - ', COALESCE(d.department_name, c.course_name, v.purpose, 'N/A')) AS detail,
-                            TIME_FORMAT(ea.first_in, '%h:%i %p') AS time_in,
-                            TIME_FORMAT(ea.last_out, '%h:%i %p') AS time_out,
+                            LOWER(TRIM(DATE_FORMAT(ea.first_in, '%l:%i %p'))) AS time_in,
+                            LOWER(TRIM(DATE_FORMAT(ea.last_out, '%l:%i %p'))) AS time_out,
                             ea.status AS status,
                             COALESCE(ea.remarks, 'N/A') AS remarks
                         FROM event_attendance ea

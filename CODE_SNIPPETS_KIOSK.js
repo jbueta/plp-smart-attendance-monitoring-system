@@ -1,4 +1,7 @@
-/* Kiosk functionality - Student and Employee */
+/* Kiosk functionality - Student and Employee
+ * COMPLETE FILE: static/js/kiosk.js
+ * Replace or merge with your existing kiosk.js
+ */
 
 /**
  * Format a datetime string to 12-hour time (e.g., "7:45 AM")
