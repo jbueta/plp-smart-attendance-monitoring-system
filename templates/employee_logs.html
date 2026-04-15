@@ -41,45 +41,55 @@
                 <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
                 <input type="text" id="searchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search Employee...">
             </div>
-            <select class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
-                <option selected>All Departments</option>
+            <select id="departmentFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
+                <option value="">All Departments</option>
                 <option>Engineering</option>
                 <option>Nursing</option>
                 <option>Arts & Sciences</option>
                 <option>Business Admin</option>
                 <option>Education</option>
             </select>
-            <input type="date" class="form-control form-control-sm bg-dark text-white border-secondary w-auto">
-            <button type="button" class="btn btn-sm btn-primary-gold px-3"><i class="bi bi-filter me-1"></i>Apply</button>
-            <button type="button" class="btn btn-sm btn-outline-light"><i class="bi bi-download me-1"></i>Export</button>
+            <input type="date" id="dateFilter" class="form-control form-control-sm bg-dark text-white border-secondary w-auto">
         </div>
     </div>
 
     <!-- Employee Logs Table -->
-    <div class="card-glass p-0 mb-4 overflow-hidden">
+    <div class="card-glass p-0 mb-4 overflow-hidden" id="tableCard">
         <div class="table-responsive">
-            <table class="table table-dark-glass table-hover align-middle mb-0">
+            <table class="table table-dark-glass table-hover align-middle mb-0" id="employeeTable">
                 <thead>
                     <tr>
                         <th class="ps-4">Employee Name</th>
+                        <th>Event Name</th>
                         <th>Department</th>
+                        <th>Date</th>
                         <th>Time In</th>
                         <th>Time Out</th>
                         <th class="text-end pe-4">Status</th>
+                        <th class="text-end pe-4" style="width: 60px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for log in logs %}
-                    <tr>
+                    <tr class="employee-row"
+                        data-attendance-id="{{ log.attendance_id }}"
+                        data-employee-id="{{ log.id | lower }}"
+                        data-employee-name="{{ log.name | lower }}"
+                        data-department="{{ log.dept }}"
+                        data-event-name="{{ log.event_name | lower }}"
+                        data-date="{{ log.date }}"
+                        data-position="{{ log.position or '' }}">
                         <td class="fw-bold text-white ps-4">
                             <div class="d-flex align-items-center">
                                 <div class="rounded-circle bg-white bg-opacity-10 p-1 me-2"
                                     style="width: 32px; height: 32px; display:grid; place-items:center;">{{
                                     log.initials }}</div>
-                                {{ log.name }}
+                                <span>{{ log.name }}</span>
                             </div>
                         </td>
+                        <td class="text-white">{{ log.event_name }}</td>
                         <td class="text-white-50">{{ log.dept }}</td>
+                        <td class="text-white-50 font-monospace small">{{ log.date_formatted or log.date }}</td>
                         <td class="text-success font-monospace small">{{ log.in or '--:--' }}</td>
                         <td class="text-danger font-monospace small">{{ log.out or '--:--' }}</td>
                         <td class="text-end pe-4">
@@ -87,10 +97,20 @@
                                 {{ log.status }}
                             </span>
                         </td>
+                        <td class="text-center align-middle">
+                            <div class="dropdown h-100 d-flex align-items-center justify-content-center">
+                                <button class="btn btn-sm btn-outline-light p-0 border-0 d-flex align-items-center justify-content-center fs-4" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    &hellip;
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end shadow-sm employee-action-menu">
+                                    <li><button type="button" class="dropdown-item text-danger delete-employee" data-id="{{ log.attendance_id }}">Delete</button></li>
+                                </ul>
+                            </div>
+                        </td>
                     </tr>
                     {% else %}
-                    <tr>
-                        <td colspan="5" class="text-center text-white-50 py-5">
+                    <tr id="emptyRow">
+                        <td colspan="8" class="text-center text-white-50 py-5">
                             <i class="bi bi-person-x display-4 d-block mb-3"></i>
                             No attendance records available for this period.
                         </td>
@@ -100,45 +120,377 @@
             </table>
         </div>
     </div>
+
+    <!-- No results (shown only when filters return nothing) -->
+    <div id="noResults" style="display: none;" class="card-glass text-center text-white-50 py-5 mb-4">
+        <i class="bi bi-search display-4 d-block mb-3"></i>
+        <p class="mb-0">No records found matching your search criteria.</p>
+    </div>
+
+    <!-- Result count -->
+    <p id="resultCount" class="text-white-50 small ms-1"></p>
+
+    <!-- Pagination Footer -->
+    <div id="paginationContainer" class="pagination-footer" style="display: none;">
+        <nav aria-label="Page navigation">
+            <ul id="paginationList" class="pagination pagination-custom mb-0 gap-1"></ul>
+        </nav>
+    </div>
 </div>
 
+<style>
+.employee-action-menu {
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.15);
+}
+.employee-action-menu .dropdown-item {
+    color: #fff;
+}
+.employee-action-menu .dropdown-item:hover,
+.employee-action-menu .dropdown-item:focus {
+    background: #d4af37;
+    color: #051a10;
+}
+.dropdown .btn {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+}
+.dropdown .btn:hover {
+    background: transparent !important;
+    border: 1px solid #fff !important;
+    border-radius: 50% !important;
+    color: #fff !important;
+}
+/* Pagination Footer */
+.pagination-footer {
+    display: none;
+    position: fixed;
+    bottom: 1rem;
+    left: 60%;
+    transform: translateX(-50%);
+    justify-content: center;
+    pointer-events: none;
+    z-index: 1100;
+    width: auto;
+    max-width: 90vw;
+    padding: 0 0.5rem;
+}
+.pagination-footer.show {
+    display: flex !important;
+}
+.pagination-footer .pagination {
+    pointer-events: auto;
+    background: transparent;
+}
+.main-content {
+    padding-bottom: 4rem;
+}
+.pagination-custom {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+}
+.pagination-custom .page-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.75rem;
+    height: 2.75rem;
+    padding: 0 0.85rem;
+    color: #fff;
+    background-color: transparent;
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+.pagination-custom .page-link:hover:not(:disabled) {
+    background-color: rgba(212, 175, 55, 0.18);
+    color: #fff;
+    transform: translateY(-1px);
+}
+.pagination-custom .page-link.active {
+    background-color: rgba(212, 175, 55, 0.25);
+    color: #ffffff;
+    font-weight: 700;
+}
+.pagination-custom .page-link:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    background-color: transparent;
+}
+.pagination-custom .page-link.page-number-separator {
+    cursor: default;
+    pointer-events: none;
+    background-color: transparent;
+    border-color: transparent;
+    color: #b6b6b6;
+}
+</style>
+
 <script>
-    // Client‑side search filter (by name or department)
+document.addEventListener('DOMContentLoaded', function () {
     const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-        searchInput.addEventListener('keyup', function() {
-            const searchTerm = this.value.trim().toLowerCase();
-            const rows = document.querySelectorAll('table tbody tr');
-            let visibleCount = 0;
+    const departmentFilter = document.getElementById('departmentFilter');
+    const dateFilter = document.getElementById('dateFilter');
+    const tableCard = document.getElementById('tableCard');
+    const noResults = document.getElementById('noResults');
+    const resultCount = document.getElementById('resultCount');
+    const paginationContainer = document.getElementById('paginationContainer');
+    const paginationList = document.getElementById('paginationList');
+    const getRows = () => document.querySelectorAll('.employee-row');
 
-            rows.forEach(row => {
-                // Skip the "no records" placeholder row (it has colspan)
-                if (row.cells.length === 1) return;
+    const ITEMS_PER_PAGE = 7;
+    let currentPage = 1;
 
-                const nameCell = row.cells[0];
-                const deptCell = row.cells[1];
+    // Format date to DD/MM/YY (minimized)
+    function formatDateToDMY(dateStr) {
+        if (!dateStr) return '';
+        let date = new Date(dateStr);
+        if (isNaN(date.getTime())) return dateStr;
+        let day = String(date.getDate()).padStart(2, '0');
+        let month = String(date.getMonth() + 1).padStart(2, '0');
+        let year = String(date.getFullYear()).slice(-2);
+        return `${day}/${month}/${year}`;
+    }
 
-                if (!nameCell || !deptCell) return;
+    // Apply date formatting to existing cells if needed
+    document.querySelectorAll('.employee-row td:nth-child(4)').forEach(cell => {
+        let raw = cell.innerText.trim();
+        if (raw && !raw.includes('/')) {
+            cell.innerText = formatDateToDMY(raw);
+        }
+    });
 
-                const name = nameCell.innerText.trim().toLowerCase();
-                const dept = deptCell.innerText.trim().toLowerCase();
+    function renderPagination(visibleCount) {
+        const totalPages = Math.ceil(visibleCount / ITEMS_PER_PAGE);
+        paginationList.innerHTML = '';
 
-                if (searchTerm === '' || name.includes(searchTerm) || dept.includes(searchTerm)) {
-                    row.style.display = '';
-                    visibleCount++;
-                } else {
-                    row.style.display = 'none';
+        if (totalPages <= 1) {
+            paginationContainer.classList.remove('show');
+            paginationContainer.style.display = 'none';
+            return;
+        }
+
+        paginationContainer.classList.add('show');
+        paginationContainer.style.display = 'flex';
+
+        // Previous
+        const prevLi = document.createElement('li');
+        prevLi.className = 'page-item';
+        const prevBtn = document.createElement('button');
+        prevBtn.type = 'button';
+        prevBtn.className = 'page-link page-prev';
+        prevBtn.innerHTML = '<i class="bi bi-chevron-left me-1"></i>Previous';
+        prevLi.appendChild(prevBtn);
+        paginationList.appendChild(prevLi);
+
+        // Page numbers
+        let startPage = Math.max(1, currentPage - 2);
+        let endPage = Math.min(totalPages, startPage + 4);
+        if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+
+        for (let i = startPage; i <= endPage; i++) {
+            const li = document.createElement('li');
+            li.className = 'page-item';
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = `page-link page-number ${i === currentPage ? 'active' : ''}`;
+            button.textContent = i;
+            button.dataset.page = i;
+            button.addEventListener('click', () => goToPage(i, visibleCount));
+            li.appendChild(button);
+            paginationList.appendChild(li);
+        }
+
+        if (endPage < totalPages) {
+            const sepLi = document.createElement('li');
+            sepLi.className = 'page-item';
+            const sepSpan = document.createElement('span');
+            sepSpan.className = 'page-link page-number-separator';
+            sepSpan.textContent = '...';
+            sepLi.appendChild(sepSpan);
+            paginationList.appendChild(sepLi);
+
+            const lastLi = document.createElement('li');
+            lastLi.className = 'page-item';
+            const lastBtn = document.createElement('button');
+            lastBtn.type = 'button';
+            lastBtn.className = 'page-link page-number';
+            lastBtn.textContent = totalPages;
+            lastBtn.dataset.page = totalPages;
+            lastBtn.addEventListener('click', () => goToPage(totalPages, visibleCount));
+            lastLi.appendChild(lastBtn);
+            paginationList.appendChild(lastLi);
+        }
+
+        // Next
+        const nextLi = document.createElement('li');
+        nextLi.className = 'page-item';
+        const nextBtn = document.createElement('button');
+        nextBtn.type = 'button';
+        nextBtn.className = 'page-link page-next';
+        nextBtn.innerHTML = 'Next <i class="bi bi-chevron-right ms-1"></i>';
+        nextLi.appendChild(nextBtn);
+        paginationList.appendChild(nextBtn);
+
+        updatePrevNextButtons(totalPages);
+    }
+
+    function goToPage(page, visibleCount) {
+        const totalPages = Math.ceil(visibleCount / ITEMS_PER_PAGE);
+        if (page < 1 || page > totalPages) return;
+        currentPage = page;
+        updateTableDisplay();
+        renderPagination(visibleCount);
+    }
+
+    function updatePrevNextButtons(totalPages) {
+        const prevBtn = paginationList.querySelector('.page-prev');
+        const nextBtn = paginationList.querySelector('.page-next');
+        if (!prevBtn || !nextBtn) return;
+        prevBtn.disabled = currentPage === 1;
+        nextBtn.disabled = currentPage === totalPages;
+        prevBtn.onclick = () => {
+            if (currentPage > 1) goToPage(currentPage - 1, getVisibleRowCount());
+        };
+        nextBtn.onclick = () => {
+            if (currentPage < totalPages) goToPage(currentPage + 1, getVisibleRowCount());
+        };
+    }
+
+    function getVisibleRowCount() {
+        let count = 0;
+        getRows().forEach(row => {
+            if (row.dataset.filterVisible !== 'false') count++;
+        });
+        return count;
+    }
+
+    function updateTableDisplay() {
+        const visibleRows = Array.from(getRows()).filter(row => row.dataset.filterVisible !== 'false');
+        const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
+        const endIdx = startIdx + ITEMS_PER_PAGE;
+        getRows().forEach(row => {
+            if (row.dataset.filterVisible === 'false') {
+                row.style.display = 'none';
+                return;
+            }
+            const idx = visibleRows.indexOf(row);
+            row.style.display = (idx >= startIdx && idx < endIdx) ? '' : 'none';
+        });
+    }
+
+    // Automatic filter (no Apply button)
+    function applyFilters() {
+        const search = searchInput.value.trim().toLowerCase();
+        const department = departmentFilter.value;
+        const date = dateFilter.value;
+
+        let visible = 0;
+        getRows().forEach(row => {
+            const name = (row.dataset.employeeName || '').toLowerCase();
+            const event = (row.dataset.eventName || '').toLowerCase();
+            const dept = row.dataset.department || '';
+            const rowDate = row.dataset.date || '';
+            const matchSearch = !search || name.includes(search) || event.includes(search);
+            const matchDepartment = !department || dept === department;
+            const matchDate = !date || rowDate === date;
+            if (matchSearch && matchDepartment && matchDate) {
+                row.dataset.filterVisible = 'true';
+                visible++;
+            } else {
+                row.dataset.filterVisible = 'false';
+            }
+        });
+
+        currentPage = 1;
+        const hasFilters = search || department || date;
+        const totalRows = getRows().length;
+
+        if (totalRows > 0 && visible === 0 && hasFilters) {
+            tableCard.style.display = 'none';
+            paginationContainer.classList.remove('show');
+            paginationContainer.style.display = 'none';
+            noResults.style.display = 'block';
+            resultCount.textContent = '';
+        } else {
+            tableCard.style.display = '';
+            noResults.style.display = 'none';
+            resultCount.textContent = hasFilters
+                ? `Showing ${Math.min(ITEMS_PER_PAGE, visible)} of ${visible} record${visible !== 1 ? 's' : ''}`
+                : '';
+            updateTableDisplay();
+            renderPagination(visible);
+        }
+    }
+
+    searchInput.addEventListener('input', applyFilters);
+    departmentFilter.addEventListener('change', applyFilters);
+    dateFilter.addEventListener('change', applyFilters);
+
+    // --- DELETE FUNCTIONALITY (AJAX) ---
+    function bindDeleteButtons() {
+        document.querySelectorAll('.delete-employee').forEach(btn => {
+            // Remove any existing listener to avoid duplicates
+            btn.removeEventListener('click', handleDelete);
+            btn.addEventListener('click', handleDelete);
+        });
+    }
+
+    async function handleDelete(event) {
+        const btn = event.currentTarget;
+        const attendanceId = btn.getAttribute('data-id');
+        const row = btn.closest('tr');
+        if (!row) return;
+
+        const employeeName = row.querySelector('td:nth-child(1) span')?.textContent.trim() || 'this employee';
+
+        if (!confirm(`Delete attendance record for ${employeeName}? This action cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`http://localhost:5001/admin/attendance/${attendanceId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
                 }
             });
 
-            // Optionally show/hide the "no results" message
-            const noDataRow = document.querySelector('table tbody tr td[colspan="5"]');
-            if (noDataRow) {
-                // If there's a placeholder row, it's only shown when logs list is empty
-                // We'll hide it if visibleCount > 0
-                noDataRow.parentElement.style.display = visibleCount === 0 ? '' : 'none';
+            const result = await response.json();
+
+            if (result.success) {
+                // Remove the row from the DOM
+                row.remove();
+                // Refresh filters and pagination (this also re-binds delete buttons)
+                applyFilters();
+
+                // Show temporary success message
+                const msgDiv = document.createElement('div');
+                msgDiv.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+                msgDiv.style.zIndex = '2000';
+                msgDiv.innerHTML = `Attendance record deleted successfully. <button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+                document.body.appendChild(msgDiv);
+                setTimeout(() => msgDiv.remove(), 3000);
+            } else {
+                alert('Failed to delete: ' + (result.message || 'Unknown error'));
             }
-        });
+        } catch (error) {
+            console.error('Delete error:', error);
+            alert('Network error while deleting record.');
+        }
     }
+
+    bindDeleteButtons();
+    applyFilters();
+});
 </script>
 {% endblock %}

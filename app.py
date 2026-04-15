@@ -529,6 +529,17 @@ def admin_live_departments():
 # HELPER
 # ==============================================================================
 
+def helper_employee_attendance():
+    try:
+        response = requests.get("http://127.0.0.1:5001/admin/employees/attendance", timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('success'):
+                return data.get('logs', [])
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Error: {e}")
+    return []
+
 def helper_admin_login(username, password):
     url = "http://127.0.0.1:5001/admin/login/auth"
     headers = {"Content-Type": "application/json"}
