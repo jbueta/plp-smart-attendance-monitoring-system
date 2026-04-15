@@ -401,6 +401,7 @@ def add_event():
             "custom_participants": extracted_custom_participants
         }
 
+        print(event_payload)
         api_url = "http://127.0.0.1:5001/admin/dashboard/add-events"
         response = requests.post(api_url, json=event_payload, timeout=5)
         
@@ -506,7 +507,7 @@ def kiosk_live_event():
 @app.route('/api/admin/live-events')
 def admin_live_event():    
     try:
-        response = requests.get("http://127.0.0.1:5001/admin/dashboard/live-events", timeout=5)
+        response = requests.get("http://127.0.0.1:5001/admin/dashboard/events", timeout=5)
         if response.status_code == 200:
             return jsonify(response.json()) 
             
@@ -644,7 +645,8 @@ def helper_admin_events():
                         'dept': event.get('dept', 'Unknown'),
                         'time_start': event.get('time_start', 'Unknown'),
                         'time_end': event.get('time_end', 'Unknown'),
-                        'location': event.get('location', 'Unknown')
+                        'location': event.get('location', 'Unknown'),
+                        'all_departments': event.get('all_departments', False)
                     })
                 
                 current_kiosk_events = real_events

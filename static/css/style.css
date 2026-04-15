@@ -271,3 +271,80 @@ h6 {
     box-shadow: 0 0 0 0.25rem rgba(212, 175, 55, 0.25);
     color: white;
 }
+
+/* ==========================================================================
+   PAGE: EVENTS - Base style for the department boxes
+   ========================================================================== */
+
+
+.dept-badge {
+    display: inline-block;
+    padding: 0.35em 0.65em;
+    margin: 0.15em 0.1em;
+    font-size: 0.70em;
+    font-weight: 600;
+    background-color: transparent;
+    border: 1.5px solid transparent;
+    border-radius: 8px;
+    white-space: nowrap;
+    
+    /* --- NEW ANIMATION PROPERTIES --- */
+    max-width: 300px; /* Must be larger than your longest department name */
+    opacity: 1;
+    overflow: hidden; /* Keeps text from spilling out while shrinking */
+    vertical-align: middle;
+    transition: max-width 0.4s ease, padding 0.4s ease, margin 0.4s ease, opacity 0.4s ease, border-width 0.4s ease;
+}
+
+.dept-badge[data-dept="Arts & Sciences"] { border-color: #ef4444; color: #fff; } 
+.dept-badge[data-dept="Information Technology"] { border-color: #3b82f6; color: #fff; } 
+.dept-badge[data-dept="Nursing"] { border-color: #10b981; color: #fff; } 
+.dept-badge[data-dept="Electrical Engineering"] { border-color: #f59e0b; color: #fff; } 
+.dept-badge[data-dept="Business and Accountancy"] { border-color: #8b5cf6; color: #fff; }
+.dept-badge[data-dept="International Hospitality Management"] { border-color: #ec4899; color: #fff; }
+.dept-badge[data-dept="Education"] { border-color: #06b6d4; color: #fff; } 
+
+.dept-badge.badge-all {
+    border-color: #fff; 
+    color: #fff;
+    font-style: bold;
+}
+
+.dept-badge.badge-more {
+    border-color: #6b7280; 
+    color: #6b7280;
+    border-style: dashed; 
+    padding: 0.35em 0.5em;
+}
+
+.hidden-dept {
+    max-width: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    opacity: 0 !important;
+    border-width: 0 !important;
+}
+
+.dept-badge.badge-more {
+    border-color: #6b7280; 
+    color: #6b7280;
+    border-style: dashed; 
+    padding: 0.35em 0.5em;
+    cursor: pointer; 
+    user-select: none;
+}
+
+.dept-badge.badge-more:hover {
+    background-color: rgba(107, 114, 128, 0.1);
+}
+
+/* Dynamic font reduction for expanded department rows */
+.shrink-font {
+    font-size: 0.9em !important;  /* 10% reduction */
+}
+
+.shrink-font-date {
+    font-size: 0.7em !important;  /* 30% reduction */
+}

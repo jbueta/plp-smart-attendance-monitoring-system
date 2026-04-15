@@ -69,7 +69,7 @@ class Database:
             
         except connector.Error as err:
             print(f"Error authenticating authenticating: {err}")
-            return None
+            return err
 
     def change_status(self):
         try:
@@ -158,12 +158,15 @@ class Database:
 
             self.cursor.execute(query, (new_status, user_id))
             self.conn.commit()
-
-            return {'status': 'Status changed successfully!', 'new_status': new_status, 'forgot_to_timeout': forgot_to_timeout}
+            
+            return {
+                'status': new_status,
+                'new_status': new_status,
+                'forgot_to_timeout': forgot_to_timeout
+            }
             
         except connector.Error as err:
             self.conn.rollback()
-            print(f"Error changing status: {err}")
             print(f"Error changing status: {err}")
             return None
 
@@ -270,13 +273,13 @@ class Database:
                 query = """INSERT IGNORE INTO events 
                            (event_name, event_type, frequency, day, event_date,
                             time_start, time_end, location, active) 
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"""
                 params = (self.parameter[0], self.parameter[1], self.parameter[2], self.parameter[3], self.parameter[4], self.parameter[5], self.parameter[6], self.parameter[7], 1)
 
             else:
                 query = """INSERT IGNORE INTO events 
                            (event_name, event_type, frequency, event_date, time_start, time_end, location, active) 
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"""
                 params = (self.parameter[0], self.parameter[1], self.parameter[2], self.parameter[4], self.parameter[5], self.parameter[6], self.parameter[7], 1)
 
             self.cursor.execute(query, params)
@@ -637,7 +640,7 @@ class Database:
                 query = """INSERT IGNORE INTO events 
                            (event_name, event_type, frequency, day, event_date,
                             time_start, time_end, location, active) 
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"""
                 params = (self.parameter[0], self.parameter[1], self.parameter[2], self.parameter[3], self.parameter[4], self.parameter[5], self.parameter[6], self.parameter[7], 1)
 
             else:
@@ -951,32 +954,37 @@ class Database:
                 raise Exception("Failed to connect to the database.")
             
             query = """
-                        SELECT
-                            e.event_id AS event_id,
-                            e.event_name AS name,
-                            e.event_type AS type,
-                            e.frequency,
-                            DATE_FORMAT(e.event_date, '%b %e, %Y') AS date,
-                            TRIM(DATE_FORMAT(e.time_start, '%l:%i %p')) AS time_start,
-                            TRIM(DATE_FORMAT(e.time_end, '%l:%i %p')) AS time_end,
-                            e.location,
-                            GROUP_CONCAT(DISTINCT d.department_name SEPARATOR ', ') AS dept
-                        FROM events e
-                        LEFT JOIN event_participants ep ON e.event_id = ep.event_id
-                        LEFT JOIN employees emp ON ep.user_id = emp.user_id
-                        LEFT JOIN departments d ON emp.department_id = d.department_id
-                        WHERE e.active = 1
-                        GROUP BY e.event_id, e.event_name, e.event_type, e.frequency, e.event_date, e.time_start, e.time_end, e.location
-                        ORDER BY e.event_date DESC;
-                    """
+                SELECT 
+                    e.event_id AS event_id, 
+                    e.event_name AS name, 
+                    e.event_type AS type, 
+                    e.frequency AS frequency,
+                    DATE_FORMAT(e.event_date, '%b %e, %Y') AS date,
+                    TRIM(DATE_FORMAT(e.time_start, '%l:%i %p')) AS time_start, 
+                    TRIM(DATE_FORMAT(e.time_end, '%l:%i %p')) AS time_end, 
+                    e.location AS location,
+                    GROUP_CONCAT(DISTINCT d.department_name SEPARATOR ', ') AS dept,
+                    (COUNT(DISTINCT d.department_id) = (SELECT COUNT(*) FROM departments)) AS all_departments
+                FROM event_participants ep
+                JOIN events e ON ep.event_id = e.event_id
+                JOIN employees emp ON ep.user_id = emp.user_id
+                JOIN departments d ON emp.department_id = d.department_id
+                WHERE e.active = 1
+                GROUP BY e.event_id
+                ORDER BY e.event_date DESC;
+            """
 
             cursor.execute(query)
             result = cursor.fetchall()
             
+            if result:
+                for row in result:
+                    row['all_departments'] = bool(row['all_departments'])
+            
             print(result)
             return result if result else []
             
-        except connector.Error as err:
+        except Exception as err: 
             print(f"Error fetching events: {err}")
             return None
         finally:
