@@ -576,7 +576,7 @@ def retrieve_all_events_for_reports():
                         'time_start': event.get('time_start', 'Unknown'),
                         'time_end': event.get('time_end', 'Unknown'),
                         'location': event.get('location', 'Unknown'),
-                        'is_active': event.get('is_active', 1)
+                        'active': event.get('active', 1)
                     })
                 
                 current_events = real_events
@@ -585,6 +585,37 @@ def retrieve_all_events_for_reports():
         print(f"Backend API Error: {e}")
         
     return current_events
+
+def helper_kiosk_live_events():    
+    current_kiosk_events = list(DEFAULT_EVENTS)
+    
+    try:
+        response = requests.get("http://127.0.0.1:5001/kiosk/employee/select-event", timeout=5)
+        
+        if response.status_code == 200:
+            api_data = response.json()
+            
+            if api_data.get('success'):
+                real_events = []
+                for event in api_data.get('events', []):
+                    real_events.append({
+                        'instance_id': event.get('instance_id', ''),
+                        'event_id': event.get('event_id', ''),
+                        'name': event.get('name', 'Unknown'),
+                        'type': event.get('type', 'Unknown'),
+                        'frequency': event.get('frequency', 'dd/mm/yyyy'),
+                        'date': event.get('date', 'Unknown'),
+                        'time_start': event.get('time_start', 'Unknown'),
+                        'time_end': event.get('time_end', 'Unknown'),
+                        'location': event.get('location', 'Unknown')
+                    })
+                
+                current_kiosk_events = real_events
+                
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Error: {e}")
+        
+    return current_kiosk_events
 
 def helper_kiosk_live_student_logs():    
     current_kiosk_data = dict(MOCK_KIOSK_DATA)

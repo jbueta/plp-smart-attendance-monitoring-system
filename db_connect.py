@@ -33,21 +33,6 @@ class Database:
 
     def authenticate_user(self):
         try:
-            # query = """ 
-            #     SELECT u.user_id, u.role, u.active,
-            #         COALESCE(s.student_id, e.employee_id, CAST(v.visitor_id AS CHAR)) as scan_id,
-            #         COALESCE(s.status, e.status, v.status) as current_status,
-            #         COALESCE(CONCAT(s.first_name, ' ', s.last_name), CONCAT(e.first_name, ' ', e.last_name), v.name) as full_name,
-            #         COALESCE(c.course_name, d.department_name, 'Visitor') as affiliation
-            #     FROM users u 
-            #     LEFT JOIN students s ON u.user_id = s.user_id 
-            #     LEFT JOIN employees e ON u.user_id = e.user_id
-            #     LEFT JOIN visitors v ON u.user_id = v.user_id
-            #     LEFT JOIN courses c ON s.course_id = c.course_id
-            #     LEFT JOIN departments d ON e.department_id = d.department_id
-            #     WHERE s.student_id = %s OR e.employee_id = %s OR v.visitor_id = %s
-            # """
-            
             query = """ 
                 SELECT u.user_id, u.role, u.active,
                     COALESCE(s.student_id, e.employee_id, CAST(v.visitor_id AS CHAR)) as scan_id,
@@ -68,7 +53,7 @@ class Database:
             return result if result else []
             
         except connector.Error as err:
-            print(f"Error authenticating authenticating: {err}")
+            print(f"Error authenticating: {err}")
             return err
 
     def change_status(self):
@@ -88,47 +73,6 @@ class Database:
             last_log = self.cursor.fetchone()
 
             new_status = 'Inside'
-            
-            now = datetime.now()
-            today_date = now.date()
-            forgot_to_timeout = False
-
-            if last_log:
-                last_time = last_log['timestamp']
-                last_type = last_log['log_type']
-                last_date = last_time.date()
-
-                if current_status.lower() == 'inside':
-                    if last_date < today_date:
-                        forgot_to_timeout = True
-                        new_status = 'Inside'
-                    else:
-                        new_status = 'Outside'
-                else:
-                    new_status = 'Inside'
-            else:
-                 new_status = 'Inside'
-
-            if role == 'student':
-                query = "UPDATE students SET status = %s WHERE user_id = %s"
-            elif role == 'employee':
-                query = "UPDATE employees SET status = %s WHERE user_id = %s"
-            user_id = self.parameter[0]
-            current_status = self.parameter[1]
-            role = self.parameter[2]
-
-            # check user last scanned
-            last_log_query = """
-                SELECT timestamp, log_type 
-                FROM general_log 
-                WHERE user_id = %s 
-                ORDER BY timestamp DESC LIMIT 1
-            """
-            self.cursor.execute(last_log_query, (user_id,))
-            last_log = self.cursor.fetchone()
-
-            new_status = 'Inside'
-            
             now = datetime.now()
             today_date = now.date()
             forgot_to_timeout = False
@@ -180,26 +124,19 @@ class Database:
                 return "Log inserted successfully!"
             return None 
             
-            return None 
-            
         except connector.Error as err:
             self.conn.rollback()
-            print(f"Error inserting log: {err}")
             print(f"Error inserting log: {err}")
             return None
 
     def retrieve_log(self):
         try:
-            # Fixed 'person_id' to 'user_id'
-            log_query = """SELECT * FROM general_log WHERE user_id = %s AND DATE(timestamp) = %s"""
-            # Fixed 'person_id' to 'user_id'
             log_query = """SELECT * FROM general_log WHERE user_id = %s AND DATE(timestamp) = %s"""
             self.cursor.execute(log_query, self.parameter)
             result = self.cursor.fetchall()
             return result if result else []
             
         except connector.Error as err:
-            print(f"Error retrieving log: {err}")
             print(f"Error retrieving log: {err}")
             return None
 
@@ -1059,7 +996,7 @@ class Database:
                             e.time_start, 
                             e.time_end, 
                             e.location AS location,
-                            e.active AS is_active
+                            e.active AS active
                         FROM event_instances ei
                         JOIN events e ON ei.event_id = e.event_id
                         WHERE ei.status = 'Scheduled'

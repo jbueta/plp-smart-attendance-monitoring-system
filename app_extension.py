@@ -83,8 +83,8 @@ def user_authenticate():
     try:
         print("Authenticating...")
         data = request.get_json()
-
         print(data)
+
         if not data or not data.get('id'):
             return jsonify({"error": "ID is required. No ID string attached"}), 400
         
@@ -132,11 +132,11 @@ def user_authenticate():
         # ==========================================
         # SMTP: EMAILING MODULE FOR VIOLATION (optional)
         # ==========================================
-
         if violation:
             # Code goes through here
             pass            
 
+        # 4. INSERT LOG
         log_params = (user_id, formatted_time, log_type, gate)
         db_insert_log = Database(conn, log_params)
         

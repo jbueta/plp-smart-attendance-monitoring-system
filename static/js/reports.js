@@ -96,27 +96,27 @@ function fetch_events() {
     fetch('http://127.0.0.1:5000/api/retrieve/events')
         .then(response => response.json())
         .then(data => {   
+            // Clear existing event mapping to avoid duplicates on re-fetch
             reportMapping.event = []; 
 
             data.forEach(event => {
-                const isActive = event.is_active === 1 || event.is_active === true;
-                const statusText = !isActive ? ' (Deleted)' : '';
-                
+                const eventName = event.active ? event.name : event.name + ' (Deleted)';
                 if (event.frequency.toLowerCase() == 'once') {
                     reportMapping.event.push({
                         value: event.event_id.toString(),
-                        text: event.name + statusText,
+                        text: eventName,
                         constraint: 'once',
-                        date: event.date
+                        date: event.date // Make sure this is in YYYY-MM-DD format from backend
                     });
                 } else {
                     reportMapping.event.push({
                         value: event.event_id.toString(),
-                        text: event.name + statusText
+                        text: eventName
                     });
                 }
             });
             
+            // Once fetched, populate the dropdown based on the default selected category
             const initialCategory = document.getElementById('report-category').value;
             populateReportTypes(initialCategory);
         })
@@ -125,7 +125,7 @@ function fetch_events() {
 
 function populateReportTypes(category) {
     const typeSelect = document.getElementById('report-type');
-    typeSelect.innerHTML = ''; 
+    typeSelect.innerHTML = ''; // Clear current options
 
     if (reportMapping[category]) {
         reportMapping[category].forEach(item => {
@@ -133,6 +133,7 @@ function populateReportTypes(category) {
             option.value = item.value;
             option.textContent = item.text;
             
+            // Embed data attributes if it's a one-time event
             if (item.constraint === 'once') {
                 option.setAttribute('data-type', 'one-time');
                 option.setAttribute('data-date', item.date);
@@ -142,6 +143,7 @@ function populateReportTypes(category) {
         });
     }
 
+    // Manually trigger the change event to ensure date UI matches the first populated option
     typeSelect.dispatchEvent(new Event('change'));
 }
 
@@ -186,18 +188,23 @@ function handleDateConstraint() {
     const displayEventDate = document.getElementById('displayEventDate');
     const dateLabel = document.getElementById('date-label');
 
+    // Check if the selected option has the data-type='one-time' attribute
     if (selectedOption && selectedOption.getAttribute('data-type') === 'one-time') {
         const eventDate = selectedOption.getAttribute('data-date');
         
+        // 1. Force hidden inputs to the exact event date
         startDateInput.value = eventDate;
         endDateInput.value = eventDate;
         
+        // 2. Swap the UI Elements
         dateRangeGroup.classList.add('d-none');
         singleDateGroup.classList.remove('d-none');
         
+        // 3. Update Text Visually
         dateLabel.innerText = "Event Date";
         displayEventDate.textContent = eventDate; 
     } else {
+        // Restore normal Date Range behavior
         startDateInput.value = '';
         endDateInput.value = '';
         
@@ -215,10 +222,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const categorySelect = document.getElementById('report-category');
     const typeSelect = document.getElementById('report-type');
 
+    // 2. Listen for Category Changes to populate the Detailed Report Type dropdown
     categorySelect.addEventListener('change', function() {
         populateReportTypes(this.value);
     });
 
+    // 3. Listen for Report Type changes to toggle the Date Constraint UI
     typeSelect.addEventListener('change', handleDateConstraint);
 
     // =====================================================================================
