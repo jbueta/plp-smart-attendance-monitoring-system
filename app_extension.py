@@ -511,6 +511,28 @@ def kiosk_live_events():
         return jsonify({"success": False, "message": str(e)}), 500
     
 
+@app.route("/api/reports/all-events", methods=["GET"])
+def reports_all_events():
+    """
+        Fetches all scheduled events for reports dropdown (Detailed Report Type).
+        Returns all events regardless of date or active status.
+    """
+    conn = None
+    try:
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "message": "Database offline"}), 500
+
+        events = Database.get_all_events_for_reports(conn)
+        
+        if events is None:
+            return jsonify({"success": False, "message": "Error fetching scheduled events"}), 500
+            
+        return jsonify({"success": True, "events": events}), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+    
 
 @app.route("/admin/dashboard/events", methods=["GET"])
 def admin_dashboard_events():

@@ -169,7 +169,6 @@ function submitManualEntry(type, manualId = null) {
                     document.getElementById(idField).value = '';
                 }
 
-                appendToLiveFeed(data.name, data.affiliation, logType);
             } else {
                 alert(data.message || "Failed to log attendance.");
                 if (typeof showScanBanner === 'function') showScanBanner('error', { id: id });

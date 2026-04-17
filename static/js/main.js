@@ -22,7 +22,6 @@ function initClock() {
             el.innerHTML = `<i class="bi bi-clock me-1 text-gold"></i> ${timeString} <span class="mx-2 opacity-50">|</span> <i class="bi bi-calendar3 me-1 text-gold"></i> ${dateString}`;
         });
 
-        // Special Hero Clock (Dual Line) for Index
         if (heroClock) {
             heroClock.innerHTML = `
                 <div class="h5 text-gold mb-0 text-uppercase letter-spacing-2 opacity-75">${dateString}</div>
@@ -37,7 +36,7 @@ function initClock() {
 
 // --- Kiosk Logic (State Machine) ---
 let isScanning = false;
-let scanState = {}; // Tracks { id: 'IN' | 'OUT' }
+let scanState = {}; 
 
 function showSuccessOverlay(type, manualData = null) {
     const overlay = document.getElementById('scan-overlay');

@@ -1038,6 +1038,55 @@ class Database:
                 cursor.close()
 
     @staticmethod
+    def get_all_events_for_reports(conn):
+        """
+        Fetches all scheduled event instances for reports dropdown.
+        Used in the Reports tab detailed report type selection.
+        """
+        try:
+            if conn:
+                cursor = conn.cursor(dictionary=True)
+            else:
+                raise Exception("Failed to connect to the database.")
+            query = """
+                        SELECT DISTINCT
+                            ei.instance_id AS instance_id,
+                            e.event_id AS event_id,
+                            e.event_name AS name, 
+                            e.event_type AS type, 
+                            e.frequency AS frequency,
+                            ei.event_date AS date, 
+                            e.time_start, 
+                            e.time_end, 
+                            e.location AS location,
+                            e.active AS is_active
+                        FROM event_instances ei
+                        JOIN events e ON ei.event_id = e.event_id
+                        WHERE ei.status = 'Scheduled'
+                        ORDER BY ei.event_date DESC
+                    """
+            cursor.execute(query)
+            result = cursor.fetchall()
+
+            if result:
+                for row in result:
+                    if row.get('date'):
+                        row['date'] = str(row['date'])
+                    if row.get('time_start'):
+                        row['time_start'] = str(row['time_start'])
+                    if row.get('time_end'):
+                        row['time_end'] = str(row['time_end'])
+                        
+            return result if result else []
+            
+        except connector.Error as err:
+            print(f"Error fetching events for reports: {err}")
+            return None
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+
+    @staticmethod
     def get_admin_departments(conn):
         try:
             cursor = conn.cursor(dictionary=True)

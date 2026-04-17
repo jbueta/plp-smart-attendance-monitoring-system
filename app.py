@@ -554,11 +554,11 @@ def helper_admin_login(username, password):
         return {"success": False, "message": f"Authentication service unavailable: {str(e)}"}
 
 @app.route('/api/retrieve/events')
-def helper_kiosk_live_events():    
-    current_kiosk_events = list(DEFAULT_EVENTS)
+def retrieve_all_events_for_reports():    
+    current_events = list(DEFAULT_EVENTS)
     
     try:
-        response = requests.get("http://127.0.0.1:5001/kiosk/employee/select-event", timeout=5)
+        response = requests.get("http://127.0.0.1:5001/api/reports/all-events", timeout=5)
         
         if response.status_code == 200:
             api_data = response.json()
@@ -575,15 +575,16 @@ def helper_kiosk_live_events():
                         'date': event.get('date', 'Unknown'),
                         'time_start': event.get('time_start', 'Unknown'),
                         'time_end': event.get('time_end', 'Unknown'),
-                        'location': event.get('location', 'Unknown')
+                        'location': event.get('location', 'Unknown'),
+                        'is_active': event.get('is_active', 1)
                     })
                 
-                current_kiosk_events = real_events
+                current_events = real_events
                 
     except requests.exceptions.RequestException as e:
         print(f"Backend API Error: {e}")
         
-    return current_kiosk_events
+    return current_events
 
 def helper_kiosk_live_student_logs():    
     current_kiosk_data = dict(MOCK_KIOSK_DATA)
