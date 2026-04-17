@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 import requests
@@ -15,6 +15,38 @@ app.secret_key = 'plp_secure_key_2026'  # Required for session management
 # Configure and initialize cache (SimpleCache for development)
 app.config['CACHE_TYPE'] = 'SimpleCache'
 cache.init_app(app)
+
+# ==============================================================================
+# STARTUP: Generate instances for the week every Sunday
+# ==============================================================================
+_instance_generator_run = False
+
+@app.before_request
+def generate_instances_on_sunday():
+    """
+    Runs only once per app startup.
+    If today is Sunday, generates event instances for the upcoming week.
+    """
+    global _instance_generator_run
+    
+    if not _instance_generator_run:
+        _instance_generator_run = True
+        today = date.today()
+        
+        # Check if today is Sunday (weekday() returns 6 for Sunday)
+        if today.weekday() == 6:
+            try:
+                print(f"[STARTUP] Today is Sunday. Generating instances for upcoming week...")
+                response = requests.post("http://127.0.0.1:5001/admin/generate-daily-instances", timeout=10)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    print(f"[SUCCESS] Generated {data.get('created', 0)} instances, {data.get('failed', 0)} failures")
+                else:
+                    print(f"[ERROR] Backend returned status {response.status_code}")
+            except Exception as e:
+                print(f"[ERROR] Failed to generate instances: {str(e)}")
+
 
 # ==============================================================================
 # MOCK DATA (Prototype State)

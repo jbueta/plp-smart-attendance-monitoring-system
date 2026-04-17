@@ -43,11 +43,6 @@
             </div>
             <select id="departmentFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
                 <option value="">All Departments</option>
-                <option>Engineering</option>
-                <option>Nursing</option>
-                <option>Arts & Sciences</option>
-                <option>Business Admin</option>
-                <option>Education</option>
             </select>
             <input type="date" id="dateFilter" class="form-control form-control-sm bg-dark text-white border-secondary w-auto">
         </div>
@@ -236,7 +231,7 @@
 </style>
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', async function () {
     const searchInput = document.getElementById('searchInput');
     const departmentFilter = document.getElementById('departmentFilter');
     const dateFilter = document.getElementById('dateFilter');
@@ -249,6 +244,33 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const ITEMS_PER_PAGE = 7;
     let currentPage = 1;
+
+    // ============================================================
+    // POPULATE DEPARTMENT FILTER FROM BACKEND
+    // ============================================================
+    async function populateDepartmentFilter() {
+        try {
+            const response = await fetch('http://localhost:5001/api/admin/departments');
+            const data = await response.json();
+            
+            if (data.success && data.departments) {
+                // Clear existing options (keep only "All Departments")
+                departmentFilter.innerHTML = '<option value="">All Departments</option>';
+                
+                // Add departments from backend
+                data.departments.forEach(dept => {
+                    const option = document.createElement('option');
+                    option.value = dept.name;
+                    option.textContent = dept.name;
+                    departmentFilter.appendChild(option);
+                });
+            } else {
+                console.warn('Failed to load departments:', data.message);
+            }
+        } catch (error) {
+            console.error('Error fetching departments:', error);
+        }
+    }
 
     // Format date to DD/MM/YY (minimized)
     function formatDateToDMY(dateStr) {
@@ -268,6 +290,9 @@ document.addEventListener('DOMContentLoaded', function () {
             cell.innerText = formatDateToDMY(raw);
         }
     });
+
+    // Populate department filter from backend
+    await populateDepartmentFilter();
 
     function renderPagination(visibleCount) {
         const totalPages = Math.ceil(visibleCount / ITEMS_PER_PAGE);
