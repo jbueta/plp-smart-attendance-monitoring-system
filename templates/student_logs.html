@@ -46,8 +46,6 @@
                 <option value="BSEd">BSEd</option>
             </select>
             <input type="date" id="dateFilter" class="form-control form-control-sm bg-dark text-white border-secondary w-auto">
-            <button type="button" id="applyBtn" class="btn btn-sm btn-primary-gold px-3"><i class="bi bi-filter me-1"></i>Apply</button>
-            <button type="button" id="exportBtn" class="btn btn-sm btn-outline-light"><i class="bi bi-download me-1"></i>Export</button>
         </div>
     </div>
 
@@ -111,8 +109,6 @@
     const searchInput  = document.getElementById('searchInput');
     const courseFilter = document.getElementById('courseFilter');
     const dateFilter   = document.getElementById('dateFilter');
-    const applyBtn     = document.getElementById('applyBtn');
-    const exportBtn    = document.getElementById('exportBtn');
     const tableCard    = document.getElementById('tableCard');
     const noResults    = document.getElementById('noResults');
     const resultCount  = document.getElementById('resultCount');
@@ -121,7 +117,7 @@
     function applyFilters() {
         const search = searchInput.value.trim().toLowerCase();
         const course = courseFilter.value;
-        const date   = dateFilter.value; // YYYY-MM-DD
+        const date   = dateFilter.value;
 
         let visible = 0;
 
@@ -144,48 +140,23 @@
 
         if (rows.length > 0) {
             if (visible === 0 && hasFilters) {
-                tableCard.style.display  = 'none';
-                noResults.style.display  = 'block';
-                resultCount.textContent  = '';
+                tableCard.style.display = 'none';
+                noResults.style.display = 'block';
+                resultCount.textContent = '';
             } else {
-                tableCard.style.display  = '';
-                noResults.style.display  = 'none';
-                resultCount.textContent  = hasFilters
+                tableCard.style.display = '';
+                noResults.style.display = 'none';
+                resultCount.textContent = hasFilters
                     ? 'Showing ' + visible + ' of ' + rows.length + ' record' + (rows.length !== 1 ? 's' : '')
                     : '';
             }
         }
     }
 
-    // Apply on button click
-    applyBtn.addEventListener('click', applyFilters);
-
-    // Live search while typing
+    // All inputs trigger filtering automatically
     searchInput.addEventListener('input', applyFilters);
-
-    // Export visible rows as CSV
-    exportBtn.addEventListener('click', function () {
-        const headers = ['Student ID', 'Name', 'Course', 'Time In', 'Time Out', 'Status'];
-        const csvRows = [headers.join(',')];
-
-        rows.forEach(function (row) {
-            if (row.style.display !== 'none') {
-                const cells  = row.querySelectorAll('td');
-                const values = Array.from(cells).map(function (td) {
-                    return '"' + td.innerText.replace(/"/g, '""').trim() + '"';
-                });
-                csvRows.push(values.join(','));
-            }
-        });
-
-        const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
-        const url  = URL.createObjectURL(blob);
-        const a    = document.createElement('a');
-        a.href     = url;
-        a.download = 'student_logs_' + (dateFilter.value || 'all') + '.csv';
-        a.click();
-        URL.revokeObjectURL(url);
-    });
+    courseFilter.addEventListener('change', applyFilters);
+    dateFilter.addEventListener('change', applyFilters);
 })();
 </script>
 {% endblock %}
