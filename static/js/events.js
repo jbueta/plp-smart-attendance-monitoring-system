@@ -474,3 +474,43 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 });
+
+function toggleDepts(button, hiddenCount) {
+    const container = button.closest('td');
+    const row = button.closest('tr');
+    const allBadges = container.querySelectorAll('.dept-badge:not(.badge-more)');
+    
+    // Check if currently hidden (before toggling)
+    const isCurrentlyHidden = allBadges.length > 3 && allBadges[3].classList.contains('hidden-dept');
+    
+    // Toggle badge visibility
+    for (let i = 3; i < allBadges.length; i++) {
+        if (isCurrentlyHidden) {
+            allBadges[i].classList.remove('hidden-dept');
+        } else {
+            allBadges[i].classList.add('hidden-dept');
+        }
+    }
+    
+    // Apply font size changes to specific columns (indices 1, 4, 5 for Event Name, Date, Schedule)
+    const cells = row.cells;
+    if (cells.length >= 7) {
+        const eventNameCell = cells[1];   // 2nd column
+        const dateCell = cells[4];        // 5th column
+        const scheduleCell = cells[5];    // 6th column
+        
+        if (isCurrentlyHidden) {
+            // Expanding → add shrink class
+            eventNameCell.classList.add('shrink-font');
+            dateCell.classList.add('shrink-font-date');
+            scheduleCell.classList.add('shrink-font-date');
+        } else {
+            // Collapsing → remove shrink class
+            eventNameCell.classList.remove('shrink-font');
+            dateCell.classList.remove('shrink-font-date');
+            scheduleCell.classList.remove('shrink-font-date');
+        }
+    }
+    
+    button.textContent = isCurrentlyHidden ? "Show Less" : "+" + hiddenCount;
+}
