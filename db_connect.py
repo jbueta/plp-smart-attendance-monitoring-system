@@ -35,16 +35,18 @@ class Database:
         try:
             query = """ 
                 SELECT u.user_id, u.role, u.active,
-                    COALESCE(s.student_id, e.employee_id, CAST(v.visitor_id AS CHAR)) as scan_id,
-                    COALESCE(s.status, e.status, v.status) as current_status,
-                    COALESCE(s.student_name, e.employee_name, v.visitor_name) as full_name,
-                    COALESCE(c.course_name, d.department_name, 'Visitor') as affiliation
+                       COALESCE(s.student_id, e.employee_id, v.visitor_id) as scan_id,
+                       COALESCE(s.status, e.status, v.status) as current_status,
+                       COALESCE(CONCAT(s.student_name), CONCAT(e.employee_name), v.visitor_name) as full_name,
+                       COALESCE(c.course_name, d.department_name, 'Visitor') as affiliation
                 FROM users u 
                 LEFT JOIN students s ON u.user_id = s.user_id 
                 LEFT JOIN employees e ON u.user_id = e.user_id
                 LEFT JOIN visitors v ON u.user_id = v.user_id
-                LEFT JOIN courses c ON s.course_id = c.course_id
-                LEFT JOIN departments d ON e.department_id = d.department_id
+
+                LEFT JOIN courses c ON s.course_id = c.course_id 
+                LEFT JOIN departments d ON d.department_id = e.department_id 
+
                 WHERE s.student_id = %s OR e.employee_id = %s OR v.visitor_id = %s
             """
             print(self.parameter)
@@ -206,163 +208,43 @@ class Database:
 
     def add_event(self):
         try:
-            if self.parameter[2] == 'WEEKLY':
-                query = """INSERT IGNORE INTO events 
-                           (event_name, event_type, frequency, day, event_date,
-                            time_start, time_end, location, active) 
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"""
-                params = (self.parameter[0], self.parameter[1], self.parameter[2], self.parameter[3], self.parameter[4], self.parameter[5], self.parameter[6], self.parameter[7], 1)
+            visitor_name = (self.parameter[0] or '').strip()
+            purpose = (self.parameter[1] or '').strip()
+            gate = self.parameter[2] if len(self.parameter) > 2 else 'Gate 1'
 
-            else:
-                query = """INSERT IGNORE INTO events 
-                           (event_name, event_type, frequency, event_date, time_start, time_end, location, active) 
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"""
-                params = (self.parameter[0], self.parameter[1], self.parameter[2], self.parameter[4], self.parameter[5], self.parameter[6], self.parameter[7], 1)
+            if not visitor_name or not purpose:
+                return {"success": False, "message": "Visitor name and purpose are required."}
 
-            self.cursor.execute(query, params)
-            rows_affected = self.cursor.rowcount
-            if rows_affected > 0:
-                print("Event created!")
+            self.cursor.execute(
+                "INSERT INTO users (role, active) VALUES (%s, %s)",
+                ('visitor', 1)
+            )
+            user_id = int(self.cursor.lastrowid)
 
-                event_id = int(self.cursor.lastrowid)
+            self.cursor.execute(
+                """
+                INSERT INTO visitors (user_id, visitor_id, visitor_name, purpose, status)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (user_id, visitor_name, purpose, 'Inside')
+            )
+            visitor_id = int(self.cursor.lastrowid)
 
-                match (self.parameter[9]):
-                    case 'grouped':
-                        departments = self.parameter[8]
-                        
-                        if departments and isinstance(departments, list):
-                            print(f"Retrieving user_ids for {len(departments)} departments...")
+            self.cursor.execute(
+                """
+                INSERT INTO general_log (user_id, timestamp, log_type, gate)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (user_id, datetime.now(), 'Entry', gate)
+            )
 
-                            format_strings = ','.join(['%s'] * len(departments))
-
-                            get_users_query = f"""
-                                SELECT user_id 
-                                FROM employees 
-                                WHERE department_id IN ({format_strings})
-                            """
-
-                            self.cursor.execute(get_users_query, tuple(departments))
-                            fetched_users = self.cursor.fetchall()
-
-                            print(fetched_users)
-                            actual_user_ids = [row['user_id'] if isinstance(row, dict) else row[0] for row in fetched_users]
-
-                            if actual_user_ids:
-                                new_query = "INSERT IGNORE INTO event_participants (event_id, user_id) VALUES (%s, %s)"
-                                participant_data = [(event_id, uid) for uid in actual_user_ids]
-                                self.cursor.executemany(new_query, participant_data)
-                                print(f"Successfully attached {len(actual_user_ids)} valid participants from grouped departments!")
-                            else:
-                                print("Warning: No employees found in the provided departments.")
-                    case 'custom':
-                        raw_ids = self.parameter[8]
-                        if raw_ids and isinstance(raw_ids, list):
-                            print(f"Translating {len(raw_ids)} raw IDs to user_ids...")
-
-                            format_strings = ','.join(['%s'] * len(raw_ids))
-
-                            get_users_query = f"""
-                                SELECT u.user_id 
-                                FROM users u
-                                LEFT JOIN students s ON u.user_id = s.user_id
-                                LEFT JOIN employees e ON u.user_id = e.user_id
-                                LEFT JOIN visitors v ON u.user_id = v.user_id
-                                WHERE s.student_id IN ({format_strings})
-                                OR e.employee_id IN ({format_strings})
-                                OR v.visitor_id IN ({format_strings})
-                            """
-
-                            query_params = tuple(raw_ids + raw_ids + raw_ids)
-
-                            self.cursor.execute(get_users_query, query_params)
-                            fetched_users = self.cursor.fetchall()
-
-                            actual_user_ids = [row['user_id'] if isinstance(row, dict) else row[0] for row in fetched_users]
-
-                            if actual_user_ids:
-                                new_query = "INSERT IGNORE INTO event_participants (event_id, user_id) VALUES (%s, %s)"
-                                participant_data = [(event_id, uid) for uid in actual_user_ids]
-                                self.cursor.executemany(new_query, participant_data)
-                                print(f"Successfully attached {len(actual_user_ids)} valid participants!")
-                            else:
-                                print("Warning: None of the provided IDs matched any users in the database.")
-
-                    case 'hybrid':
-                        hybrid_data = self.parameter[8]
-                        
-                        grouped_deps = hybrid_data.get('grouped_participants', [])
-                        custom_raw_ids = hybrid_data.get('custom_participants', [])
-                        
-                        final_user_ids = set()
-
-                        # 2. PROCESS GROUPED DEPARTMENTS
-                        if grouped_deps:
-                            print(f"Fetching users for {len(grouped_deps)} departments...")
-                            format_strings = ','.join(['%s'] * len(grouped_deps))
-                            get_dept_query = f"""
-                                SELECT user_id FROM employees WHERE department_id IN ({format_strings})
-                            """
-                            self.cursor.execute(get_dept_query, tuple(grouped_deps))
-                            dept_users = self.cursor.fetchall()
-                            
-                            # Add it to set
-                            for row in dept_users:
-                                final_user_ids.add(row['user_id'] if isinstance(row, dict) else row[0])
-
-                        # 3. PROCESS CUSTOM IDS
-                        if custom_raw_ids:
-                            print(f"Fetching users for {len(custom_raw_ids)} custom IDs...")
-                            format_strings = ','.join(['%s'] * len(custom_raw_ids))
-                            get_custom_query = f"""
-                                SELECT u.user_id FROM users u
-                                LEFT JOIN students s ON u.user_id = s.user_id
-                                LEFT JOIN employees e ON u.user_id = e.user_id
-                                LEFT JOIN visitors v ON u.user_id = v.user_id
-                                WHERE s.student_id IN ({format_strings})
-                                OR e.employee_id IN ({format_strings})
-                                OR v.visitor_id IN ({format_strings})
-                            """
-                            self.cursor.execute(get_custom_query, tuple(custom_raw_ids + custom_raw_ids + custom_raw_ids))
-                            custom_users = self.cursor.fetchall()
-                            
-                            # Add it to set
-                            for row in custom_users:
-                                final_user_ids.add(row['user_id'] if isinstance(row, dict) else row[0])
-
-                        # 4. INSERT EVERYONE AT ONCE
-                        if final_user_ids:
-                            new_query = "INSERT IGNORE INTO event_participants (event_id, user_id) VALUES (%s, %s)"
-                            participant_data = [(event_id, uid) for uid in final_user_ids]
-                            self.cursor.executemany(new_query, participant_data)
-                            print(f"Successfully attached {len(final_user_ids)} unique hybrid participants!")
-                        else:
-                            print("Warning: No valid participants found in either hybrid list.")
-
-                print ("Participants attached successfully!")
-
-                # ==========================================
-                # ONCE TIME EVENT INSTANCE GENERATOR
-                # ==========================================
-                frequency = self.parameter[2]
-                start_date = self.parameter[4]
-
-                if frequency not in ['WEEKLY', 'DAILY', 'MONTHLY', 'YEARLY']: 
-                    instance_query = """ INSERT IGNORE INTO event_instances (event_id, event_date, status) 
-                                         VALUES (%s, %s, 'Scheduled') """
-                    self.cursor.execute(instance_query, (event_id, start_date))
-                    instance_id = int(self.cursor.lastrowid)
-
-                    attendance_query = """ INSERT IGNORE INTO event_attendance (instance_id, user_id, event_date, status) 
-                                           SELECT %s, user_id, %s, 'Absent' FROM event_participants WHERE event_id = %s """
-                    self.cursor.execute(attendance_query, (instance_id, start_date, event_id))
-                    
-                    self.conn.commit()
-                    print(f"One-time instance and roster generated for {start_date}!")
-
-                self.conn.commit()
-                return {"message": "Event created successfully!", "success": True}
-            else:
-                return {"success": False, "message": "Event already exists or could not be created."}
+            self.conn.commit()
+            return {
+                "success": True,
+                "visitor_id": visitor_id,
+                "user_id": user_id,
+                "message": "Visitor logged successfully."
+            }
         except connector.Error as err:
             self.conn.rollback()
             print(f"Error: {err}")
