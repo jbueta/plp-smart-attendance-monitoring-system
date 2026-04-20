@@ -1,14 +1,20 @@
 from datetime import date, datetime
 from functools import wraps
+from database import connect_db
+from db_connect import EmployeeModel
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 import requests
 import csv
 import io
 import uuid
+import pandas as pd
+
+from db_connect import EmployeeModel
 
 from app_tasks import fetch_report_data     #reports generator
 from extensions import cache
 
+employee_model = EmployeeModel() 
 app = Flask(__name__)
 app.secret_key = 'plp_secure_key_2026'  # Required for session management
 
@@ -709,7 +715,53 @@ def generate_report():
         metrics=report_results['metrics_data'],
         logs=report_results['logs']
     )
-    
+
+@app.route("/add_employee", methods=["POST"])
+def add_employee():
+    data = request.get_json()
+
+    model = EmployeeModel()
+
+    result = model.add_employee(
+        employee_id=data["employee_id"],
+        employee_name=data["employee_name"],
+        department_id=data["department_id"],
+        position=data["position"]
+    )
+
+    return jsonify(result)
+
+@app.route("/upload_employees", methods=["POST"])
+def upload_employees():
+    file = request.files.get("file")
+
+    if not file:
+        return jsonify({"success": False, "error": "No file uploaded"})
+
+    try:
+        df = pd.read_excel(file, dtype=str)
+        df.columns = df.columns.str.strip()
+
+        inserted = 0
+        errors   = []
+
+        for i, row in df.iterrows():
+            result = employee_model.add_employee_excel(
+                employee_id     = (row.get("Employee Number") or "").strip(),
+                employee_name   = (row.get("Employee Name")   or "").strip(),
+                department_name = (row.get("Department")      or "").strip(),
+                position        = (row.get("Position")        or "").strip()
+            )
+
+            if result.get("success"):
+                inserted += 1
+            else:
+                errors.append(f"Row {i + 2}: {result.get('error')}")
+
+        return jsonify({"success": True, "inserted": inserted, "errors": errors})
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
 # ==============================================================================
 # MAIN ENTRY POINT
 # ==============================================================================

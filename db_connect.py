@@ -1,3 +1,4 @@
+from database import connect_db
 import mysql.connector as connector
 from datetime import date, datetime, timedelta
 
@@ -1368,3 +1369,127 @@ class Database:
             return None
         finally:
             cursor.close()
+            
+class EmployeeModel:
+
+    def add_employee(self, employee_id, employee_name, department_id, position):
+        conn = connect_db()
+
+        if conn is None:
+            return {"success": False, "error": "Database connection failed"}
+
+        try:
+            cursor = conn.cursor(dictionary=True)
+
+            # Force capitalization
+            employee_name = employee_name.upper()
+            position = position.upper()
+
+            # 1. Insert into users
+            cursor.execute("""
+                INSERT INTO users (role, active)
+                VALUES (%s, %s)
+            """, ("employee", 1))
+
+            user_id = cursor.lastrowid
+
+            # 2. Insert into employees
+            cursor.execute("""
+                INSERT INTO employees
+                (user_id, employee_id, employee_name, department_id, position, status)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (
+                user_id,
+                employee_id,
+                employee_name,
+                department_id,
+                position,
+                "Outside"
+            ))
+
+            conn.commit()
+
+            return {"success": True}
+
+        except Exception as e:
+            conn.rollback()
+            return {"success": False, "error": str(e)}
+
+        finally:
+            conn.close()
+
+    def add_employee_excel(self, conn, employee_id, employee_name, department_name, position):
+
+        cursor = None
+
+        try:
+            cursor = conn.cursor()
+
+            # clean inputs
+            employee_id = str(employee_id or "").strip()
+            employee_name = str(employee_name or "").strip().upper()
+            department_name = str(department_name or "").strip().upper().replace('\u2019', "'")
+            position = str(position or "").strip().upper()
+
+            if not employee_id or not employee_name or not department_name:
+                return {"success": False, "error": "Missing required fields"}
+
+            # find department (make it bulletproof)
+            cursor.execute("""
+                SELECT department_id
+                FROM departments
+                WHERE UPPER(TRIM(department_name)) = %s
+            """, (department_name,))
+
+            dept = cursor.fetchone()
+
+            if not dept:
+                return {"success": False, "error": f"Department not found: {department_name}"}
+
+            department_id = dept[0]
+
+            # check duplicate employee
+            cursor.execute("""
+                SELECT employee_id
+                FROM employees
+                WHERE employee_id = %s
+            """, (employee_id,))
+
+            if cursor.fetchone():
+                return {"success": False, "error": f"Employee already exists: {employee_id}"}
+
+            # insert user
+            cursor.execute("""
+                INSERT INTO users (role, active)
+                VALUES (%s, %s)
+            """, ("employee", 1))
+
+            user_id = cursor.lastrowid
+
+            # insert employee
+            cursor.execute("""
+                INSERT INTO employees
+                (user_id, employee_id, employee_name, department_id, position, status)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (
+                user_id,
+                employee_id,
+                employee_name,
+                department_id,
+                position,
+                "Outside"
+            ))
+
+            # ✅ THIS WAS MISSING (CRITICAL)
+            conn.commit()
+
+            return {"success": True}
+
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            return {"success": False, "error": str(e)}
+
+        finally:
+            if cursor:
+                cursor.close()

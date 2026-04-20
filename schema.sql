@@ -305,3 +305,22 @@ CREATE TABLE `admin` (
 ALTER TABLE `admin` 
 MODIFY `username` VARCHAR(255) COLLATE utf8mb4_bin,
 MODIFY `password` VARCHAR(255) COLLATE utf8mb4_bin;
+
+ALTER TABLE departments
+MODIFY department_id INT(11) NOT NULL AUTO_INCREMENT;
+
+INSERT INTO departments (department_name) VALUES
+('College of Engineering'),
+('College of Nursing'),
+('College of Computer Studies'),
+('College of Business and Accountancy'),
+('College of Education'),
+('College of Arts and Sciences'),
+('College of International Hospitality Management');
+
+INSERT INTO departments (department_name) VALUES
+("Registrar's Office"),
+("Accounting Office"),
+("Human Resources"),
+("MIS Office"),
+("Library");

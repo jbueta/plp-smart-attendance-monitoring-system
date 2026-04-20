@@ -376,15 +376,14 @@
                                                 <label class="form-label text-white-50 small fw-bold mb-0" for="manualAddCollege">COLLEGE:</label>
                                             </div>
                                             <div class="col-sm-8">
-                                                <select id="manualAddCollege" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
-                                                    <option value="" selected disabled class="text-dark">Select College</option>
-                                                    <option class="text-dark">College of Engineering</option>
-                                                    <option class="text-dark">College of Nursing</option>
-                                                    <option class="text-dark">College of Computer Studies</option>
-                                                    <option class="text-dark">College of Business and Accountancy</option>
-                                                    <option class="text-dark">College of Education</option>
-                                                    <option class="text-dark">College of Arts and Sciences</option>
-                                                    <option class="text-dark">College of International Hospitality Management</option>
+                                                <select id="manualAddCollege" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">                                                        <option value="" disabled selected class="text-dark">Select College</option>
+                                                    <option value="1" class="text-dark">College of Engineering</option>
+                                                    <option value="2" class="text-dark">College of Nursing</option>
+                                                    <option value="3" class="text-dark">College of Computer Studies</option>
+                                                    <option value="4" class="text-dark">College of Business and Accountancy</option>
+                                                    <option value="5" class="text-dark">College of Education</option>
+                                                    <option value="6" class="text-dark">College of Arts and Sciences</option>
+                                                    <option value="7" class="text-dark">College of International Hospitality Management</option>
                                                 </select>
                                             </div>
                                         </div>
@@ -414,11 +413,11 @@
                                             <div class="col-sm-8">
                                                 <select id="manualAddOffice" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
                                                     <option value="" selected disabled class="text-dark">Select Office</option>
-                                                    <option class="text-dark">Registrar's Office</option>
-                                                    <option class="text-dark">Accounting Office</option>
-                                                    <option class="text-dark">Human Resources</option>
-                                                    <option class="text-dark">MIS Office</option>
-                                                    <option class="text-dark">Library</option>
+                                                    <option class="text-dark" value="8">Registrar's Office</option>
+                                                    <option class="text-dark" value="9">Accounting Office</option>
+                                                    <option class="text-dark" value="10">Human Resources</option>
+                                                    <option class="text-dark" value="11">MIS Office</option>
+                                                    <option class="text-dark" value="12">Library</option>
                                                 </select>
                                             </div>
                                         </div>
@@ -675,154 +674,212 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // --- Add User Modal View Transitions ---
-    const addUserModalEl = document.getElementById('addUserModal');
-    const selectionView = document.getElementById('addSelectionView');
-    const xlsView = document.getElementById('xlsUploadView');
-    const manualView = document.getElementById('manualAddView');
-    const xlsCard = document.querySelector('.xls-card');
-    const manualCard = document.querySelector('.manual-card');
-    const backBtnsSelection = document.querySelectorAll('.btn-back-selection');
-    const uploadZone = document.querySelector('.upload-zone');
-    const fileInput = document.getElementById('xlsFileInput');
-    
-    if(xlsCard && selectionView && xlsView) {
-        xlsCard.addEventListener('click', () => {
-            selectionView.classList.add('d-none');
-            xlsView.classList.remove('d-none');
-            xlsView.style.animation = 'fadeInModal 0.4s ease forwards';
-        });
-    }
-    
-    if(manualCard && selectionView && manualView) {
-        manualCard.addEventListener('click', () => {
-            selectionView.classList.add('d-none');
-            manualView.classList.remove('d-none');
-            manualView.style.animation = 'fadeInModal 0.4s ease forwards';
-        });
-    }
-    
-    backBtnsSelection.forEach(btn => {
-        btn.addEventListener('click', () => {
-            if(xlsView) xlsView.classList.add('d-none');
-            if(manualView) manualView.classList.add('d-none');
-            if(selectionView) {
-                selectionView.classList.remove('d-none');
-                selectionView.style.animation = 'fadeInModal 0.4s ease forwards';
-            }
-        });
-    });
-    
-    if(uploadZone && fileInput) {
-        uploadZone.addEventListener('click', () => fileInput.click());
-        
-        fileInput.addEventListener('change', function() {
-            if(this.files && this.files.length > 0) {
-                uploadZone.querySelector('span').textContent = this.files[0].name;
-                uploadZone.querySelector('i').classList.replace('bi-file-earmark-spreadsheet', 'bi-file-earmark-check');
-                uploadZone.querySelector('i').classList.replace('text-white-50', 'text-success');
-            }
-        });
-    }
-    
-    if(addUserModalEl) {
-        addUserModalEl.addEventListener('hidden.bs.modal', () => {
-            if (selectionView) {
-                if(xlsView) xlsView.classList.add('d-none');
-                if(manualView) manualView.classList.add('d-none');
-                selectionView.classList.remove('d-none');
-            }
-            if(fileInput) {
-                fileInput.value = '';
-                if(uploadZone) {
-                    uploadZone.querySelector('span').textContent = 'Click to export xls file';
-                    uploadZone.querySelector('i').classList.replace('bi-file-earmark-check', 'bi-file-earmark-spreadsheet');
-                    uploadZone.querySelector('i').classList.remove('text-success');
-                    uploadZone.querySelector('i').classList.add('text-white-50');
-                }
-            }
-            
-            // Reset Manual Add Form
-            const manualForm = document.getElementById('manualAddEmployeeForm');
-            if (manualForm) {
-                manualForm.reset();
-                document.getElementById('teachingFields').classList.add('d-none');
-                document.getElementById('nonTeachingFields').classList.add('d-none');
-                document.getElementById('submitManualAddBtn').disabled = true;
-            }
-        });
-    }
 
-    // --- Dynamic Dropdowns & Validation for Manual Add ---
-    const manualIdInput = document.getElementById('manualAddId');
-    const manualNameInput = document.getElementById('manualAddName');
-    const typeTeachingRadio = document.getElementById('typeTeaching');
-    const typeNonTeachingRadio = document.getElementById('typeNonTeaching');
-    const teachingFields = document.getElementById('teachingFields');
-    const nonTeachingFields = document.getElementById('nonTeachingFields');
-    
-    const manualAddCollege = document.getElementById('manualAddCollege');
-    const manualAddTeachingPosition = document.getElementById('manualAddTeachingPosition');
-    
-    const manualAddOffice = document.getElementById('manualAddOffice');
+    // =========================================================
+    // ADD USER MODAL — View Transitions
+    // =========================================================
+    const addUserModalEl   = document.getElementById('addUserModal');
+    const selectionView    = document.getElementById('addSelectionView');
+    const xlsView          = document.getElementById('xlsUploadView');
+    const manualView       = document.getElementById('manualAddView');
+    const xlsCard          = document.querySelector('.xls-card');
+    const manualCard       = document.querySelector('.manual-card');
+    const backBtnsSelection = document.querySelectorAll('.btn-back-selection');
+    const uploadZone       = document.querySelector('.upload-zone');
+    const fileInput        = document.getElementById('xlsFileInput');
+
+    const showView = (viewToShow) => {
+        [selectionView, xlsView, manualView].forEach(v => v?.classList.add('d-none'));
+        if (viewToShow) {
+            viewToShow.classList.remove('d-none');
+            viewToShow.style.animation = 'fadeInModal 0.4s ease forwards';
+        }
+    };
+
+    xlsCard?.addEventListener('click', () => showView(xlsView));
+    manualCard?.addEventListener('click', () => showView(manualView));
+    backBtnsSelection.forEach(btn => btn.addEventListener('click', () => showView(selectionView)));
+
+    // =========================================================
+    // FILE UPLOAD — Zone Click & File Change
+    // =========================================================
+    uploadZone?.addEventListener('click', () => fileInput?.click());
+
+    fileInput?.addEventListener('change', function () {
+        if (!this.files?.length) return;
+        uploadZone.querySelector('span').textContent = this.files[0].name;
+        const icon = uploadZone.querySelector('i');
+        icon.classList.replace('bi-file-earmark-spreadsheet', 'bi-file-earmark-check');
+        icon.classList.replace('text-white-50', 'text-success');
+    });
+
+    fileInput?.addEventListener('change', async function () {
+        const file = this.files?.[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const response = await fetch('/upload_employees', { method: 'POST', body: formData });
+            if (!response.ok) {
+                const text = await response.text();
+                console.error('Upload error:', response.status, text);
+                alert('Upload failed: ' + response.status);
+                return;
+            }
+            const result = await response.json();
+            if (result.success) {
+                alert('Employees imported successfully! Inserted: ' + result.inserted);
+            } else {
+                alert('Error: ' + result.error);
+            }
+        } catch (err) {
+            console.error('Upload fetch error:', err);
+            alert('Upload failed (check console).');
+        }
+    });
+
+    // =========================================================
+    // ADD USER MODAL — Reset on Close
+    // =========================================================
+    addUserModalEl?.addEventListener('hidden.bs.modal', () => {
+        showView(selectionView);
+
+        if (fileInput) {
+            fileInput.value = '';
+            if (uploadZone) {
+                uploadZone.querySelector('span').textContent = 'Click to export xls file';
+                const icon = uploadZone.querySelector('i');
+                icon.classList.replace('bi-file-earmark-check', 'bi-file-earmark-spreadsheet');
+                icon.classList.remove('text-success');
+                icon.classList.add('text-white-50');
+            }
+        }
+
+        const manualForm = document.getElementById('manualAddEmployeeForm');
+        if (manualForm) {
+            manualForm.reset();
+            document.getElementById('teachingFields')?.classList.add('d-none');
+            document.getElementById('nonTeachingFields')?.classList.add('d-none');
+            document.getElementById('submitManualAddBtn').disabled = true;
+        }
+    });
+
+    // =========================================================
+    // MANUAL ADD — Dynamic Fields & Validation
+    // =========================================================
+    const manualIdInput              = document.getElementById('manualAddId');
+    const manualNameInput            = document.getElementById('manualAddName');
+    const typeTeachingRadio          = document.getElementById('typeTeaching');
+    const typeNonTeachingRadio       = document.getElementById('typeNonTeaching');
+    const teachingFields             = document.getElementById('teachingFields');
+    const nonTeachingFields          = document.getElementById('nonTeachingFields');
+    const manualAddCollege           = document.getElementById('manualAddCollege');
+    const manualAddTeachingPosition  = document.getElementById('manualAddTeachingPosition');
+    const manualAddOffice            = document.getElementById('manualAddOffice');
     const manualAddNonTeachingPosition = document.getElementById('manualAddNonTeachingPosition');
-    
-    const submitManualBtn = document.getElementById('submitManualAddBtn');
+    const submitManualBtn            = document.getElementById('submitManualAddBtn');
 
     function togglePersonnelFields() {
-        if (typeTeachingRadio.checked) {
-            teachingFields.classList.remove('d-none');
-            nonTeachingFields.classList.add('d-none');
-            manualAddOffice.value = "";
-            manualAddNonTeachingPosition.value = "";
-        } else if (typeNonTeachingRadio.checked) {
-            teachingFields.classList.add('d-none');
-            nonTeachingFields.classList.remove('d-none');
-            manualAddCollege.value = "";
-            manualAddTeachingPosition.value = "";
+        const isTeaching = typeTeachingRadio.checked;
+        teachingFields?.classList.toggle('d-none', !isTeaching);
+        nonTeachingFields?.classList.toggle('d-none', isTeaching);
+        if (isTeaching) {
+            if (manualAddOffice) manualAddOffice.value = '';
+            if (manualAddNonTeachingPosition) manualAddNonTeachingPosition.value = '';
+        } else {
+            if (manualAddCollege) manualAddCollege.value = '';
+            if (manualAddTeachingPosition) manualAddTeachingPosition.value = '';
         }
         validateManualForm();
     }
 
-    if (typeTeachingRadio) typeTeachingRadio.addEventListener('change', togglePersonnelFields);
-    if (typeNonTeachingRadio) typeNonTeachingRadio.addEventListener('change', togglePersonnelFields);
-
     function validateManualForm() {
-        const idValid = manualIdInput && manualIdInput.value.trim().length > 0;
-        const nameValid = manualNameInput && manualNameInput.value.trim().length > 0;
-        
-        let typeValid = false;
-        if (typeTeachingRadio && typeTeachingRadio.checked) {
-            typeValid = manualAddCollege.value !== "" && manualAddTeachingPosition.value !== "";
-        } else if (typeNonTeachingRadio && typeNonTeachingRadio.checked) {
-            typeValid = manualAddOffice.value !== "" && manualAddNonTeachingPosition.value !== "";
+        const idValid   = manualIdInput?.value.trim().length > 0;
+        const nameValid = manualNameInput?.value.trim().length > 0;
+        let typeValid   = false;
+
+        if (typeTeachingRadio?.checked) {
+            typeValid = !!manualAddCollege?.value && !!manualAddTeachingPosition?.value;
+        } else if (typeNonTeachingRadio?.checked) {
+            typeValid = !!manualAddOffice?.value && !!manualAddNonTeachingPosition?.value;
         }
-        
-        if (submitManualBtn) {
-            submitManualBtn.disabled = !(idValid && nameValid && typeValid);
-        }
+
+        if (submitManualBtn) submitManualBtn.disabled = !(idValid && nameValid && typeValid);
     }
 
-    if (manualIdInput) manualIdInput.addEventListener('input', validateManualForm);
-    if (manualNameInput) manualNameInput.addEventListener('input', validateManualForm);
-    if (manualAddCollege) manualAddCollege.addEventListener('change', validateManualForm);
-    if (manualAddTeachingPosition) manualAddTeachingPosition.addEventListener('change', validateManualForm);
-    if (manualAddOffice) manualAddOffice.addEventListener('change', validateManualForm);
-    if (manualAddNonTeachingPosition) manualAddNonTeachingPosition.addEventListener('change', validateManualForm);
+    typeTeachingRadio?.addEventListener('change', togglePersonnelFields);
+    typeNonTeachingRadio?.addEventListener('change', togglePersonnelFields);
+    manualIdInput?.addEventListener('input', validateManualForm);
+    manualNameInput?.addEventListener('input', validateManualForm);
+    manualAddCollege?.addEventListener('change', validateManualForm);
+    manualAddTeachingPosition?.addEventListener('change', validateManualForm);
+    manualAddOffice?.addEventListener('change', validateManualForm);
+    manualAddNonTeachingPosition?.addEventListener('change', validateManualForm);
 
-    // --- View Toggler Logic ---
+    // =========================================================
+    // MANUAL ADD — Submit
+    // =========================================================
+    submitManualBtn?.addEventListener('click', async () => {
+        const employeeId   = manualIdInput?.value.trim();
+        const name         = manualNameInput?.value.trim();
+        const isTeaching   = typeTeachingRadio?.checked;
+        const departmentId = isTeaching ? manualAddCollege?.value : manualAddOffice?.value;
+        const position     = isTeaching ? manualAddTeachingPosition?.value : manualAddNonTeachingPosition?.value;
+
+        const missing = [];
+        if (!employeeId)   missing.push('Employee ID');
+        if (!name)         missing.push('Full Name');
+        if (!departmentId) missing.push('Department');
+        if (!position)     missing.push('Position');
+
+        if (missing.length) {
+            alert('Missing: ' + missing.join(', '));
+            return;
+        }
+
+        try {
+            const response = await fetch('/add_employee', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ employee_id: employeeId, employee_name: name, department_id: departmentId, position })
+            });
+
+            if (!response.ok) {
+                const text = await response.text();
+                console.error('HTTP error:', response.status, text);
+                alert('Server Error: ' + response.status);
+                return;
+            }
+
+            const result = await response.json();
+            if (result.success) {
+                alert('Employee added successfully!');
+            } else {
+                alert('Error: ' + (result.error || 'Unknown error'));
+            }
+        } catch (err) {
+            console.error('Fetch error:', err);
+            alert('Network/Server Error. Check console.');
+        }
+    });
+
+    // =========================================================
+    // VIEW TOGGLER
+    // =========================================================
     const viewRadios = document.querySelectorAll('.view-toggle');
     const views = {
-        'activity': document.getElementById('activity-view'),
-        'records': document.getElementById('records-view')
+        activity: document.getElementById('activity-view'),
+        records:  document.getElementById('records-view')
     };
 
     viewRadios.forEach(radio => {
         radio.addEventListener('change', function (e) {
             Object.values(views).forEach(v => v?.classList.remove('active-view'));
-            const targetView = views[e.target.value];
-            if (targetView) {
-                targetView.classList.add('active-view');
+            const target = views[e.target.value];
+            if (target) {
+                target.classList.add('active-view');
                 history.replaceState(null, null, '#' + e.target.value);
             }
         });
@@ -832,289 +889,208 @@ document.addEventListener('DOMContentLoaded', function () {
         const hash = window.location.hash.replace('#', '');
         if (hash && views[hash]) {
             const radio = document.getElementById('view' + hash.charAt(0).toUpperCase() + hash.slice(1));
-            if (radio) {
-                radio.checked = true;
-                radio.dispatchEvent(new Event('change'));
-            }
+            if (radio) { radio.checked = true; radio.dispatchEvent(new Event('change')); }
         }
     }
     window.addEventListener('hashchange', handleHash);
     handleHash();
 
-    const searchInput  = document.getElementById('searchInput');
-    const departmentFilter = document.getElementById('departmentFilter');
-    const dateFilter   = document.getElementById('dateFilter');
-    const tableCard    = document.getElementById('tableCard');
-    const noResults    = document.getElementById('noResults');
-    const resultCount  = document.getElementById('resultCount');
+    // =========================================================
+    // ACTIVITY TABLE — Filters & Pagination
+    // =========================================================
+    const ITEMS_PER_PAGE     = 6;
+    let currentPage          = 1;
+    const searchInput        = document.getElementById('searchInput');
+    const departmentFilter   = document.getElementById('departmentFilter');
+    const dateFilter         = document.getElementById('dateFilter');
+    const tableCard          = document.getElementById('tableCard');
+    const noResults          = document.getElementById('noResults');
+    const resultCount        = document.getElementById('resultCount');
     const paginationContainer = document.getElementById('paginationContainer');
-    const paginationList = document.getElementById('paginationList');
-    const getRows      = () => document.querySelectorAll('.employee-row');
+    const paginationList     = document.getElementById('paginationList');
+    const getRows            = () => document.querySelectorAll('.employee-row');
 
-    // Pagination settings
-    const ITEMS_PER_PAGE = 6;
-    let currentPage = 1;
+    function getVisibleRowCount() {
+        return Array.from(getRows()).filter(r => r.dataset.filterVisible !== 'false').length;
+    }
+
+    function updateTableDisplay() {
+        const visibleRows = Array.from(getRows()).filter(r => r.dataset.filterVisible !== 'false');
+        const start = (currentPage - 1) * ITEMS_PER_PAGE;
+        const end   = start + ITEMS_PER_PAGE;
+        getRows().forEach(row => {
+            if (row.dataset.filterVisible === 'false') { row.style.display = 'none'; return; }
+            row.style.display = (visibleRows.indexOf(row) >= start && visibleRows.indexOf(row) < end) ? '' : 'none';
+        });
+    }
 
     function renderPagination(visibleCount) {
         const totalPages = Math.ceil(visibleCount / ITEMS_PER_PAGE);
         paginationList.innerHTML = '';
 
-        if (totalPages <= 1) {
-            paginationContainer.classList.remove('show');
-            paginationContainer.style.display = 'none';
-            return;
-        }
+        const showPager = totalPages > 1;
+        paginationContainer.classList.toggle('show', showPager);
+        paginationContainer.style.display = showPager ? 'flex' : 'none';
+        if (!showPager) return;
 
-        paginationContainer.classList.add('show');
-        paginationContainer.style.display = 'flex';
+        const mkBtn = (label, cls, onClick) => {
+            const li  = document.createElement('li');  li.className = 'page-item';
+            const btn = document.createElement('button'); btn.type = 'button';
+            btn.className = 'page-link ' + cls; btn.innerHTML = label;
+            btn.addEventListener('click', onClick);
+            li.appendChild(btn); return { li, btn };
+        };
 
-        const prevLi = document.createElement('li');
-        prevLi.className = 'page-item';
-        const prevBtn = document.createElement('button');
-        prevBtn.type = 'button';
-        prevBtn.className = 'page-link page-prev';
-        prevBtn.innerHTML = '<i class="bi bi-chevron-left me-1"></i>Previous';
-        prevLi.appendChild(prevBtn);
+        const { li: prevLi, btn: prevBtn } = mkBtn('<i class="bi bi-chevron-left me-1"></i>Previous', 'page-prev', () => {
+            if (currentPage > 1) goToPage(currentPage - 1, visibleCount);
+        });
         paginationList.appendChild(prevLi);
 
-        // Determine which pages to show (simplified logic: show max 5 page numbers)
-        let startPage = 1;
-        let endPage = totalPages;
-
+        let startPage = 1, endPage = totalPages;
         if (totalPages > 5) {
             startPage = Math.max(1, currentPage - 2);
-            endPage = Math.min(totalPages, startPage + 4);
-            if (endPage - startPage < 4) {
-                startPage = Math.max(1, endPage - 4);
-            }
+            endPage   = Math.min(totalPages, startPage + 4);
+            if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
         }
 
         for (let i = startPage; i <= endPage; i++) {
-            const li = document.createElement('li');
-            li.className = 'page-item';
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = `page-link page-number ${i === currentPage ? 'active' : ''}`;
-            button.textContent = i;
-            button.dataset.page = i;
-            button.addEventListener('click', () => goToPage(i, visibleCount));
-            li.appendChild(button);
+            const { li } = mkBtn(i, `page-number${i === currentPage ? ' active' : ''}`, () => goToPage(i, visibleCount));
             paginationList.appendChild(li);
         }
 
         if (endPage < totalPages) {
-            const separatorLi = document.createElement('li');
-            separatorLi.className = 'page-item';
-            const separatorSpan = document.createElement('span');
-            separatorSpan.className = 'page-link page-number-separator';
-            separatorSpan.textContent = '...';
-            separatorLi.appendChild(separatorSpan);
-            paginationList.appendChild(separatorLi);
+            const sepLi = document.createElement('li'); sepLi.className = 'page-item';
+            const sep   = document.createElement('span'); sep.className = 'page-link page-number-separator'; sep.textContent = '...';
+            sepLi.appendChild(sep); paginationList.appendChild(sepLi);
 
-            const lastLi = document.createElement('li');
-            lastLi.className = 'page-item';
-            const lastButton = document.createElement('button');
-            lastButton.type = 'button';
-            lastButton.className = 'page-link page-number';
-            lastButton.textContent = totalPages;
-            lastButton.dataset.page = totalPages;
-            lastButton.addEventListener('click', () => goToPage(totalPages, visibleCount));
-            lastLi.appendChild(lastButton);
+            const { li: lastLi } = mkBtn(totalPages, 'page-number', () => goToPage(totalPages, visibleCount));
             paginationList.appendChild(lastLi);
         }
 
-        const nextLi = document.createElement('li');
-        nextLi.className = 'page-item';
-        const nextBtn = document.createElement('button');
-        nextBtn.type = 'button';
-        nextBtn.className = 'page-link page-next';
-        nextBtn.innerHTML = 'Next <i class="bi bi-chevron-right ms-1"></i>';
-        nextLi.appendChild(nextBtn);
+        const { li: nextLi, btn: nextBtn } = mkBtn('Next <i class="bi bi-chevron-right ms-1"></i>', 'page-next', () => {
+            if (currentPage < totalPages) goToPage(currentPage + 1, visibleCount);
+        });
         paginationList.appendChild(nextLi);
 
-        updatePrevNextButtons(totalPages);
+        prevBtn.disabled = currentPage === 1;
+        nextBtn.disabled = currentPage === totalPages;
     }
 
     function goToPage(page, visibleCount) {
         const totalPages = Math.ceil(visibleCount / ITEMS_PER_PAGE);
         if (page < 1 || page > totalPages) return;
-        
         currentPage = page;
         updateTableDisplay();
         renderPagination(visibleCount);
     }
 
-    function updatePrevNextButtons(totalPages) {
-        const prevBtn = paginationList.querySelector('.page-prev');
-        const nextBtn = paginationList.querySelector('.page-next');
-        
-        if (!prevBtn || !nextBtn) return;
-
-        prevBtn.disabled = currentPage === 1;
-        nextBtn.disabled = currentPage === totalPages;
-
-        prevBtn.onclick = () => {
-            if (currentPage > 1) {
-                goToPage(currentPage - 1, getVisibleRowCount());
-            }
-        };
-
-        nextBtn.onclick = () => {
-            if (currentPage < totalPages) {
-                goToPage(currentPage + 1, getVisibleRowCount());
-            }
-        };
-    }
-
-    function getVisibleRowCount() {
-        let count = 0;
-        getRows().forEach(row => {
-            if (row.dataset.filterVisible !== 'false') count++;
-        });
-        return count;
-    }
-
-    function updateTableDisplay() {
-        const visibleRows = Array.from(getRows()).filter(row => row.dataset.filterVisible !== 'false');
-        const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
-        const endIdx = startIdx + ITEMS_PER_PAGE;
-
-        getRows().forEach(row => {
-            if (row.dataset.filterVisible === 'false') {
-                row.style.display = 'none';
-                return;
-            }
-            const idx = visibleRows.indexOf(row);
-            row.style.display = (idx >= startIdx && idx < endIdx) ? '' : 'none';
-        });
-    }
-
     function applyFilters() {
-        const search = searchInput.value.trim().toLowerCase();
+        const search     = searchInput.value.trim().toLowerCase();
         const department = departmentFilter.value;
-        const date   = dateFilter.value;
+        const date       = dateFilter.value;
+        let visible      = 0;
 
-        let visible = 0;
+        getRows().forEach(row => {
+            const match =
+                (!search     || row.dataset.employeeId.includes(search) || row.dataset.employeeName.includes(search)) &&
+                (!department || row.dataset.department === department) &&
+                (!date       || row.dataset.date === date);
 
-        getRows().forEach(function (row) {
-            const matchSearch = !search ||
-                row.dataset.employeeId.includes(search) ||
-                row.dataset.employeeName.includes(search);
-            const matchDepartment = !department || row.dataset.department === department;
-            const matchDate   = !date   || row.dataset.date === date;
-
-            if (matchSearch && matchDepartment && matchDate) {
-                row.dataset.filterVisible = 'true';
-                row.style.display = '';
-                visible++;
-            } else {
-                row.dataset.filterVisible = 'false';
-                row.style.display = 'none';
-            }
+            row.dataset.filterVisible = match ? 'true' : 'false';
+            row.style.display = match ? '' : 'none';
+            if (match) visible++;
         });
 
-        currentPage = 1; // Reset to first page when filtering
+        currentPage = 1;
         const hasFilters = search || department || date;
 
         if (getRows().length > 0) {
             if (visible === 0 && hasFilters) {
-                tableCard.style.display  = 'none';
+                tableCard.style.display = 'none';
                 paginationContainer.classList.remove('show');
                 paginationContainer.style.display = 'none';
-                noResults.style.display  = 'block';
-                resultCount.textContent  = '';
+                noResults.style.display = 'block';
+                resultCount.textContent = '';
             } else {
-                tableCard.style.display  = '';
-                noResults.style.display  = 'none';
-                resultCount.textContent  = hasFilters
-                    ? 'Showing up to ' + Math.min(ITEMS_PER_PAGE, visible) + ' of ' + visible + ' record' + (visible !== 1 ? 's' : '')
+                tableCard.style.display = '';
+                noResults.style.display = 'none';
+                resultCount.textContent = hasFilters
+                    ? `Showing up to ${Math.min(ITEMS_PER_PAGE, visible)} of ${visible} record${visible !== 1 ? 's' : ''}`
                     : '';
-                
                 updateTableDisplay();
                 renderPagination(visible);
             }
         }
     }
 
-    // Live search while typing
     searchInput.addEventListener('input', applyFilters);
     departmentFilter.addEventListener('change', applyFilters);
     dateFilter.addEventListener('change', applyFilters);
-    
-    // Records search
-    const recordsSearch = document.getElementById('recordsSearchInput');
-    const recordsDeptFilter = document.getElementById('recordsDepartmentFilter');
-    const recordsRows = document.querySelectorAll('.employee-record-row');
-    const recordsPaginationContainer = document.getElementById('recordsPaginationContainer');
-    const recordsPaginationList = document.getElementById('recordsPaginationList');
-    const recordsTableCard = document.getElementById('recordsTableCard');
-    const recordsNoResults = document.getElementById('recordsNoResults');
-    const recordsResultCount = document.getElementById('recordsResultCount');
-    
-    let recordsCurrentPage = 1;
+
+    // =========================================================
+    // RECORDS TABLE — Filters & Pagination
+    // =========================================================
+    let recordsCurrentPage            = 1;
+    const recordsSearch               = document.getElementById('recordsSearchInput');
+    const recordsDeptFilter           = document.getElementById('recordsDepartmentFilter');
+    const recordsRows                 = document.querySelectorAll('.employee-record-row');
+    const recordsPaginationContainer  = document.getElementById('recordsPaginationContainer');
+    const recordsPaginationList       = document.getElementById('recordsPaginationList');
+    const recordsTableCard            = document.getElementById('recordsTableCard');
+    const recordsNoResults            = document.getElementById('recordsNoResults');
+    const recordsResultCount          = document.getElementById('recordsResultCount');
+
+    function updateRecordsTableDisplay() {
+        const visibleRows = Array.from(recordsRows).filter(r => r.dataset.filterVisible !== 'false');
+        const start = (recordsCurrentPage - 1) * ITEMS_PER_PAGE;
+        const end   = start + ITEMS_PER_PAGE;
+        recordsRows.forEach(row => {
+            if (row.dataset.filterVisible === 'false') { row.style.display = 'none'; return; }
+            row.style.display = (visibleRows.indexOf(row) >= start && visibleRows.indexOf(row) < end) ? '' : 'none';
+        });
+    }
 
     function renderRecordsPagination(visibleCount) {
         const totalPages = Math.ceil(visibleCount / ITEMS_PER_PAGE);
         recordsPaginationList.innerHTML = '';
 
-        if (totalPages <= 1) {
-            recordsPaginationContainer.classList.remove('show');
-            recordsPaginationContainer.style.display = 'none';
-            return;
-        }
+        const showPager = totalPages > 1;
+        recordsPaginationContainer.classList.toggle('show', showPager);
+        recordsPaginationContainer.style.display = showPager ? 'flex' : 'none';
+        if (!showPager) return;
 
-        recordsPaginationContainer.classList.add('show');
-        recordsPaginationContainer.style.display = 'flex';
+        const mkBtn = (label, cls, onClick) => {
+            const li  = document.createElement('li');  li.className = 'page-item';
+            const btn = document.createElement('button'); btn.type = 'button';
+            btn.className = 'page-link ' + cls; btn.innerHTML = label;
+            btn.addEventListener('click', onClick);
+            li.appendChild(btn); return { li, btn };
+        };
 
-        const prevLi = document.createElement('li');
-        prevLi.className = 'page-item';
-        const prevBtn = document.createElement('button');
-        prevBtn.type = 'button';
-        prevBtn.className = 'page-link page-prev';
-        prevBtn.innerHTML = '<i class="bi bi-chevron-left me-1"></i>Previous';
-        prevLi.appendChild(prevBtn);
+        const { li: prevLi, btn: prevBtn } = mkBtn('<i class="bi bi-chevron-left me-1"></i>Previous', 'page-prev', () => {
+            if (recordsCurrentPage > 1) goToRecordsPage(recordsCurrentPage - 1, visibleCount);
+        });
         recordsPaginationList.appendChild(prevLi);
 
-        let startPage = 1;
-        let endPage = totalPages;
-
+        let startPage = 1, endPage = totalPages;
         if (totalPages > 5) {
             startPage = Math.max(1, recordsCurrentPage - 2);
-            endPage = Math.min(totalPages, startPage + 4);
-            if (endPage - startPage < 4) {
-                startPage = Math.max(1, endPage - 4);
-            }
+            endPage   = Math.min(totalPages, startPage + 4);
+            if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
         }
 
         for (let i = startPage; i <= endPage; i++) {
-            const li = document.createElement('li');
-            li.className = 'page-item';
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = `page-link page-number ${i === recordsCurrentPage ? 'active' : ''}`;
-            button.textContent = i;
-            button.addEventListener('click', () => goToRecordsPage(i, visibleCount));
-            li.appendChild(button);
+            const { li } = mkBtn(i, `page-number${i === recordsCurrentPage ? ' active' : ''}`, () => goToRecordsPage(i, visibleCount));
             recordsPaginationList.appendChild(li);
         }
 
-        const nextLi = document.createElement('li');
-        nextLi.className = 'page-item';
-        const nextBtn = document.createElement('button');
-        nextBtn.type = 'button';
-        nextBtn.className = 'page-link page-next';
-        nextBtn.innerHTML = 'Next <i class="bi bi-chevron-right ms-1"></i>';
-        nextLi.appendChild(nextBtn);
+        const { li: nextLi, btn: nextBtn } = mkBtn('Next <i class="bi bi-chevron-right ms-1"></i>', 'page-next', () => {
+            if (recordsCurrentPage < totalPages) goToRecordsPage(recordsCurrentPage + 1, visibleCount);
+        });
         recordsPaginationList.appendChild(nextLi);
 
-        const prevNode = recordsPaginationList.querySelector('.page-prev');
-        const nextNode = recordsPaginationList.querySelector('.page-next');
-        if (prevNode && nextNode) {
-            prevNode.disabled = recordsCurrentPage === 1;
-            nextNode.disabled = recordsCurrentPage === totalPages;
-            prevNode.onclick = () => { if (recordsCurrentPage > 1) goToRecordsPage(recordsCurrentPage - 1, visibleCount); };
-            nextNode.onclick = () => { if (recordsCurrentPage < totalPages) goToRecordsPage(recordsCurrentPage + 1, visibleCount); };
-        }
+        prevBtn.disabled = recordsCurrentPage === 1;
+        nextBtn.disabled = recordsCurrentPage === totalPages;
     }
 
     function goToRecordsPage(page, visibleCount) {
@@ -1125,39 +1101,18 @@ document.addEventListener('DOMContentLoaded', function () {
         renderRecordsPagination(visibleCount);
     }
 
-    function updateRecordsTableDisplay() {
-        const visibleRows = Array.from(recordsRows).filter(row => row.dataset.filterVisible !== 'false');
-        const startIdx = (recordsCurrentPage - 1) * ITEMS_PER_PAGE;
-        const endIdx = startIdx + ITEMS_PER_PAGE;
-        recordsRows.forEach(row => {
-            if (row.dataset.filterVisible === 'false') {
-                row.style.display = 'none';
-                return;
-            }
-            const idx = visibleRows.indexOf(row);
-            row.style.display = (idx >= startIdx && idx < endIdx) ? '' : 'none';
-        });
-    }
-    
     function applyRecordsFilter() {
-        const val = recordsSearch ? recordsSearch.value.trim().toLowerCase() : '';
-        const deptVal = recordsDeptFilter ? recordsDeptFilter.value.toLowerCase() : '';
-        
-        let visible = 0;
-        
+        const val    = recordsSearch?.value.trim().toLowerCase() ?? '';
+        const deptVal = recordsDeptFilter?.value.toLowerCase() ?? '';
+        let visible  = 0;
+
         recordsRows.forEach(row => {
-            const name = row.dataset.name || '';
-            const dept = row.dataset.dept || '';
-            
-            const matchSearch = name.includes(val) || dept.includes(val);
-            const matchDept = !deptVal || dept === deptVal;
-            
-            if (matchSearch && matchDept) {
-                row.dataset.filterVisible = 'true';
-                visible++;
-            } else {
-                row.dataset.filterVisible = 'false';
-            }
+            const match =
+                (row.dataset.name?.includes(val) || row.dataset.dept?.includes(val)) &&
+                (!deptVal || row.dataset.dept === deptVal);
+
+            row.dataset.filterVisible = match ? 'true' : 'false';
+            if (match) visible++;
         });
 
         recordsCurrentPage = 1;
@@ -1176,71 +1131,55 @@ document.addEventListener('DOMContentLoaded', function () {
                 recordsResultCount.textContent = hasFilters
                     ? `Showing up to ${Math.min(ITEMS_PER_PAGE, visible)} of ${visible} record${visible !== 1 ? 's' : ''}`
                     : '';
-                
                 updateRecordsTableDisplay();
                 renderRecordsPagination(visible);
             }
         }
     }
 
-    if (recordsSearch) recordsSearch.addEventListener('input', applyRecordsFilter);
-    if (recordsDeptFilter) recordsDeptFilter.addEventListener('change', applyRecordsFilter);
+    recordsSearch?.addEventListener('input', applyRecordsFilter);
+    recordsDeptFilter?.addEventListener('change', applyRecordsFilter);
 
-    const editOverlay = document.getElementById('editOverlay');
-    const editCard = document.getElementById('employeeEditCard');
-    const editEmployeeId = document.getElementById('editEmployeeId');
+    // =========================================================
+    // EDIT / VIEW / DELETE — Row Actions
+    // =========================================================
+    const editOverlay      = document.getElementById('editOverlay');
+    const editCard         = document.getElementById('employeeEditCard');
+    const editEmployeeId   = document.getElementById('editEmployeeId');
     const editEmployeeName = document.getElementById('editEmployeeName');
     const editDepartmentId = document.getElementById('editDepartmentId');
-    const editPosition = document.getElementById('editPosition');
+    const editPosition     = document.getElementById('editPosition');
     const saveEmployeeEdit = document.getElementById('saveEmployeeEdit');
     const cancelEditEmployee = document.getElementById('cancelEditEmployee');
-    let currentEditRow = null;
+    let currentEditRow     = null;
 
     function showEditCard(row, mode = 'edit') {
         currentEditRow = row;
-        const employeeId = row.dataset.employeeId || row.dataset.id || row.querySelector('td:nth-child(1)')?.textContent.trim() || '';
-        
-        let employeeName = '';
-        const nameSpan = row.querySelector('td:nth-child(1) span');
-        if (nameSpan) {
-            employeeName = nameSpan.textContent.trim();
-        } else {
-            employeeName = row.querySelector('td:nth-child(2)')?.textContent.trim() || '';
-        }
-        
-        let departmentId = row.dataset.department || row.dataset.dept || '';
-        if (!departmentId && mode === 'edit') {
-             departmentId = row.querySelector('td:nth-child(3)')?.textContent.trim() || '';
-        } else if (!departmentId) {
-             departmentId = row.querySelector('td:nth-child(2)')?.textContent.trim() || '';
-        }
-        
-        let position = row.dataset.position || '';
-        if (!position && mode === 'edit') {
-             position = row.querySelector('td:nth-child(4)')?.textContent.trim() || '';
-        }
+        const employeeId   = row.dataset.employeeId || row.dataset.id || row.querySelector('td:nth-child(1)')?.textContent.trim() || '';
+        const nameSpan     = row.querySelector('td:nth-child(1) span');
+        const employeeName = nameSpan ? nameSpan.textContent.trim() : row.querySelector('td:nth-child(2)')?.textContent.trim() || '';
+        const isView       = mode === 'view';
 
-        editEmployeeId.value = employeeId;
+        let departmentId = row.dataset.department || row.dataset.dept || '';
+        if (!departmentId) departmentId = row.querySelector(`td:nth-child(${isView ? 2 : 3})`)?.textContent.trim() || '';
+
+        let position = row.dataset.position || '';
+        if (!position && !isView) position = row.querySelector('td:nth-child(4)')?.textContent.trim() || '';
+
+        editEmployeeId.value   = employeeId;
         editEmployeeName.value = employeeName;
         editDepartmentId.value = departmentId;
-        editPosition.value = position;
-        
-        const title = document.querySelector('#employeeEditCard h5');
-        const desc = document.querySelector('#employeeEditCard p');
+        editPosition.value     = position;
+
+        const title  = editCard.querySelector('h5');
+        const desc   = editCard.querySelector('p');
         const inputs = [editEmployeeId, editEmployeeName, editDepartmentId, editPosition];
-        
-        if (mode === 'view') {
-            title.textContent = 'View Employee Details';
-            desc.textContent = 'Read-only view of the activity log details.';
-            saveEmployeeEdit.style.display = 'none';
-            inputs.forEach(i => i.readOnly = true);
-        } else {
-            title.textContent = 'Edit Employee Record';
-            desc.textContent = 'Update the employee details and save the changes.';
-            saveEmployeeEdit.style.display = 'block';
-            inputs.forEach(i => i.readOnly = false);
-        }
-        
+
+        title.textContent = isView ? 'View Employee Details'  : 'Edit Employee Record';
+        desc.textContent  = isView ? 'Read-only view of the activity log details.' : 'Update the employee details and save the changes.';
+        saveEmployeeEdit.style.display = isView ? 'none' : 'block';
+        inputs.forEach(i => i.readOnly = isView);
+
         editOverlay.classList.remove('d-none');
         editCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
@@ -1248,53 +1187,39 @@ document.addEventListener('DOMContentLoaded', function () {
     function hideEditCard() {
         currentEditRow = null;
         editOverlay.classList.add('d-none');
-        editEmployeeId.value = '';
-        editEmployeeName.value = '';
-        editDepartmentId.value = '';
-        editPosition.value = '';
+        [editEmployeeId, editEmployeeName, editDepartmentId, editPosition].forEach(i => i.value = '');
     }
 
     function bindRowActions() {
-        document.querySelectorAll('.view-employee, .edit-employee-record').forEach(function (button) {
-            button.addEventListener('click', function (event) {
-                const row = event.target.closest('tr');
-                const isView = event.target.classList.contains('view-employee');
-                if (row) {
-                    showEditCard(row, isView ? 'view' : 'edit');
-                }
+        document.querySelectorAll('.view-employee, .edit-employee-record').forEach(btn => {
+            btn.addEventListener('click', e => {
+                const row = e.target.closest('tr');
+                if (row) showEditCard(row, btn.classList.contains('view-employee') ? 'view' : 'edit');
             });
         });
 
-        document.querySelectorAll('.delete-employee, .delete-employee-record').forEach(function (button) {
-            button.addEventListener('click', function (event) {
-                const row = event.target.closest('tr');
-                if (!row) {
-                    return;
-                }
-                let employeeName = row.querySelector('td:nth-child(1) span')?.textContent.trim();
-                if (!employeeName) {
-                    employeeName = row.querySelector('td:nth-child(2)')?.textContent.trim() || 'this employee';
-                }
-                if (confirm(`Delete ${employeeName} from records?`)) {
+        document.querySelectorAll('.delete-employee, .delete-employee-record').forEach(btn => {
+            btn.addEventListener('click', e => {
+                const row = e.target.closest('tr');
+                if (!row) return;
+                const name = row.querySelector('td:nth-child(1) span')?.textContent.trim()
+                          || row.querySelector('td:nth-child(2)')?.textContent.trim()
+                          || 'this employee';
+                if (confirm(`Delete ${name} from records?`)) {
+                    if (currentEditRow === row) hideEditCard();
                     row.remove();
-                    if (currentEditRow === row) {
-                        hideEditCard();
-                    }
-                    applyFilters(); // Refresh pagination
-                    if (typeof applyRecordsFilter === 'function') applyRecordsFilter();
+                    applyFilters();
+                    applyRecordsFilter();
                 }
             });
         });
     }
 
     saveEmployeeEdit.addEventListener('click', function () {
-        if (!currentEditRow) {
-            return;
-        }
-
-        const newId = editEmployeeId.value.trim();
-        const newName = editEmployeeName.value.trim();
-        const newDept = editDepartmentId.value.trim();
+        if (!currentEditRow) return;
+        const newId       = editEmployeeId.value.trim();
+        const newName     = editEmployeeName.value.trim();
+        const newDept     = editDepartmentId.value.trim();
         const newPosition = editPosition.value.trim();
 
         if (!newId || !newName || !newDept || !newPosition) {
@@ -1302,35 +1227,35 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        currentEditRow.dataset.employeeId = newId;
+        currentEditRow.dataset.employeeId   = newId;
         currentEditRow.dataset.employeeName = newName.toLowerCase();
-        currentEditRow.dataset.department = newDept;
-        currentEditRow.dataset.position = newPosition;
+        currentEditRow.dataset.department   = newDept;
+        currentEditRow.dataset.position     = newPosition;
         currentEditRow.querySelector('td:nth-child(1) span').textContent = newName;
-        currentEditRow.querySelector('td:nth-child(2)').textContent = newDept;
+        currentEditRow.querySelector('td:nth-child(2)').textContent      = newDept;
         hideEditCard();
     });
 
     cancelEditEmployee.addEventListener('click', hideEditCard);
-    editOverlay.addEventListener('click', function (event) {
-        if (event.target === editOverlay) {
-            hideEditCard();
-        }
-    });
+    editOverlay.addEventListener('click', e => { if (e.target === editOverlay) hideEditCard(); });
 
     bindRowActions();
 
-    // Initialize pagination after the page is fully ready
+    // =========================================================
+    // INIT
+    // =========================================================
     setTimeout(() => {
-        const initialVisibleCount = getVisibleRowCount();
-        if (initialVisibleCount > 0) {
+        const initialCount = getVisibleRowCount();
+        if (initialCount > 0) {
             currentPage = 1;
             updateTableDisplay();
-            renderPagination(initialVisibleCount);
+            renderPagination(initialCount);
         }
-        // Run records pagination filter
         applyRecordsFilter();
     }, 50);
+
 });
 </script>
+
+
 {% endblock %}
