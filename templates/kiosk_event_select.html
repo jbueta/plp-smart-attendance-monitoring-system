@@ -1,78 +1,160 @@
-<!-- Load base layout -->
 {% extends "base.html" %}
 
-<!-- Page title -->
 {% block title %}Select Event - PLP Employee{% endblock %}
 
-<!-- Page content -->
 {% block content %}
 <div class="container py-5 min-vh-100 d-flex flex-column justify-content-center">
 
-    <!-- Header -->
     <div class="text-center mb-5">
         <h1 class="display-4 fw-bold text-white mb-2">Select Attendance Event</h1>
         <p class="lead text-white-50">Please choose the event you are attending to log your entrance.</p>
     </div>
 
-    <!-- Events Grid -->
-    <div class="row g-4 justify-content-center">
+    <div id="events-grid-container" class="row g-4 justify-content-center">
 
-        {% if events|length <= 2 %} <div class="col-12 text-center mb-4">
+        {% if not events %} 
+        <div class="col-12 text-center mb-4">
             <div class="alert alert-info bg-opacity-10 border-info text-info d-inline-block px-4">
-                <i class="bi bi-info-circle me-2"></i>No additional events scheduled at this time.
+                <i class="bi bi-info-circle me-2"></i>No events scheduled this day.
             </div>
-    </div>
-    {% endif %}
+        </div>
+        {% endif %}
 
-    {% for event in events %}
-    <div class="col-md-6 col-lg-4">
-        <a href="{{ url_for('kiosk_employee', event_id=event.id) }}" class="text-decoration-none">
-            <div class="card-glass p-4 h-100 transition-hover border-gold-subtle text-center">
-                <div class="mb-3">
-                    {% if event.type == 'Ceremony' %}
-                    <i class="bi bi-flag text-warning display-4"></i>
-                    {% elif event.type == 'Meeting' %}
-                    <i class="bi bi-people text-info display-4"></i>
-                    {% elif event.type == 'Training' %}
-                    <i class="bi bi-easel text-primary display-4"></i>
-                    {% elif event.type == 'Seminar' %}
-                    <i class="bi bi-mic text-danger display-4"></i>
-                    {% elif event.type == 'Workshop' %}
-                    <i class="bi bi-tools text-success display-4"></i>
-                    {% elif event.type == 'Drill' %}
-                    <i class="bi bi-exclamation-triangle text-warning display-4"></i>
-                    {% elif event.type == 'Activity' %}
-                    <i class="bi bi-emoji-smile text-secondary display-4"></i>
-                    {% else %}
-                    <i class="bi bi-calendar-event text-light display-4"></i>
+        {% for event in events %}
+        <div class="col-md-6 col-lg-4">
+            <a href="{{ url_for('kiosk_employee', instance_id=event.instance_id) }}" class="text-decoration-none">
+                <div class="card-glass p-4 h-100 transition-hover border-gold-subtle text-center">
+                    <div class="mb-3">
+                        {% if 'flag' in event.name|lower or 'ceremony' in event.name|lower or 'retreat' in event.name|lower %}
+                        <i class="bi bi-flag-fill text-info display-4"></i>
+                        {% elif event.type == 'Meeting' %}
+                        <i class="bi bi-people-fill text-success display-4"></i>
+                        {% elif event.type == 'Training' %}
+                        <i class="bi bi-easel2-fill text-primary display-4"></i>
+                        {% elif event.type == 'Seminar' %}
+                        <i class="bi bi-mic-fill text-warning display-4"></i>
+                        {% elif event.type == 'Workshop' %}
+                        <i class="bi bi-tools text-secondary display-4"></i>
+                        {% elif event.type == 'Drill' %}
+                        <i class="bi bi-megaphone-fill text-danger display-4"></i>
+                        {% elif event.type == 'Activity' %}
+                        <i class="bi bi-balloon-fill text-white display-4"></i>
+                        {% else %}
+                        <i class="bi bi-calendar-event-fill text-success display-4"></i>
+                        {% endif %}
+                    </div>
+                    <h3 class="h5 text-white fw-bold mb-2">{{ event.name }}</h3>
+                    <div class="badge bg-white bg-opacity-10 text-white border border-secondary mb-3">{{ event.type }}</div>
+                    {% if event.date %}
+                    <div class="text-white-50 small mb-1"><i class="bi bi-calendar-event me-2"></i>{{ event.date }}</div>
                     {% endif %}
-                </div>
-                <h3 class="h5 text-white fw-bold mb-2">{{ event.name }}</h3>
-                <div class="badge bg-white bg-opacity-10 text-white border border-secondary mb-3">{{ event.type }}</div>
-                {% if event.date %}
-                <div class="text-white-50 small mb-1"><i class="bi bi-calendar-event me-2"></i>{{ event.date }}</div>
-                {% endif %}
-                {% if event.time %}
-                <div class="text-white-50 small"><i class="bi bi-clock me-2"></i>{{ event.time }}</div>
-                {% endif %}
-                <div class="text-white-50 small mb-0">
-                    {% if event.dept and event.dept != 'All Departments' %}
-                    <span class="d-block mb-1 text-info">{{ event.dept }}</span>
+                    {% if event.time_start and event.time_end %}
+                    <div class="text-white-50 small"><i class="bi bi-clock me-2"></i>{{ event.time_start }} Start</div>
+                    <div class="text-white-50 small"><i class="bi bi-clock me-2"></i>{{ event.time_end }} End</div>
                     {% endif %}
-                    Click to enter attendance kiosk.
+                    <div class="text-white-50 small mb-0">
+                        {% if event.dept and event.dept != 'All Departments' %}
+                        <span class="d-block mb-1 text-info">{{ event.dept }}</span>
+                        {% endif %}
+                        Click to enter attendance kiosk.
+                    </div>
                 </div>
-            </div>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="text-center mt-5">
+        <a href="{{ url_for('index') }}" class="btn btn-outline-light rounded-pill px-4 hover-text-dark">
+            <i class="bi bi-arrow-left me-2"></i>Back to Main Menu
         </a>
     </div>
-    {% endfor %}
-</div>
-
-<!-- Back Button -->
-<div class="text-center mt-5">
-    <a href="{{ url_for('index') }}" class="btn btn-outline-light rounded-pill px-4">
-        <i class="bi bi-arrow-left me-2"></i>Back to Main Menu
-    </a>
-</div>
 
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function fetchLiveEvents() {
+        fetch('http://127.0.0.1:5000/api/kiosk/live-events')
+            .then(response => response.json())
+            .then(data => {
+                console.log(data);
+                if (data.status === 'success') {
+                    updateEventsGrid(data.events);
+                }
+            })
+            .catch(error => console.error("Error fetching live events:", error));
+    }
+
+    function updateEventsGrid(events) {
+        const gridContainer = document.getElementById('events-grid-container');
+        if (!gridContainer) return;
+
+        let htmlContent = '';
+
+        if (events.length <= 2) {
+            htmlContent += `
+                <div class="col-12 text-center mb-4">
+                    <div class="alert alert-info bg-opacity-10 border-info text-info d-inline-block px-4">
+                        <i class="bi bi-info-circle me-2"></i>No additional events scheduled at this time.
+                    </div>
+                </div>
+            `;
+        }
+
+        events.forEach(event => {
+            let iconClass = 'bi-calendar-event-fill text-success';
+            const nameLower = event.name.toLowerCase();
+            
+            if (nameLower.includes('flag') || nameLower.includes('ceremony') || nameLower.includes('retreat')) {
+                iconClass = 'bi-flag-fill text-info';
+            } else if (event.type === 'Meeting') {
+                iconClass = 'bi-people-fill text-success';
+            } else if (event.type === 'Training') {
+                iconClass = 'bi-easel2-fill text-primary';
+            } else if (event.type === 'Seminar') {
+                iconClass = 'bi-mic-fill text-warning';
+            } else if (event.type === 'Workshop') {
+                iconClass = 'bi-tools text-secondary';
+            } else if (event.type === 'Drill') {
+                iconClass = 'bi-megaphone-fill text-danger';
+            } else if (event.type === 'Activity') {
+                iconClass = 'bi-balloon-fill text-white';
+            }
+
+            const dateHtml = event.date ? `<div class="text-white-50 small mb-1"><i class="bi bi-calendar-event me-2"></i>${event.date}</div>` : '';
+            const timeStartHtml = event.time_start ? `<div class="text-white-50 small"><i class="bi bi-clock me-2"></i>${event.time_start} Start</div>` : '';
+            const timeEndHtml = event.time_end ? `<div class="text-white-50 small"><i class="bi bi-clock me-2"></i>${event.time_end} End</div>` : '';
+            const deptHtml = (event.location && event.location !== 'Facade') ? `<span class="d-block mb-1 text-info">${event.dept}</span>` : '';
+
+            const eventUrl = `/kiosk/employee?instance_id=${event.instance_id}`;
+
+            htmlContent += `
+                <div class="col-md-6 col-lg-4">
+                    <a href="${eventUrl}" class="text-decoration-none">
+                        <div class="card-glass p-4 h-100 transition-hover border-gold-subtle text-center">
+                            <div class="mb-3">
+                                <i class="bi ${iconClass} display-4"></i>
+                            </div>
+                            <h3 class="h5 text-white fw-bold mb-2">${event.name}</h3>
+                            <div class="badge bg-white bg-opacity-10 text-white border border-secondary mb-3">${event.type}</div>
+                            ${dateHtml}
+                            ${timeStartHtml}
+                            ${timeEndHtml}
+                            <div class="text-white-50 small mb-0">
+                                ${deptHtml}
+                                Click to enter attendance kiosk.
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            `;
+        });
+
+        gridContainer.innerHTML = htmlContent;
+    }
+
+    setInterval(fetchLiveEvents, 5000);
+</script>
 {% endblock %}
