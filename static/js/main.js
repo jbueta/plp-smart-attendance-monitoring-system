@@ -3,6 +3,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     initClock();
     initAnimations();
+    populateRandomStudentRecords();
 });
 
 // --- Real-time Clock ---
@@ -104,4 +105,87 @@ function initAnimations() {
             // subtle effect
         });
     });
+}
+
+function populateRandomStudentRecords() {
+    const tableBody = document.getElementById('studentTableBody');
+    if (!tableBody) return;
+
+    const collegeOptions = [
+        'College of Education',
+        'College of Business and Accountancy',
+        'College of Nursing',
+        'College of Engineering',
+        'College of Computer Studies',
+        'College of International Hospitality Management'
+    ];
+
+    const randomNames = [
+        'Ana Marie Santos',
+        'Carlos Miguel dela Cruz',
+        'Isabela Reyes',
+        'Miguel Antonio Garcia',
+        'Riza Lorena Aquino',
+        'Jomar Peña',
+        'Lara Mae Villar',
+        'Noel Gabriel Ramos',
+        'Karen Faith Soriano',
+        'Ethan Mark Bautista',
+        'Janella Cruz',
+        'Marco Angelo dela Rosa',
+        'Sofia Anne Navarro',
+        'David Lee Tan',
+        'Aiza Mae Lopez'
+    ];
+
+    const existingRows = tableBody.querySelectorAll('.student-row').length;
+    const rowsToAdd = Math.max(0, 10 - existingRows);
+
+    // Remove empty placeholder when adding sample records
+    const emptyRow = document.getElementById('emptyRow');
+    if (emptyRow && rowsToAdd > 0) {
+        emptyRow.remove();
+    }
+
+    for (let i = 0; i < rowsToAdd; i++) {
+        const name = randomNames[Math.floor(Math.random() * randomNames.length)];
+        const college = collegeOptions[Math.floor(Math.random() * collegeOptions.length)];
+        const id = `23-00${Math.floor(Math.random() * 900 + 100)}${Math.floor(Math.random() * 10)}`;
+        const timeIn = `${Math.floor(Math.random() * 3 + 7).toString().padStart(2, '0')}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`;
+        const timeOut = `${Math.floor(Math.random() * 3 + 11).toString().padStart(2, '0')}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`;
+        const statusActive = Math.random() > 0.5;
+        const status = statusActive ? 'Checked In' : 'Checked Out';
+        const statusClass = statusActive ? 'success' : 'danger';
+
+        const row = document.createElement('tr');
+        row.className = 'student-row';
+        row.dataset.id = id.toLowerCase();
+        row.dataset.name = name.toLowerCase();
+        row.dataset.course = college;
+        row.dataset.date = '';
+        row.innerHTML = `
+            <td class="font-monospace text-white-50 ps-4">${id}</td>
+            <td class="fw-bold text-white">${name}</td>
+            <td class="text-white-50">${college}</td>
+            <td class="text-success font-monospace small">${timeIn}</td>
+            <td class="text-danger font-monospace small">${timeOut}</td>
+            <td class="text-end" style="padding-right: 3rem;">
+                <span class="badge bg-${statusClass} bg-opacity-25 border border-${statusClass} text-${statusClass} rounded-pill px-3">
+                    ${status}
+                </span>
+            </td>
+            <td class="text-center align-middle" style="width: 80px;">
+                <div class="dropdown h-100 d-flex align-items-center justify-content-center">
+                    <button class="btn btn-sm btn-outline-light p-0 border-0 d-flex align-items-center justify-content-center fs-4" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        &hellip;
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm student-action-menu">
+                        <li><button type="button" class="dropdown-item edit-student text-white" data-id="${id}">Edit</button></li>
+                        <li><button type="button" class="dropdown-item text-danger delete-student" data-id="${id}">Delete</button></li>
+                    </ul>
+                </div>
+            </td>
+        `;
+        tableBody.appendChild(row);
+    }
 }

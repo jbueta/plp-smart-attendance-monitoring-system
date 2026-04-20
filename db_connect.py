@@ -526,14 +526,24 @@ class Database:
 
     def delete_bulk_events(self):
         """
-        Soft deletion of events to prevent data loss if needed
+        Soft deletion of multiple events to prevent data loss if needed
         """
         try: 
-            query = "UPDATE events SET active = 0 WHERE event_id = %s"
-            self.cursor.execute(query, self.parameter)
+            event_ids_list = self.parameter[0]
+
+            if not event_ids_list:
+                return {"message": "No valid event IDs provided.", "success": False}
+
+            placeholders = ', '.join(['%s'] * len(event_ids_list))
+            
+            query = f"UPDATE events SET active = 0 WHERE event_id IN ({placeholders})"
+            
+            self.cursor.execute(query, tuple(event_ids_list))
             self.conn.commit()
-            return {"message": "Event deleted successfully!", "success": True}
-        except connector.Error as err:
+            
+            return {"message": f"{len(event_ids_list)} events deleted successfully!", "success": True}
+            
+        except Exception as err:
             self.conn.rollback()
             return {"message": f"Database Error: {err}", "success": False}
 

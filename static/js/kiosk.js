@@ -268,7 +268,7 @@ function submitManualEntry(type, manualId = null) {
         })
         .catch(err => {
             console.error('General auth error:', err);
-            alert("Connection error. Please try again.");
+            alert("Connection error: " + err.message + ". Please try again.");
             if (typeof showScanBanner === 'function') showScanBanner('error', { id: id });
         });
     }
