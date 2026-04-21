@@ -289,7 +289,7 @@
                             <h4 class="fw-bold text-white mb-1 tracking-wider">EXPORT XLS FILE</h4>
                             <p class="text-white-50 small mb-0">Add all the records from the excel</p>
                         </div>
-                        <button type="button" class="btn btn-sm btn-primary-gold rounded-3 px-3 fw-bold shadow-sm mt-1">EXPORT</button>
+                        <button type="button" class="btn btn-sm btn-primary-gold rounded-3 px-3 fw-bold shadow-sm mt-1" id="uploadXlsBtn">EXPORT</button>
                     </div>
                     
                     <div class="upload-zone border border-secondary rounded-4 d-flex flex-column align-items-center justify-content-center p-5" style="border-style: dashed !important; border-width: 2px !important; cursor: pointer; background: rgba(255,255,255,0.02); min-height: 250px;">
@@ -380,15 +380,14 @@
                                                 <label class="form-label text-white-50 small fw-bold mb-0" for="manualAddCollege">COLLEGE:</label>
                                             </div>
                                             <div class="col-sm-8">
-                                                <select id="manualAddCollege" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
-                                                    <option value="" selected disabled class="text-dark">Select College</option>
-                                                    <option class="text-dark">College of Engineering</option>
-                                                    <option class="text-dark">College of Nursing</option>
-                                                    <option class="text-dark">College of Computer Studies</option>
-                                                    <option class="text-dark">College of Business and Accountancy</option>
-                                                    <option class="text-dark">College of Education</option>
-                                                    <option class="text-dark">College of Arts and Sciences</option>
-                                                    <option class="text-dark">College of International Hospitality Management</option>
+                                                <select id="manualAddCollege" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">                                                        <option value="" disabled selected class="text-dark">Select College</option>
+                                                    <option value="1" class="text-dark">College of Engineering</option>
+                                                    <option value="2" class="text-dark">College of Nursing</option>
+                                                    <option value="3" class="text-dark">College of Computer Studies</option>
+                                                    <option value="4" class="text-dark">College of Business and Accountancy</option>
+                                                    <option value="5" class="text-dark">College of Education</option>
+                                                    <option value="6" class="text-dark">College of Arts and Sciences</option>
+                                                    <option value="7" class="text-dark">College of International Hospitality Management</option>
                                                 </select>
                                             </div>
                                         </div>
@@ -418,11 +417,11 @@
                                             <div class="col-sm-8">
                                                 <select id="manualAddOffice" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
                                                     <option value="" selected disabled class="text-dark">Select Office</option>
-                                                    <option class="text-dark">Registrar's Office</option>
-                                                    <option class="text-dark">Accounting Office</option>
-                                                    <option class="text-dark">Human Resources</option>
-                                                    <option class="text-dark">MIS Office</option>
-                                                    <option class="text-dark">Library</option>
+                                                    <option class="text-dark" value="8">Registrar's Office</option>
+                                                    <option class="text-dark" value="9">Accounting Office</option>
+                                                    <option class="text-dark" value="10">Human Resources</option>
+                                                    <option class="text-dark" value="11">MIS Office</option>
+                                                    <option class="text-dark" value="12">Library</option>
                                                 </select>
                                             </div>
                                         </div>
@@ -457,6 +456,7 @@
                             <i class="bi bi-arrow-left me-2"></i>Back to selection
                         </button>
                     </div>
+
                 </div>
 
             </div>
@@ -822,6 +822,44 @@ document.addEventListener('DOMContentLoaded', function () {
             submitManualBtn.disabled = !(idValid && nameValid && typeValid);
         }
     }
+    if (submitManualBtn) {
+    submitManualBtn.addEventListener('click', async function () {
+        // Determine which type is selected
+        const isTeaching = typeTeachingRadio && typeTeachingRadio.checked;
+
+        const payload = {
+            employee_id: manualIdInput.value.trim(),
+            employee_name: manualNameInput.value.trim(),
+            department_id: isTeaching
+                ? manualAddCollege.value
+                : manualAddOffice.value,
+            position: isTeaching
+                ? manualAddTeachingPosition.value
+                : manualAddNonTeachingPosition.value
+        };
+
+        try {
+            const response = await fetch('/add_employee', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                alert('Employee added successfully!');
+                // Close the modal
+                const modal = bootstrap.Modal.getInstance(addUserModalEl);
+                if (modal) modal.hide();
+            } else {
+                alert('Error: ' + result.error);
+            }
+        } catch (err) {
+            alert('Request failed: ' + err.message);
+        }
+    });
+}
 
     if (manualIdInput) manualIdInput.addEventListener('input', validateManualForm);
     if (manualNameInput) manualNameInput.addEventListener('input', validateManualForm);
@@ -1351,6 +1389,57 @@ document.addEventListener('DOMContentLoaded', function () {
         // Run records pagination filter
         applyRecordsFilter();
     }, 50);
+
+    // Find your upload submit button - adjust the ID to match yours
+const uploadSubmitBtn = document.getElementById('uploadXlsBtn'); // change ID to match yours
+
+if (uploadSubmitBtn) {
+    uploadSubmitBtn.addEventListener('click', async function () {
+        const file = fileInput.files[0];
+
+        if (!file) {
+            alert('Please select an Excel file first.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        uploadSubmitBtn.disabled = true;
+        uploadSubmitBtn.textContent = 'Uploading...';
+
+        try {
+            const response = await fetch('/upload_employees', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                let msg = `✅ Successfully inserted ${result.inserted} employee(s).`;
+                if (result.errors && result.errors.length > 0) {
+                    msg += `\n\n⚠️ Skipped rows:\n` + result.errors.join('\n');
+                }
+                alert(msg);
+
+                // Close modal and reload to show new employees
+                const modal = bootstrap.Modal.getInstance(addUserModalEl);
+                if (modal) modal.hide();
+                location.reload();
+
+            } else {
+                alert('Error: ' + result.error);
+            }
+
+        } catch (err) {
+            alert('Request failed: ' + err.message);
+        } finally {
+            uploadSubmitBtn.disabled = false;
+            uploadSubmitBtn.textContent = 'Upload';
+        }
+    });
+}
 });
 </script>
 {% endblock %}

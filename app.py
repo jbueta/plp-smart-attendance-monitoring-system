@@ -5,12 +5,17 @@ import requests
 import csv
 import io
 import uuid
+import pandas as pd
+from database import connect_db
+from db_connect import EmployeeModel
 
 from app_tasks import fetch_report_data     #reports generator
 from extensions import cache
 
 app = Flask(__name__)
 app.secret_key = 'plp_secure_key_2026'  # Required for session management
+
+employee_model = EmployeeModel()
 
 # Configure and initialize cache (SimpleCache for development)
 app.config['CACHE_TYPE'] = 'SimpleCache'
@@ -851,6 +856,145 @@ def helper_employee_attendance():
     except requests.exceptions.RequestException as e:
         print(f"Backend API Error: {e}")
     return []
+
+@app.route("/upload_employees", methods=["POST"])
+def upload_employees():
+    file = request.files.get("file")
+
+    if not file:
+        return jsonify({"success": False, "error": "No file uploaded"})
+
+    try:
+        import pandas as pd
+        import re
+        import unicodedata
+
+        # ----------------------------------------
+        # Helper: deep-clean any string
+        # ----------------------------------------
+        def clean(text):
+            if not isinstance(text, str):
+                text = str(text) if text is not None else ""
+            text = unicodedata.normalize("NFKC", text)
+            text = re.sub(r"[\u2018\u2019\u02bc\u0060\u00b4]", "'", text)
+            text = re.sub(r"[\u2013\u2014]", "-", text)
+            text = text.replace("\u00a0", " ").replace("\u200b", "")
+            text = re.sub(r"\s+", " ", text)
+            return text.strip()
+
+        # ----------------------------------------
+        # 1. Read raw file (no header assumed)
+        # ----------------------------------------
+        raw = pd.read_excel(file, dtype=str, header=None)
+
+        # ----------------------------------------
+        # 2. Find the header row dynamically
+        # ----------------------------------------
+        header_row = None
+        for idx, row in raw.iterrows():
+            row_values = row.astype(str).str.strip().str.upper()
+            if "EMPLOYEE NUMBER" in row_values.values:
+                header_row = idx
+                break
+
+        if header_row is None:
+            return jsonify({
+                "success": False,
+                "error": "Could not find 'Employee Number' header in the file"
+            })
+
+        # ----------------------------------------
+        # 3. Re-read using the correct header row
+        # ----------------------------------------
+        file.seek(0)
+        df = pd.read_excel(file, dtype=str, header=header_row)
+
+        # Normalize column names
+        df.columns = [clean(c).upper() for c in df.columns]
+
+        # Drop fully empty rows
+        df.dropna(how="all", inplace=True)
+        df = df.applymap(lambda x: clean(x) if isinstance(x, str) else x)
+
+        # ----------------------------------------
+        # 4. Fix Employee Number
+        # ----------------------------------------
+        df["EMPLOYEE NUMBER"] = (
+            df["EMPLOYEE NUMBER"]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .str.replace(r"\.0$", "", regex=True)
+            .str.zfill(5)
+        )
+
+        # Drop rows with no employee number
+        df = df[df["EMPLOYEE NUMBER"].str.strip().astype(bool)]
+
+        # ----------------------------------------
+        # 5. Check for duplicates within the file
+        # ----------------------------------------
+        dupes = df[df["EMPLOYEE NUMBER"].duplicated(keep=False)]
+        if not dupes.empty:
+            dupe_ids = dupes["EMPLOYEE NUMBER"].unique().tolist()
+            return jsonify({
+                "success": False,
+                "error": f"Duplicate Employee IDs found in uploaded file: {', '.join(dupe_ids)}"
+            })
+
+        # ----------------------------------------
+        # 6. Connect to DB
+        # ----------------------------------------
+        conn = connect_db()
+        if conn is None:
+            return jsonify({"success": False, "error": "Database connection failed"})
+
+        inserted = 0
+        errors = []
+
+        # ----------------------------------------
+        # 7. Process each row
+        # ----------------------------------------
+        for i, row in df.iterrows():
+            try:
+                employee_id     = str(row.get("EMPLOYEE NUMBER") or "").strip()
+                employee_name   = str(row.get("EMPLOYEE NAME")   or "").strip().upper()
+                department_name = str(row.get("DEPARTMENT")      or "").strip().upper()
+                position        = str(row.get("POSITION")        or "").strip().upper()
+
+                if not employee_id or not employee_name or not department_name:
+                    errors.append(f"Row {i + 2}: Missing required field(s) — "
+                                  f"ID='{employee_id}' Name='{employee_name}' Dept='{department_name}'")
+                    continue
+
+                result = employee_model.add_employee_excel(
+                    conn=conn,
+                    employee_id=employee_id,
+                    employee_name=employee_name,
+                    department_name=department_name,
+                    position=position,
+                )
+
+                if result.get("success"):
+                    inserted += 1
+                else:
+                    errors.append(f"Row {i + 2} [{employee_id}]: {result.get('error')}")
+
+            except Exception as row_error:
+                errors.append(f"Row {i + 2}: {str(row_error)}")
+    
+        return jsonify({
+            "success": True,
+            "inserted": inserted,
+            "errors": errors
+        })
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+    finally:
+        if "conn" in locals() and conn:
+            conn.close()
 # ==============================================================================
 # MAIN ENTRY POINT
 # ==============================================================================

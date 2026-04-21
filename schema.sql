@@ -136,15 +136,6 @@ TRUNCATE TABLE `employees`;
 -- Dumping data for table `employees`
 --
 
-INSERT INTO `employees` (`user_id`, `employee_id`, `employee_name`, `department_id`, `position`, `status`, `emp_last_updated`) VALUES
-(23, 'EMP-0001', 'Gregoria De Jesus', 3, 'Professor', 'Outside', '2026-04-15 08:56:17'),
-(24, 'EMP-0002', 'Melchora Aquino', 4, 'Dean', 'Outside', '2026-04-15 08:56:17'),
-(25, 'EMP-0003', 'Antonio Luna', 5, 'Faculty', 'Outside', '2026-04-15 08:56:17'),
-(26, 'EMP-0004', 'Gabriela Silang', 6, 'Department Chair', 'Outside', '2026-04-15 08:56:17'),
-(27, 'EMP-0005', 'Josefa Llanes Escoda', 7, 'Registrar', 'Outside', '2026-04-15 08:56:17'),
-(5, 'EMP-1098', 'Apolinario Mabini', 2, 'Dean', 'Outside', '2026-04-15 13:36:17'),
-(4, 'EMP-2015', 'Juan Dela Cruz', 1, 'Faculty', 'Inside', '2026-03-12 14:22:44');
-
 -- --------------------------------------------------------
 
 --
@@ -779,3 +770,23 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+ALTER TABLE departments
+MODIFY department_id INT(11) NOT NULL AUTO_INCREMENT;
+TRUNCATE TABLE `departments`;
+
+INSERT INTO departments (department_name) VALUES
+('College of Engineering'),
+('College of Nursing'),
+('College of Computer Studies'),
+('College of Business and Accountancy'),
+('College of Education'),
+('College of Arts and Sciences'),
+('College of International Hospitality Management');
+
+INSERT INTO departments (department_name) VALUES
+("Registrar's Office"),
+("Accounting Office"),
+("Human Resources"),
+("MIS Office"),
+("Library");
