@@ -4,9 +4,17 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 import requests
 import csv
 import io
+import uuid
+
+from app_tasks import fetch_report_data     #reports generator
+from extensions import cache
 
 app = Flask(__name__)
 app.secret_key = 'plp_secure_key_2026'  # Required for session management
+
+# Configure and initialize cache (SimpleCache for development)
+app.config['CACHE_TYPE'] = 'SimpleCache'
+cache.init_app(app)
 
 # ==============================================================================
 # MOCK DATA (Prototype State)
@@ -57,9 +65,16 @@ MOCK_EMPLOYEE_STATS = {
 }
 
 MOCK_EMPLOYEE_LOGS = [
-    {"initials": "JD", "name": "Juan Dela Cruz", "dept": "Civil Engineering", "in": "07:45 AM", "out": "05:00 PM", "status": "Present", "status_class": "success"},
-    {"initials": "MS", "name": "Maria Santos", "dept": "College of Nursing", "in": "08:15 AM", "out": "--:--", "status": "Late +15m", "status_class": "warning"},
-    {"initials": "AL", "name": "Antonio Luna", "dept": "Arts & Letters", "in": "08:30 AM", "out": "04:30 PM", "status": "Late", "status_class": "warning"}
+    {"id": "EMP-001", "initials": "JD", "name": "Juan Dela Cruz", "dept": "Civil Engineering", "position": "Professor", "in": "07:45 AM", "out": "05:00 PM", "status": "Present", "status_class": "success", "date": "2026-04-09"},
+    {"id": "EMP-002", "initials": "MS", "name": "Maria Santos", "dept": "College of Nursing", "position": "Dean", "in": "08:15 AM", "out": "--:--", "status": "Late +15m", "status_class": "warning", "date": "2026-04-09"},
+    {"id": "EMP-003", "initials": "AL", "name": "Antonio Luna", "dept": "Arts & Letters", "position": "Lecturer", "in": "08:30 AM", "out": "04:30 PM", "status": "Late", "status_class": "warning", "date": "2026-04-09"},
+    {"id": "EMP-004", "initials": "CR", "name": "Carmen Reyes", "dept": "Business Admin", "position": "Assistant Professor", "in": "07:30 AM", "out": "05:30 PM", "status": "Present", "status_class": "success", "date": "2026-04-09"},
+    {"id": "EMP-005", "initials": "RG", "name": "Roberto Garcia", "dept": "Engineering", "position": "Instructor", "in": "08:00 AM", "out": "--:--", "status": "Inside", "status_class": "success", "date": "2026-04-09"},
+    {"id": "EMP-006", "initials": "LM", "name": "Lourdes Mendoza", "dept": "Education", "position": "Professor", "in": "07:50 AM", "out": "04:45 PM", "status": "Present", "status_class": "success", "date": "2026-04-09"},
+    {"id": "EMP-007", "initials": "FT", "name": "Fernando Torres", "dept": "Arts & Sciences", "position": "Lecturer", "in": "08:20 AM", "out": "--:--", "status": "Late +20m", "status_class": "warning", "date": "2026-04-09"},
+    {"id": "EMP-008", "initials": "EV", "name": "Elena Valdez", "dept": "Nursing", "position": "Clinical Instructor", "in": "07:40 AM", "out": "05:10 PM", "status": "Present", "status_class": "success", "date": "2026-04-09"},
+    {"id": "EMP-009", "initials": "HP", "name": "Hector Perez", "dept": "Business Admin", "position": "Department Head", "in": "08:10 AM", "out": "04:50 PM", "status": "Late", "status_class": "warning", "date": "2026-04-09"},
+    {"id": "EMP-010", "initials": "IS", "name": "Isabel Santos", "dept": "Education", "position": "Assistant Professor", "in": "07:55 AM", "out": "--:--", "status": "Inside", "status_class": "success", "date": "2026-04-09"}
 ]
 
 MOCK_STUDENT_STATS = {
@@ -124,16 +139,24 @@ def login_required(f):
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+        data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "message": "Invalid request."}), 400
+            
+        username = data.get('username')
+        password = data.get('password')
         
-        # Hardcoded credentials for prototype demonstration
-        if username == 'admin' and password == 'admin123':
+        if not username or not password:
+            return jsonify({"success": False, "message": "Please enter a username and password."})
+
+        result = helper_admin_login(username, password)
+        
+        if result and result.get('success'):
+            data = result.get('data')
             session['logged_in'] = True
-            flash('Welcome back, Admin.', 'success')
-            return redirect(url_for('dashboard'))
+            return jsonify({ "success": True, "redirect_url": url_for('dashboard', user=data.get('username')) })
         else:
-            flash('Invalid credentials. Please try again.', 'danger')
+            return jsonify({"success": False, "message": result.get('message')})
             
     return render_template('login.html')
 
@@ -177,6 +200,7 @@ def kiosk_employee():
     session.pop('logged_in', None)
     instance_id = request.args.get('instance_id', type=int)
     events = helper_kiosk_live_events()
+    print(events)
     selected_event = next((e for e in events if e['instance_id'] == instance_id), None)
     event_name = selected_event['name'] if selected_event else "General Attendance"
     return render_template('kiosk_employee.html', event_name=event_name, kiosk_data=MOCK_KIOSK_DATA)
@@ -239,6 +263,9 @@ def visitor_checkout(visitor_id):
 @app.route('/dashboard')
 @login_required
 def dashboard():
+
+    USER_NAME = request.args.get('user', 'Admin')
+
     events = helper_admin_live_events()
     # Pass structured stats for different tabs
     return render_template('dashboard.html', 
@@ -246,7 +273,8 @@ def dashboard():
                            overall_stats=MOCK_DASHBOARD_STATS,
                            student_stats=MOCK_STUDENT_STATS,
                            employee_stats=MOCK_EMPLOYEE_STATS,
-                           logs=MOCK_EMPLOYEE_LOGS)
+                           logs=MOCK_EMPLOYEE_LOGS,
+                           user=USER_NAME)
 
 @app.route('/events')
 @login_required
@@ -394,43 +422,38 @@ def add_event():
 @login_required
 def delete_event(event_id):
     if event_id <= 2:
-        flash('Cannot delete default system events.', 'warning')
-        return redirect(url_for('dashboard'))
+        return jsonify({'success': False, 'message': 'Cannot delete default system events.'}), 403
 
-    global EVENTS
-    EVENTS = [e for e in EVENTS if e['id'] != event_id]
-    flash('Event deleted successfully.', 'info')
-    return redirect(url_for('manage_events'))
+    result = helper_admin_delete_events(event_id, 'single')
 
-@app.route('/admin/events/delete/bulk', methods=['POST'])
+    if result and result.get('success'):
+        return jsonify({'success': True, 'message': result.get('message', 'Event deleted successfully.')}), 200
+    else:
+        return jsonify({'success': False, 'message': result.get('message', 'Failed to delete event.')}), 500
+
+@app.route('/admin/events/bulk-delete', methods=['POST'])
 @login_required
 def bulk_delete_events():
-    event_ids = request.form.getlist('event_ids')
-    
+    data = request.get_json()
+    event_ids = data.get('event_ids', [])
+
     if not event_ids:
-        flash('No events selected for deletion.', 'warning')
-        return redirect(url_for('manage_events'))
+        return jsonify({'success': False, 'message': 'No events selected.'}), 400
+
+    # Protect default system events from bulk deletion
+    valid_ids = [str(eid) for eid in event_ids if int(eid) > 2]
+    
+    if not valid_ids:
+        return jsonify({'success': False, 'message': 'Cannot delete default system events.'}), 403
 
     try:
-        event_ids = [int(eid) for eid in event_ids]
-    except ValueError:
-        flash('Invalid event IDs provided.', 'danger')
-        return redirect(url_for('manage_events'))
-
-    safe_ids = [eid for eid in event_ids if eid > 2]
-    skipped_count = len(event_ids) - len(safe_ids)
-
-    global EVENTS
-    initial_count = len(EVENTS)
-    EVENTS = [e for e in EVENTS if e['id'] not in safe_ids]
-    deleted_count = initial_count - len(EVENTS)
-
-    msg = f'{deleted_count} events deleted successfully.'
-    if skipped_count > 0:
-        msg += f' {skipped_count} default events were protected.'
-    
-    flash(msg, 'info')
-    return redirect(url_for('manage_events'))
+        helper_admin_delete_events(valid_ids, 'bulk')
+            
+        return jsonify({'success': True, 'message': f'{len(valid_ids)} events deleted successfully.'}), 200
+        
+    except Exception as e:
+        print(f"Bulk delete error: {e}")
+        return jsonify({'success': False, 'message': 'An error occurred during bulk deletion.'}), 500
 
 @app.route('/admin/profile/update', methods=['POST'])
 @login_required
@@ -502,37 +525,20 @@ def admin_live_departments():
 # HELPER
 # ==============================================================================
 
-def helper_admin_live_events():    
-    current_kiosk_events = list(DEFAULT_EVENTS)
-    
+def helper_admin_login(username, password):
+    url = "http://127.0.0.1:5001/admin/login/auth"
+    headers = {"Content-Type": "application/json"}
+    payload = {"username": username, "password": password}   
+
     try:
-        response = requests.get("http://127.0.0.1:5001/admin/dashboard/live-events", timeout=5)
-        
-        if response.status_code == 200:
-            api_data = response.json()
-            
-            if api_data.get('success'):
-                real_events = []
-                for event in api_data.get('events', []):
-                    real_events.append({
-                        'event_id': event.get('event_id', ''),
-                        'name': event.get('name', 'Unknown'),
-                        'type': event.get('type', 'Unknown'),
-                        'date': event.get('date', 'Unknown'),
-                        'dept': event.get('dept', 'Unknown'),
-                        'time_start': event.get('time_start', 'Unknown'),
-                        'time_end': event.get('time_end', 'Unknown'),
-                        'location': event.get('location', 'Unknown')
-                    })
-                
-                current_kiosk_events = real_events
-                
+        response = requests.post(url, headers=headers, json=payload, timeout=5)
+        response.raise_for_status()
+        return response.json()   
     except requests.exceptions.RequestException as e:
-        print(f"Backend API Error: {e}")
-        
-    return current_kiosk_events 
+        print(f"API for admin authentication bridge error: {e}")
+        return {"success": False, "message": f"Authentication service unavailable: {str(e)}"}
 
-
+@app.route('/api/retrieve/events')
 def helper_kiosk_live_events():    
     current_kiosk_events = list(DEFAULT_EVENTS)
     
@@ -546,9 +552,10 @@ def helper_kiosk_live_events():
                 real_events = []
                 for event in api_data.get('events', []):
                     real_events.append({
-                        'instance_id': event.get('instance_id', ''),
+                        'event_id': event.get('event_id', ''),
                         'name': event.get('name', 'Unknown'),
                         'type': event.get('type', 'Unknown'),
+                        'frequency': event.get('frequency', 'dd/mm/yyyy'),
                         'date': event.get('date', 'Unknown'),
                         'time_start': event.get('time_start', 'Unknown'),
                         'time_end': event.get('time_end', 'Unknown'),
@@ -588,6 +595,7 @@ def helper_kiosk_live_student_logs():
         
     return current_kiosk_data 
 
+@app.route('/api/retrieve/departments')
 def helper_admin_live_departments(): 
     current_live_departments = list(LIVE_DEPARTMENTS)
     
@@ -612,6 +620,96 @@ def helper_admin_live_departments():
         
     return current_live_departments 
 
+def helper_admin_live_events():    
+    current_kiosk_events = list(DEFAULT_EVENTS)
+    
+    try:
+        response = requests.get("http://127.0.0.1:5001/admin/dashboard/live-events", timeout=5)
+        
+        if response.status_code == 200:
+            api_data = response.json()
+            
+            if api_data.get('success'):
+                real_events = []
+                for event in api_data.get('events', []):
+                    real_events.append({
+                        'event_id': event.get('event_id', ''),
+                        'name': event.get('name', 'Unknown'),
+                        'type': event.get('type', 'Unknown'),
+                        'date': event.get('date', 'Unknown'),
+                        'dept': event.get('dept', 'Unknown'),
+                        'time_start': event.get('time_start', 'Unknown'),
+                        'time_end': event.get('time_end', 'Unknown'),
+                        'location': event.get('location', 'Unknown')
+                    })
+                
+                current_kiosk_events = real_events
+                
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Error: {e}")
+        
+    return current_kiosk_events 
+
+
+def helper_admin_delete_events(event_id, delete_type):
+    """
+    Call the backend API to soft‑delete an event.
+    Returns the JSON response from the backend.
+    """
+    if delete_type == 'single':
+        url = "http://127.0.0.1:5001/admin/events/delete-event"
+    elif delete_type == 'bulk':
+        url = "http://127.0.0.1:5001/admin/events/delete-events"
+    headers = {"Content-Type": "application/json"}
+    payload = {"event_id": str(event_id)}   
+
+    try:
+        response = requests.put(url, headers=headers, json=payload, timeout=5)
+        response.raise_for_status()          
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Error: {e}")
+        return {"success": False, "message": f"Backend error: {e}"}
+
+# ==============================================================================
+# REPORTS GENERATION FUNCTION
+# ==============================================================================
+
+@app.route('/generate_report')
+def generate_report():
+    category = request.args.get('category')
+    report_type = request.args.get('type')
+    filter_val = request.args.get('filter', 'All')
+    start_date = request.args.get('start')
+    end_date = request.args.get('end')
+    
+    # Validate date range
+    if start_date and end_date:
+        try:
+            start = datetime.strptime(start_date, '%Y-%m-%d')
+            end = datetime.strptime(end_date, '%Y-%m-%d')
+            
+            if start > end:
+                error_msg = f"Invalid date range: 'From' date ({start_date}) cannot be after 'To' date ({end_date})."
+                return f"<h1>Report Error</h1><p>{error_msg}</p>", 400
+        except ValueError as e:
+            return f"<h1>Report Error</h1><p>Invalid date format. Please use YYYY-MM-DD format.</p>", 400
+    
+    report_results = fetch_report_data(category, report_type, filter_val, start_date, end_date)
+    
+    # 3. Handle any errors returned by the service
+    if "error" in report_results:
+        return f"<h1>Report Error</h1><p>{report_results['error']}</p>", 500
+        
+    # 4. Render the template using the clean dictionaries returned by tasks.py
+    return render_template(
+        'sample_report.html',
+        current_date=datetime.now().strftime('%B %d, %Y - %I:%M %p'),
+        report=report_results['report_data'],
+        metrics=report_results['metrics_data'],
+        logs=report_results['logs']
+    )
+    
 # ==============================================================================
 # MAIN ENTRY POINT
 # ==============================================================================

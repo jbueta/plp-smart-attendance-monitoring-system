@@ -288,3 +288,20 @@ ALTER TABLE `visitors`
   ADD CONSTRAINT `visitors_usersFK` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`);
 COMMIT;
 
+ALTER TABLE `users`
+  MODIFY column `role` enum('student','employee','visitor', 'admin') not null;
+
+ALTER TABLE `users` drop column `user_name`;
+
+--
+-- Constraints for table `admin`
+--
+CREATE TABLE `admin` (
+  `user_id` int not null,
+  `username` varchar(100) not null unique,
+  `password` varchar(100) not null,
+  FOREIGN KEY (`user_id`) references `users`(`user_id`) on delete cascade on update cascade );
+
+ALTER TABLE `admin` 
+MODIFY `username` VARCHAR(255) COLLATE utf8mb4_bin,
+MODIFY `password` VARCHAR(255) COLLATE utf8mb4_bin;

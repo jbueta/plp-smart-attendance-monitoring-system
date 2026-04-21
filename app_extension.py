@@ -3,7 +3,9 @@ from datetime import date, datetime
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, request, g
 from datetime import date, timedelta, datetime
+
 from db_connect import Database
+from database import init_db_pool, connect_db, close_db
 
 import json
 import os
@@ -11,6 +13,12 @@ import logging
 import mysql.connector as connector
 from mysql.connector import pooling
 from flask_cors import CORS
+from functools import wraps
+import jwt  #token based authentication
+
+JWT_SECRET = 'plp_jwt_secret_key_2026'  # Secret key for JWT (to be changed)
+JWT_ALGORITHM = 'HS256'
+JWT_EXPIRATION_DELTA = timedelta(hours=8)  # Token valid for 8 hours
         
 app = Flask(__name__)
 app.secret_key = 'plp_secure_key_2026'  # Required for session management
@@ -26,48 +34,48 @@ allowed_origins = [
 ]
 
 CORS(app, origins=allowed_origins)
+
 # ==============================================================================
-# MAIN ENTRY POINT
+# DATABASE INITIALIZATION
 # ==============================================================================
 
-# 1. Create the pool once 
-dbconfig = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '',
-    'database': 'smart_monitoring',
-    'use_pure': True
-}
+with app.app_context():
+    init_db_pool()
 
-try:
-    print("Creating database connection pool...")
-    # Initialize globally
-    global_pool = pooling.MySQLConnectionPool(pool_name="main_entry_exit", pool_size=20, autocommit=True, **dbconfig)
-    print("Database connection pool created.")
-except Exception as err:
-    print(f"Warning: Could not connect to database: {err}")
-    global_pool = None
+app.teardown_appcontext(close_db)
 
-def connect_db():
-    if 'db' not in g:        
-        try:
-            if global_pool is None:
-                g.db = None
-            else:
-                g.db = global_pool.get_connection()
-        except Exception as err:
-            print(f"Pool exhausted or error: {err}")
-            g.db = None
-    return g.db
 
-def close_db(error):
-    db = g.pop('db', None)
-    if db is not None:
-        db.close()
+# ==============================================================================
+# ADMIN AUTHENTICATION
+# ==============================================================================
 
-@app.teardown_appcontext
-def teardown_db(error):
-    close_db(error)
+@app.route('/admin/login/auth', methods=['POST'])
+def login():
+    conn = None
+    try:
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "message": "Database offline"}), 500
+
+        data = request.get_json()
+        required_fields = ["username", "password"]
+        if not data or not all(field in data for field in required_fields):
+            return jsonify({"success": False, "message": "Missing required fields"}), 400
+
+        username = data['username']
+        password = data['password']
+
+        params = (username, password)
+        db = Database(conn, params)
+        result = db.admin_login()
+
+        if not result or len(result) == 0:
+            return jsonify({"success": False, "message": "Incorrect username or password."}), 200
+
+        return jsonify({"success": True, "message": "Authentication successful", "data": result}), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
 
 @app.route('/admin/user/authentication', methods=['POST'])
 def user_authenticate():
@@ -398,6 +406,79 @@ def update_event_status():
         return jsonify({"success": True, 
                         "message": f"Event status updated to {status}.",
                         "data": events.get('data')
+                      }), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+# ====================================================
+# ENDPOINT 5: Delete an event (soft deletion, UI controlled)
+# ====================================================
+@app.route("/admin/events/delete-event", methods=["PUT"])
+def delete_event():
+    conn = None
+    try:
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "message": "Database offline"}), 500
+
+        data = request.get_json()
+        required_fields = ["event_id"]
+        if not data or not all(field in data for field in required_fields):
+            return jsonify({"success": False, "message": "Missing required fields"}), 400
+
+        event_id = data['event_id']
+
+        if isinstance(event_id, str):
+            pass
+        else:
+            return jsonify({"success": False, "message": "Invalid event ID"}), 400
+
+        params = (event_id,)
+        db = Database(conn, params)
+        result = db.delete_event()
+
+        if not result or result.get('success') is False:
+            print(result)
+            return jsonify({"success": False, "message": result.get('message', 'Error deleting event')}), 500
+
+        return jsonify({"success": True, 
+                        "message": f"Event deleted successfully."
+                      }), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+# ====================================================
+# ENDPOINT 6: Delete an event (soft deletion, UI controlled)
+# ====================================================
+@app.route("/admin/events/delete-events", methods=["PUT"])
+def delete_bulk_event():
+    conn = None
+    try:
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "message": "Database offline"}), 500
+
+        data = request.get_json()
+        event_ids = data.get('event_ids', [])
+
+        valid_ids = [str(eid) for eid in event_ids if int(eid) > 2]
+
+        if not valid_ids:
+            return jsonify({'success': False, 'message': 'Cannot delete default system events.'}), 403
+
+        params = (valid_ids,)
+        db = Database(conn, params)
+        result = db.delete_bulk_events()
+
+        if not result or result.get('success') is False:
+            print(result)
+            return jsonify({"success": False, "message": result.get('message', 'Error deleting event')}), 500
+
+        return jsonify({"success": True, 
+                        "message": f"Event deleted successfully."
                       }), 200
 
     except Exception as e:

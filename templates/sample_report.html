@@ -1,110 +1,41 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PLP Sample Report</title>
-    <!-- Bootstrap CSS (using CDN for the printed report) -->
+    <title>PLP Report - {{ report.title }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body {
-            background-color: #fff;
-            color: #000;
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            padding: 2rem;
-            font-size: 14px;
-        }
-
-        .report-header {
-            border-bottom: 2px solid #000;
-            padding-bottom: 1rem;
-            margin-bottom: 2rem;
-        }
-
-        .report-title {
-            font-size: 24px;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-
-        .logo-placeholder {
-            width: 80px;
-            height: 80px;
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            color: #6c757d;
-        }
-
-        .meta-box {
-            border: 1px solid #000;
-            padding: 1rem;
-            background-color: #f8f9fa;
-        }
-
-        .summary-metric {
-            text-align: center;
-            padding: 1rem;
-            border: 1px solid #dee2e6;
-        }
-
-        .summary-metric h3 {
-            margin: 0;
-            font-size: 28px;
-            font-weight: bold;
-            color: #0b7d3f;
-        }
-
-        th {
-            background-color: #0b7d3f !important;
-            color: white !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-        }
-
-        .footer {
-            margin-top: 3rem;
-            border-top: 1px solid #dee2e6;
-            padding-top: 1rem;
-            font-size: 12px;
-            color: #6c757d;
-        }
-
+        body { background-color: #fff; color: #000; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 2rem; font-size: 14px; }
+        .report-header { border-bottom: 2px solid #000; padding-bottom: 1rem; margin-bottom: 2rem; }
+        .report-title { font-size: 24px; font-weight: bold; text-transform: uppercase; }
+        .logo-placeholder { width: 80px; height: 80px; background-color: #f8f9fa; border: 1px solid #dee2e6; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #6c757d; }
+        .meta-box { border: 1px solid #000; padding: 1rem; background-color: #f8f9fa; }
+        .summary-metric { text-align: center; padding: 1rem; border: 1px solid #dee2e6; }
+        .summary-metric h3 { margin: 0; font-size: 28px; font-weight: bold; color: #0b7d3f; }
+        th { background-color: #0b7d3f !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .footer { margin-top: 3rem; border-top: 1px solid #dee2e6; padding-top: 1rem; font-size: 12px; color: #6c757d; }
         @media print {
-            body {
-                padding: 0;
-            }
-
-            button {
-                display: none;
-            }
-
-            @page {
-                margin: 1cm;
-            }
+            body { padding: 0; }
+            button { display: none; }
+            @page { margin: 1cm; }
         }
     </style>
 </head>
-
 <body>
 
     <button onclick="window.print()" class="btn btn-primary d-print-none mb-4">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-printer me-2"
-            viewBox="0 0 16 16">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-printer me-2" viewBox="0 0 16 16">
             <path d="M2.5 8a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z" />
-            <path
-                d="M5 1a2 2 0 0 0-2 2v2H2a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1v1a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1V3a2 2 0 0 0-2-2H5zM4 3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2H4V3zm1 5a2 2 0 0 0-2 2v1H2a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v-1a2 2 0 0 0-2-2H5zm7 2v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1z" />
+            <path d="M5 1a2 2 0 0 0-2 2v2H2a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1v1a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1V3a2 2 0 0 0-2-2H5zM4 3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2H4V3zm1 5a2 2 0 0 0-2 2v1H2a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v-1a2 2 0 0 0-2-2H5zm7 2v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1z" />
         </svg>
         Print / Save as PDF
     </button>
 
     <div class="report-header d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center">
-            <div class="logo-placeholder me-3">PLP</div>
+            <div class="logo-placeholder me-3">
+                <img src="{{ url_for('static', filename='images/plp_logo.png') }}" alt="PLP Logo" style="max-width: 100%; max-height: 100%; object-fit: contain;"></div>
             <div>
                 <div class="report-title">Pamantasan ng Lungsod ng Pasig</div>
                 <div class="text-secondary">Official Data Monitoring System</div>
@@ -112,16 +43,16 @@
         </div>
         <div class="text-end text-muted small">
             Generated: <strong>{{ current_date }}</strong><br>
-            Reference: <strong>RPT-2026-0881A</strong>
+            Reference: <strong>{{ report.reference_id }}</strong>
         </div>
     </div>
 
     <div class="row mb-4">
         <div class="col-8">
-            <h5 class="mb-3 text-uppercase">Event Attendance Report</h5>
-            <p class="mb-0"><strong>Event Name:</strong> Annual Faculty Meeting</p>
-            <p class="mb-0"><strong>Target Department:</strong> All Departments</p>
-            <p class="mb-0"><strong>Date of Event:</strong> February 03, 2026</p>
+            <h5 class="mb-3 text-uppercase">{{ report.title }}</h5>
+            <p class="mb-0"><strong>Event/Scope:</strong> {{ report.event_name }}</p>
+            <p class="mb-0"><strong>Target Department:</strong> {{ report.department }}</p>
+            <p class="mb-0"><strong>Date Filter:</strong> {{ report.date_range }}</p>
         </div>
         <div class="col-4">
             <div class="meta-box small">
@@ -132,81 +63,263 @@
         </div>
     </div>
 
-    <!-- Summary Metrics -->
     <div class="row g-3 mb-4">
-        <div class="col-4">
-            <div class="summary-metric border rounded bg-light">
-                <div class="text-secondary text-uppercase small fw-bold mb-1">Total Expected</div>
-                <h3>2,800</h3>
-            </div>
-        </div>
-        <div class="col-4">
-            <div class="summary-metric border rounded bg-light">
-                <div class="text-secondary text-uppercase small fw-bold mb-1">Total Present</div>
-                <h3 style="color: #198754;">2,506</h3>
-            </div>
-        </div>
-        <div class="col-4">
-            <div class="summary-metric border rounded bg-light">
-                <div class="text-secondary text-uppercase small fw-bold mb-1">Attendance Rate</div>
-                <h3>89.5%</h3>
-            </div>
-        </div>
-    </div>
+        {% set category = request.args.get('category', '').lower() %}
+        {% set type = request.args.get('type', '').lower() %}
+        
+        {% if category == 'general' %}
+            {% if type == 'student_entry_exit' %}
+                <!-- General Logs for Daily Student Entry/Exit Logs Metrics -->
+                <div class="col-4">
+                    <div class="summary-metric border rounded bg-light">
+                        <div class="text-secondary text-uppercase small fw-bold mb-1">Total Entry</div>
+                        <h3>{{ metrics.total_entry }}</h3>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="summary-metric border rounded bg-light">
+                        <div class="text-secondary text-uppercase small fw-bold mb-1">Peak Time Hour</div>
+                        <h3 style="color: #FF9800;">{{ metrics.peak_hour }}</h3>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="summary-metric border rounded bg-light">
+                        <div class="text-secondary text-uppercase small fw-bold mb-1">Avg Time Spent</div>
+                        <h3>{{ metrics.avg_time_spent }}</h3>
+                    </div>
+                </div>
+            {% elif type == 'daily_traffic' %}
+                <!-- General Logs for Daily Traffic Analysis Metrics -->
+                    <div class="col-4">
+                        <div class="summary-metric border rounded bg-light">
+                            <div class="text-secondary text-uppercase small fw-bold mb-1">Total Entry</div>
+                            <!-- <h3>{{ metrics.total_entry }}</h3> -->
+                             <h3>{{ metrics.total_entry }}</h3>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="summary-metric border rounded bg-light">
+                            <div class="text-secondary text-uppercase small fw-bold mb-1">Total Foot Traffic</div>
+                            <!-- <h3 style="color: #FF9800;">{{ metrics.total_foot_traffic }}</h3> -->
+                             <h3>{{ metrics.peak_hour }}</h3>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="summary-metric border rounded bg-light">
+                            <div class="text-secondary text-uppercase small fw-bold mb-1">Net Campus Population</div>
+                            <!-- <h3>{{ metrics.campus_population }}</h3> -->
+                            <h3>{{ metrics.avg_time_spent }}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="row g-3 mb-4">
+                    <div class="col-4">
+                        <div class="summary-metric border rounded bg-light">
+                            <div class="text-secondary text-uppercase small fw-bold mb-1">Faculty/Staff Footprint</div>
+                            <h3>{{ metrics.total_entry }}</h3>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="summary-metric border rounded bg-light">
+                            <div class="text-secondary text-uppercase small fw-bold mb-1">Student Footprint</div>
+                            <h3 style="color: #FF9800;">{{ metrics.peak_hour }}</h3>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="summary-metric border rounded bg-light">
+                            <div class="text-secondary text-uppercase small fw-bold mb-1">Visitor Footprint</div>
+                            <h3>{{ metrics.avg_time_spent }}</h3>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
 
-    <h5 class="mb-3 text-uppercase">Detailed Action Logs (Sample Subset)</h5>
+        {% elif category == 'visitor' %}
+            <!-- General Logs for Daily Student Entry/Exit Logs Metrics -->
+            <div class="col-4">
+                <div class="summary-metric border rounded bg-light">
+                    <div class="text-secondary text-uppercase small fw-bold mb-1">Total Entry</div>
+                    <h3>{{ metrics.total_entry }}</h3>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="summary-metric border rounded bg-light">
+                    <div class="text-secondary text-uppercase small fw-bold mb-1">Peak Time Hour</div>
+                    <h3 style="color: #FF9800;">{{ metrics.peak_hour }}</h3>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="summary-metric border rounded bg-light">
+                    <div class="text-secondary text-uppercase small fw-bold mb-1">Avg Time Spent</div>
+                    <h3>{{ metrics.avg_time_spent }}</h3>
+                </div>
+            </div>
+        {% elif category == 'event' %}
+        
+        {% elif category == 'violation' %}
+
+        {% else %}
+            <!-- Standard Event/Visitor Metrics -->
+            <div class="col-4">
+                <div class="summary-metric border rounded bg-light">
+                    <div class="text-secondary text-uppercase small fw-bold mb-1">Total Expected</div>
+                    <h3>{{ metrics.expected }}</h3>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="summary-metric border rounded bg-light">
+                    <div class="text-secondary text-uppercase small fw-bold mb-1">Total Present</div>
+                    <h3 style="color: #198754;">{{ metrics.present }}</h3>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="summary-metric border rounded bg-light">
+                    <div class="text-secondary text-uppercase small fw-bold mb-1">Attendance Rate</div>
+                    <h3>{{ metrics.rate }}</h3>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+    
+    <h5 class="mb-3 text-uppercase">Detailed Action Logs</h5>
     <table class="table table-bordered table-striped" style="border-color: #dee2e6;">
         <thead>
-            <tr>
-                <th>#</th>
-                <th>Employee Name</th>
-                <th>Department</th>
-                <th>Time In</th>
-                <th>Status</th>
-                <th>Remarks</th>
-            </tr>
+            {% set category = request.args.get('category', '').lower() %}
+
+            {% if category == 'general' %}
+                <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Role / Affiliation</th>
+                    <th>Time In</th>
+                    <th>Time Out</th>
+                    <th>Status</th>
+                    <th>Gate</th>
+                </tr>
+            {% elif category == 'visitor' %}
+                <tr>
+                    <th>#</th>
+                    <th>Visitor Name</th>
+                    <th>Purpose</th>
+                    <th>Time In</th>
+                    <th>Time Out</th>
+                    <th>Status</th>
+                </tr>
+            {% elif category == 'event' %}
+                <tr>
+                    <th>#</th>
+                    <th>Participant Name</th>
+                    <th>Role / Affiliation</th>
+                    <th>Time In</th>
+                    <th>Time Out</th>
+                    <th>Status</th>
+                    <th>Remarks</th>
+                </tr>
+            {% else %}
+                <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Detail</th>
+                    <th>Time In</th>
+                    <th>Time Out</th>
+                    <th>Status</th>
+                    <th>Remarks</th>
+                </tr>
+            {% endif %}
         </thead>
         <tbody>
-            <tr>
-                <td>1</td>
-                <td>Juan Dela Cruz</td>
-                <td>Civil Engineering</td>
-                <td>07:45 AM</td>
-                <td><strong class="text-success">Present</strong></td>
-                <td>On-time</td>
-            </tr>
-            <tr>
-                <td>2</td>
-                <td>Maria Santos</td>
-                <td>College of Nursing</td>
-                <td>08:15 AM</td>
-                <td><strong class="text-warning text-dark">Late</strong></td>
-                <td>+15m delay</td>
-            </tr>
-            <tr>
-                <td>3</td>
-                <td>Antonio Luna</td>
-                <td>Arts & Letters</td>
-                <td>08:30 AM</td>
-                <td><strong class="text-warning text-dark">Late</strong></td>
-                <td>+30m delay</td>
-            </tr>
-            <tr>
-                <td>4</td>
-                <td>Andres Bonifacio</td>
-                <td>College of Education</td>
-                <td>07:50 AM</td>
-                <td><strong class="text-success">Present</strong></td>
-                <td>On-time</td>
-            </tr>
-            <tr>
-                <td>5</td>
-                <td>Emilio Aguinaldo</td>
-                <td>Business & Accountancy</td>
-                <td>--:--</td>
-                <td><strong class="text-info">Excused</strong></td>
-                <td>Official Leave</td>
-            </tr>
+            {% if logs %}
+                {% if category == 'general' %}
+                    {% for log in logs %}
+                    <tr>
+                        <td>{{ log.id }}</td>
+                        <td>{{ log.name }}</td>
+                        <td>{{ log.detail }}</td>
+                        <td>{{ log.time_in }}</td>
+                        <td>{{ log.time_out }}</td>
+                        <td>
+                            {% if log.status in ['Present', 'Entry'] %}
+                                <strong class="text-success">{{ log.status }}</strong>
+                            {% elif log.status in ['Exit', 'Absent'] %}
+                                <strong class="text-danger">{{ log.status }}</strong>
+                            {% elif log.status == 'In Progress' %}
+                                <strong class="text-warning text-dark">In Progress</strong>
+                            {% else %}
+                                <strong class="text-info">{{ log.status }}</strong>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.remarks }}</td>
+                    </tr>
+                    {% endfor %}
+                    
+                {% elif category == 'visitor' %}
+                    {% for log in logs %}
+                    <tr>
+                        <td>{{ log.id }}</td>
+                        <td>{{ log.name }}</td>
+                        <td>{{ log.detail }}</td>
+                        <td>{{ log.time_in }}</td>
+                        <td>{{ log.time_out }}</td>
+                        <td>
+                            {% if log.status in ['Present', 'Entry'] %}
+                                <strong class="text-success">{{ log.status }}</strong>
+                            {% elif log.status in ['Exit', 'Absent'] %}
+                                <strong class="text-danger">{{ log.status }}</strong>
+                            {% else %}
+                                <strong class="text-info">{{ log.status }}</strong>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    
+                {% elif category == 'event' %}
+                    {% for log in logs %}
+                    <tr>
+                        <td>{{ log.id }}</td>
+                        <td>{{ log.name }}</td>
+                        <td>{{ log.detail }}</td>
+                        <td>{{ log.time_in }}</td>
+                        <td>{{ log.time_out }}</td>
+                        <td>
+                            {% if log.status in ['Present', 'Late'] %}
+                                <strong class="text-success">{{ log.status }}</strong>
+                            {% elif log.status in ['Absent', 'Excused'] %}
+                                <strong class="text-danger">{{ log.status }}</strong>
+                            {% else %}
+                                <strong class="text-info">{{ log.status }}</strong>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.remarks }}</td>
+                    </tr>
+                    {% endfor %}
+                    
+                {% else %}
+                    {% for log in logs %}
+                    <tr>
+                        <td>{{ log.id }}</td>
+                        <td>{{ log.name }}</td>
+                        <td>{{ log.detail }}</td>
+                        <td>{{ log.time_in if log.time_in else 'N/A' }}</td>
+                        <td>{{ log.time_out if log.time_out else 'N/A' }}</td>
+                        <td>
+                            {% if log.status in ['Present', 'Late'] %}
+                                <strong class="text-success">{{ log.status }}</strong>
+                            {% elif log.status in ['Absent', 'Exit'] %}
+                                <strong class="text-danger">{{ log.status }}</strong>
+                            {% else %}
+                                <strong class="text-info">{{ log.status }}</strong>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.remarks }}</td>
+                    </tr>
+                    {% endfor %}
+                    
+                {% endif %}
+            {% else %}
+                <tr>
+                    <td colspan="8" class="text-center py-3">No records found for this date range.</td>
+                </tr>
+            {% endif %}
         </tbody>
     </table>
 
@@ -221,18 +334,5 @@
         <span>Page 1 of 1</span>
     </div>
 
-    <script>
-        // Auto trigger print dialogue when loaded via Generate button
-        window.addEventListener('load', function () {
-            // Check url params for auto-print
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('autoprint') === 'true') {
-                setTimeout(() => {
-                    window.print();
-                }, 500);
-            }
-        });
-    </script>
 </body>
-
 </html>

@@ -93,6 +93,7 @@ plp_monitoring_system/
 4. **Run the Application:**
    ```bash
    python app.py
+   python app_extension.py
    ```
 5. **Access the System:**
    Navigate to `http://127.0.0.1:5000` in your web browser. *(Prototype Admin Credentials: Username: `admin`, Password: `admin123`)*

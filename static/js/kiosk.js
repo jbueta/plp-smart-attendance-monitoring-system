@@ -30,6 +30,10 @@ function submitManualEntry(type) {
         if (data.success) {
             const logType = data.attendance_status.toLowerCase();
             const bannerType = logType === 'entry' ? 'in' : 'out';
+            
+            if (typeof appendToLiveFeed === 'function') {
+                appendToLiveFeed(data.name, data.affiliation, logType);
+            }
 
             if (typeof showScanBanner === 'function') {
                 showScanBanner(bannerType, {
@@ -54,7 +58,7 @@ function submitManualEntry(type) {
     })
     .catch(err => {
         console.error(err);
-        alert("Connection error. Please try again.");
+        alert("Connection error: " + err.message + ". Please try again.");
         if (typeof showScanBanner === 'function') showScanBanner('error', { id: id });
     });
 
