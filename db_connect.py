@@ -33,21 +33,6 @@ class Database:
 
     def authenticate_user(self):
         try:
-            # query = """ 
-            #     SELECT u.user_id, u.role, u.active,
-            #         COALESCE(s.student_id, e.employee_id, CAST(v.visitor_id AS CHAR)) as scan_id,
-            #         COALESCE(s.status, e.status, v.status) as current_status,
-            #         COALESCE(CONCAT(s.first_name, ' ', s.last_name), CONCAT(e.first_name, ' ', e.last_name), v.name) as full_name,
-            #         COALESCE(c.course_name, d.department_name, 'Visitor') as affiliation
-            #     FROM users u 
-            #     LEFT JOIN students s ON u.user_id = s.user_id 
-            #     LEFT JOIN employees e ON u.user_id = e.user_id
-            #     LEFT JOIN visitors v ON u.user_id = v.user_id
-            #     LEFT JOIN courses c ON s.course_id = c.course_id
-            #     LEFT JOIN departments d ON e.department_id = d.department_id
-            #     WHERE s.student_id = %s OR e.employee_id = %s OR v.visitor_id = %s
-            # """
-            
             query = """ 
                 SELECT u.user_id, u.role, u.active,
                     COALESCE(s.student_id, e.employee_id, CAST(v.visitor_id AS CHAR)) as scan_id,
@@ -68,8 +53,8 @@ class Database:
             return result if result else []
             
         except connector.Error as err:
-            print(f"Error authenticating authenticating: {err}")
-            return None
+            print(f"Error authenticating: {err}")
+            return err
 
     def change_status(self):
         try:
@@ -88,47 +73,6 @@ class Database:
             last_log = self.cursor.fetchone()
 
             new_status = 'Inside'
-            
-            now = datetime.now()
-            today_date = now.date()
-            forgot_to_timeout = False
-
-            if last_log:
-                last_time = last_log['timestamp']
-                last_type = last_log['log_type']
-                last_date = last_time.date()
-
-                if current_status.lower() == 'inside':
-                    if last_date < today_date:
-                        forgot_to_timeout = True
-                        new_status = 'Inside'
-                    else:
-                        new_status = 'Outside'
-                else:
-                    new_status = 'Inside'
-            else:
-                 new_status = 'Inside'
-
-            if role == 'student':
-                query = "UPDATE students SET status = %s WHERE user_id = %s"
-            elif role == 'employee':
-                query = "UPDATE employees SET status = %s WHERE user_id = %s"
-            user_id = self.parameter[0]
-            current_status = self.parameter[1]
-            role = self.parameter[2]
-
-            # check user last scanned
-            last_log_query = """
-                SELECT timestamp, log_type 
-                FROM general_log 
-                WHERE user_id = %s 
-                ORDER BY timestamp DESC LIMIT 1
-            """
-            self.cursor.execute(last_log_query, (user_id,))
-            last_log = self.cursor.fetchone()
-
-            new_status = 'Inside'
-            
             now = datetime.now()
             today_date = now.date()
             forgot_to_timeout = False
@@ -158,14 +102,15 @@ class Database:
 
             self.cursor.execute(query, (new_status, user_id))
             self.conn.commit()
-
-            if self.cursor.rowcount > 0:
-                return {"message": "Status changed successfully!", "status": new_status, "forgot_to_timeout": forgot_to_timeout}
-            return None
+            
+            return {
+                'status': new_status,
+                'new_status': new_status,
+                'forgot_to_timeout': forgot_to_timeout
+            }
             
         except connector.Error as err:
             self.conn.rollback()
-            print(f"Error changing status: {err}")
             print(f"Error changing status: {err}")
             return None
 
@@ -179,26 +124,19 @@ class Database:
                 return "Log inserted successfully!"
             return None 
             
-            return None 
-            
         except connector.Error as err:
             self.conn.rollback()
-            print(f"Error inserting log: {err}")
             print(f"Error inserting log: {err}")
             return None
 
     def retrieve_log(self):
         try:
-            # Fixed 'person_id' to 'user_id'
-            log_query = """SELECT * FROM general_log WHERE user_id = %s AND DATE(timestamp) = %s"""
-            # Fixed 'person_id' to 'user_id'
             log_query = """SELECT * FROM general_log WHERE user_id = %s AND DATE(timestamp) = %s"""
             self.cursor.execute(log_query, self.parameter)
             result = self.cursor.fetchall()
             return result if result else []
             
         except connector.Error as err:
-            print(f"Error retrieving log: {err}")
             print(f"Error retrieving log: {err}")
             return None
 
@@ -272,13 +210,13 @@ class Database:
                 query = """INSERT IGNORE INTO events 
                            (event_name, event_type, frequency, day, event_date,
                             time_start, time_end, location, active) 
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"""
                 params = (self.parameter[0], self.parameter[1], self.parameter[2], self.parameter[3], self.parameter[4], self.parameter[5], self.parameter[6], self.parameter[7], 1)
 
             else:
                 query = """INSERT IGNORE INTO events 
                            (event_name, event_type, frequency, event_date, time_start, time_end, location, active) 
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"""
                 params = (self.parameter[0], self.parameter[1], self.parameter[2], self.parameter[4], self.parameter[5], self.parameter[6], self.parameter[7], 1)
 
             self.cursor.execute(query, params)
@@ -588,14 +526,24 @@ class Database:
 
     def delete_bulk_events(self):
         """
-        Soft deletion of events to prevent data loss if needed
+        Soft deletion of multiple events to prevent data loss if needed
         """
         try: 
-            query = "UPDATE events SET active = 0 WHERE event_id = %s"
-            self.cursor.execute(query, self.parameter)
+            event_ids_list = self.parameter[0]
+
+            if not event_ids_list:
+                return {"message": "No valid event IDs provided.", "success": False}
+
+            placeholders = ', '.join(['%s'] * len(event_ids_list))
+            
+            query = f"UPDATE events SET active = 0 WHERE event_id IN ({placeholders})"
+            
+            self.cursor.execute(query, tuple(event_ids_list))
             self.conn.commit()
-            return {"message": "Event deleted successfully!", "success": True}
-        except connector.Error as err:
+            
+            return {"message": f"{len(event_ids_list)} events deleted successfully!", "success": True}
+            
+        except Exception as err:
             self.conn.rollback()
             return {"message": f"Database Error: {err}", "success": False}
 
@@ -639,7 +587,7 @@ class Database:
                 query = """INSERT IGNORE INTO events 
                            (event_name, event_type, frequency, day, event_date,
                             time_start, time_end, location, active) 
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"""
                 params = (self.parameter[0], self.parameter[1], self.parameter[2], self.parameter[3], self.parameter[4], self.parameter[5], self.parameter[6], self.parameter[7], 1)
 
             else:
@@ -953,32 +901,37 @@ class Database:
                 raise Exception("Failed to connect to the database.")
             
             query = """
-                        SELECT 
-                            e.event_id AS event_id, 
-                            e.event_name AS name, 
-                            e.event_type AS type, 
-                            e.frequency AS frequency,
-                            DATE_FORMAT(e.event_date, '%b %e, %Y') AS date,
-                            TRIM(DATE_FORMAT(e.time_start, '%l:%i %p')) AS time_start, 
-                            TRIM(DATE_FORMAT(e.time_end, '%l:%i %p')) AS time_end, 
-                            e.location AS location,
-                            GROUP_CONCAT(DISTINCT d.department_name SEPARATOR ', ') AS dept
-                        FROM event_participants ep
-                        JOIN events e ON ep.event_id = e.event_id
-                        JOIN employees emp ON ep.user_id = emp.user_id
-                        JOIN departments d ON emp.department_id = d.department_id
-                        WHERE e.active = 1
-                        GROUP BY e.event_id, e.event_name
-                        ORDER BY e.event_date DESC;
-                    """
+                SELECT 
+                    e.event_id AS event_id, 
+                    e.event_name AS name, 
+                    e.event_type AS type, 
+                    e.frequency AS frequency,
+                    DATE_FORMAT(e.event_date, '%b %e, %Y') AS date,
+                    TRIM(DATE_FORMAT(e.time_start, '%l:%i %p')) AS time_start, 
+                    TRIM(DATE_FORMAT(e.time_end, '%l:%i %p')) AS time_end, 
+                    e.location AS location,
+                    GROUP_CONCAT(DISTINCT d.department_name SEPARATOR ', ') AS dept,
+                    (COUNT(DISTINCT d.department_id) = (SELECT COUNT(*) FROM departments)) AS all_departments
+                FROM event_participants ep
+                JOIN events e ON ep.event_id = e.event_id
+                JOIN employees emp ON ep.user_id = emp.user_id
+                JOIN departments d ON emp.department_id = d.department_id
+                WHERE e.active = 1
+                GROUP BY e.event_id
+                ORDER BY e.event_date DESC;
+            """
 
             cursor.execute(query)
             result = cursor.fetchall()
             
+            if result:
+                for row in result:
+                    row['all_departments'] = bool(row['all_departments'])
+            
             print(result)
             return result if result else []
             
-        except connector.Error as err:
+        except Exception as err: 
             print(f"Error fetching events: {err}")
             return None
         finally:
@@ -995,9 +948,11 @@ class Database:
                 raise Exception("Failed to connect to the database.")
             query = """
                         SELECT 
-                            ei.instance_id AS instance_id, 
+                            ei.instance_id AS instance_id,
+                            e.event_id AS event_id,
                             e.event_name AS name, 
                             e.event_type AS type, 
+                            e.frequency AS frequency,
                             ei.event_date AS date, 
                             e.time_start, 
                             e.time_end, 
@@ -1024,6 +979,55 @@ class Database:
             
         except connector.Error as err:
             print(f"Error fetching events: {err}")
+            return None
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+
+    @staticmethod
+    def get_all_events_for_reports(conn):
+        """
+        Fetches all scheduled event instances for reports dropdown.
+        Used in the Reports tab detailed report type selection.
+        """
+        try:
+            if conn:
+                cursor = conn.cursor(dictionary=True)
+            else:
+                raise Exception("Failed to connect to the database.")
+            query = """
+                        SELECT DISTINCT
+                            ei.instance_id AS instance_id,
+                            e.event_id AS event_id,
+                            e.event_name AS name, 
+                            e.event_type AS type, 
+                            e.frequency AS frequency,
+                            ei.event_date AS date, 
+                            e.time_start, 
+                            e.time_end, 
+                            e.location AS location,
+                            e.active AS active
+                        FROM event_instances ei
+                        JOIN events e ON ei.event_id = e.event_id
+                        WHERE ei.status = 'Scheduled'
+                        ORDER BY ei.event_date DESC
+                    """
+            cursor.execute(query)
+            result = cursor.fetchall()
+
+            if result:
+                for row in result:
+                    if row.get('date'):
+                        row['date'] = str(row['date'])
+                    if row.get('time_start'):
+                        row['time_start'] = str(row['time_start'])
+                    if row.get('time_end'):
+                        row['time_end'] = str(row['time_end'])
+                        
+            return result if result else []
+            
+        except connector.Error as err:
+            print(f"Error fetching events for reports: {err}")
             return None
         finally:
             if 'cursor' in locals():
@@ -1143,12 +1147,14 @@ class Database:
             query = """ 
                 SELECT 
                     ea.attendance_id, ea.user_id, ea.status, 
-                    ea.first_in, ea.last_out, ea.remarks, 
-                    COALESCE(s.student_name, e.employee_name, u.user_name) AS user_name,
+                    LOWER(TRIM(DATE_FORMAT(ea.first_in, '%l:%i %p'))) AS first_in,
+                    LOWER(TRIM(DATE_FORMAT(ea.last_out, '%l:%i %p'))) AS last_out,
+                    ea.remarks, 
+                    COALESCE(s.student_name, e.employee_name, v.visitor_name) AS user_name,
                     COALESCE(d.department_name, 'N/A') AS department
                 FROM event_attendance ea
                 LEFT JOIN users u ON ea.user_id = u.user_id
-                
+                LEFT JOIN visitors v ON u.user_id = v.user_id
                 LEFT JOIN students s ON u.user_id = s.user_id
                 LEFT JOIN employees e ON u.user_id = e.user_id
                 LEFT JOIN departments d ON (e.department_id = d.department_id)
@@ -1160,15 +1166,6 @@ class Database:
             
             cleaned_attendance = []
             for row in result:
-                for key, val in row.items():
-                    if isinstance(val, (timedelta, date, datetime)):
-                        if isinstance(val, timedelta):
-                            total_seconds = int(val.total_seconds())
-                            hours = total_seconds // 3600
-                            minutes = (total_seconds % 3600) // 60
-                            row[key] = f"{hours:02d}:{minutes:02d}"
-                        else:
-                            row[key] = str(val)
                 cleaned_attendance.append(row)
 
             return cleaned_attendance
@@ -1189,7 +1186,7 @@ class Database:
                     SELECT 
                         e.employee_name, 
                         d.department_name, 
-                        TIME_FORMAT(ea.first_in, '%h:%i %p') AS time_in, 
+                        LOWER(TRIM(DATE_FORMAT(ea.first_in, '%l:%i %p'))) AS time_in, 
                         ea.status, 
                         ea.remarks
                     FROM event_attendance ea
@@ -1275,8 +1272,8 @@ class Database:
                         SELECT 
                             COALESCE(e.employee_name, s.student_name, v.visitor_name, a.username, 'Unknown User') AS name,
                             CONCAT(UPPER(u.role), ' - ', COALESCE(d.department_name, c.course_name, v.purpose, 'N/A')) AS detail,
-                            TIME_FORMAT(ea.first_in, '%h:%i %p') AS time_in,
-                            TIME_FORMAT(ea.last_out, '%h:%i %p') AS time_out,
+                            LOWER(TRIM(DATE_FORMAT(ea.first_in, '%l:%i %p'))) AS time_in,
+                            LOWER(TRIM(DATE_FORMAT(ea.last_out, '%l:%i %p'))) AS time_out,
                             ea.status AS status,
                             COALESCE(ea.remarks, 'N/A') AS remarks
                         FROM event_attendance ea
@@ -1301,29 +1298,55 @@ class Database:
 
                 case 'General Logs' | 'Visitor Logs':
                     report_title = "General Campus Access Logs"
-                    event_name_display = "Campus Gates Entry/Exit"
-                    col_headers = ["User Name", "Role / Affiliation", "Time", "Action", "Gate"]
-                    
-                    query = f"""
-                        SELECT 
-                            COALESCE(e.employee_name, s.student_name, v.visitor_name, a.username, 'Unknown User') AS name,
-                            CONCAT(UPPER(u.role), ' - ', COALESCE(d.department_name, c.course_name, v.purpose, 'N/A')) AS detail,
-                            TIME_FORMAT(gl.timestamp, '%h:%i %p') AS time,
-                            gl.log_type AS status,
-                            COALESCE(gl.gate, 'Main Gate') AS remarks
-                        FROM general_log gl
-                        JOIN users u ON gl.user_id = u.user_id
-                        LEFT JOIN employees e ON u.user_id = e.user_id
-                        LEFT JOIN departments d ON e.department_id = d.department_id
-                        LEFT JOIN students s ON u.user_id = s.user_id
-                        LEFT JOIN courses c ON s.course_id = c.course_id
-                        LEFT JOIN visitors v ON u.user_id = v.user_id
-                        LEFT JOIN admin a ON u.user_id = a.user_id
-                        WHERE DATE(gl.timestamp) BETWEEN %s AND %s {dept_condition}
-                        ORDER BY gl.timestamp DESC
-                    """
-                    cursor.execute(query, [start_date, end_date] + dept_params)
-                    raw_logs = cursor.fetchall()
+
+                    if report_type == 'student_entry_exit':
+                        event_name_display = "Campus Gates Entry/Exit"
+                        col_headers = ["User Name", "Role / Affiliation", "Time", "Action", "Gate"]
+                        
+                        query = f"""
+                            SELECT 
+                                COALESCE(e.employee_name, s.student_name, v.visitor_name, a.username, 'Unknown User') AS name,
+                                CONCAT(UPPER(u.role), ' - ', COALESCE(d.department_name, c.course_name, v.purpose, 'N/A')) AS detail,
+                                TIME_FORMAT(gl.timestamp, '%h:%i %p') AS time,
+                                gl.log_type AS status,
+                                COALESCE(gl.gate, 'Main Gate') AS remarks
+                            FROM general_log gl
+                            JOIN users u ON gl.user_id = u.user_id
+                            LEFT JOIN employees e ON u.user_id = e.user_id
+                            LEFT JOIN departments d ON e.department_id = d.department_id
+                            LEFT JOIN students s ON u.user_id = s.user_id
+                            LEFT JOIN courses c ON s.course_id = c.course_id
+                            LEFT JOIN visitors v ON u.user_id = v.user_id
+                            LEFT JOIN admin a ON u.user_id = a.user_id
+                            WHERE DATE(gl.timestamp) BETWEEN %s AND %s {dept_condition}
+                            ORDER BY gl.timestamp DESC
+                        """
+                        cursor.execute(query, [start_date, end_date] + dept_params)
+                        raw_logs = cursor.fetchall()
+                    elif report_type == 'daily_traffic':
+                        event_name_display = "Daily Traffic Analysis"
+                        col_headers = ["Hour Time", "Role / Affiliation", "Time", "Action", "Gate"]
+                        
+                        query = f"""
+                            SELECT 
+                                COALESCE(e.employee_name, s.student_name, v.visitor_name, a.username, 'Unknown User') AS name,
+                                CONCAT(UPPER(u.role), ' - ', COALESCE(d.department_name, c.course_name, v.purpose, 'N/A')) AS detail,
+                                TIME_FORMAT(gl.timestamp, '%h:%i %p') AS time,
+                                gl.log_type AS status,
+                                COALESCE(gl.gate, 'Main Gate') AS remarks
+                            FROM general_log gl
+                            JOIN users u ON gl.user_id = u.user_id
+                            LEFT JOIN employees e ON u.user_id = e.user_id
+                            LEFT JOIN departments d ON e.department_id = d.department_id
+                            LEFT JOIN students s ON u.user_id = s.user_id
+                            LEFT JOIN courses c ON s.course_id = c.course_id
+                            LEFT JOIN visitors v ON u.user_id = v.user_id
+                            LEFT JOIN admin a ON u.user_id = a.user_id
+                            WHERE DATE(gl.timestamp) BETWEEN %s AND %s {dept_condition}
+                            ORDER BY gl.timestamp DESC
+                        """
+                        cursor.execute(query, [start_date, end_date] + dept_params)
+                        raw_logs = cursor.fetchall()
                     
                     total_present = len(raw_logs)
                     total_expected = len(raw_logs)
@@ -1342,3 +1365,292 @@ class Database:
             return None
         finally:
             cursor.close()
+
+# ==============================================================================
+    # ANALYTICS / DASHBOARD STATS
+    # ==============================================================================
+
+    @staticmethod
+    def get_overall_dashboard_stats(conn):
+        try:
+            cursor = conn.cursor(dictionary=True)
+            today = datetime.now().date()
+
+            cursor.execute("""
+                SELECT COUNT(*) AS total FROM general_log 
+                WHERE DATE(timestamp) = %s AND log_type = 'Entry'
+            """, (today,))
+            total_entries = cursor.fetchone()['total']
+
+            cursor.execute("""
+                SELECT 
+                    (SELECT COUNT(*) FROM students WHERE status = 'Inside') +
+                    (SELECT COUNT(*) FROM employees WHERE status = 'Inside') AS inside
+            """)
+            currently_inside = cursor.fetchone()['inside']
+
+            cursor.execute("""
+                SELECT AVG(TIMESTAMPDIFF(MINUTE, e.timestamp, x.timestamp)) AS avg_dwell
+                FROM general_log e
+                JOIN general_log x 
+                    ON e.user_id = x.user_id
+                    AND DATE(e.timestamp) = DATE(x.timestamp)
+                    AND e.log_type = 'Entry'
+                    AND x.log_type = 'Exit'
+                    AND x.timestamp > e.timestamp
+                WHERE DATE(e.timestamp) = %s
+            """, (today,))
+            avg_mins = cursor.fetchone()['avg_dwell'] or 0
+            avg_dwell = f"{int(avg_mins // 60)} hrs {int(avg_mins % 60)} mins"
+
+            cursor.execute("""
+                SELECT HOUR(timestamp) AS hr, COUNT(*) AS cnt
+                FROM general_log
+                WHERE DATE(timestamp) = %s AND log_type = 'Entry'
+                GROUP BY HOUR(timestamp)
+                ORDER BY cnt DESC
+                LIMIT 1
+            """, (today,))
+            peak_row = cursor.fetchone()
+            peak_hour = f"{peak_row['hr']:02d}:00" if peak_row else "N/A"
+
+            cursor.execute("""
+                SELECT HOUR(timestamp) AS hr, COUNT(*) AS cnt
+                FROM general_log
+                WHERE DATE(timestamp) = %s AND log_type = 'Entry'
+                GROUP BY HOUR(timestamp)
+            """, (today,))
+            hourly = {row['hr']: row['cnt'] for row in cursor.fetchall()}
+            traffic_chart = [hourly.get(h, 0) for h in range(6, 18)]
+
+            cursor.execute("""
+                SELECT 
+                    COUNT(*) AS total,
+                    SUM(status IN ('Present', 'Late')) AS attended
+                FROM event_attendance
+                WHERE event_date = %s
+            """, (today,))
+            event_row = cursor.fetchone()
+            total_invited = event_row['total'] or 0
+            total_attended = int(event_row['attended'] or 0)
+            rate = f"{round((total_attended / total_invited) * 100, 1)}%" if total_invited > 0 else "N/A"
+            raw = f"{total_attended:,} / {total_invited:,} Attendees"
+
+            cursor.execute("""
+                SELECT COUNT(*) AS total FROM general_log
+                WHERE DATE(timestamp) = %s AND log_type = 'Entry'
+            """, (today - timedelta(days=1),))
+            yesterday = cursor.fetchone()['total'] or 1
+            trend = f"+{round(((total_entries - yesterday) / yesterday) * 100)}%" if yesterday else "N/A"
+
+            cursor.execute("""
+                SELECT d.department_name, COUNT(*) AS cnt
+                FROM general_log gl
+                JOIN users u ON gl.user_id = u.user_id
+                JOIN employees emp ON u.user_id = emp.user_id
+                JOIN departments d ON emp.department_id = d.department_id
+                WHERE DATE(gl.timestamp) = %s AND gl.log_type = 'Entry'
+                GROUP BY d.department_name
+                ORDER BY cnt DESC
+                LIMIT 5
+            """, (today,))
+            dist_rows = cursor.fetchall()
+            total_dept_entries = sum(r['cnt'] for r in dist_rows) or 1
+            dept_distribution = [round((r['cnt'] / total_dept_entries) * 100) for r in dist_rows]
+
+            while len(dept_distribution) < 5:
+                dept_distribution.append(0)
+                
+            return {
+                "total_entries": f"{total_entries:,}",
+                "entries_trend": trend,
+                "currently_inside": f"{currently_inside:,}",
+                "avg_dwell_time": avg_dwell,
+                "peak_hour": peak_hour,
+                "traffic_chart": traffic_chart,
+                "event_attendance_rate": rate,
+                "event_attendance_raw": raw,
+                "dept_distribution": dept_distribution,
+                "alerts": []
+            }
+
+        except connector.Error as err:
+            print(f"Error fetching overall stats: {err}")
+            return None
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+
+
+    @staticmethod
+    def get_student_dashboard_stats(conn):
+        try:
+            cursor = conn.cursor(dictionary=True)
+            today = datetime.now().date()
+
+            cursor.execute("""
+                SELECT COUNT(*) AS total
+                FROM general_log gl
+                JOIN users u ON gl.user_id = u.user_id
+                WHERE u.role = 'student' AND DATE(gl.timestamp) = %s AND gl.log_type = 'Entry'
+            """, (today,))
+            total_entries = cursor.fetchone()['total']
+
+            cursor.execute("SELECT COUNT(*) AS inside FROM students WHERE status = 'Inside'")
+            currently_inside = cursor.fetchone()['inside']
+
+            cursor.execute("""
+                SELECT AVG(TIMESTAMPDIFF(MINUTE, e.timestamp, x.timestamp)) AS avg_stay
+                FROM general_log e
+                JOIN general_log x
+                    ON e.user_id = x.user_id
+                    AND DATE(e.timestamp) = DATE(x.timestamp)
+                    AND e.log_type = 'Entry'
+                    AND x.log_type = 'Exit'
+                    AND x.timestamp > e.timestamp
+                JOIN users u ON e.user_id = u.user_id
+                WHERE u.role = 'student' AND DATE(e.timestamp) = %s
+            """, (today,))
+            avg_mins = cursor.fetchone()['avg_stay'] or 0
+            avg_stay = f"{round(avg_mins / 60, 1)} Hrs"
+
+            cursor.execute("""
+                SELECT HOUR(gl.timestamp) AS hr, COUNT(*) AS cnt
+                FROM general_log gl
+                JOIN users u ON gl.user_id = u.user_id
+                WHERE u.role = 'student' AND DATE(gl.timestamp) = %s AND gl.log_type = 'Entry'
+                GROUP BY HOUR(gl.timestamp)
+                ORDER BY cnt DESC LIMIT 1
+            """, (today,))
+            peak_row = cursor.fetchone()
+            peak_hour = f"{peak_row['hr']:02d}:00 AM" if peak_row else "N/A"
+
+            cursor.execute("SELECT COUNT(*) AS total FROM students")
+            total_students = cursor.fetchone()['total'] or 1
+            peak_load = f"{round((currently_inside / total_students) * 100)}%"
+
+            cursor.execute("""
+                SELECT HOUR(gl.timestamp) AS hr, COUNT(*) AS cnt
+                FROM general_log gl
+                JOIN users u ON gl.user_id = u.user_id
+                WHERE u.role = 'student' AND DATE(gl.timestamp) = %s AND gl.log_type = 'Entry'
+                GROUP BY HOUR(gl.timestamp)
+            """, (today,))
+            hourly = {row['hr']: row['cnt'] for row in cursor.fetchall()}
+            hourly_traffic = [hourly.get(h, 0) for h in range(6, 18)]
+
+            cursor.execute("""
+                SELECT COUNT(*) AS total FROM general_log gl
+                JOIN users u ON gl.user_id = u.user_id
+                WHERE u.role = 'student' AND DATE(gl.timestamp) = %s AND gl.log_type = 'Entry'
+            """, (today - timedelta(days=1),))
+            yesterday = cursor.fetchone()['total'] or 1
+            trend = f"+{round(((total_entries - yesterday) / yesterday) * 100)}%" if yesterday else "N/A"
+
+            return {
+                "total_entries": f"{total_entries:,}",
+                "entries_trend": trend,
+                "peak_hour": peak_hour,
+                "peak_load": peak_load,
+                "currently_inside": f"{currently_inside:,}",
+                "avg_stay": avg_stay,
+                "hourly_traffic": hourly_traffic,
+                "watchlist": [],
+                "curfew_trigger": "09:40:00 PM"
+            }
+
+        except connector.Error as err:
+            print(f"Error fetching student stats: {err}")
+            return None
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+
+
+    @staticmethod
+    def get_employee_dashboard_stats(conn):
+        try:
+            cursor = conn.cursor(dictionary=True)
+            today = datetime.now().date()
+
+            cursor.execute("""
+                SELECT status, COUNT(*) AS cnt
+                FROM event_attendance
+                WHERE event_date = %s
+                GROUP BY status
+            """, (today,))
+            attendance_map = {row['status']: row['cnt'] for row in cursor.fetchall()}
+            attendance_data = [
+                attendance_map.get('Present', 0),
+                attendance_map.get('Late', 0),
+                attendance_map.get('Absent', 0)
+            ]
+
+            total_attendance = sum(attendance_data)
+            on_time = attendance_data[0]
+            on_time_rate = f"{round((on_time / total_attendance) * 100)}%" if total_attendance > 0 else "N/A"
+
+            cursor.execute("""
+                SELECT AVG(TIMESTAMPDIFF(MINUTE, 
+                    TIMESTAMP(ea.event_date, e.time_start), 
+                    ea.first_in
+                )) AS avg_late
+                FROM event_attendance ea
+                JOIN event_instances ei ON ea.instance_id = ei.instance_id
+                JOIN events e ON ei.event_id = e.event_id
+                WHERE ea.event_date = %s AND ea.status = 'Late'
+            """, (today,))
+            avg_late = cursor.fetchone()['avg_late'] or 0
+            avg_tardiness = f"{int(avg_late)} mins"
+
+            cursor.execute("""
+                SELECT d.department_name AS dept, 
+                       AVG(TIMESTAMPDIFF(MINUTE,
+                           TIMESTAMP(ea.event_date, e.time_start),
+                           ea.first_in
+                       )) AS avg_late
+                FROM event_attendance ea
+                JOIN event_instances ei ON ea.instance_id = ei.instance_id
+                JOIN events e ON ei.event_id = e.event_id
+                JOIN users u ON ea.user_id = u.user_id
+                JOIN employees emp ON u.user_id = emp.user_id
+                JOIN departments d ON emp.department_id = d.department_id
+                WHERE ea.event_date = %s AND ea.status = 'Late'
+                GROUP BY d.department_name
+                ORDER BY avg_late DESC
+                LIMIT 7
+            """, (today,))
+            tardiness_rows = cursor.fetchall()
+            tardiness_data = [round(row['avg_late'] or 0) for row in tardiness_rows]
+
+            cursor.execute("""
+                SELECT d.department_name AS name,
+                       ROUND(SUM(ea.status IN ('Present','Late')) / COUNT(*) * 100) AS value
+                FROM event_attendance ea
+                JOIN users u ON ea.user_id = u.user_id
+                JOIN employees emp ON u.user_id = emp.user_id
+                JOIN departments d ON emp.department_id = d.department_id
+                WHERE ea.event_date = %s
+                GROUP BY d.department_name
+                ORDER BY value DESC
+                LIMIT 5
+            """, (today,))
+            dept_participation = [
+                {"name": row['name'], "value": row['value']}
+                for row in cursor.fetchall()
+            ]
+
+            return {
+                "attendance_data": attendance_data,
+                "tardiness_data": tardiness_data if tardiness_data else [0] * 7,
+                "dept_participation": dept_participation,
+                "avg_tardiness": avg_tardiness,
+                "on_time_rate": on_time_rate
+            }
+
+        except connector.Error as err:
+            print(f"Error fetching employee stats: {err}")
+            return None
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
