@@ -6,7 +6,7 @@
 
 <!-- Page content -->
 {% block content %}
-<!-- Sidebar -->
+<!-- Sidebar (unchanged) -->
 <div class="sidebar d-flex flex-column flex-shrink-0 p-3">
     <a href="#" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
         <i class="bi bi-bank2 fs-4 text-gold me-2"></i>
@@ -75,7 +75,9 @@
                 <thead>
                     <tr>
                         <th class="ps-4">Employee Name</th>
+                        <th>Event Name</th>
                         <th>Department</th>
+                        <th>Date</th>
                         <th>Time In</th>
                         <th>Time Out</th>
                         <th class="text-end" style="padding-right: 3rem;">Status</th>
@@ -98,7 +100,9 @@
                                 <span>{{ log.name }}</span>
                             </div>
                         </td>
+                        <td class="text-white">{{ log.event_name }}</td>
                         <td class="text-white-50">{{ log.dept }}</td>
+                        <td class="text-white-50 font-monospace small">{{ log.date_formatted or log.date }}</td>
                         <td class="text-success font-monospace small">{{ log.in or '--:--' }}</td>
                         <td class="text-danger font-monospace small">{{ log.out or '--:--' }}</td>
                         <td class="text-end" style="padding-right: 3rem;">
@@ -491,6 +495,22 @@
             <button id="cancelEditEmployee" type="button" class="btn btn-outline-light">Cancel</button>
             <button id="saveEmployeeEdit" type="button" class="btn btn-primary-gold">Update</button>
         </div>
+    </div>
+
+    <!-- No results (shown only when filters return nothing) -->
+    <div id="noResults" style="display: none;" class="card-glass text-center text-white-50 py-5 mb-4">
+        <i class="bi bi-search display-4 d-block mb-3"></i>
+        <p class="mb-0">No records found matching your search criteria.</p>
+    </div>
+
+    <!-- Result count -->
+    <p id="resultCount" class="text-white-50 small ms-1"></p>
+
+    <!-- Pagination Footer -->
+    <div id="paginationContainer" class="pagination-footer" style="display: none;">
+        <nav aria-label="Page navigation">
+            <ul id="paginationList" class="pagination pagination-custom mb-0 gap-1"></ul>
+        </nav>
     </div>
 </div>
 
