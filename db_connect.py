@@ -1573,12 +1573,21 @@ class Database:
             cursor = conn.cursor(dictionary=True)
             today = datetime.now().date()
 
+            # Find the latest date with attendance data for fallback
+            cursor.execute("SELECT MAX(event_date) AS latest FROM event_attendance")
+            latest_row = cursor.fetchone()
+            latest_date = latest_row['latest'] if latest_row and latest_row['latest'] else today
+            
+            # Use today if data exists, otherwise use latest_date for demo/fallback
+            cursor.execute("SELECT COUNT(*) AS cnt FROM event_attendance WHERE event_date = %s", (today,))
+            target_date = today if cursor.fetchone()['cnt'] > 0 else latest_date
+
             cursor.execute("""
                 SELECT status, COUNT(*) AS cnt
                 FROM event_attendance
                 WHERE event_date = %s
                 GROUP BY status
-            """, (today,))
+            """, (target_date,))
             attendance_map = {row['status']: row['cnt'] for row in cursor.fetchall()}
             attendance_data = [
                 attendance_map.get('Present', 0),
@@ -1587,8 +1596,17 @@ class Database:
             ]
 
             total_attendance = sum(attendance_data)
-            on_time = attendance_data[0]
-            on_time_rate = f"{round((on_time / total_attendance) * 100)}%" if total_attendance > 0 else "N/A"
+            present_count = attendance_data[0]
+            late_count = attendance_data[1]
+            attendees_count = present_count + late_count
+            
+            # On-time rate is based on people who actually showed up
+            on_time_rate = f"{round((present_count / attendees_count) * 100)}%" if attendees_count > 0 else "N/A"
+            on_time_percentage = round((present_count / attendees_count) * 100) if attendees_count > 0 else 0
+
+            # Calculate Participation Level (based on total invited)
+            participation_pct = (attendees_count / total_attendance * 100) if total_attendance > 0 else 0
+            participation_level = "High" if participation_pct > 80 else "Medium" if participation_pct > 50 else "Low" if total_attendance > 0 else "N/A"
 
             cursor.execute("""
                 SELECT AVG(TIMESTAMPDIFF(MINUTE, 
@@ -1599,7 +1617,7 @@ class Database:
                 JOIN event_instances ei ON ea.instance_id = ei.instance_id
                 JOIN events e ON ei.event_id = e.event_id
                 WHERE ea.event_date = %s AND ea.status = 'Late'
-            """, (today,))
+            """, (target_date,))
             avg_late = cursor.fetchone()['avg_late'] or 0
             avg_tardiness = f"{int(avg_late)} mins"
 
@@ -1619,9 +1637,10 @@ class Database:
                 GROUP BY d.department_name
                 ORDER BY avg_late DESC
                 LIMIT 7
-            """, (today,))
+            """, (target_date,))
             tardiness_rows = cursor.fetchall()
             tardiness_data = [round(row['avg_late'] or 0) for row in tardiness_rows]
+            tardiness_labels = [row['dept'][:5] for row in tardiness_rows] # Shortened for chart
 
             cursor.execute("""
                 SELECT d.department_name AS name,
@@ -1634,19 +1653,83 @@ class Database:
                 GROUP BY d.department_name
                 ORDER BY value DESC
                 LIMIT 5
-            """, (today,))
-            dept_participation = [
-                {"name": row['name'], "value": row['value']}
-                for row in cursor.fetchall()
-            ]
+            """, (target_date,))
+            dept_participation = cursor.fetchall()
+
+            # --- NEW: Upcoming Events ---
+            cursor.execute("""
+                SELECT e.event_name, 
+                       DATE_FORMAT(ei.event_date, '%b %d') as date,
+                       TIME_FORMAT(e.time_start, '%h:%i %p') as time,
+                       e.location
+                FROM event_instances ei
+                JOIN events e ON ei.event_id = e.event_id
+                WHERE ei.event_date >= CURDATE()
+                AND ei.status = 'Scheduled'
+                ORDER BY ei.event_date ASC, e.time_start ASC
+                LIMIT 3
+            """)
+            upcoming_events = cursor.fetchall()
+
+            # --- NEW: Recent Activity Stream ---
+            cursor.execute("""
+                SELECT emp.employee_name, 
+                       el.log_type as type, 
+                       TIME_FORMAT(el.timestamp, '%h:%i %p') as time,
+                       e.event_name as event
+                FROM event_log el
+                JOIN employees emp ON el.user_id = emp.user_id
+                JOIN events e ON el.event_id = e.event_id
+                ORDER BY el.timestamp DESC
+                LIMIT 5
+            """)
+            recent_activity = cursor.fetchall()
+
+            # --- NEW: Punctuality Leaderboard (Last 30 Days) ---
+            cursor.execute("""
+                SELECT emp.employee_name, COUNT(*) as present_count
+                FROM event_attendance ea
+                JOIN employees emp ON ea.user_id = emp.user_id
+                WHERE ea.status = 'Present'
+                AND ea.event_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                GROUP BY emp.user_id
+                ORDER BY present_count DESC
+                LIMIT 5
+            """)
+            leaderboard = cursor.fetchall()
+
+            # --- NEW: Departmental Comparison Table ---
+            cursor.execute("""
+                SELECT 
+                    d.department_name as dept,
+                    COUNT(*) as invited,
+                    SUM(ea.status IN ('Present', 'Late')) as attended,
+                    CAST(ROUND(SUM(ea.status IN ('Present', 'Late')) / COUNT(*) * 100) AS UNSIGNED) as rate
+                FROM event_attendance ea
+                JOIN employees emp ON ea.user_id = emp.user_id
+                JOIN departments d ON emp.department_id = d.department_id
+                WHERE ea.event_date = %s
+                GROUP BY d.department_id
+                ORDER BY rate DESC
+            """, (target_date,))
+            dept_comparison = cursor.fetchall()
 
             return {
                 "attendance_data": attendance_data,
                 "tardiness_data": tardiness_data if tardiness_data else [0] * 7,
+                "tardiness_labels": tardiness_labels if tardiness_labels else ["N/A"] * 7,
                 "dept_participation": dept_participation,
                 "avg_tardiness": avg_tardiness,
-                "on_time_rate": on_time_rate
+                "on_time_rate": on_time_rate,
+                "on_time_percentage": on_time_percentage,
+                "participation_level": participation_level,
+                "target_date": str(target_date),
+                "upcoming_events": upcoming_events,
+                "recent_activity": recent_activity,
+                "leaderboard": leaderboard,
+                "dept_comparison": dept_comparison
             }
+
 
         except connector.Error as err:
             print(f"Error fetching employee stats: {err}")
