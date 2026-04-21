@@ -1,6 +1,6 @@
 from datetime import date, datetime, timedelta
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Flask, current_app, render_template, request, redirect, url_for, flash, session, jsonify
 import requests
 import csv
 import io
@@ -337,8 +337,37 @@ def admin_students():
 @app.route('/admin/employees')
 @login_required
 def admin_employees():
-    logs = helper_employee_attendance()
-    return render_template('employee_logs.html', logs=logs)
+    logs = helper_employee_attendance()  # keep this for attendance
+    
+    # Add this — fetch employee records
+    conn = connect_db()
+    employees = []
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT e.employee_id, e.employee_name, d.department_name, e.position, e.status
+            FROM employees e
+            LEFT JOIN departments d ON e.department_id = d.department_id
+            ORDER BY e.employee_name ASC
+        """)
+        rows = cursor.fetchall()
+        employees = [
+            {
+                "id": row[0],
+                "name": row[1],
+                "dept": row[2] or "N/A",
+                "position": row[3] or "",
+                "status": row[4] or "Active",
+            }
+            for row in rows
+        ]
+    except Exception as e:
+        print(f"Error fetching employees: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+    return render_template('employee_logs.html', logs=logs, employees=employees)
 
 @app.route('/admin/visitors')
 @login_required
@@ -857,6 +886,22 @@ def helper_employee_attendance():
         print(f"Backend API Error: {e}")
     return []
 
+@app.route("/add_employee", methods=["POST"])
+def add_employee():
+    data = request.get_json()
+
+    model = EmployeeModel()
+
+    result = model.add_employee(
+        employee_id=data["employee_id"],
+        employee_name=data["employee_name"],
+        department_id=data["department_id"],
+        position=data["position"]
+    )
+
+    return jsonify(result)
+
+
 @app.route("/upload_employees", methods=["POST"])
 def upload_employees():
     file = request.files.get("file")
@@ -995,6 +1040,46 @@ def upload_employees():
     finally:
         if "conn" in locals() and conn:
             conn.close()
+            
+
+@app.route("/employees")
+def employees():
+    conn = connect_db()
+    if conn is None:
+        return render_template("employee_logs.html", logs=[])
+        
+    try:
+        cursor = conn.cursor()
+        # Ensure your table names 'employees' and 'departments' match your DB exactly
+        cursor.execute("""
+            SELECT e.employee_id, e.employee_name, d.department_name, e.position, e.status
+            FROM employees e
+            LEFT JOIN departments d ON e.department_id = d.department_id
+            ORDER BY e.employee_name ASC
+        """)
+        rows = cursor.fetchall()
+        
+        logs = [
+            {
+                "id": row[0],
+                "name": row[1],
+                "dept": row[2] or "N/A",
+                "position": row[3] or "",
+                "status": row[4] or "Active",
+            }
+            for row in rows
+        ]
+        return render_template("employee_logs.html", logs=logs)
+        
+    except Exception as e:
+        # Check your console/logs for this error message if it still doesn't work
+        print(f"Database error: {e}") 
+        return render_template("employee_logs.html", logs=[])
+        
+    finally:
+        if conn:
+            conn.close()
+            
 # ==============================================================================
 # MAIN ENTRY POINT
 # ==============================================================================
