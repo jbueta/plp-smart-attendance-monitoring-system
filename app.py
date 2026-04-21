@@ -337,11 +337,10 @@ def admin_students():
 @app.route('/admin/employees')
 @login_required
 def admin_employees():
-    logs = helper_employee_attendance()  # keep this for attendance
-    
-    # Add this — fetch employee records
+    logs = helper_employee_attendance()
     conn = connect_db()
     employees = []
+    departments = []
     try:
         cursor = conn.cursor()
         cursor.execute("""
@@ -361,13 +360,18 @@ def admin_employees():
             }
             for row in rows
         ]
+
+        # Fetch departments
+        cursor.execute("SELECT department_id, department_name FROM departments ORDER BY department_name ASC")
+        departments = [{"id": row[0], "name": row[1]} for row in cursor.fetchall()]
+
     except Exception as e:
-        print(f"Error fetching employees: {e}")
+        print(f"Error: {e}")
     finally:
         if conn:
             conn.close()
 
-    return render_template('employee_logs.html', logs=logs, employees=employees)
+    return render_template('employee_logs.html', logs=logs, employees=employees, departments=departments)
 
 @app.route('/admin/visitors')
 @login_required
@@ -1080,6 +1084,43 @@ def employees():
         if conn:
             conn.close()
             
+@app.route("/update_employee", methods=["POST"])
+@login_required
+def update_employee():
+    data = request.get_json()
+    # employee_id is read-only so we use it only as the WHERE key
+    conn = connect_db()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE employees
+            SET employee_name = %s,
+                department_id = (SELECT department_id FROM departments WHERE department_name = %s),
+                position = %s
+            WHERE employee_id = %s
+        """, (data["employee_name"], data["department_id"], data["position"], data["employee_id"]))
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+    finally:
+        conn.close()
+        
+        
+@app.route("/delete_employee", methods=["POST"])
+@login_required
+def delete_employee():
+    data = request.get_json()
+    conn = connect_db()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM employees WHERE employee_id = %s", (data["employee_id"],))
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+    finally:
+        conn.close()
 # ==============================================================================
 # MAIN ENTRY POINT
 # ==============================================================================
