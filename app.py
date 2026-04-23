@@ -4,9 +4,17 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 import requests
 import csv
 import io
+import uuid
+
+from app_tasks import fetch_report_data     #reports generator
+from extensions import cache
 
 app = Flask(__name__)
 app.secret_key = 'plp_secure_key_2026'  # Required for session management
+
+# Configure and initialize cache (SimpleCache for development)
+app.config['CACHE_TYPE'] = 'SimpleCache'
+cache.init_app(app)
 
 # ==============================================================================
 # MOCK DATA (Prototype State)
@@ -124,27 +132,24 @@ def login_required(f):
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+        data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "message": "Invalid request."}), 400
+            
+        username = data.get('username')
+        password = data.get('password')
         
-        if username is None or password is None:
-            flash('Please enter a username and password.', 'danger')
+        if not username or not password:
+            return jsonify({"success": False, "message": "Please enter a username and password."})
 
-        if username == "admin" and password == "admin123":
-            session['logged_in'] = True
-            flash("Welcome back, Admin.", 'success')
-            return redirect(url_for('dashboard'))
-        
         result = helper_admin_login(username, password)
+        
         if result and result.get('success'):
-            data = result.get('data') or {}
-            user_name = data.get('user_name') or 'Admin'
+            data = result.get('data')
             session['logged_in'] = True
-            flash(f"Welcome back, {user_name}.", 'success')
-            return redirect(url_for('dashboard'))
+            return jsonify({ "success": True, "redirect_url": url_for('dashboard', user=data.get('username')) })
         else:
-            message = result.get('message') if result else 'Could not connect to the database. Please try again.'
-            flash(message, 'danger')
+            return jsonify({"success": False, "message": result.get('message')})
             
     return render_template('login.html')
 
@@ -188,9 +193,15 @@ def kiosk_employee():
     session.pop('logged_in', None)
     instance_id = request.args.get('instance_id', type=int)
     events = helper_kiosk_live_events()
+    print(events)
     selected_event = next((e for e in events if e['instance_id'] == instance_id), None)
     event_name = selected_event['name'] if selected_event else "General Attendance"
-    return render_template('kiosk_employee.html', event_name=event_name, kiosk_data=MOCK_KIOSK_DATA)
+    event_id = selected_event.get('event_id') if selected_event else None  # Add this line
+    return render_template('kiosk_employee.html',
+                       event_name=event_name,
+                       event_id=event_id,
+                       instance_id=instance_id,          # Pass instance_id
+                       kiosk_data=MOCK_KIOSK_DATA)
 
 @app.route('/kiosk/visitor')
 def kiosk_visitor():
@@ -250,22 +261,27 @@ def visitor_checkout(visitor_id):
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    events = helper_admin_live_events()
+
+    USER_NAME = request.args.get('user', 'Admin')
+
+    events = helper_admin_events()
     overall_stats = helper_dashboard_overall_stats()
     student_stats = helper_dashboard_student_stats()
     employee_stats = helper_dashboard_employee_stats()
+
     # Pass structured stats for different tabs
     return render_template('dashboard.html', 
                            events=events, 
                            overall_stats=overall_stats,
                            student_stats=student_stats,
                            employee_stats=employee_stats,
-                           logs=MOCK_EMPLOYEE_LOGS)
+                           logs=MOCK_EMPLOYEE_LOGS,
+                           user=USER_NAME)
 
 @app.route('/events')
 @login_required
 def manage_events():
-    events = helper_admin_live_events()
+    events = helper_admin_events()
     departments = helper_admin_live_departments()
     return render_template('events.html', events=events, departments=departments)
 
@@ -277,7 +293,8 @@ def admin_students():
 @app.route('/admin/employees')
 @login_required
 def admin_employees():
-    return render_template('employee_logs.html', logs=MOCK_EMPLOYEE_LOGS)
+    logs = helper_employee_attendance()
+    return render_template('employee_logs.html', logs=logs)
 
 @app.route('/admin/visitors')
 @login_required
@@ -287,21 +304,12 @@ def admin_visitors():
 @app.route('/analytics/employee')
 @login_required
 def analytics_employee():
-    events = helper_admin_live_events()
-    stats = helper_dashboard_employee_stats()
-    return render_template('analytics_employee.html',
-                           events=events,
-                           stats=stats,
-                           logs=MOCK_EMPLOYEE_LOGS,
-                           today=datetime.now().strftime('%b %d, %Y'))
+    return redirect(url_for('admin_employees'))
 
 @app.route('/analytics/students')
 @login_required
 def analytics_students():
-    stats = helper_dashboard_student_stats()
-    return render_template('analytics_students.html',
-                           stats=stats,
-                           logs=MOCK_STUDENT_LOGS)
+    return redirect(url_for('admin_students'))
 
 @app.route('/reports')
 @login_required
@@ -393,6 +401,7 @@ def add_event():
             "custom_participants": extracted_custom_participants
         }
 
+        print(event_payload)
         api_url = "http://127.0.0.1:5001/admin/dashboard/add-events"
         response = requests.post(api_url, json=event_payload, timeout=5)
         
@@ -498,7 +507,7 @@ def kiosk_live_event():
 @app.route('/api/admin/live-events')
 def admin_live_event():    
     try:
-        response = requests.get("http://127.0.0.1:5001/admin/dashboard/live-events", timeout=5)
+        response = requests.get("http://127.0.0.1:5001/admin/dashboard/events", timeout=5)
         if response.status_code == 200:
             return jsonify(response.json()) 
             
@@ -520,19 +529,31 @@ def admin_live_departments():
 # HELPER
 # ==============================================================================
 
+def helper_employee_attendance():
+    try:
+        response = requests.get("http://127.0.0.1:5001/admin/employees/attendance", timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('success'):
+                return data.get('logs', [])
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Error: {e}")
+    return []
+
 def helper_admin_login(username, password):
     url = "http://127.0.0.1:5001/admin/login/auth"
     headers = {"Content-Type": "application/json"}
     payload = {"username": username, "password": password}   
 
     try:
-        response = requests.put(url, headers=headers, json=payload, timeout=5)
+        response = requests.post(url, headers=headers, json=payload, timeout=5)
         response.raise_for_status()
-        return response.json()
-            
+        return response.json()   
     except requests.exceptions.RequestException as e:
         print(f"API for admin authentication bridge error: {e}")
+        return {"success": False, "message": f"Authentication service unavailable: {str(e)}"}
 
+@app.route('/api/retrieve/events')
 def helper_kiosk_live_events():    
     current_kiosk_events = list(DEFAULT_EVENTS)
     
@@ -547,8 +568,10 @@ def helper_kiosk_live_events():
                 for event in api_data.get('events', []):
                     real_events.append({
                         'instance_id': event.get('instance_id', ''),
+                        'event_id': event.get('event_id', ''),
                         'name': event.get('name', 'Unknown'),
                         'type': event.get('type', 'Unknown'),
+                        'frequency': event.get('frequency', 'dd/mm/yyyy'),
                         'date': event.get('date', 'Unknown'),
                         'time_start': event.get('time_start', 'Unknown'),
                         'time_end': event.get('time_end', 'Unknown'),
@@ -560,7 +583,7 @@ def helper_kiosk_live_events():
     except requests.exceptions.RequestException as e:
         print(f"Backend API Error: {e}")
         
-    return current_kiosk_events 
+    return current_kiosk_events
 
 def helper_kiosk_live_student_logs():    
     current_kiosk_data = dict(MOCK_KIOSK_DATA)
@@ -588,6 +611,7 @@ def helper_kiosk_live_student_logs():
         
     return current_kiosk_data 
 
+@app.route('/api/retrieve/departments')
 def helper_admin_live_departments(): 
     current_live_departments = list(LIVE_DEPARTMENTS)
     
@@ -612,11 +636,11 @@ def helper_admin_live_departments():
         
     return current_live_departments 
 
-def helper_admin_live_events():    
+def helper_admin_events():    
     current_kiosk_events = list(DEFAULT_EVENTS)
     
     try:
-        response = requests.get("http://127.0.0.1:5001/admin/dashboard/live-events", timeout=5)
+        response = requests.get("http://127.0.0.1:5001/admin/dashboard/events", timeout=5)
         
         if response.status_code == 200:
             api_data = response.json()
@@ -632,7 +656,8 @@ def helper_admin_live_events():
                         'dept': event.get('dept', 'Unknown'),
                         'time_start': event.get('time_start', 'Unknown'),
                         'time_end': event.get('time_end', 'Unknown'),
-                        'location': event.get('location', 'Unknown')
+                        'location': event.get('location', 'Unknown'),
+                        'all_departments': event.get('all_departments', False)
                     })
                 
                 current_kiosk_events = real_events
@@ -662,6 +687,45 @@ def helper_admin_delete_events(event_id, delete_type):
     except requests.exceptions.RequestException as e:
         print(f"Backend API Error: {e}")
         return {"success": False, "message": f"Backend error: {e}"}
+
+# ==============================================================================
+# REPORTS GENERATION FUNCTION
+# ==============================================================================
+
+@app.route('/generate_report')
+def generate_report():
+    category = request.args.get('category')
+    report_type = request.args.get('type')
+    filter_val = request.args.get('filter', 'All')
+    start_date = request.args.get('start')
+    end_date = request.args.get('end')
+    
+    # Validate date range
+    if start_date and end_date:
+        try:
+            start = datetime.strptime(start_date, '%Y-%m-%d')
+            end = datetime.strptime(end_date, '%Y-%m-%d')
+            
+            if start > end:
+                error_msg = f"Invalid date range: 'From' date ({start_date}) cannot be after 'To' date ({end_date})."
+                return f"<h1>Report Error</h1><p>{error_msg}</p>", 400
+        except ValueError as e:
+            return f"<h1>Report Error</h1><p>Invalid date format. Please use YYYY-MM-DD format.</p>", 400
+    
+    report_results = fetch_report_data(category, report_type, filter_val, start_date, end_date)
+    
+    # 3. Handle any errors returned by the service
+    if "error" in report_results:
+        return f"<h1>Report Error</h1><p>{report_results['error']}</p>", 500
+        
+    # 4. Render the template using the clean dictionaries returned by tasks.py
+    return render_template(
+        'sample_report.html',
+        current_date=datetime.now().strftime('%B %d, %Y - %I:%M %p'),
+        report=report_results['report_data'],
+        metrics=report_results['metrics_data'],
+        logs=report_results['logs']
+    )
 
 def helper_dashboard_overall_stats():
     stats = dict(MOCK_DASHBOARD_STATS)  
@@ -700,6 +764,22 @@ def helper_dashboard_employee_stats():
     except requests.exceptions.RequestException as e:
         print(f"Backend API Error (employee stats): {e}")
     return stats
+    
+
+# ==============================================================================
+# EMPLOYEE LOGS HELPER
+# ==============================================================================
+
+def helper_employee_attendance():
+    try:
+        response = requests.get("http://127.0.0.1:5001/admin/employees/attendance", timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('success'):
+                return data.get('logs', [])
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Error: {e}")
+    return []
 # ==============================================================================
 # MAIN ENTRY POINT
 # ==============================================================================
