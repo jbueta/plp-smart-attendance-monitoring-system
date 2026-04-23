@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 15, 2026 at 03:39 PM
+-- Generation Time: Apr 24, 2026 at 12:14 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -36,11 +36,6 @@ CREATE TABLE `admin` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Truncate table before insert `admin`
---
-
-TRUNCATE TABLE `admin`;
---
 -- Dumping data for table `admin`
 --
 
@@ -60,11 +55,6 @@ CREATE TABLE `courses` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Truncate table before insert `courses`
---
-
-TRUNCATE TABLE `courses`;
 --
 -- Dumping data for table `courses`
 --
@@ -93,11 +83,6 @@ CREATE TABLE `departments` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Truncate table before insert `departments`
---
-
-TRUNCATE TABLE `departments`;
---
 -- Dumping data for table `departments`
 --
 
@@ -118,25 +103,49 @@ INSERT INTO `departments` (`department_id`, `department_name`, `created_at`) VAL
 
 DROP TABLE IF EXISTS `employees`;
 CREATE TABLE `employees` (
-  `seq` int(11) NOT NULL AUTO_INCREMENT,
+  `seq` int(11) NOT NULL,
   `user_id` int(11) NOT NULL,
-  `employee_id` varchar(8) NOT NULL,
+  `employee_id` varchar(12) NOT NULL,
   `employee_name` varchar(80) DEFAULT NULL,
   `department_id` int(11) NOT NULL,
   `position` varchar(100) DEFAULT NULL,
   `status` enum('Inside','Outside') DEFAULT 'Outside',
-  `emp_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  UNIQUE KEY `employees_seq_unique` (`seq`)
+  `emp_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Truncate table before insert `employees`
---
-
-TRUNCATE TABLE `employees`;
---
 -- Dumping data for table `employees`
 --
+
+INSERT INTO `employees` (`seq`, `user_id`, `employee_id`, `employee_name`, `department_id`, `position`, `status`, `emp_last_updated`) VALUES
+(1, 23, 'EMP-0001', 'Gregoria De Jesus', 3, 'Professor', 'Outside', '2026-04-15 08:56:17'),
+(2, 24, 'EMP-0002', 'Melchora Aquino', 4, 'Dean', 'Outside', '2026-04-15 08:56:17'),
+(3, 25, 'EMP-0003', 'Antonio Luna', 5, 'Faculty', 'Outside', '2026-04-15 08:56:17'),
+(4, 26, 'EMP-0004', 'Gabriela Silang', 6, 'Department Chair', 'Outside', '2026-04-15 08:56:17'),
+(5, 27, 'EMP-0005', 'Josefa Llanes Escoda', 7, 'Registrar', 'Outside', '2026-04-15 08:56:17'),
+(6, 5, 'EMP-1098', 'Apolinario Mabini', 2, 'Dean', 'Outside', '2026-04-15 13:36:17'),
+(7, 4, 'EMP-2015', 'Juan Dela Cruz', 1, 'Faculty', 'Inside', '2026-03-12 14:22:44');
+
+--
+-- Triggers `employees`
+--
+DROP TRIGGER IF EXISTS `employee_id_format`;
+DELIMITER $$
+CREATE TRIGGER `employee_id_format` BEFORE INSERT ON `employees` FOR EACH ROW BEGIN
+    DECLARE next_seq INT;
+
+    SELECT AUTO_INCREMENT INTO next_seq
+    FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employees';
+
+    IF next_seq IS NULL THEN
+        SET next_seq = 1;
+    END IF;
+
+    SET NEW.employee_id = CONCAT('EMP-', LPAD(next_seq, 4, '0'));
+END
+$$
+DELIMITER ;
 
 -- --------------------------------------------------------
 
@@ -158,11 +167,6 @@ CREATE TABLE `events` (
   `active` tinyint(1) DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Truncate table before insert `events`
---
-
-TRUNCATE TABLE `events`;
 --
 -- Dumping data for table `events`
 --
@@ -191,11 +195,6 @@ CREATE TABLE `event_attendance` (
   `remarks` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Truncate table before insert `event_attendance`
---
-
-TRUNCATE TABLE `event_attendance`;
 --
 -- Dumping data for table `event_attendance`
 --
@@ -226,11 +225,6 @@ CREATE TABLE `event_instances` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Truncate table before insert `event_instances`
---
-
-TRUNCATE TABLE `event_instances`;
---
 -- Dumping data for table `event_instances`
 --
 
@@ -254,11 +248,6 @@ CREATE TABLE `event_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Truncate table before insert `event_log`
---
-
-TRUNCATE TABLE `event_log`;
---
 -- Dumping data for table `event_log`
 --
 
@@ -281,11 +270,6 @@ CREATE TABLE `event_participants` (
   `user_id` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Truncate table before insert `event_participants`
---
-
-TRUNCATE TABLE `event_participants`;
 --
 -- Dumping data for table `event_participants`
 --
@@ -330,11 +314,6 @@ CREATE TABLE `general_log` (
   `gate` enum('Gate 1','Gate 2','Gate 3') DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Truncate table before insert `general_log`
---
-
-TRUNCATE TABLE `general_log`;
 --
 -- Dumping data for table `general_log`
 --
@@ -395,7 +374,18 @@ INSERT INTO `general_log` (`log_id`, `user_id`, `timestamp`, `log_type`, `gate`)
 (53, 5, '2026-04-15 21:35:00', 'Entry', 'Gate 1'),
 (54, 5, '2026-04-15 21:35:06', 'Exit', 'Gate 2'),
 (55, 5, '2026-04-15 21:36:13', 'Entry', 'Gate 1'),
-(56, 5, '2026-04-15 21:36:17', 'Exit', 'Gate 2');
+(56, 5, '2026-04-15 21:36:17', 'Exit', 'Gate 2'),
+(57, 28, '2026-04-24 00:09:17', 'Entry', 'Gate 1'),
+(58, 28, '2026-04-24 00:10:13', 'Exit', 'Gate 2'),
+(59, 28, '2026-04-24 04:09:59', 'Entry', 'Gate 1'),
+(60, 28, '2026-04-24 04:10:06', 'Exit', 'Gate 2'),
+(61, 28, '2026-04-24 04:10:54', 'Entry', 'Gate 1'),
+(62, 28, '2026-04-24 04:11:01', 'Exit', 'Gate 2'),
+(63, 28, '2026-04-24 04:11:16', 'Entry', 'Gate 1'),
+(64, 28, '2026-04-24 04:11:23', 'Exit', 'Gate 2'),
+(65, 28, '2026-04-24 04:15:47', 'Entry', 'Gate 1'),
+(66, 28, '2026-04-24 04:16:21', 'Exit', 'Gate 2'),
+(67, 28, '2026-04-24 04:16:25', 'Entry', 'Gate 1');
 
 -- --------------------------------------------------------
 
@@ -411,11 +401,6 @@ CREATE TABLE `reports` (
   `generated_by` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Truncate table before insert `reports`
---
-
-TRUNCATE TABLE `reports`;
 -- --------------------------------------------------------
 
 --
@@ -432,11 +417,6 @@ CREATE TABLE `students` (
   `stud_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Truncate table before insert `students`
---
-
-TRUNCATE TABLE `students`;
 --
 -- Dumping data for table `students`
 --
@@ -460,11 +440,6 @@ CREATE TABLE `users` (
   `active` tinyint(1) DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Truncate table before insert `users`
---
-
-TRUNCATE TABLE `users`;
 --
 -- Dumping data for table `users`
 --
@@ -495,7 +470,8 @@ INSERT INTO `users` (`user_id`, `role`, `active`) VALUES
 (24, 'employee', 1),
 (25, 'employee', 1),
 (26, 'employee', 1),
-(27, 'employee', 1);
+(27, 'employee', 1),
+(28, 'visitor', 1);
 
 -- --------------------------------------------------------
 
@@ -511,11 +487,6 @@ CREATE TABLE `violations` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Truncate table before insert `violations`
---
-
-TRUNCATE TABLE `violations`;
 -- --------------------------------------------------------
 
 --
@@ -524,21 +495,44 @@ TRUNCATE TABLE `violations`;
 
 DROP TABLE IF EXISTS `visitors`;
 CREATE TABLE `visitors` (
-  `seq` int(11) NOT NULL AUTO_INCREMENT,
+  `seq` int(11) NOT NULL,
   `user_id` int(11) DEFAULT NULL,
-  `visitor_id` varchar(8) NOT NULL,
+  `visitor_id` varchar(12) NOT NULL,
   `visitor_name` varchar(80) DEFAULT NULL,
   `purpose` varchar(100) DEFAULT NULL,
+  `details` varchar(200) DEFAULT NULL,
   `status` enum('Inside','Outside') DEFAULT 'Outside',
-  `visitor_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  UNIQUE KEY `visitors_seq_unique` (`seq`)
+  `visitor_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Truncate table before insert `visitors`
+-- Dumping data for table `visitors`
 --
 
-TRUNCATE TABLE `visitors`;
+INSERT INTO `visitors` (`seq`, `user_id`, `visitor_id`, `visitor_name`, `purpose`, `details`, `status`, `visitor_last_updated`) VALUES
+(1, 28, 'VT-00001', 'Vico Sotto', 'Other', 'Monitor Campus facilities and staff', 'Inside', '2026-04-23 20:16:25');
+
+--
+-- Triggers `visitors`
+--
+DROP TRIGGER IF EXISTS `visitor_id_format`;
+DELIMITER $$
+CREATE TRIGGER `visitor_id_format` BEFORE INSERT ON `visitors` FOR EACH ROW BEGIN
+    DECLARE next_seq INT;
+
+    SELECT AUTO_INCREMENT INTO next_seq
+    FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'visitors';
+
+    IF next_seq IS NULL THEN
+        SET next_seq = 1;
+    END IF;
+
+    SET NEW.visitor_id = CONCAT('VT-', LPAD(next_seq, 5, '0'));
+END
+$$
+DELIMITER ;
+
 --
 -- Indexes for dumped tables
 --
@@ -567,6 +561,7 @@ ALTER TABLE `departments`
 --
 ALTER TABLE `employees`
   ADD PRIMARY KEY (`employee_id`),
+  ADD UNIQUE KEY `employees_seq_unique` (`seq`),
   ADD KEY `employees_fk_departments` (`department_id`),
   ADD KEY `employees_ibfk_1` (`user_id`);
 
@@ -646,6 +641,7 @@ ALTER TABLE `violations`
 --
 ALTER TABLE `visitors`
   ADD PRIMARY KEY (`visitor_id`),
+  ADD UNIQUE KEY `visitors_seq_unique` (`seq`),
   ADD KEY `visitors_usersFK` (`user_id`);
 
 --
@@ -657,6 +653,12 @@ ALTER TABLE `visitors`
 --
 ALTER TABLE `departments`
   MODIFY `department_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+
+--
+-- AUTO_INCREMENT for table `employees`
+--
+ALTER TABLE `employees`
+  MODIFY `seq` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `events`
@@ -686,13 +688,19 @@ ALTER TABLE `event_log`
 -- AUTO_INCREMENT for table `general_log`
 --
 ALTER TABLE `general_log`
-  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=57;
+  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=68;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
+
+--
+-- AUTO_INCREMENT for table `visitors`
+--
+ALTER TABLE `visitors`
+  MODIFY `seq` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- Constraints for dumped tables
@@ -769,43 +777,49 @@ ALTER TABLE `visitors`
   ADD CONSTRAINT `visitors_usersFK` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`);
 
 DROP TRIGGER IF EXISTS `employee_id_format`;
-DELIMITER //
+DELIMITER $$
 CREATE TRIGGER `employee_id_format`
 BEFORE INSERT ON `employees`
 FOR EACH ROW
 BEGIN
-    DECLARE next_seq INT;
+    DECLARE next_seq INT DEFAULT 1;
 
-    SELECT AUTO_INCREMENT INTO next_seq
-    FROM information_schema.TABLES
-    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employees';
+    IF NEW.`employee_id` IS NULL OR NEW.`employee_id` = '' THEN
+        SELECT AUTO_INCREMENT INTO next_seq
+        FROM information_schema.TABLES
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employees';
 
-    IF next_seq IS NULL THEN
-        SET next_seq = 1;
+        IF next_seq IS NULL THEN
+            SET next_seq = 1;
+        END IF;
+
+        SET NEW.`employee_id` = CONCAT('EMP-', LPAD(next_seq, 8, '0'));
     END IF;
-
-    SET NEW.employee_id = CONCAT('EMP-', LPAD(next_seq, 4, '0'));
-END//
+END
+$$
 DELIMITER ;
 
 DROP TRIGGER IF EXISTS `visitor_id_format`;
-DELIMITER //
+DELIMITER $$
 CREATE TRIGGER `visitor_id_format`
 BEFORE INSERT ON `visitors`
 FOR EACH ROW
 BEGIN
-    DECLARE next_seq INT;
+    DECLARE next_seq INT DEFAULT 1;
 
-    SELECT AUTO_INCREMENT INTO next_seq
-    FROM information_schema.TABLES
-    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'visitors';
+    IF NEW.`visitor_id` IS NULL OR NEW.`visitor_id` = '' THEN
+        SELECT AUTO_INCREMENT INTO next_seq
+        FROM information_schema.TABLES
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'visitors';
 
-    IF next_seq IS NULL THEN
-        SET next_seq = 1;
+        IF next_seq IS NULL THEN
+            SET next_seq = 1;
+        END IF;
+
+        SET NEW.`visitor_id` = CONCAT('VT-', LPAD(next_seq, 9, '0'));
     END IF;
-
-    SET NEW.visitor_id = CONCAT('VT-', LPAD(next_seq, 5, '0'));
-END//
+END
+$$
 DELIMITER ;
 
 SET FOREIGN_KEY_CHECKS=1;
@@ -814,23 +828,3 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-
-ALTER TABLE departments
-MODIFY department_id INT(11) NOT NULL AUTO_INCREMENT;
-TRUNCATE TABLE `departments`;
-
-INSERT INTO departments (department_name) VALUES
-('College of Engineering'),
-('College of Nursing'),
-('College of Computer Studies'),
-('College of Business and Accountancy'),
-('College of Education'),
-('College of Arts and Sciences'),
-('College of International Hospitality Management');
-
-INSERT INTO departments (department_name) VALUES
-("Registrar's Office"),
-("Accounting Office"),
-("Human Resources"),
-("MIS Office"),
-("Library");
