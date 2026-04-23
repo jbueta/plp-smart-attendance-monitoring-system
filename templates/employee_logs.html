@@ -9,7 +9,7 @@
 <!-- Sidebar (unchanged) -->
 <div class="sidebar d-flex flex-column flex-shrink-0 p-3">
     <a href="#" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
-        <i class="bi bi-bank2 fs-4 text-gold me-2"></i>
+        <img src="{{ url_for('static', filename='images/plp_logo.png') }}" alt="PLP Logo" class="me-2" style="width: 32px; height: 32px; object-fit: contain;">
         <span class="fs-5 fw-bold">PLP Admin</span>
     </a>
     <hr>
@@ -50,10 +50,9 @@
     <!-- MAIN CONTAINER -->
     <div id="employee-content-area" class="position-relative overflow-hidden" style="min-height: 500px;">
 
-        <!-- ACTIVITY LOGS VIEW -->
+        <!-- ========== ACTIVITY LOGS VIEW ========== -->
         <div id="activity-view" class="employee-view active-view">
 
-            <!-- Employee Logs Table -->
             <div class="card-glass p-0 mb-4 overflow-hidden" id="tableCard">
                 <div class="d-flex flex-wrap gap-2 p-3 justify-content-end">
                     <div class="input-group input-group-sm" style="width: 200px;">
@@ -69,89 +68,91 @@
                     <input type="date" id="dateFilter" class="form-control form-control-sm bg-dark text-white border-secondary w-auto">
                 </div>
                 <div class="table-responsive pb-3">
-            <table class="table table-dark-glass table-hover align-middle mb-0" id="employeeTable">
-                <thead>
-                    <tr>
-                        <th class="ps-4">Employee Name</th>
-                        <th>Event Name</th>
-                        <th>Department</th>
-                        <th>Date</th>
-                        <th>Time In</th>
-                        <th>Time Out</th>
-                        <th class="text-end" style="padding-right: 3rem;">Status</th>
-                        <th class="text-end pe-4">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for log in logs %}
-                    <tr class="employee-row"
-                        data-employee-id="{{ log.id | lower }}"
-                        data-employee-name="{{ log.name | lower }}"
-                        data-department="{{ log.dept }}"
-                        data-position="{{ log.position or '' }}"
-                        data-date="{{ log.date or '' }}">
-                        <td class="fw-bold text-white ps-4">
-                            <div class="d-flex align-items-center">
-                                <div class="rounded-circle bg-white bg-opacity-10 p-1 me-2"
-                                    style="width: 32px; height: 32px; display:grid; place-items:center;">{{
-                                    log.initials }}</div>
-                                <span>{{ log.name }}</span>
-                            </div>
-                        </td>
-                        <td class="text-white">{{ log.event_name }}</td>
-                        <td class="text-white-50">{{ log.dept }}</td>
-                        <td class="text-white-50 font-monospace small">{{ log.date_formatted or log.date }}</td>
-                        <td class="text-success font-monospace small">{{ log.in or '--:--' }}</td>
-                        <td class="text-danger font-monospace small">{{ log.out or '--:--' }}</td>
-                        <td class="text-end" style="padding-right: 3rem;">
-                            <span class="badge bg-{{ log.status_class }} bg-opacity-25 text-{{ log.status_class }} border border-{{ log.status_class }} border-opacity-25 rounded-pill px-3">
-                                {{ log.status }}
-                            </span>
-                        </td>
-                        <td class="text-center align-middle" style="width: 80px;">
-                            <div class="dropdown h-100 d-flex align-items-center justify-content-center">
-                                <button class="btn btn-sm btn-outline-light p-0 border-0 d-flex align-items-center justify-content-center fs-4" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    &hellip;
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-end shadow-sm employee-action-menu">
-                                    <li><button type="button" class="dropdown-item view-employee text-white" data-id="{{ log.id }}">View Details</button></li>
-                                    <li><button type="button" class="dropdown-item text-danger delete-employee" data-id="{{ log.id }}">Delete</button></li>
-                                </ul>
-                            </div>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr id="emptyRow">
-                        <td colspan="8" class="text-center text-white-50 py-5">
-                            <i class="bi bi-person-x display-4 d-block mb-3"></i>
-                            No attendance records available for this period.
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
+                    <table class="table table-dark-glass table-hover align-middle mb-0" id="employeeTable">
+                        <thead>
+                            <tr>
+                                <th class="ps-4">Employee Name</th>
+                                <th>Event Name</th>
+                                <th>Department</th>
+                                <th>Date</th>
+                                <th>Time In</th>
+                                <th>Time Out</th>
+                                <th class="text-end" style="padding-right: 3rem;">Status</th>
+                                <th class="text-end pe-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in logs %}
+                            <tr class="employee-row"
+                                data-employee-id="{{ log.id | lower }}"
+                                data-employee-name="{{ log.name | lower }}"
+                                data-department="{{ log.dept }}"
+                                data-position="{{ log.position or '' }}"
+                                data-date="{{ log.date or '' }}">
+                                <td class="fw-bold text-white ps-4">
+                                    <div class="d-flex align-items-center">
+                                        <div class="rounded-circle bg-white bg-opacity-10 p-1 me-2"
+                                            style="width: 32px; height: 32px; display:grid; place-items:center;">{{ log.initials }}</div>
+                                        <span>{{ log.name }}</span>
+                                    </div>
+                                </td>
+                                <td class="text-white">{{ log.event_name }}</td>
+                                <td class="text-white-50">{{ log.dept }}</td>
+                                <td class="text-white-50 font-monospace small">{{ log.date_formatted or log.date }}</td>
+                                <td class="text-success font-monospace small">{{ log.in or '--:--' }}</td>
+                                <td class="text-danger font-monospace small">{{ log.out or '--:--' }}</td>
+                                <td class="text-end" style="padding-right: 3rem;">
+                                    <span class="badge bg-{{ log.status_class }} bg-opacity-25 text-{{ log.status_class }} border border-{{ log.status_class }} border-opacity-25 rounded-pill px-3">
+                                        {{ log.status }}
+                                    </span>
+                                </td>
+                                <td class="text-center align-middle" style="width: 80px;">
+                                    <div class="dropdown h-100 d-flex align-items-center justify-content-center">
+                                        <button class="btn btn-sm btn-outline-light p-0 border-0 d-flex align-items-center justify-content-center fs-4" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                            &hellip;
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow-sm employee-action-menu">
+                                            <li><button type="button" class="dropdown-item view-employee text-white" data-id="{{ log.id }}">View Details</button></li>
+                                            <li><button type="button" class="dropdown-item text-danger delete-employee" data-id="{{ log.id }}">Delete</button></li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr id="emptyRow">
+                                <td colspan="8" class="text-center text-white-50 py-5">
+                                    <i class="bi bi-person-x display-4 d-block mb-3"></i>
+                                    No attendance records available for this period.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
-    <!-- No results (shown only when filters return nothing) -->
-    <div id="noResults" style="display: none;" class="card-glass text-center text-white-50 py-5 mb-4">
-        <i class="bi bi-search display-4 d-block mb-3"></i>
-        <p class="mb-0">No records found matching your search criteria.</p>
-    </div>
+            <!-- No results (activity) -->
+            <div id="noResults" style="display: none;" class="card-glass text-center text-white-50 py-5 mb-4">
+                <i class="bi bi-search display-4 d-block mb-3"></i>
+                <p class="mb-0">No records found matching your search criteria.</p>
+            </div>
 
-    <!-- Result count -->
-    <p id="resultCount" class="text-white-50 small ms-1"></p>
+            <!-- Result count (activity only) -->
+            <p id="resultCount" class="text-white-50 small ms-1"></p>
 
-    <!-- Pagination Footer -->
-    <div id="paginationContainer" class="pagination-footer" style="display: none;">
-        <nav aria-label="Page navigation">
-            <ul id="paginationList" class="pagination pagination-custom mb-0 gap-1"></ul>
-        </nav>
-    </div>
-        </div>
+            <!-- Pagination (activity) -->
+            <div id="paginationContainer" class="pagination-footer" style="display: none;">
+                <nav aria-label="Page navigation">
+                    <ul id="paginationList" class="pagination pagination-custom mb-0 gap-1"></ul>
+                </nav>
+            </div>
 
-        <!-- RECORDS VIEW -->
+        </div><!-- end activity-view -->
+
+
+        <!-- ========== RECORDS VIEW ========== -->
         <div id="records-view" class="employee-view">
+
             <div class="card-glass p-0 mb-4 overflow-hidden" id="recordsTableCard">
                 <div class="d-flex flex-wrap gap-3 p-3 justify-content-between align-items-center">
                     <div class="me-3">
@@ -166,8 +167,8 @@
                         </div>
                         <select id="recordsDepartmentFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
                             <option value="">All Departments</option>
-                            {% for department in department_options %}
-                            <option>{{ department }}</option>
+                            {% for dept in departments %}
+                            <option value="{{ dept.name | lower }}">{{ dept.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -185,28 +186,28 @@
                             </tr>
                         </thead>
                         <tbody id="recordsTableBody">
-                            {% for record in records %}
+                            {% for emp in employees %}
                             <tr class="employee-record-row"
-                                data-id="{{ record.id | lower }}"
-                                data-name="{{ record.name | lower }}"
-                                data-dept="{{ record.dept | lower }}">
-                                <td class="font-monospace text-white-50 ps-4">{{ record.id }}</td>
-                                <td class="fw-bold text-white">{{ record.name }}</td>
-                                <td class="text-white-50">{{ record.dept }}</td>
-                                <td class="text-white-50">{{ record.position }}</td>
+                                data-id="{{ emp.id | lower }}"
+                                data-name="{{ emp.name | lower }}"
+                                data-dept="{{ emp.dept | lower }}">
+                                <td class="font-monospace text-white-50 ps-4">{{ emp.id }}</td>
+                                <td class="fw-bold text-white">{{ emp.name }}</td>
+                                <td class="text-white-50">{{ emp.dept }}</td>
+                                <td class="text-white-50">{{ emp.position }}</td>
                                 <td class="text-center">
-                                    <span class="badge bg-{{ record.status_class }} bg-opacity-25 border border-{{ record.status_class }} text-{{ record.status_class }} rounded-pill px-3">
-                                        {{ record.status }}
+                                    <span class="badge bg-{{ emp.status_class or 'success' }} bg-opacity-25 border border-{{ emp.status_class or 'success' }} text-{{ emp.status_class or 'success' }} rounded-pill px-3">
+                                        {{ emp.status }}
                                     </span>
                                 </td>
-                                <td class="text-center align-middle" style="width: 80px;">
-                                    <div class="dropdown h-100 d-flex align-items-center justify-content-center">
-                                        <button class="btn btn-sm btn-outline-light p-0 border-0 d-flex align-items-center justify-content-center fs-4" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                            &hellip;
+                                <td class="text-end pe-4">
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-light border-0" type="button" data-bs-toggle="dropdown">
+                                            <i class="bi bi-three-dots"></i>
                                         </button>
                                         <ul class="dropdown-menu dropdown-menu-end shadow-sm employee-action-menu">
-                                            <li><button type="button" class="dropdown-item edit-employee-record text-white" data-id="{{ record.id }}">Edit</button></li>
-                                            <li><button type="button" class="dropdown-item text-danger delete-employee-record" data-id="{{ record.id }}">Delete</button></li>
+                                            <li><button type="button" class="dropdown-item edit-employee-record" data-id="{{ emp.id }}">Edit</button></li>
+                                            <li><button type="button" class="dropdown-item text-danger delete-employee-record" data-id="{{ emp.id }}">Delete</button></li>
                                         </ul>
                                     </div>
                                 </td>
@@ -224,41 +225,42 @@
                 </div>
             </div>
 
-            <!-- No results for records -->
+            <!-- No results (records) -->
             <div id="recordsNoResults" style="display: none;" class="card-glass text-center text-white-50 py-5 mb-4">
                 <i class="bi bi-search display-4 d-block mb-3"></i>
                 <p class="mb-0">No records found matching your search criteria.</p>
             </div>
 
-            <!-- Result count for records -->
+            <!-- Result count (records only) -->
             <p id="recordsResultCount" class="text-white-50 small ms-1"></p>
 
-            <!-- Pagination Footer for records -->
+            <!-- Pagination (records) -->
             <div id="recordsPaginationContainer" class="pagination-footer" style="display: none;">
                 <nav aria-label="Page navigation">
                     <ul id="recordsPaginationList" class="pagination pagination-custom mb-0 gap-1"></ul>
                 </nav>
             </div>
-        </div>
-    </div>
-</div>
 
-<!-- Add User Selection Modal -->
+        </div><!-- end records-view -->
+
+    </div><!-- end employee-content-area -->
+</div><!-- end main-content -->
+
+
+<!-- ========== ADD USER MODAL ========== -->
 <div class="modal fade" id="addUserModal" tabindex="-1" aria-hidden="true" style="backdrop-filter: blur(5px);">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg" style="background-color: #07271d; border-radius: 20px;">
             <div class="modal-body p-4 position-relative">
                 <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-4" data-bs-dismiss="modal" aria-label="Close" style="z-index: 10;"></button>
-                
+
                 <!-- View 1: Selection -->
                 <div id="addSelectionView">
                     <div class="text-center mb-5 mt-2">
                         <h4 class="text-white fw-bold">Select Addition Method</h4>
                         <p class="text-white-50">Choose how you want to add new employee records.</p>
                     </div>
-
                     <div class="row g-4 justify-content-center">
-                        <!-- Left Card: XLS -->
                         <div class="col-md-6">
                             <div class="add-option-card xls-card h-100 p-5 rounded-4 border text-center d-flex flex-column justify-content-center align-items-center">
                                 <i class="bi bi-file-earmark-spreadsheet display-3 text-light mb-4"></i>
@@ -266,8 +268,6 @@
                                 <p class="text-white-50 small mb-0">Add all the records from the excel</p>
                             </div>
                         </div>
-
-                        <!-- Right Card: Manual -->
                         <div class="col-md-6">
                             <div class="add-option-card manual-card h-100 p-5 rounded-4 border text-center d-flex flex-column justify-content-center align-items-center">
                                 <i class="bi bi-person-plus display-3 mb-4" style="color: #d4af37;"></i>
@@ -285,15 +285,13 @@
                             <h4 class="fw-bold text-white mb-1 tracking-wider">EXPORT XLS FILE</h4>
                             <p class="text-white-50 small mb-0">Add all the records from the excel</p>
                         </div>
-                        <button type="button" class="btn btn-sm btn-primary-gold rounded-3 px-3 fw-bold shadow-sm mt-1">EXPORT</button>
+                        <button type="button" class="btn btn-sm btn-primary-gold rounded-3 px-3 fw-bold shadow-sm mt-1" id="uploadXlsBtn">EXPORT</button>
                     </div>
-                    
                     <div class="upload-zone border border-secondary rounded-4 d-flex flex-column align-items-center justify-content-center p-5" style="border-style: dashed !important; border-width: 2px !important; cursor: pointer; background: rgba(255,255,255,0.02); min-height: 250px;">
                         <input type="file" id="xlsFileInput" accept=".xls,.xlsx,.csv" class="d-none">
                         <i class="bi bi-file-earmark-spreadsheet display-4 text-white-50 mb-3"></i>
                         <span class="text-white-50">Click to export xls file</span>
                     </div>
-                    
                     <div class="mt-4">
                         <button type="button" class="btn btn-link text-white-50 text-decoration-none p-0 btn-back-selection">
                             <i class="bi bi-arrow-left me-2"></i>Back to selection
@@ -312,9 +310,7 @@
                             <button type="button" id="submitManualAddBtn" class="btn btn-sm btn-warning rounded-3 px-3 fw-bold text-dark shadow-sm mt-1" disabled>+ ADD EMPLOYEE</button>
                         </div>
                     </div>
-                    
                     <div class="row g-3 mb-0">
-                        <!-- Left Side: QR Code Area -->
                         <div class="col-md-5">
                             <div class="card-glass border-secondary p-3 h-100 d-flex flex-column align-items-center justify-content-center text-center shadow-sm" style="background: linear-gradient(135deg, #0f3d2e 0%, #0b2f23 100%); border-radius: 16px;">
                                 <div class="bg-transparent border border-secondary rounded-4 mb-3 d-flex align-items-center justify-content-center p-3" style="width: 180px; height: 180px; border-style: dashed !important; border-width: 2px !important;">
@@ -325,36 +321,20 @@
                                 </button>
                             </div>
                         </div>
-                        
-                        <!-- Right Side: Form Inputs -->
                         <div class="col-md-7">
                             <form id="manualAddEmployeeForm" class="d-flex flex-column h-100 justify-content-between card-glass border-secondary p-3 shadow-sm" style="background: linear-gradient(135deg, #0f3d2e 0%, #0b2f23 100%); border-radius: 16px;">
                                 <h6 class="text-white fw-bold mb-3 tracking-wider">INFORMATION DETAILS</h6>
-                                
                                 <div class="vstack gap-2 text-start flex-grow-1">
                                     <div class="row align-items-center">
-                                        <div class="col-sm-4">
-                                            <label class="form-label text-white-50 small fw-bold mb-0" for="manualAddId">EMPLOYEE ID:</label>
-                                        </div>
-                                        <div class="col-sm-8">
-                                            <input type="text" id="manualAddId" class="form-control form-control-sm bg-transparent text-white border-secondary rounded-3 shadow-none" placeholder="e.g. 00-00000" pattern="^[0-9]{2}-[0-9]{5}$" required>
-                                        </div>
+                                        <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0" for="manualAddId">EMPLOYEE ID:</label></div>
+                                        <div class="col-sm-8"><input type="text" id="manualAddId" class="form-control form-control-sm bg-transparent text-white border-secondary rounded-3 shadow-none" placeholder="e.g. 00-00000" pattern="^[0-9]{2}-[0-9]{5}$" required></div>
                                     </div>
-                                    
                                     <div class="row align-items-center">
-                                        <div class="col-sm-4">
-                                            <label class="form-label text-white-50 small fw-bold mb-0" for="manualAddName">FULL NAME:</label>
-                                        </div>
-                                        <div class="col-sm-8">
-                                            <input type="text" id="manualAddName" class="form-control form-control-sm bg-transparent text-white border-secondary rounded-3 shadow-none" placeholder="e.g. Juan Dela Cruz" required>
-                                        </div>
+                                        <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0" for="manualAddName">FULL NAME:</label></div>
+                                        <div class="col-sm-8"><input type="text" id="manualAddName" class="form-control form-control-sm bg-transparent text-white border-secondary rounded-3 shadow-none" placeholder="e.g. Juan Dela Cruz" required></div>
                                     </div>
-                                    
-                                    <!-- Radio Buttons -->
                                     <div class="row align-items-center my-1">
-                                        <div class="col-sm-4">
-                                            <label class="form-label text-white-50 small fw-bold mb-0">TYPE:</label>
-                                        </div>
+                                        <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0">TYPE:</label></div>
                                         <div class="col-sm-8 d-flex gap-3">
                                             <div class="form-check mb-0">
                                                 <input class="form-check-input bg-transparent border-secondary" type="radio" name="personnelType" id="typeTeaching" value="teaching">
@@ -366,88 +346,73 @@
                                             </div>
                                         </div>
                                     </div>
-
-                                    <!-- Wrapper to maintain fixed card height -->
                                     <div style="min-height: 80px;">
-                                    <!-- Conditional Fields: Teaching -->
-                                    <div id="teachingFields" class="d-none vstack gap-2">
-                                        <div class="row align-items-center">
-                                            <div class="col-sm-4">
-                                                <label class="form-label text-white-50 small fw-bold mb-0" for="manualAddCollege">COLLEGE:</label>
+                                        <div id="teachingFields" class="d-none vstack gap-2">
+                                            <div class="row align-items-center">
+                                                <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0" for="manualAddCollege">COLLEGE:</label></div>
+                                                <div class="col-sm-8">
+                                                    <select id="manualAddCollege" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
+                                                        <option value="" disabled selected class="text-dark">Select College</option>
+                                                        <option value="1" class="text-dark">College of Engineering</option>
+                                                        <option value="2" class="text-dark">College of Nursing</option>
+                                                        <option value="3" class="text-dark">College of Computer Studies</option>
+                                                        <option value="4" class="text-dark">College of Business and Accountancy</option>
+                                                        <option value="5" class="text-dark">College of Education</option>
+                                                        <option value="6" class="text-dark">College of Arts and Sciences</option>
+                                                        <option value="7" class="text-dark">College of International Hospitality Management</option>
+                                                    </select>
+                                                </div>
                                             </div>
-                                            <div class="col-sm-8">
-                                                <select id="manualAddCollege" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
-                                                    <option value="" selected disabled class="text-dark">Select College</option>
-                                                    <option class="text-dark">College of Engineering</option>
-                                                    <option class="text-dark">College of Nursing</option>
-                                                    <option class="text-dark">College of Computer Studies</option>
-                                                    <option class="text-dark">College of Business and Accountancy</option>
-                                                    <option class="text-dark">College of Education</option>
-                                                    <option class="text-dark">College of Arts and Sciences</option>
-                                                    <option class="text-dark">College of International Hospitality Management</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <div class="row align-items-center">
-                                            <div class="col-sm-4">
-                                                <label class="form-label text-white-50 small fw-bold mb-0" for="manualAddTeachingPosition">POSITION:</label>
-                                            </div>
-                                            <div class="col-sm-8">
-                                                <select id="manualAddTeachingPosition" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
-                                                    <option value="" selected disabled class="text-dark">Select Position</option>
-                                                    <option class="text-dark">Professor I</option>
-                                                    <option class="text-dark">Professor II</option>
-                                                    <option class="text-dark">Instructor I</option>
-                                                    <option class="text-dark">Instructor II</option>
-                                                    <option class="text-dark">Dean</option>
-                                                </select>
+                                            <div class="row align-items-center">
+                                                <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0" for="manualAddTeachingPosition">POSITION:</label></div>
+                                                <div class="col-sm-8">
+                                                    <select id="manualAddTeachingPosition" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
+                                                        <option value="" selected disabled class="text-dark">Select Position</option>
+                                                        <option class="text-dark">Professor I</option>
+                                                        <option class="text-dark">Professor II</option>
+                                                        <option class="text-dark">Instructor I</option>
+                                                        <option class="text-dark">Instructor II</option>
+                                                        <option class="text-dark">Dean</option>
+                                                    </select>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-
-                                    <!-- Conditional Fields: Non-Teaching -->
-                                    <div id="nonTeachingFields" class="d-none vstack gap-2">
-                                        <div class="row align-items-center">
-                                            <div class="col-sm-4">
-                                                <label class="form-label text-white-50 small fw-bold mb-0" for="manualAddOffice">OFFICE:</label>
+                                        <div id="nonTeachingFields" class="d-none vstack gap-2">
+                                            <div class="row align-items-center">
+                                                <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0" for="manualAddOffice">OFFICE:</label></div>
+                                                <div class="col-sm-8">
+                                                    <select id="manualAddOffice" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
+                                                        <option value="" selected disabled class="text-dark">Select Office</option>
+                                                        <option class="text-dark" value="8">Registrar's Office</option>
+                                                        <option class="text-dark" value="9">Accounting Office</option>
+                                                        <option class="text-dark" value="10">Human Resources</option>
+                                                        <option class="text-dark" value="11">MIS Office</option>
+                                                        <option class="text-dark" value="12">Library</option>
+                                                    </select>
+                                                </div>
                                             </div>
-                                            <div class="col-sm-8">
-                                                <select id="manualAddOffice" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
-                                                    <option value="" selected disabled class="text-dark">Select Office</option>
-                                                    <option class="text-dark">Registrar's Office</option>
-                                                    <option class="text-dark">Accounting Office</option>
-                                                    <option class="text-dark">Human Resources</option>
-                                                    <option class="text-dark">MIS Office</option>
-                                                    <option class="text-dark">Library</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <div class="row align-items-center">
-                                            <div class="col-sm-4">
-                                                <label class="form-label text-white-50 small fw-bold mb-0" for="manualAddNonTeachingPosition">POSITION:</label>
-                                            </div>
-                                            <div class="col-sm-8">
-                                                <select id="manualAddNonTeachingPosition" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
-                                                    <option value="" selected disabled class="text-dark">Select Position</option>
-                                                    <option class="text-dark">Admin Aide</option>
-                                                    <option class="text-dark">Admin Officer</option>
-                                                    <option class="text-dark">Clerk</option>
-                                                    <option class="text-dark">IT Staff</option>
-                                                    <option class="text-dark">Director</option>
-                                                </select>
+                                            <div class="row align-items-center">
+                                                <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0" for="manualAddNonTeachingPosition">POSITION:</label></div>
+                                                <div class="col-sm-8">
+                                                    <select id="manualAddNonTeachingPosition" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
+                                                        <option value="" selected disabled class="text-dark">Select Position</option>
+                                                        <option class="text-dark">Admin Aide</option>
+                                                        <option class="text-dark">Admin Officer</option>
+                                                        <option class="text-dark">Clerk</option>
+                                                        <option class="text-dark">IT Staff</option>
+                                                        <option class="text-dark">Director</option>
+                                                    </select>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
                                     </div>
                                 </div>
-                                
                                 <div class="mt-3 pt-2 border-top border-secondary">
                                     <span class="text-white-50" style="font-size: 0.70rem;">Once complete, click generate QR</span>
                                 </div>
                             </form>
                         </div>
                     </div>
-                    
                     <div class="mt-4">
                         <button type="button" class="btn btn-link text-white-50 text-decoration-none p-0 btn-back-selection">
                             <i class="bi bi-arrow-left me-2"></i>Back to selection
@@ -460,6 +425,8 @@
     </div>
 </div>
 
+
+<!-- ========== EDIT OVERLAY ========== -->
 <div id="editOverlay" class="d-none position-fixed top-0 start-0 w-100 h-100" style="background: rgba(10, 12, 20, 0.56); backdrop-filter: blur(8px); z-index: 1080;">
     <div id="employeeEditCard" class="card-glass p-4 position-absolute top-50 start-50 translate-middle" style="width: min(760px, 94%); border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 28px 80px rgba(0,0,0,0.35);">
         <div class="d-flex justify-content-between align-items-center mb-3">
@@ -472,14 +439,14 @@
         <div class="row g-3">
             <div class="col-md-3">
                 <label class="form-label text-white-50" for="editEmployeeId">Employee ID</label>
-                <input id="editEmployeeId" class="form-control bg-dark text-white border-secondary" type="text" />
+                <input id="editEmployeeId" class="form-control bg-dark text-white border-secondary" type="text" readonly style="opacity: 0.6; cursor: not-allowed;" />
             </div>
             <div class="col-md-3">
                 <label class="form-label text-white-50" for="editEmployeeName">Employee Name</label>
                 <input id="editEmployeeName" class="form-control bg-dark text-white border-secondary" type="text" />
             </div>
             <div class="col-md-3">
-                <label class="form-label text-white-50" for="editDepartmentId">Department ID</label>
+                <label class="form-label text-white-50" for="editDepartmentId">Department</label>
                 <input id="editDepartmentId" class="form-control bg-dark text-white border-secondary" type="text" />
             </div>
             <div class="col-md-3">
@@ -492,21 +459,77 @@
             <button id="saveEmployeeEdit" type="button" class="btn btn-primary-gold">Update</button>
         </div>
     </div>
+</div>
 
-    <!-- No results (shown only when filters return nothing) -->
-    <div id="noResults" style="display: none;" class="card-glass text-center text-white-50 py-5 mb-4">
-        <i class="bi bi-search display-4 d-block mb-3"></i>
-        <p class="mb-0">No records found matching your search criteria.</p>
+
+<!-- ========== SUCCESS TOAST ========== -->
+<div id="successToast" style="
+    display: none; position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%); z-index: 9999;
+    background: rgba(25, 135, 84, 0.15); border: 1px solid rgba(25, 135, 84, 0.4);
+    backdrop-filter: blur(10px); border-radius: 16px; padding: 2rem 2.5rem;
+    color: #fff; min-width: 380px; box-shadow: 0 8px 32px rgba(0,0,0,0.3);">
+    <div class="d-flex align-items-center gap-3">
+        <i class="bi bi-check-circle-fill text-success" style="font-size: 2.5rem;"></i>
+        <div>
+            <div class="fw-bold fs-5">Success</div>
+            <div class="text-white-50" id="successToastMsg">Employee updated successfully.</div>
+        </div>
+        <button onclick="hideToast()" class="btn-close btn-close-white ms-auto" style="opacity:0.6"></button>
     </div>
+</div>
 
-    <!-- Result count -->
-    <p id="resultCount" class="text-white-50 small ms-1"></p>
 
-    <!-- Pagination Footer -->
-    <div id="paginationContainer" class="pagination-footer" style="display: none;">
-        <nav aria-label="Page navigation">
-            <ul id="paginationList" class="pagination pagination-custom mb-0 gap-1"></ul>
-        </nav>
+<!-- ========== CONFIRM DELETE TOAST ========== -->
+<div id="confirmDeleteToast" style="
+    display: none; position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%); z-index: 9999;
+    background: rgba(20, 20, 30, 0.95); border: 1px solid rgba(220, 53, 69, 0.4);
+    backdrop-filter: blur(10px); border-radius: 16px; padding: 2rem 2.5rem;
+    color: #fff; min-width: 380px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
+    <div class="d-flex flex-column gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-trash3-fill text-danger" style="font-size: 2rem;"></i>
+            <div>
+                <div class="fw-bold fs-5">Delete Employee</div>
+                <div class="text-white-50 small" id="confirmDeleteMsg">Are you sure you want to delete this employee?</div>
+            </div>
+        </div>
+        <div class="d-flex justify-content-end gap-2 mt-1">
+            <button id="cancelDeleteBtn" class="btn btn-outline-light btn-sm px-4">Cancel</button>
+            <button id="confirmDeleteBtn" class="btn btn-danger btn-sm px-4">Delete</button>
+        </div>
+    </div>
+</div>
+
+
+<!-- ========== UPLOAD RESULT MODAL ========== -->
+<div class="modal fade" id="uploadResultModal" tabindex="-1" aria-hidden="true" style="z-index: 1090;">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content card-glass" style="background: rgba(11, 45, 33, 0.85); backdrop-filter: blur(16px); border: 1px solid rgba(212,175,55,0.25); box-shadow: 0 28px 80px rgba(0,0,0,0.5);">
+            <div class="modal-header border-secondary border-opacity-25 pb-3 pt-4 px-4">
+                <div class="d-flex align-items-center gap-4">
+                    <div id="uploadResultIconContainer" class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 64px; height: 64px; background: rgba(25,135,84,0.15);">
+                        <i id="uploadResultIcon" class="bi bi-check-circle-fill text-success" style="font-size: 2.2rem;"></i>
+                    </div>
+                    <div>
+                        <h4 class="modal-title text-white mb-1 fw-bold" id="uploadResultTitle">Upload Successful</h4>
+                        <p class="text-white-50 mb-0" id="uploadResultSubtitle" style="font-size: 0.95rem;">X employees inserted</p>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white opacity-50" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-4 px-4">
+                <div id="uploadResultTipContainer"></div>
+                <div id="uploadResultContent" class="text-white-50 small" style="max-height: 400px; overflow-y: auto;">
+                    <!-- Content populated via JS -->
+                </div>
+                <div id="uploadResultPagination" class="d-flex justify-content-center mt-3 gap-2"></div>
+            </div>
+            <div class="modal-footer border-0 pt-0 pb-4 justify-content-center gap-3" id="uploadResultFooter">
+                <button type="button" class="btn btn-outline-light px-4 rounded-pill" data-bs-dismiss="modal">Exit</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -516,30 +539,16 @@
     backdrop-filter: blur(12px);
     border: 1px solid rgba(255,255,255,0.15);
 }
-.employee-action-menu .dropdown-item {
-    color: #fff;
-}
+.employee-action-menu .dropdown-item { color: #fff; }
 .employee-action-menu .dropdown-item:hover,
-.employee-action-menu .dropdown-item:focus {
-    background: #d4af37;
-    color: #051a10;
-}
-.dropdown .btn {
-    width: 2rem;
-    height: 2rem;
-    border-radius: 50%;
-}
+.employee-action-menu .dropdown-item:focus { background: #d4af37; color: #051a10; }
+.dropdown .btn { width: 2rem; height: 2rem; border-radius: 50%; }
 .dropdown .btn:hover {
     background: transparent !important;
     border: 1px solid #fff !important;
     border-radius: 50% !important;
     color: #fff !important;
 }
-/* Fixed table card height for 6 records */
-#tableCard .table-responsive {
-    overflow: visible;
-}
-/* Pagination Footer */
 .pagination-footer {
     display: none;
     position: fixed;
@@ -553,212 +562,126 @@
     max-width: 90vw;
     padding: 0 0.5rem;
 }
-
-.pagination-footer.show {
-    display: flex !important;
-}
-
-.pagination-footer .pagination {
-    pointer-events: auto;
-    background: transparent;
-}
-
-/* Add bottom padding to main content when pagination is visible */
-.main-content {
-    padding-bottom: 4rem;
-}
-
-/* Pagination Styling */
-.pagination-custom {
-    list-style: none;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin: 0;
-    padding: 0;
-}
-.pagination-custom .page-item {
-    margin: 0;
-}
+.pagination-footer.show { display: flex !important; }
+.pagination-footer .pagination { pointer-events: auto; background: transparent; }
+.main-content { padding-bottom: 4rem; }
+.pagination-custom { list-style: none; display: flex; align-items: center; gap: 0.5rem; margin: 0; padding: 0; }
+.pagination-custom .page-item { margin: 0; }
 .pagination-custom .page-link {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 2.75rem;
-    height: 2.75rem;
-    padding: 0 0.85rem;
-    color: #fff;
-    background-color: transparent;
-    border: none;
-    border-radius: 999px;
-    cursor: pointer;
-    transition: all 0.25s ease;
-    font-size: 0.95rem;
-    font-weight: 500;
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 2.75rem; height: 2.75rem; padding: 0 0.85rem;
+    color: #fff; background-color: transparent; border: none;
+    border-radius: 999px; cursor: pointer;
+    transition: all 0.25s ease; font-size: 0.95rem; font-weight: 500;
 }
 .pagination-custom .page-link:hover:not(:disabled) {
-    background-color: rgba(212, 175, 55, 0.18);
-    color: #fff;
-    transform: translateY(-1px);
+    background-color: rgba(212, 175, 55, 0.18); color: #fff; transform: translateY(-1px);
 }
 .pagination-custom .page-link.active {
-    background-color: rgba(212, 175, 55, 0.25);
-    color: #ffffff;
-    font-weight: 700;
+    background-color: rgba(212, 175, 55, 0.25); color: #ffffff; font-weight: 700;
 }
-.pagination-custom .page-link:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
-    background-color: transparent;
-}
+.pagination-custom .page-link:disabled { opacity: 0.35; cursor: not-allowed; background-color: transparent; }
 .pagination-custom .page-link.page-number-separator {
-    cursor: default;
-    pointer-events: none;
-    background-color: transparent;
-    border-color: transparent;
-    color: #b6b6b6;
+    cursor: default; pointer-events: none; background-color: transparent; border-color: transparent; color: #b6b6b6;
 }
-.pagination-custom .page-link.page-prev,
-.pagination-custom .page-link.page-next {
-    min-width: auto;
-    padding: 0.4rem 0.9rem;
-    font-size: 0.9rem;
-}
-.pagination-custom .page-link.page-prev i,
-.pagination-custom .page-link.page-next i {
-    font-size: 1rem;
-}
-
 /* View System */
 .employee-view { display: none; }
 .employee-view.active-view { display: block; }
-
-/* Active Toggle Styling */
-.view-toggle:checked + label {
-    background-color: #d4af37 !important;
-    color: #ffffff !important;
-}
-
-/* Add Button Enhancement */
-#addEmployeeBtn {
-    transition: all 0.25s ease; font-weight: 600; border: none; box-shadow: 0 2px 8px rgba(212, 175, 55, 0.3);
-}
-#addEmployeeBtn:hover {
-    transform: translateY(-1px); box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
-}
-
-/* Add User Modal Styles */
-.add-option-card {
-    background-color: #0b3d2e;
-    transition: all 0.3s ease;
-    cursor: pointer;
-}
-.add-option-card:hover {
-    transform: translateY(-5px);
-}
-.add-option-card.xls-card {
-    border-color: rgba(255, 255, 255, 0.3) !important;
-}
-.add-option-card.xls-card:hover {
-    border-color: rgba(255, 255, 255, 0.8) !important;
-    box-shadow: 0 10px 25px rgba(255, 255, 255, 0.1);
-}
-.add-option-card.manual-card {
-    border-color: #d4af37 !important;
-}
-.add-option-card.manual-card:hover {
-    border-color: #f5dd00 !important;
-    box-shadow: 0 10px 25px rgba(212, 175, 55, 0.2);
-}
-.upload-zone {
-    transition: all 0.3s ease;
-}
-.upload-zone:hover {
-    background: rgba(255, 255, 255, 0.05) !important;
-    border-color: #d4af37 !important;
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
-}
-.upload-zone:hover i, .upload-zone:hover span {
-    color: #d4af37 !important;
-    transition: color 0.3s ease;
-}
-@keyframes fadeInModal {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
+.view-toggle:checked + label { background-color: #d4af37 !important; color: #ffffff !important; }
+#addEmployeeBtn { transition: all 0.25s ease; font-weight: 600; border: none; box-shadow: 0 2px 8px rgba(212, 175, 55, 0.3); }
+#addEmployeeBtn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4); }
+.add-option-card { background-color: #0b3d2e; transition: all 0.3s ease; cursor: pointer; }
+.add-option-card:hover { transform: translateY(-5px); }
+.add-option-card.xls-card { border-color: rgba(255,255,255,0.3) !important; }
+.add-option-card.xls-card:hover { border-color: rgba(255,255,255,0.8) !important; box-shadow: 0 10px 25px rgba(255,255,255,0.1); }
+.add-option-card.manual-card { border-color: #d4af37 !important; }
+.add-option-card.manual-card:hover { border-color: #f5dd00 !important; box-shadow: 0 10px 25px rgba(212,175,55,0.2); }
+.upload-zone { transition: all 0.3s ease; }
+.upload-zone:hover { background: rgba(255,255,255,0.05) !important; border-color: #d4af37 !important; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
+.upload-zone:hover i, .upload-zone:hover span { color: #d4af37 !important; transition: color 0.3s ease; }
+@keyframes fadeInModal { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 </style>
 
+
 <script>
+window.reopenUploadModal = function() {
+    sessionStorage.setItem('reopenUploadModal', 'true');
+    location.reload();
+};
+
 document.addEventListener('DOMContentLoaded', function () {
-    // --- Add User Modal View Transitions ---
-    const addUserModalEl = document.getElementById('addUserModal');
-    const selectionView = document.getElementById('addSelectionView');
-    const xlsView = document.getElementById('xlsUploadView');
-    const manualView = document.getElementById('manualAddView');
-    const xlsCard = document.querySelector('.xls-card');
-    const manualCard = document.querySelector('.manual-card');
-    const backBtnsSelection = document.querySelectorAll('.btn-back-selection');
-    const uploadZone = document.querySelector('.upload-zone');
-    const fileInput = document.getElementById('xlsFileInput');
-    
-    if(xlsCard && selectionView && xlsView) {
-        xlsCard.addEventListener('click', () => {
-            selectionView.classList.add('d-none');
-            xlsView.classList.remove('d-none');
-            xlsView.style.animation = 'fadeInModal 0.4s ease forwards';
-        });
+
+    // ─── SHARED CONSTANTS ─────────────────────────────────────────────────────
+    const ITEMS_PER_PAGE = 6;
+
+    // ─── TOAST HELPERS ────────────────────────────────────────────────────────
+    function showToast(msg) {
+        const toast = document.getElementById('successToast');
+        document.getElementById('successToastMsg').textContent = msg;
+        toast.style.display = 'block';
+        clearTimeout(window._toastTimer);
+        window._toastTimer = setTimeout(() => hideToast(), 3000);
+    }
+    window.hideToast = function () {
+        const toast = document.getElementById('successToast');
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s ease';
+        setTimeout(() => { toast.style.display = 'none'; toast.style.opacity = '1'; }, 300);
+    };
+
+    // ─── ADD USER MODAL ───────────────────────────────────────────────────────
+    const addUserModalEl       = document.getElementById('addUserModal');
+    const selectionView        = document.getElementById('addSelectionView');
+    const xlsView              = document.getElementById('xlsUploadView');
+    const manualView           = document.getElementById('manualAddView');
+    const xlsCard              = document.querySelector('.xls-card');
+    const manualCard           = document.querySelector('.manual-card');
+    const backBtnsSelection    = document.querySelectorAll('.btn-back-selection');
+    const uploadZone           = document.querySelector('.upload-zone');
+    const fileInput            = document.getElementById('xlsFileInput');
+
+    if (xlsCard)   xlsCard.addEventListener('click', () => switchModalView(xlsView));
+    if (manualCard) manualCard.addEventListener('click', () => switchModalView(manualView));
+
+    function switchModalView(targetView) {
+        [selectionView, xlsView, manualView].forEach(v => v && v.classList.add('d-none'));
+        if (targetView) {
+            targetView.classList.remove('d-none');
+            targetView.style.animation = 'fadeInModal 0.4s ease forwards';
+        }
     }
     
-    if(manualCard && selectionView && manualView) {
-        manualCard.addEventListener('click', () => {
-            selectionView.classList.add('d-none');
-            manualView.classList.remove('d-none');
-            manualView.style.animation = 'fadeInModal 0.4s ease forwards';
-        });
+    if (sessionStorage.getItem('reopenUploadModal') === 'true') {
+        sessionStorage.removeItem('reopenUploadModal');
+        const addModal = new bootstrap.Modal(addUserModalEl);
+        addModal.show();
+        switchModalView(xlsView);
     }
-    
-    backBtnsSelection.forEach(btn => {
-        btn.addEventListener('click', () => {
-            if(xlsView) xlsView.classList.add('d-none');
-            if(manualView) manualView.classList.add('d-none');
-            if(selectionView) {
-                selectionView.classList.remove('d-none');
-                selectionView.style.animation = 'fadeInModal 0.4s ease forwards';
-            }
-        });
-    });
-    
-    if(uploadZone && fileInput) {
+
+    backBtnsSelection.forEach(btn => btn.addEventListener('click', () => switchModalView(selectionView)));
+
+    if (uploadZone && fileInput) {
         uploadZone.addEventListener('click', () => fileInput.click());
-        
-        fileInput.addEventListener('change', function() {
-            if(this.files && this.files.length > 0) {
+        fileInput.addEventListener('change', function () {
+            if (this.files && this.files.length > 0) {
                 uploadZone.querySelector('span').textContent = this.files[0].name;
-                uploadZone.querySelector('i').classList.replace('bi-file-earmark-spreadsheet', 'bi-file-earmark-check');
-                uploadZone.querySelector('i').classList.replace('text-white-50', 'text-success');
+                const icon = uploadZone.querySelector('i');
+                icon.className = icon.className.replace('bi-file-earmark-spreadsheet', 'bi-file-earmark-check').replace('text-white-50', 'text-success');
             }
         });
     }
-    
-    if(addUserModalEl) {
+
+    if (addUserModalEl) {
         addUserModalEl.addEventListener('hidden.bs.modal', () => {
-            if (selectionView) {
-                if(xlsView) xlsView.classList.add('d-none');
-                if(manualView) manualView.classList.add('d-none');
-                selectionView.classList.remove('d-none');
-            }
-            if(fileInput) {
+            switchModalView(selectionView);
+            if (fileInput) {
                 fileInput.value = '';
-                if(uploadZone) {
+                if (uploadZone) {
                     uploadZone.querySelector('span').textContent = 'Click to export xls file';
-                    uploadZone.querySelector('i').classList.replace('bi-file-earmark-check', 'bi-file-earmark-spreadsheet');
-                    uploadZone.querySelector('i').classList.remove('text-success');
-                    uploadZone.querySelector('i').classList.add('text-white-50');
+                    const icon = uploadZone.querySelector('i');
+                    icon.className = icon.className.replace('bi-file-earmark-check', 'bi-file-earmark-spreadsheet').replace('text-success', 'text-white-50');
                 }
             }
-            
-            // Reset Manual Add Form
             const manualForm = document.getElementById('manualAddEmployeeForm');
             if (manualForm) {
                 manualForm.reset();
@@ -769,407 +692,405 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // --- Dynamic Dropdowns & Validation for Manual Add ---
-    const manualIdInput = document.getElementById('manualAddId');
-    const manualNameInput = document.getElementById('manualAddName');
-    const typeTeachingRadio = document.getElementById('typeTeaching');
-    const typeNonTeachingRadio = document.getElementById('typeNonTeaching');
-    const teachingFields = document.getElementById('teachingFields');
-    const nonTeachingFields = document.getElementById('nonTeachingFields');
-    
-    const manualAddCollege = document.getElementById('manualAddCollege');
-    const manualAddTeachingPosition = document.getElementById('manualAddTeachingPosition');
-    
-    const manualAddOffice = document.getElementById('manualAddOffice');
-    const manualAddNonTeachingPosition = document.getElementById('manualAddNonTeachingPosition');
-    
-    const submitManualBtn = document.getElementById('submitManualAddBtn');
+    // Manual Add — dynamic fields & validation
+    const manualIdInput               = document.getElementById('manualAddId');
+    const manualNameInput             = document.getElementById('manualAddName');
+    const typeTeachingRadio           = document.getElementById('typeTeaching');
+    const typeNonTeachingRadio        = document.getElementById('typeNonTeaching');
+    const teachingFields              = document.getElementById('teachingFields');
+    const nonTeachingFields           = document.getElementById('nonTeachingFields');
+    const manualAddCollege            = document.getElementById('manualAddCollege');
+    const manualAddTeachingPosition   = document.getElementById('manualAddTeachingPosition');
+    const manualAddOffice             = document.getElementById('manualAddOffice');
+    const manualAddNonTeachingPos     = document.getElementById('manualAddNonTeachingPosition');
+    const submitManualBtn             = document.getElementById('submitManualAddBtn');
 
     function togglePersonnelFields() {
         if (typeTeachingRadio.checked) {
             teachingFields.classList.remove('d-none');
             nonTeachingFields.classList.add('d-none');
-            manualAddOffice.value = "";
-            manualAddNonTeachingPosition.value = "";
-        } else if (typeNonTeachingRadio.checked) {
+            if (manualAddOffice) manualAddOffice.value = '';
+            if (manualAddNonTeachingPos) manualAddNonTeachingPos.value = '';
+        } else {
             teachingFields.classList.add('d-none');
             nonTeachingFields.classList.remove('d-none');
-            manualAddCollege.value = "";
-            manualAddTeachingPosition.value = "";
+            if (manualAddCollege) manualAddCollege.value = '';
+            if (manualAddTeachingPosition) manualAddTeachingPosition.value = '';
         }
         validateManualForm();
     }
 
-    if (typeTeachingRadio) typeTeachingRadio.addEventListener('change', togglePersonnelFields);
-    if (typeNonTeachingRadio) typeNonTeachingRadio.addEventListener('change', togglePersonnelFields);
-
     function validateManualForm() {
-        const idValid = manualIdInput && manualIdInput.value.trim().length > 0;
-        const nameValid = manualNameInput && manualNameInput.value.trim().length > 0;
-        
-        let typeValid = false;
-        if (typeTeachingRadio && typeTeachingRadio.checked) {
-            typeValid = manualAddCollege.value !== "" && manualAddTeachingPosition.value !== "";
-        } else if (typeNonTeachingRadio && typeNonTeachingRadio.checked) {
-            typeValid = manualAddOffice.value !== "" && manualAddNonTeachingPosition.value !== "";
-        }
-        
-        if (submitManualBtn) {
-            submitManualBtn.disabled = !(idValid && nameValid && typeValid);
-        }
+        const idOk   = manualIdInput && manualIdInput.value.trim().length > 0;
+        const nameOk = manualNameInput && manualNameInput.value.trim().length > 0;
+        let typeOk   = false;
+        if (typeTeachingRadio && typeTeachingRadio.checked)
+            typeOk = manualAddCollege.value !== '' && manualAddTeachingPosition.value !== '';
+        else if (typeNonTeachingRadio && typeNonTeachingRadio.checked)
+            typeOk = manualAddOffice.value !== '' && manualAddNonTeachingPos.value !== '';
+        if (submitManualBtn) submitManualBtn.disabled = !(idOk && nameOk && typeOk);
     }
 
-    if (manualIdInput) manualIdInput.addEventListener('input', validateManualForm);
-    if (manualNameInput) manualNameInput.addEventListener('input', validateManualForm);
-    if (manualAddCollege) manualAddCollege.addEventListener('change', validateManualForm);
-    if (manualAddTeachingPosition) manualAddTeachingPosition.addEventListener('change', validateManualForm);
-    if (manualAddOffice) manualAddOffice.addEventListener('change', validateManualForm);
-    if (manualAddNonTeachingPosition) manualAddNonTeachingPosition.addEventListener('change', validateManualForm);
+    if (typeTeachingRadio)    typeTeachingRadio.addEventListener('change', togglePersonnelFields);
+    if (typeNonTeachingRadio) typeNonTeachingRadio.addEventListener('change', togglePersonnelFields);
+    [manualIdInput, manualNameInput, manualAddCollege, manualAddTeachingPosition, manualAddOffice, manualAddNonTeachingPos]
+        .forEach(el => el && el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', validateManualForm));
 
-    // --- View Toggler Logic ---
+    if (submitManualBtn) {
+        submitManualBtn.addEventListener('click', async function () {
+            const isTeaching = typeTeachingRadio && typeTeachingRadio.checked;
+            const payload = {
+                employee_id:   manualIdInput.value.trim(),
+                employee_name: manualNameInput.value.trim(),
+                department_id: isTeaching ? manualAddCollege.value : manualAddOffice.value,
+                position:      isTeaching ? manualAddTeachingPosition.value : manualAddNonTeachingPos.value
+            };
+            try {
+                const res = await fetch('/add_employee', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const result = await res.json();
+                if (result.success) {
+                    const modal = bootstrap.Modal.getInstance(addUserModalEl);
+                    if (modal) modal.hide();
+                    showToast('Employee added successfully.');
+                    setTimeout(() => location.reload(), 1800);
+                } else { alert('Error: ' + result.error); }
+            } catch (err) { alert('Request failed: ' + err.message); }
+        });
+    }
+
+    // XLS Upload
+    const uploadSubmitBtn = document.getElementById('uploadXlsBtn');
+    if (uploadSubmitBtn) {
+        uploadSubmitBtn.addEventListener('click', async function () {
+            const file = fileInput && fileInput.files[0];
+            if (!file) { alert('Please select an Excel file first.'); return; }
+            const formData = new FormData();
+            formData.append('file', file);
+            uploadSubmitBtn.disabled = true;
+            uploadSubmitBtn.textContent = 'Uploading...';
+            try {
+                const res = await fetch('/upload_employees', { method: 'POST', body: formData });
+                const result = await res.json();
+
+                const resultModalEl = document.getElementById('uploadResultModal');
+                const resultModal = new bootstrap.Modal(resultModalEl);
+                const title = document.getElementById('uploadResultTitle');
+                const subtitle = document.getElementById('uploadResultSubtitle');
+                const content = document.getElementById('uploadResultContent');
+                const iconContainer = document.getElementById('uploadResultIconContainer');
+                const icon = document.getElementById('uploadResultIcon');
+
+                if (result.success) {
+                    const hasErrors = result.errors && result.errors.length > 0;
+
+                    if (result.inserted === 0) {
+                        title.textContent = 'Upload Needs Attention';
+                        subtitle.textContent = 'No records were added';
+                    } else {
+                        title.textContent = hasErrors ? 'Upload Partially Successful' : 'Upload Successful';
+                        subtitle.textContent = `${result.inserted} employee(s) added successfully`;
+                    }
+
+                    const tipContainer = document.getElementById('uploadResultTipContainer');
+                    const paginationContainer = document.getElementById('uploadResultPagination');
+
+                    if (hasErrors) {
+                        iconContainer.style.background = 'rgba(255, 193, 7, 0.15)';
+                        icon.className = 'bi bi-exclamation-triangle-fill text-warning fs-4';
+                        icon.style.color = '';
+
+                        tipContainer.innerHTML = `
+                            <div class="alert border-0 rounded-4 mb-4 px-4 py-3" style="background: rgba(13, 202, 240, 0.12); border: 1px solid rgba(13,202,240,0.2) !important;">
+                                <div class="d-flex gap-3 align-items-start">
+                                    <i class="bi bi-info-circle-fill fs-5 mt-1 text-info"></i>
+                                    <div>
+                                        <strong class="d-block mb-1 text-info" style="font-size: 0.95rem;">Required Excel Format</strong>
+                                        <p class="mb-3 text-white-50" style="font-size: 0.85rem;">To successfully upload records, your file must include these exact column headers. Please ensure no required fields are left blank. If errors persist, verify that your spreadsheet has no hidden columns, empty rows, or duplicate employee IDs.</p>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <span class="badge rounded-pill px-3 py-2" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-weight: 500; letter-spacing: 0.5px;">EMPLOYEE NUMBER</span>
+                                            <span class="badge rounded-pill px-3 py-2" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-weight: 500; letter-spacing: 0.5px;">EMPLOYEE NAME</span>
+                                            <span class="badge rounded-pill px-3 py-2" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-weight: 500; letter-spacing: 0.5px;">DEPARTMENT</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-1 fw-bold text-warning" style="font-size: 0.95rem;">Upload Errors Summary</div>
+                            <p class="text-white-50 mb-3" style="font-size: 0.85rem;">We couldn't add the following rows due to missing information or duplicate employee records:</p>`;
+
+                        let ulHtml = '<ul class="list-unstyled mb-0 pe-2" style="opacity: 0.9; font-size: 0.9rem;">';
+                        result.errors.forEach(err => {
+                            ulHtml += `<li class="mb-2 pb-2 border-bottom border-secondary border-opacity-25 d-flex gap-2 align-items-start"><i class="bi bi-x-circle text-danger mt-1"></i> <span class="text-white-50">${err}</span></li>`;
+                        });
+                        ulHtml += '</ul>';
+                        content.innerHTML = ulHtml;
+                        paginationContainer.innerHTML = '';
+
+                        document.getElementById('uploadResultFooter').innerHTML = `
+                            <button type="button" class="btn btn-primary-gold px-4 rounded-pill" onclick="window.reopenUploadModal()">Upload a New File</button>
+                            <button type="button" class="btn btn-outline-light px-4 rounded-pill" data-bs-dismiss="modal">Exit</button>
+                        `;
+                    } else {
+                        iconContainer.style.background = 'rgba(25,135,84,0.15)';
+                        icon.className = 'bi bi-check-circle-fill text-success fs-4';
+                        icon.style.color = '';
+                        tipContainer.innerHTML = '';
+                        paginationContainer.innerHTML = '';
+                        content.innerHTML = '<div class="text-center py-2 text-white">All records were uploaded and saved successfully!</div>';
+
+                        document.getElementById('uploadResultFooter').innerHTML = `
+                            <button type="button" class="btn btn-primary-gold px-4 rounded-pill" onclick="window.reopenUploadModal()">Add another file</button>
+                            <button type="button" class="btn btn-outline-light px-4 rounded-pill" data-bs-dismiss="modal">Exit</button>
+                        `;
+                    }
+
+                    const modal = bootstrap.Modal.getInstance(addUserModalEl);
+                    if (modal) modal.hide();
+
+                    resultModalEl.addEventListener('hidden.bs.modal', function() {
+                        location.reload();
+                    }, { once: true });
+
+                    resultModal.show();
+
+                } else {
+                    title.textContent = 'Upload Failed';
+                    subtitle.textContent = 'An error occurred during upload';
+                    iconContainer.style.background = 'rgba(220,53,69,0.15)';
+                    icon.className = 'bi bi-x-circle-fill text-danger fs-4';
+                    icon.style.color = '';
+
+                    document.getElementById('uploadResultTipContainer').innerHTML = '';
+                    document.getElementById('uploadResultPagination').innerHTML = '';
+                    content.innerHTML = `<div class="text-danger"><i class="bi bi-exclamation-triangle me-2"></i> ${result.error}</div>`;
+
+                    document.getElementById('uploadResultFooter').innerHTML = `
+                        <button type="button" class="btn btn-primary-gold px-4 rounded-pill" onclick="window.reopenUploadModal()">Upload a New File</button>
+                        <button type="button" class="btn btn-outline-light px-4 rounded-pill" data-bs-dismiss="modal">Exit</button>
+                    `;
+
+                    const modal = bootstrap.Modal.getInstance(addUserModalEl);
+                    if (modal) modal.hide();
+
+                    resultModal.show();
+                }
+            } catch (err) { alert('Request failed: ' + err.message); }
+            finally { uploadSubmitBtn.disabled = false; uploadSubmitBtn.textContent = 'Export'; }
+        });
+    }
+
+
+    // ─── VIEW TOGGLE ──────────────────────────────────────────────────────────
     const viewRadios = document.querySelectorAll('.view-toggle');
-    const views = {
-        'activity': document.getElementById('activity-view'),
-        'records': document.getElementById('records-view')
+    const viewMap    = {
+        activity: document.getElementById('activity-view'),
+        records:  document.getElementById('records-view')
     };
 
     viewRadios.forEach(radio => {
         radio.addEventListener('change', function (e) {
-            Object.values(views).forEach(v => v?.classList.remove('active-view'));
-            const targetView = views[e.target.value];
-            if (targetView) {
-                targetView.classList.add('active-view');
-                history.replaceState(null, null, '#' + e.target.value);
-            }
+            Object.values(viewMap).forEach(v => v && v.classList.remove('active-view'));
+            const target = viewMap[e.target.value];
+            if (target) { target.classList.add('active-view'); history.replaceState(null, null, '#' + e.target.value); }
         });
     });
 
     function handleHash() {
         const hash = window.location.hash.replace('#', '');
-        if (hash && views[hash]) {
+        if (hash && viewMap[hash]) {
             const radio = document.getElementById('view' + hash.charAt(0).toUpperCase() + hash.slice(1));
-            if (radio) {
-                radio.checked = true;
-                radio.dispatchEvent(new Event('change'));
-            }
+            if (radio) { radio.checked = true; radio.dispatchEvent(new Event('change')); }
         }
     }
     window.addEventListener('hashchange', handleHash);
     handleHash();
 
-    const searchInput  = document.getElementById('searchInput');
-    const departmentFilter = document.getElementById('departmentFilter');
-    const dateFilter   = document.getElementById('dateFilter');
-    const tableCard    = document.getElementById('tableCard');
-    const tableResponsive = tableCard ? tableCard.querySelector('.table-responsive') : null;
-    const noResults    = document.getElementById('noResults');
-    const resultCount  = document.getElementById('resultCount');
-    const paginationContainer = document.getElementById('paginationContainer');
-    const paginationList = document.getElementById('paginationList');
-    const getRows      = () => document.querySelectorAll('.employee-row');
 
-    // Pagination settings
-    const ITEMS_PER_PAGE = 6;
+    // ─── ACTIVITY LOGS FILTER + PAGINATION ───────────────────────────────────
+    const searchInput         = document.getElementById('searchInput');
+    const departmentFilter    = document.getElementById('departmentFilter');
+    const dateFilter          = document.getElementById('dateFilter');
+    const tableCard           = document.getElementById('tableCard');
+    const noResults           = document.getElementById('noResults');
+    const resultCount         = document.getElementById('resultCount');
+    const paginationContainer = document.getElementById('paginationContainer');
+    const paginationList      = document.getElementById('paginationList');
+    const getActivityRows     = () => document.querySelectorAll('.employee-row');
+
     let currentPage = 1;
 
-    function renderPagination(visibleCount) {
+    function buildPagination(listEl, containerEl, visibleCount, curPage, onPageChange) {
         const totalPages = Math.ceil(visibleCount / ITEMS_PER_PAGE);
-        paginationList.innerHTML = '';
+        listEl.innerHTML = '';
 
         if (totalPages <= 1) {
+            containerEl.classList.remove('show');
+            containerEl.style.display = 'none';
+            return;
+        }
+
+        containerEl.classList.add('show');
+        containerEl.style.display = 'flex';
+
+        function makeBtn(label, cls, onClick, disabled) {
+            const li  = document.createElement('li'); li.className = 'page-item';
+            const btn = document.createElement('button'); btn.type = 'button';
+            btn.className = 'page-link ' + cls; btn.innerHTML = label;
+            if (disabled) btn.disabled = true;
+            else btn.addEventListener('click', onClick);
+            li.appendChild(btn); listEl.appendChild(li);
+            return btn;
+        }
+
+        makeBtn('<i class="bi bi-chevron-left me-1"></i>Previous', 'page-prev',
+            () => onPageChange(curPage - 1), curPage === 1);
+
+        let startPage = 1, endPage = totalPages;
+        if (totalPages > 5) {
+            startPage = Math.max(1, curPage - 2);
+            endPage   = Math.min(totalPages, startPage + 4);
+            if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            const active = i === curPage;
+            makeBtn(String(i), 'page-number' + (active ? ' active' : ''), () => onPageChange(i), false);
+        }
+
+        if (endPage < totalPages) {
+            makeBtn('...', 'page-number-separator', null, true);
+            makeBtn(String(totalPages), 'page-number', () => onPageChange(totalPages), false);
+        }
+
+        makeBtn('Next <i class="bi bi-chevron-right ms-1"></i>', 'page-next',
+            () => onPageChange(curPage + 1), curPage === totalPages);
+    }
+
+    function getActivityVisibleCount() {
+        return Array.from(getActivityRows()).filter(r => r.dataset.filterVisible !== 'false').length;
+    }
+
+    function updateActivityTableDisplay() {
+        const visibleRows = Array.from(getActivityRows()).filter(r => r.dataset.filterVisible !== 'false');
+        const start = (currentPage - 1) * ITEMS_PER_PAGE;
+        const end   = start + ITEMS_PER_PAGE;
+        getActivityRows().forEach(row => {
+            if (row.dataset.filterVisible === 'false') { row.style.display = 'none'; return; }
+            const idx = visibleRows.indexOf(row);
+            row.style.display = (idx >= start && idx < end) ? '' : 'none';
+        });
+    }
+
+    function goToActivityPage(page) {
+        const total = Math.ceil(getActivityVisibleCount() / ITEMS_PER_PAGE);
+        if (page < 1 || page > total) return;
+        currentPage = page;
+        updateActivityTableDisplay();
+        buildPagination(paginationList, paginationContainer, getActivityVisibleCount(), currentPage, goToActivityPage);
+    }
+
+    function applyActivityFilters() {
+        const search = searchInput.value.trim().toLowerCase();
+        const dept   = departmentFilter.value;
+        const date   = dateFilter.value;
+        let visible  = 0;
+
+        getActivityRows().forEach(row => {
+            const matchSearch = !search || row.dataset.employeeId.includes(search) || row.dataset.employeeName.includes(search);
+            const matchDept   = !dept   || row.dataset.department === dept;
+            const matchDate   = !date   || row.dataset.date === date;
+
+            if (matchSearch && matchDept && matchDate) {
+                row.dataset.filterVisible = 'true';
+                visible++;
+            } else {
+                row.dataset.filterVisible = 'false';
+            }
+        });
+
+        currentPage = 1;
+        const hasFilters = search || dept || date;
+
+        if (getActivityRows().length === 0) {
+            // No rows at all — keep table visible (shows built-in empty row), hide pagination & count
+            tableCard.style.display  = '';
+            noResults.style.display  = 'none';
+            resultCount.textContent  = '';
             paginationContainer.classList.remove('show');
             paginationContainer.style.display = 'none';
             return;
         }
 
-        paginationContainer.classList.add('show');
-        paginationContainer.style.display = 'flex';
-
-        const prevLi = document.createElement('li');
-        prevLi.className = 'page-item';
-        const prevBtn = document.createElement('button');
-        prevBtn.type = 'button';
-        prevBtn.className = 'page-link page-prev';
-        prevBtn.innerHTML = '<i class="bi bi-chevron-left me-1"></i>Previous';
-        prevLi.appendChild(prevBtn);
-        paginationList.appendChild(prevLi);
-
-        // Determine which pages to show (simplified logic: show max 5 page numbers)
-        let startPage = 1;
-        let endPage = totalPages;
-
-        if (totalPages > 5) {
-            startPage = Math.max(1, currentPage - 2);
-            endPage = Math.min(totalPages, startPage + 4);
-            if (endPage - startPage < 4) {
-                startPage = Math.max(1, endPage - 4);
-            }
-        }
-
-        for (let i = startPage; i <= endPage; i++) {
-            const li = document.createElement('li');
-            li.className = 'page-item';
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = `page-link page-number ${i === currentPage ? 'active' : ''}`;
-            button.textContent = i;
-            button.dataset.page = i;
-            button.addEventListener('click', () => goToPage(i, visibleCount));
-            li.appendChild(button);
-            paginationList.appendChild(li);
-        }
-
-        if (endPage < totalPages) {
-            const separatorLi = document.createElement('li');
-            separatorLi.className = 'page-item';
-            const separatorSpan = document.createElement('span');
-            separatorSpan.className = 'page-link page-number-separator';
-            separatorSpan.textContent = '...';
-            separatorLi.appendChild(separatorSpan);
-            paginationList.appendChild(separatorLi);
-
-            const lastLi = document.createElement('li');
-            lastLi.className = 'page-item';
-            const lastButton = document.createElement('button');
-            lastButton.type = 'button';
-            lastButton.className = 'page-link page-number';
-            lastButton.textContent = totalPages;
-            lastButton.dataset.page = totalPages;
-            lastButton.addEventListener('click', () => goToPage(totalPages, visibleCount));
-            lastLi.appendChild(lastButton);
-            paginationList.appendChild(lastLi);
-        }
-
-        const nextLi = document.createElement('li');
-        nextLi.className = 'page-item';
-        const nextBtn = document.createElement('button');
-        nextBtn.type = 'button';
-        nextBtn.className = 'page-link page-next';
-        nextBtn.innerHTML = 'Next <i class="bi bi-chevron-right ms-1"></i>';
-        nextLi.appendChild(nextBtn);
-        paginationList.appendChild(nextLi);
-
-        updatePrevNextButtons(totalPages);
-    }
-
-    function goToPage(page, visibleCount) {
-        const totalPages = Math.ceil(visibleCount / ITEMS_PER_PAGE);
-        if (page < 1 || page > totalPages) return;
-        
-        currentPage = page;
-        updateTableDisplay();
-        renderPagination(visibleCount);
-    }
-
-    function updatePrevNextButtons(totalPages) {
-        const prevBtn = paginationList.querySelector('.page-prev');
-        const nextBtn = paginationList.querySelector('.page-next');
-        
-        if (!prevBtn || !nextBtn) return;
-
-        prevBtn.disabled = currentPage === 1;
-        nextBtn.disabled = currentPage === totalPages;
-
-        prevBtn.onclick = () => {
-            if (currentPage > 1) {
-                goToPage(currentPage - 1, getVisibleRowCount());
-            }
-        };
-
-        nextBtn.onclick = () => {
-            if (currentPage < totalPages) {
-                goToPage(currentPage + 1, getVisibleRowCount());
-            }
-        };
-    }
-
-    function getVisibleRowCount() {
-        let count = 0;
-        getRows().forEach(row => {
-            if (row.dataset.filterVisible !== 'false') count++;
-        });
-        return count;
-    }
-
-    function updateTableDisplay() {
-        const visibleRows = Array.from(getRows()).filter(row => row.dataset.filterVisible !== 'false');
-        const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
-        const endIdx = startIdx + ITEMS_PER_PAGE;
-
-        getRows().forEach(row => {
-            if (row.dataset.filterVisible === 'false') {
-                row.style.display = 'none';
-                return;
-            }
-            const idx = visibleRows.indexOf(row);
-            row.style.display = (idx >= startIdx && idx < endIdx) ? '' : 'none';
-        });
-    }
-
-    function applyFilters() {
-        const search = searchInput.value.trim().toLowerCase();
-        const department = departmentFilter.value;
-        const date   = dateFilter.value;
-
-        let visible = 0;
-
-        getRows().forEach(function (row) {
-            const matchSearch = !search ||
-                row.dataset.employeeId.includes(search) ||
-                row.dataset.employeeName.includes(search);
-            const matchDepartment = !department || row.dataset.department === department;
-            const matchDate   = !date   || row.dataset.date === date;
-
-            if (matchSearch && matchDepartment && matchDate) {
-                row.dataset.filterVisible = 'true';
-                row.style.display = '';
-                visible++;
-            } else {
-                row.dataset.filterVisible = 'false';
-                row.style.display = 'none';
-            }
-        });
-
-        currentPage = 1; // Reset to first page when filtering
-        const hasFilters = search || department || date;
-
-        if (getRows().length > 0) {
-            if (visible === 0 && hasFilters) {
-                if (tableResponsive) tableResponsive.style.display = 'none';
-                paginationContainer.classList.remove('show');
-                paginationContainer.style.display = 'none';
-                noResults.style.display  = 'block';
-                resultCount.textContent  = '';
-            } else {
-                if (tableResponsive) tableResponsive.style.display = '';
-                noResults.style.display  = 'none';
-                resultCount.textContent  = hasFilters
-                    ? 'Showing up to ' + Math.min(ITEMS_PER_PAGE, visible) + ' of ' + visible + ' record' + (visible !== 1 ? 's' : '')
-                    : '';
-                
-                updateTableDisplay();
-                renderPagination(visible);
-            }
+        if (visible === 0 && hasFilters) {
+            // Rows exist but none match the current filter
+            tableCard.style.display  = 'none';
+            noResults.style.display  = 'block';
+            resultCount.textContent  = '';
+            paginationContainer.classList.remove('show');
+            paginationContainer.style.display = 'none';
+        } else {
+            tableCard.style.display  = '';
+            noResults.style.display  = 'none';
+            // Only show count text when a filter is actually active
+            resultCount.textContent  = hasFilters
+                ? `Showing up to ${Math.min(ITEMS_PER_PAGE, visible)} of ${visible} record${visible !== 1 ? 's' : ''}`
+                : '';
+            updateActivityTableDisplay();
+            buildPagination(paginationList, paginationContainer, visible, currentPage, goToActivityPage);
         }
     }
 
-    // Live search while typing
-    searchInput.addEventListener('input', applyFilters);
-    departmentFilter.addEventListener('change', applyFilters);
-    dateFilter.addEventListener('change', applyFilters);
-    
-    // Records search
-    const recordsSearch = document.getElementById('recordsSearchInput');
-    const recordsDeptFilter = document.getElementById('recordsDepartmentFilter');
-    const recordsRows = document.querySelectorAll('.employee-record-row');
+    if (searchInput)      searchInput.addEventListener('input',  applyActivityFilters);
+    if (departmentFilter) departmentFilter.addEventListener('change', applyActivityFilters);
+    if (dateFilter)       dateFilter.addEventListener('change',  applyActivityFilters);
+
+
+    // ─── RECORDS FILTER + PAGINATION ─────────────────────────────────────────
+    const recordsSearch           = document.getElementById('recordsSearchInput');
+    const recordsDeptFilter       = document.getElementById('recordsDepartmentFilter');
+    const recordsTableCard        = document.getElementById('recordsTableCard');
+    const recordsNoResults        = document.getElementById('recordsNoResults');
+    const recordsResultCount      = document.getElementById('recordsResultCount');
     const recordsPaginationContainer = document.getElementById('recordsPaginationContainer');
-    const recordsPaginationList = document.getElementById('recordsPaginationList');
-    const recordsTableCard = document.getElementById('recordsTableCard');
-    const recordsTableResponsive = recordsTableCard ? recordsTableCard.querySelector('.table-responsive') : null;
-    const recordsNoResults = document.getElementById('recordsNoResults');
-    const recordsResultCount = document.getElementById('recordsResultCount');
-    
+    const recordsPaginationList   = document.getElementById('recordsPaginationList');
+    const getRecordRows           = () => document.querySelectorAll('.employee-record-row');
     let recordsCurrentPage = 1;
 
-    function renderRecordsPagination(visibleCount) {
-        const totalPages = Math.ceil(visibleCount / ITEMS_PER_PAGE);
-        recordsPaginationList.innerHTML = '';
-
-        if (totalPages <= 1) {
-            recordsPaginationContainer.classList.remove('show');
-            recordsPaginationContainer.style.display = 'none';
-            return;
-        }
-
-        recordsPaginationContainer.classList.add('show');
-        recordsPaginationContainer.style.display = 'flex';
-
-        const prevLi = document.createElement('li');
-        prevLi.className = 'page-item';
-        const prevBtn = document.createElement('button');
-        prevBtn.type = 'button';
-        prevBtn.className = 'page-link page-prev';
-        prevBtn.innerHTML = '<i class="bi bi-chevron-left me-1"></i>Previous';
-        prevLi.appendChild(prevBtn);
-        recordsPaginationList.appendChild(prevLi);
-
-        let startPage = 1;
-        let endPage = totalPages;
-
-        if (totalPages > 5) {
-            startPage = Math.max(1, recordsCurrentPage - 2);
-            endPage = Math.min(totalPages, startPage + 4);
-            if (endPage - startPage < 4) {
-                startPage = Math.max(1, endPage - 4);
-            }
-        }
-
-        for (let i = startPage; i <= endPage; i++) {
-            const li = document.createElement('li');
-            li.className = 'page-item';
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = `page-link page-number ${i === recordsCurrentPage ? 'active' : ''}`;
-            button.textContent = i;
-            button.addEventListener('click', () => goToRecordsPage(i, visibleCount));
-            li.appendChild(button);
-            recordsPaginationList.appendChild(li);
-        }
-
-        const nextLi = document.createElement('li');
-        nextLi.className = 'page-item';
-        const nextBtn = document.createElement('button');
-        nextBtn.type = 'button';
-        nextBtn.className = 'page-link page-next';
-        nextBtn.innerHTML = 'Next <i class="bi bi-chevron-right ms-1"></i>';
-        nextLi.appendChild(nextBtn);
-        recordsPaginationList.appendChild(nextLi);
-
-        const prevNode = recordsPaginationList.querySelector('.page-prev');
-        const nextNode = recordsPaginationList.querySelector('.page-next');
-        if (prevNode && nextNode) {
-            prevNode.disabled = recordsCurrentPage === 1;
-            nextNode.disabled = recordsCurrentPage === totalPages;
-            prevNode.onclick = () => { if (recordsCurrentPage > 1) goToRecordsPage(recordsCurrentPage - 1, visibleCount); };
-            nextNode.onclick = () => { if (recordsCurrentPage < totalPages) goToRecordsPage(recordsCurrentPage + 1, visibleCount); };
-        }
-    }
-
-    function goToRecordsPage(page, visibleCount) {
-        const totalPages = Math.ceil(visibleCount / ITEMS_PER_PAGE);
-        if (page < 1 || page > totalPages) return;
-        recordsCurrentPage = page;
-        updateRecordsTableDisplay();
-        renderRecordsPagination(visibleCount);
+    function getRecordsVisibleCount() {
+        return Array.from(getRecordRows()).filter(r => r.dataset.filterVisible !== 'false').length;
     }
 
     function updateRecordsTableDisplay() {
-        const visibleRows = Array.from(recordsRows).filter(row => row.dataset.filterVisible !== 'false');
-        const startIdx = (recordsCurrentPage - 1) * ITEMS_PER_PAGE;
-        const endIdx = startIdx + ITEMS_PER_PAGE;
-        recordsRows.forEach(row => {
-            if (row.dataset.filterVisible === 'false') {
-                row.style.display = 'none';
-                return;
-            }
+        const visibleRows = Array.from(getRecordRows()).filter(r => r.dataset.filterVisible !== 'false');
+        const start = (recordsCurrentPage - 1) * ITEMS_PER_PAGE;
+        const end   = start + ITEMS_PER_PAGE;
+        getRecordRows().forEach(row => {
+            if (row.dataset.filterVisible === 'false') { row.style.display = 'none'; return; }
             const idx = visibleRows.indexOf(row);
-            row.style.display = (idx >= startIdx && idx < endIdx) ? '' : 'none';
+            row.style.display = (idx >= start && idx < end) ? '' : 'none';
         });
     }
-    
+
+    function goToRecordsPage(page) {
+        const total = Math.ceil(getRecordsVisibleCount() / ITEMS_PER_PAGE);
+        if (page < 1 || page > total) return;
+        recordsCurrentPage = page;
+        updateRecordsTableDisplay();
+        buildPagination(recordsPaginationList, recordsPaginationContainer, getRecordsVisibleCount(), recordsCurrentPage, goToRecordsPage);
+    }
+
     function applyRecordsFilter() {
-        const val = recordsSearch ? recordsSearch.value.trim().toLowerCase() : '';
-        const deptVal = recordsDeptFilter ? recordsDeptFilter.value.toLowerCase() : '';
-        
-        let visible = 0;
-        
-        recordsRows.forEach(row => {
+        const search  = recordsSearch  ? recordsSearch.value.trim().toLowerCase()  : '';
+        const deptVal = recordsDeptFilter ? recordsDeptFilter.value.toLowerCase()   : '';
+        let visible   = 0;
+
+        getRecordRows().forEach(row => {
             const name = row.dataset.name || '';
             const dept = row.dataset.dept || '';
-            
-            const matchSearch = name.includes(val) || dept.includes(val);
-            const matchDept = !deptVal || dept === deptVal;
-            
+            const id   = row.dataset.id   || '';
+
+            const matchSearch = !search   || name.includes(search) || id.includes(search) || dept.includes(search);
+            const matchDept   = !deptVal  || dept === deptVal;
+
             if (matchSearch && matchDept) {
                 row.dataset.filterVisible = 'true';
                 visible++;
@@ -1179,176 +1100,175 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         recordsCurrentPage = 1;
-        const hasFilters = val || deptVal;
+        const hasFilters = search || deptVal;
 
-        if (recordsRows.length > 0) {
-            if (visible === 0 && hasFilters) {
-                if (recordsTableResponsive) recordsTableResponsive.style.display = 'none';
-                recordsPaginationContainer.classList.remove('show');
-                recordsPaginationContainer.style.display = 'none';
-                recordsNoResults.style.display = 'block';
-                recordsResultCount.textContent = '';
-            } else {
-                if (recordsTableResponsive) recordsTableResponsive.style.display = '';
-                recordsNoResults.style.display = 'none';
-                recordsResultCount.textContent = hasFilters
-                    ? `Showing up to ${Math.min(ITEMS_PER_PAGE, visible)} of ${visible} record${visible !== 1 ? 's' : ''}`
-                    : '';
-                
-                updateRecordsTableDisplay();
-                renderRecordsPagination(visible);
-            }
+        if (getRecordRows().length === 0) {
+            // No rows at all — keep table + filters visible, hide extra UI
+            recordsTableCard.style.display  = '';
+            recordsNoResults.style.display  = 'none';
+            recordsResultCount.textContent  = '';
+            recordsPaginationContainer.classList.remove('show');
+            recordsPaginationContainer.style.display = 'none';
+            return;
+        }
+
+        if (visible === 0 && hasFilters) {
+                // Rows exist but nothing matches — hide only the table, keep controls visible
+            recordsTableCard.querySelector('.table-responsive').style.display = 'none';
+            recordsNoResults.style.display  = 'block';
+            recordsResultCount.textContent  = '';
+            recordsPaginationContainer.classList.remove('show');
+            recordsPaginationContainer.style.display = 'none';
+        } else {
+            recordsTableCard.querySelector('.table-responsive').style.display = '';
+            recordsNoResults.style.display  = 'none';
+            // Only show count when a filter is active
+            recordsResultCount.textContent  = hasFilters
+                ? `Showing up to ${Math.min(ITEMS_PER_PAGE, visible)} of ${visible} record${visible !== 1 ? 's' : ''}`
+                : '';
+            updateRecordsTableDisplay();
+            buildPagination(recordsPaginationList, recordsPaginationContainer, visible, recordsCurrentPage, goToRecordsPage);
         }
     }
 
-    if (recordsSearch) recordsSearch.addEventListener('input', applyRecordsFilter);
+    if (recordsSearch)     recordsSearch.addEventListener('input',  applyRecordsFilter);
     if (recordsDeptFilter) recordsDeptFilter.addEventListener('change', applyRecordsFilter);
 
-    const editOverlay = document.getElementById('editOverlay');
-    const editCard = document.getElementById('employeeEditCard');
-    const editEmployeeId = document.getElementById('editEmployeeId');
+
+    // ─── EDIT OVERLAY ─────────────────────────────────────────────────────────
+    const editOverlay      = document.getElementById('editOverlay');
+    const editEmployeeId   = document.getElementById('editEmployeeId');
     const editEmployeeName = document.getElementById('editEmployeeName');
     const editDepartmentId = document.getElementById('editDepartmentId');
-    const editPosition = document.getElementById('editPosition');
+    const editPosition     = document.getElementById('editPosition');
     const saveEmployeeEdit = document.getElementById('saveEmployeeEdit');
-    const cancelEditEmployee = document.getElementById('cancelEditEmployee');
-    let currentEditRow = null;
+    const cancelEdit       = document.getElementById('cancelEditEmployee');
 
-    function showEditCard(row, mode = 'edit') {
-        currentEditRow = row;
-        const employeeId = row.dataset.employeeId || row.dataset.id || row.querySelector('td:nth-child(1)')?.textContent.trim() || '';
-        
-        let employeeName = '';
-        const nameSpan = row.querySelector('td:nth-child(1) span');
-        if (nameSpan) {
-            employeeName = nameSpan.textContent.trim();
-        } else {
-            employeeName = row.querySelector('td:nth-child(2)')?.textContent.trim() || '';
-        }
-        
-        let departmentId = row.dataset.department || row.dataset.dept || '';
-        if (!departmentId && mode === 'edit') {
-             departmentId = row.querySelector('td:nth-child(3)')?.textContent.trim() || '';
-        } else if (!departmentId) {
-             departmentId = row.querySelector('td:nth-child(2)')?.textContent.trim() || '';
-        }
-        
-        let position = row.dataset.position || '';
-        if (!position && mode === 'edit') {
-             position = row.querySelector('td:nth-child(4)')?.textContent.trim() || '';
-        }
+    function showEditCard(row, mode) {
+        const id       = row.querySelector('td:nth-child(1)').textContent.trim();
+        const name     = row.querySelector('td:nth-child(2)').textContent.trim();
+        const dept     = row.querySelector('td:nth-child(3)').textContent.trim();
+        const position = row.querySelector('td:nth-child(4)').textContent.trim();
 
-        editEmployeeId.value = employeeId;
-        editEmployeeName.value = employeeName;
-        editDepartmentId.value = departmentId;
-        editPosition.value = position;
-        
+        editEmployeeId.value   = id;
+        editEmployeeName.value = name;
+        editDepartmentId.value = dept;
+        editPosition.value     = position;
+
         const title = document.querySelector('#employeeEditCard h5');
-        const desc = document.querySelector('#employeeEditCard p');
-        const inputs = [editEmployeeId, editEmployeeName, editDepartmentId, editPosition];
-        
+        const desc  = document.querySelector('#employeeEditCard p');
+        const inputs = [editEmployeeName, editDepartmentId, editPosition];
+
         if (mode === 'view') {
             title.textContent = 'View Employee Details';
-            desc.textContent = 'Read-only view of the activity log details.';
+            desc.textContent  = 'Read-only view of the employee details.';
             saveEmployeeEdit.style.display = 'none';
             inputs.forEach(i => i.readOnly = true);
         } else {
             title.textContent = 'Edit Employee Record';
-            desc.textContent = 'Update the employee details and save the changes.';
+            desc.textContent  = 'Update the employee details and save the changes.';
             saveEmployeeEdit.style.display = 'block';
             inputs.forEach(i => i.readOnly = false);
         }
-        
+
         editOverlay.classList.remove('d-none');
-        editCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
     function hideEditCard() {
-        currentEditRow = null;
         editOverlay.classList.add('d-none');
-        editEmployeeId.value = '';
-        editEmployeeName.value = '';
-        editDepartmentId.value = '';
-        editPosition.value = '';
+        [editEmployeeId, editEmployeeName, editDepartmentId, editPosition].forEach(i => i.value = '');
     }
 
-    function bindRowActions() {
-        document.querySelectorAll('.view-employee, .edit-employee-record').forEach(function (button) {
-            button.addEventListener('click', function (event) {
-                const row = event.target.closest('tr');
-                const isView = event.target.classList.contains('view-employee');
-                if (row) {
-                    showEditCard(row, isView ? 'view' : 'edit');
-                }
-            });
-        });
+    if (cancelEdit) cancelEdit.addEventListener('click', hideEditCard);
+    if (editOverlay) editOverlay.addEventListener('click', e => { if (e.target === editOverlay) hideEditCard(); });
 
-        document.querySelectorAll('.delete-employee, .delete-employee-record').forEach(function (button) {
-            button.addEventListener('click', function (event) {
-                const row = event.target.closest('tr');
-                if (!row) {
-                    return;
-                }
-                let employeeName = row.querySelector('td:nth-child(1) span')?.textContent.trim();
-                if (!employeeName) {
-                    employeeName = row.querySelector('td:nth-child(2)')?.textContent.trim() || 'this employee';
-                }
-                if (confirm(`Delete ${employeeName} from records?`)) {
-                    row.remove();
-                    if (currentEditRow === row) {
-                        hideEditCard();
-                    }
-                    applyFilters(); // Refresh pagination
-                    if (typeof applyRecordsFilter === 'function') applyRecordsFilter();
-                }
+    // Edit record via overlay + API
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('.edit-employee-record');
+        if (!btn) return;
+        const row = btn.closest('tr');
+        if (row) showEditCard(row, 'edit');
+    });
+
+    // View activity log details
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('.view-employee');
+        if (!btn) return;
+        const row = btn.closest('tr');
+        if (row) showEditCard(row, 'view');
+    });
+
+    if (saveEmployeeEdit) {
+        saveEmployeeEdit.addEventListener('click', function () {
+            const payload = {
+                employee_id:   editEmployeeId.value.trim(),
+                employee_name: editEmployeeName.value.trim(),
+                department_id: editDepartmentId.value.trim(),
+                position:      editPosition.value.trim()
+            };
+            if (!payload.employee_id || !payload.employee_name || !payload.department_id || !payload.position) {
+                alert('Please fill in all fields before updating.');
+                return;
+            }
+            fetch('/update_employee', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    hideEditCard();
+                    showToast('Employee record updated successfully.');
+                    setTimeout(() => location.reload(), 1800);
+                } else { alert('Update failed: ' + data.error); }
             });
         });
     }
 
-    saveEmployeeEdit.addEventListener('click', function () {
-        if (!currentEditRow) {
-            return;
-        }
 
-        const newId = editEmployeeId.value.trim();
-        const newName = editEmployeeName.value.trim();
-        const newDept = editDepartmentId.value.trim();
-        const newPosition = editPosition.value.trim();
+    // ─── DELETE RECORD ────────────────────────────────────────────────────────
+    let pendingDeleteId = null;
 
-        if (!newId || !newName || !newDept || !newPosition) {
-            alert('Please fill in all fields before updating.');
-            return;
-        }
-
-        currentEditRow.dataset.employeeId = newId;
-        currentEditRow.dataset.employeeName = newName.toLowerCase();
-        currentEditRow.dataset.department = newDept;
-        currentEditRow.dataset.position = newPosition;
-        currentEditRow.querySelector('td:nth-child(1) span').textContent = newName;
-        currentEditRow.querySelector('td:nth-child(2)').textContent = newDept;
-        hideEditCard();
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('.delete-employee-record');
+        if (!btn) return;
+        pendingDeleteId = btn.dataset.id;
+        document.getElementById('confirmDeleteMsg').textContent =
+            `Are you sure you want to delete employee ${pendingDeleteId}? This cannot be undone.`;
+        document.getElementById('confirmDeleteToast').style.display = 'block';
     });
 
-    cancelEditEmployee.addEventListener('click', hideEditCard);
-    editOverlay.addEventListener('click', function (event) {
-        if (event.target === editOverlay) {
-            hideEditCard();
-        }
+    document.getElementById('cancelDeleteBtn').addEventListener('click', function () {
+        document.getElementById('confirmDeleteToast').style.display = 'none';
+        pendingDeleteId = null;
     });
 
-    bindRowActions();
+    document.getElementById('confirmDeleteBtn').addEventListener('click', function () {
+        if (!pendingDeleteId) return;
+        document.getElementById('confirmDeleteToast').style.display = 'none';
+        fetch('/delete_employee', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ employee_id: pendingDeleteId })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Employee deleted successfully.');
+                setTimeout(() => location.reload(), 1800);
+            } else { alert('Delete failed: ' + data.error); }
+        });
+        pendingDeleteId = null;
+    });
 
-    // Initialize pagination after the page is fully ready
+
+    // ─── INIT ─────────────────────────────────────────────────────────────────
     setTimeout(() => {
-        const initialVisibleCount = getVisibleRowCount();
-        if (initialVisibleCount > 0) {
-            currentPage = 1;
-            updateTableDisplay();
-            renderPagination(initialVisibleCount);
-        }
-        // Run records pagination filter
+        applyActivityFilters();
         applyRecordsFilter();
     }, 50);
+
 });
 </script>
 {% endblock %}

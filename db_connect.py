@@ -1,3 +1,4 @@
+from database import connect_db
 from datetime import date, datetime, timedelta
 
 import mysql.connector as connector
@@ -1905,3 +1906,140 @@ class Database:
             return None
         finally:
             cursor.close()
+
+
+class EmployeeModel:
+    def add_employee(self, employee_id, employee_name, department_id, position):
+        conn = connect_db()
+        if conn is None:
+            return {"success": False, "error": "Database connection failed"}
+
+        cursor = None
+        try:
+            employee_id = str(employee_id or "").strip()
+            employee_name = str(employee_name or "").strip()
+            department_id = str(department_id or "").strip()
+            position = str(position or "").strip()
+
+            if not employee_id or not employee_name or not department_id or not position:
+                return {"success": False, "error": "All employee fields are required."}
+
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT department_id
+                FROM departments
+                WHERE department_id = %s
+                LIMIT 1
+                """,
+                (department_id,),
+            )
+            department = cursor.fetchone()
+            if not department:
+                return {"success": False, "error": "Selected department does not exist."}
+
+            cursor.execute(
+                """
+                SELECT employee_id
+                FROM employees
+                WHERE employee_id = %s
+                LIMIT 1
+                """,
+                (employee_id,),
+            )
+            if cursor.fetchone():
+                return {"success": False, "error": f"Employee already exists: {employee_id}"}
+
+            cursor.execute(
+                """
+                INSERT INTO users (role, active)
+                VALUES (%s, %s)
+                """,
+                ("employee", 1),
+            )
+            user_id = cursor.lastrowid
+
+            cursor.execute(
+                """
+                INSERT INTO employees
+                    (user_id, employee_id, employee_name, department_id, position, status)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """,
+                (user_id, employee_id, employee_name, department_id, position, "Outside"),
+            )
+            conn.commit()
+            return {"success": True}
+        except Exception as err:
+            conn.rollback()
+            return {"success": False, "error": str(err)}
+        finally:
+            if cursor:
+                cursor.close()
+            conn.close()
+
+    def add_employee_excel(self, conn, employee_id, employee_name, department_name, position):
+        cursor = None
+        try:
+            cursor = conn.cursor()
+
+            employee_id = str(employee_id or "").strip()
+            employee_name = str(employee_name or "").strip().title()
+            department_name = str(department_name or "").strip().upper().replace("\u2019", "'")
+            position = str(position or "").strip()
+
+            if not employee_id or not employee_name or not department_name:
+                return {"success": False, "error": "Missing required fields"}
+
+            cursor.execute(
+                """
+                SELECT department_id
+                FROM departments
+                WHERE UPPER(TRIM(department_name)) = TRIM(%s)
+                LIMIT 1
+                """,
+                (department_name,),
+            )
+            department = cursor.fetchone()
+            if not department:
+                return {"success": False, "error": f"Department not found: {department_name}"}
+
+            department_id = department[0]
+
+            cursor.execute(
+                """
+                SELECT employee_id
+                FROM employees
+                WHERE employee_id = %s
+                LIMIT 1
+                """,
+                (employee_id,),
+            )
+            if cursor.fetchone():
+                return {"success": False, "error": f"Employee already exists: {employee_id}"}
+
+            cursor.execute(
+                """
+                INSERT INTO users (role, active)
+                VALUES (%s, %s)
+                """,
+                ("employee", 1),
+            )
+            user_id = cursor.lastrowid
+
+            cursor.execute(
+                """
+                INSERT INTO employees
+                    (user_id, employee_id, employee_name, department_id, position, status)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """,
+                (user_id, employee_id, employee_name, department_id, position or None, "Outside"),
+            )
+            conn.commit()
+            return {"success": True}
+        except Exception as err:
+            if conn:
+                conn.rollback()
+            return {"success": False, "error": str(err)}
+        finally:
+            if cursor:
+                cursor.close()

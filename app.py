@@ -3,6 +3,8 @@ from functools import wraps
 import csv
 import io
 import os
+import re
+import unicodedata
 
 import requests
 from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
@@ -10,7 +12,7 @@ from flask import Flask, flash, jsonify, redirect, render_template, request, ses
 from app_tasks import fetch_report_data
 from config import get_config
 from database import close_db, connect_db, init_db_pool
-from db_connect import Database
+from db_connect import Database, EmployeeModel
 from extensions import cache
 
 
@@ -18,6 +20,7 @@ app = Flask(__name__)
 app.config.from_object(get_config())
 
 os.makedirs(os.path.dirname(app.config["LOG_FILE"]) or ".", exist_ok=True)
+employee_model = EmployeeModel()
 cache.init_app(app)
 
 with app.app_context():
@@ -504,11 +507,14 @@ def admin_students():
 @login_required
 def admin_employees():
     logs, records, department_options = fetch_admin_employees_page_data()
+    departments = [{"name": department} for department in department_options]
     return render_template(
         "employee_logs.html",
         logs=logs,
         records=records,
+        employees=records,
         department_options=department_options,
+        departments=departments,
     )
 
 
@@ -784,6 +790,236 @@ def generate_report():
         metrics=report_results["metrics_data"],
         logs=report_results["logs"],
     )
+
+
+@app.route("/add_employee", methods=["POST"])
+@login_required
+def add_employee():
+    data = request.get_json(silent=True) or {}
+
+    result = employee_model.add_employee(
+        employee_id=(data.get("employee_id") or "").strip(),
+        employee_name=(data.get("employee_name") or "").strip(),
+        department_id=(data.get("department_id") or "").strip(),
+        position=(data.get("position") or "").strip(),
+    )
+
+    return jsonify(result), (200 if result.get("success") else 400)
+
+
+@app.route("/upload_employees", methods=["POST"])
+@login_required
+def upload_employees():
+    file = request.files.get("file")
+
+    if not file or not file.filename:
+        return jsonify({"success": False, "error": "No file uploaded"}), 400
+
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in {".xls", ".xlsx", ".csv"}:
+        return jsonify({"success": False, "error": "Please upload a valid Excel or CSV file."}), 400
+
+    def clean(text):
+        if not isinstance(text, str):
+            text = str(text) if text is not None else ""
+        text = unicodedata.normalize("NFKC", text)
+        text = re.sub(r"[\u2018\u2019\u02bc\u0060\u00b4]", "'", text)
+        text = re.sub(r"[\u2013\u2014]", "-", text)
+        text = text.replace("\u00a0", " ").replace("\u200b", "")
+        text = re.sub(r"\s+", " ", text)
+        return text.strip()
+
+    conn = None
+    try:
+        import pandas as pd
+
+        reader = pd.read_csv if file_ext == ".csv" else pd.read_excel
+        raw = reader(file, dtype=str, header=None)
+
+        header_row = None
+        for idx, row in raw.iterrows():
+            row_values = row.astype(str).str.strip().str.upper()
+            if "EMPLOYEE NUMBER" in row_values.values:
+                header_row = idx
+                break
+
+        if header_row is None:
+            return jsonify({"success": False, "error": "Could not find 'Employee Number' header in the file"}), 400
+
+        file.seek(0)
+        df = reader(file, dtype=str, header=header_row)
+        df.columns = [clean(col).upper() for col in df.columns]
+        df.dropna(how="all", inplace=True)
+        df = df.applymap(lambda value: clean(value) if isinstance(value, str) else value)
+
+        if "EMPLOYEE NUMBER" not in df.columns:
+            return jsonify({"success": False, "error": "Missing 'Employee Number' column in the file"}), 400
+
+        df["EMPLOYEE NUMBER"] = (
+            df["EMPLOYEE NUMBER"]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .str.replace(r"\.0$", "", regex=True)
+        )
+        df = df[df["EMPLOYEE NUMBER"].str.strip().astype(bool)]
+
+        duplicates = df[df["EMPLOYEE NUMBER"].duplicated(keep=False)]
+        if not duplicates.empty:
+            duplicate_ids = duplicates["EMPLOYEE NUMBER"].unique().tolist()
+            return jsonify(
+                {
+                    "success": False,
+                    "error": f"Duplicate Employee IDs found in uploaded file: {', '.join(duplicate_ids)}",
+                }
+            ), 400
+
+        conn = connect_db()
+        if conn is None:
+            return jsonify({"success": False, "error": "Database connection failed"}), 500
+
+        inserted = 0
+        errors = []
+
+        for index, row in df.iterrows():
+            employee_id = str(row.get("EMPLOYEE NUMBER") or "").strip()
+            employee_name = str(row.get("EMPLOYEE NAME") or "").strip()
+            department_name = str(row.get("DEPARTMENT") or "").strip()
+            position = str(row.get("POSITION") or "").strip()
+
+            if not employee_id or not employee_name or not department_name:
+                missing = [
+                    label
+                    for label, value in (
+                        ("Employee Number", employee_id),
+                        ("Employee Name", employee_name),
+                        ("Department", department_name),
+                    )
+                    if not value
+                ]
+                errors.append(f"Row {index + 2}: Missing {', '.join(missing)}")
+                continue
+
+            result = employee_model.add_employee_excel(
+                conn=conn,
+                employee_id=employee_id,
+                employee_name=employee_name,
+                department_name=department_name,
+                position=position,
+            )
+
+            if result.get("success"):
+                inserted += 1
+            else:
+                errors.append(f"Row {index + 2} (ID: {employee_id}): {result.get('error')}")
+
+        return jsonify({"success": True, "inserted": inserted, "errors": errors})
+    except Exception as err:
+        return jsonify({"success": False, "error": str(err)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route("/update_employee", methods=["POST"])
+@login_required
+def update_employee():
+    data = request.get_json(silent=True) or {}
+    employee_id = (data.get("employee_id") or "").strip()
+    employee_name = (data.get("employee_name") or "").strip()
+    department_name = (data.get("department_id") or "").strip()
+    position = (data.get("position") or "").strip()
+
+    if not employee_id or not employee_name or not department_name or not position:
+        return jsonify({"success": False, "error": "All fields are required."}), 400
+
+    conn = connect_db()
+    if conn is None:
+        return jsonify({"success": False, "error": "Database connection failed"}), 500
+
+    cursor = None
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT department_id
+            FROM departments
+            WHERE LOWER(TRIM(department_name)) = LOWER(TRIM(%s))
+            LIMIT 1
+            """,
+            (department_name,),
+        )
+        department = cursor.fetchone()
+
+        if not department:
+            return jsonify({"success": False, "error": f"Department not found: {department_name}"}), 400
+
+        cursor.execute(
+            """
+            UPDATE employees
+            SET employee_name = %s,
+                department_id = %s,
+                position = %s
+            WHERE employee_id = %s
+            """,
+            (employee_name, department[0], position, employee_id),
+        )
+        conn.commit()
+
+        if cursor.rowcount == 0:
+            return jsonify({"success": False, "error": "Employee not found."}), 404
+
+        return jsonify({"success": True})
+    except Exception as err:
+        conn.rollback()
+        return jsonify({"success": False, "error": str(err)}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        conn.close()
+
+
+@app.route("/delete_employee", methods=["POST"])
+@login_required
+def delete_employee():
+    data = request.get_json(silent=True) or {}
+    employee_id = (data.get("employee_id") or "").strip()
+
+    if not employee_id:
+        return jsonify({"success": False, "error": "Missing employee_id."}), 400
+
+    conn = connect_db()
+    if conn is None:
+        return jsonify({"success": False, "error": "Database connection failed"}), 500
+
+    cursor = None
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT user_id
+            FROM employees
+            WHERE employee_id = %s
+            LIMIT 1
+            """,
+            (employee_id,),
+        )
+        employee = cursor.fetchone()
+
+        if not employee:
+            return jsonify({"success": False, "error": "Employee not found."}), 404
+
+        cursor.execute("DELETE FROM employees WHERE employee_id = %s", (employee_id,))
+        cursor.execute("UPDATE users SET active = 0 WHERE user_id = %s", (employee[0],))
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as err:
+        conn.rollback()
+        return jsonify({"success": False, "error": str(err)}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        conn.close()
 
 
 if __name__ == "__main__":
