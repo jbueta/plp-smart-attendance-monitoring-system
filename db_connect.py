@@ -1464,7 +1464,53 @@ class Database:
 
             while len(dept_distribution) < 5:
                 dept_distribution.append(0)
-                
+
+
+            alerts = []
+
+            cursor.execute("SELECT COUNT(*) AS cnt FROM students WHERE status = 'Inside'")
+            students_inside = cursor.fetchone()['cnt']
+            if students_inside > 0:
+                alerts.append({
+                    "type": "danger",
+                    "icon": "shield-exclamation",
+                    "title": f"Curfew Watch: {students_inside} student(s) still inside",
+                    "time": datetime.now().strftime("%I:%M %p")
+                })
+
+            # density - 2 for testing
+            if currently_inside > 2:
+                alerts.append({
+                    "type": "warning",
+                    "icon": "exclamation-triangle-fill",
+                    "title": f"High Campus Density: {currently_inside:,} people inside",
+                    "time": datetime.now().strftime("%I:%M %p")
+                })
+
+            if peak_row:
+                alerts.append({
+                    "type": "info",
+                    "icon": "graph-up-arrow",
+                    "title": f"Peak Hour Detected at {peak_hour}",
+                    "time": "Today"
+                })
+
+            if total_invited > 0 and (total_attended / total_invited) < 0.5:
+                alerts.append({
+                    "type": "warning",
+                    "icon": "calendar-x-fill",
+                    "title": f"Low Event Attendance: {rate} turnout today",
+                    "time": datetime.now().strftime("%I:%M %p")
+                })
+
+            if not alerts:
+                alerts.append({
+                    "type": "success",
+                    "icon": "check-circle-fill",
+                    "title": "All systems normal. No issues detected.",
+                    "time": datetime.now().strftime("%I:%M %p")
+                })
+                    
             return {
                 "total_entries": f"{total_entries:,}",
                 "entries_trend": trend,
@@ -1475,7 +1521,7 @@ class Database:
                 "event_attendance_rate": rate,
                 "event_attendance_raw": raw,
                 "dept_distribution": dept_distribution,
-                "alerts": []
+                "alerts": alerts
             }
 
         except connector.Error as err:
@@ -1576,17 +1622,18 @@ class Database:
                 """, (today,))
                 watchlist = cursor.fetchall()
 
-                return {
-                    "total_entries": f"{total_entries:,}",
-                    "entries_trend": trend,
-                    "peak_hour": peak_hour,
-                    "peak_load": peak_load,
-                    "currently_inside": f"{currently_inside:,}",
-                    "avg_stay": avg_stay,
-                    "hourly_traffic": hourly_traffic,
-                    "watchlist": watchlist,
-                    "curfew_trigger": "09:40:00 PM"
-                }
+            # ↓ return is OUTSIDE the if block — always runs
+            return {
+                "total_entries": f"{total_entries:,}",
+                "entries_trend": trend,
+                "peak_hour": peak_hour,
+                "peak_load": peak_load,
+                "currently_inside": f"{currently_inside:,}",
+                "avg_stay": avg_stay,
+                "hourly_traffic": hourly_traffic,
+                "watchlist": watchlist,
+                "curfew_trigger": "09:40:00 PM"
+            }
 
         except connector.Error as err:
             print(f"Error fetching student stats: {err}")

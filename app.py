@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 import requests
@@ -15,6 +15,38 @@ app.secret_key = 'plp_secure_key_2026'  # Required for session management
 # Configure and initialize cache (SimpleCache for development)
 app.config['CACHE_TYPE'] = 'SimpleCache'
 cache.init_app(app)
+
+# ==============================================================================
+# STARTUP: Generate instances for the week every Sunday
+# ==============================================================================
+_instance_generator_run = False
+
+@app.before_request
+def generate_instances_on_sunday():
+    """
+    Runs only once per app startup.
+    If today is Sunday, generates event instances for the upcoming week.
+    """
+    global _instance_generator_run
+    
+    if not _instance_generator_run:
+        _instance_generator_run = True
+        today = date.today()
+        
+        # Check if today is Sunday (weekday() returns 6 for Sunday)
+        if today.weekday() == 6:
+            try:
+                print(f"[STARTUP] Today is Sunday. Generating instances for upcoming week...")
+                response = requests.post("http://127.0.0.1:5001/admin/generate-daily-instances", timeout=10)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    print(f"[SUCCESS] Generated {data.get('created', 0)} instances, {data.get('failed', 0)} failures")
+                else:
+                    print(f"[ERROR] Backend returned status {response.status_code}")
+            except Exception as e:
+                print(f"[ERROR] Failed to generate instances: {str(e)}")
+
 
 # ==============================================================================
 # MOCK DATA (Prototype State)
@@ -65,9 +97,16 @@ MOCK_EMPLOYEE_STATS = {
 }
 
 MOCK_EMPLOYEE_LOGS = [
-    {"initials": "JD", "name": "Juan Dela Cruz", "dept": "Civil Engineering", "in": "07:45 AM", "out": "05:00 PM", "status": "Present", "status_class": "success"},
-    {"initials": "MS", "name": "Maria Santos", "dept": "College of Nursing", "in": "08:15 AM", "out": "--:--", "status": "Late +15m", "status_class": "warning"},
-    {"initials": "AL", "name": "Antonio Luna", "dept": "Arts & Letters", "in": "08:30 AM", "out": "04:30 PM", "status": "Late", "status_class": "warning"}
+    {"id": "EMP-001", "initials": "JD", "name": "Juan Dela Cruz", "dept": "Civil Engineering", "position": "Professor", "in": "07:45 AM", "out": "05:00 PM", "status": "Present", "status_class": "success", "date": "2026-04-09"},
+    {"id": "EMP-002", "initials": "MS", "name": "Maria Santos", "dept": "College of Nursing", "position": "Dean", "in": "08:15 AM", "out": "--:--", "status": "Late +15m", "status_class": "warning", "date": "2026-04-09"},
+    {"id": "EMP-003", "initials": "AL", "name": "Antonio Luna", "dept": "Arts & Letters", "position": "Lecturer", "in": "08:30 AM", "out": "04:30 PM", "status": "Late", "status_class": "warning", "date": "2026-04-09"},
+    {"id": "EMP-004", "initials": "CR", "name": "Carmen Reyes", "dept": "Business Admin", "position": "Assistant Professor", "in": "07:30 AM", "out": "05:30 PM", "status": "Present", "status_class": "success", "date": "2026-04-09"},
+    {"id": "EMP-005", "initials": "RG", "name": "Roberto Garcia", "dept": "Engineering", "position": "Instructor", "in": "08:00 AM", "out": "--:--", "status": "Inside", "status_class": "success", "date": "2026-04-09"},
+    {"id": "EMP-006", "initials": "LM", "name": "Lourdes Mendoza", "dept": "Education", "position": "Professor", "in": "07:50 AM", "out": "04:45 PM", "status": "Present", "status_class": "success", "date": "2026-04-09"},
+    {"id": "EMP-007", "initials": "FT", "name": "Fernando Torres", "dept": "Arts & Sciences", "position": "Lecturer", "in": "08:20 AM", "out": "--:--", "status": "Late +20m", "status_class": "warning", "date": "2026-04-09"},
+    {"id": "EMP-008", "initials": "EV", "name": "Elena Valdez", "dept": "Nursing", "position": "Clinical Instructor", "in": "07:40 AM", "out": "05:10 PM", "status": "Present", "status_class": "success", "date": "2026-04-09"},
+    {"id": "EMP-009", "initials": "HP", "name": "Hector Perez", "dept": "Business Admin", "position": "Department Head", "in": "08:10 AM", "out": "04:50 PM", "status": "Late", "status_class": "warning", "date": "2026-04-09"},
+    {"id": "EMP-010", "initials": "IS", "name": "Isabel Santos", "dept": "Education", "position": "Assistant Professor", "in": "07:55 AM", "out": "--:--", "status": "Inside", "status_class": "success", "date": "2026-04-09"}
 ]
 
 MOCK_STUDENT_STATS = {
@@ -554,6 +593,38 @@ def helper_admin_login(username, password):
         return {"success": False, "message": f"Authentication service unavailable: {str(e)}"}
 
 @app.route('/api/retrieve/events')
+def retrieve_all_events_for_reports():    
+    current_events = list(DEFAULT_EVENTS)
+    
+    try:
+        response = requests.get("http://127.0.0.1:5001/api/reports/all-events", timeout=5)
+        
+        if response.status_code == 200:
+            api_data = response.json()
+            
+            if api_data.get('success'):
+                real_events = []
+                for event in api_data.get('events', []):
+                    real_events.append({
+                        'instance_id': event.get('instance_id', ''),
+                        'event_id': event.get('event_id', ''),
+                        'name': event.get('name', 'Unknown'),
+                        'type': event.get('type', 'Unknown'),
+                        'frequency': event.get('frequency', 'dd/mm/yyyy'),
+                        'date': event.get('date', 'Unknown'),
+                        'time_start': event.get('time_start', 'Unknown'),
+                        'time_end': event.get('time_end', 'Unknown'),
+                        'location': event.get('location', 'Unknown'),
+                        'active': event.get('active', 1)
+                    })
+                
+                current_events = real_events
+                
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Error: {e}")
+        
+    return current_events
+
 def helper_kiosk_live_events():    
     current_kiosk_events = list(DEFAULT_EVENTS)
     
@@ -678,7 +749,7 @@ def helper_admin_delete_events(event_id, delete_type):
     elif delete_type == 'bulk':
         url = "http://127.0.0.1:5001/admin/events/delete-events"
     headers = {"Content-Type": "application/json"}
-    payload = {"event_id": str(event_id)}   
+    payload = {"event_ids": event_id}
 
     try:
         response = requests.put(url, headers=headers, json=payload, timeout=5)
