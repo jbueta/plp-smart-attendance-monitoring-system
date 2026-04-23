@@ -6,7 +6,7 @@
 <!-- Sidebar -->
 <div class="sidebar d-flex flex-column flex-shrink-0 p-3">
     <a href="#" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
-        <i class="bi bi-bank2 fs-4 text-gold me-2"></i>
+        <img src="{{ url_for('static', filename='images/plp_logo.png') }}" alt="PLP Logo" class="me-2" style="width: 32px; height: 32px; object-fit: contain;">
         <span class="fs-5 fw-bold">PLP Admin</span>
     </a>
     <hr>
@@ -59,10 +59,9 @@
                     </div>
                     <select id="courseFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
                         <option value="">All Courses</option>
-                        <option value="BSCS">BSCS</option>
-                        <option value="BSN">BSN</option>
-                        <option value="BSA">BSA</option>
-                        <option value="BSEd">BSEd</option>
+                        {% for course in course_options %}
+                        <option value="{{ course }}">{{ course }}</option>
+                        {% endfor %}
                     </select>
                     <input type="date" id="dateFilter" class="form-control form-control-sm bg-dark text-white border-secondary w-auto">
                 </div>
@@ -154,10 +153,9 @@
                         </div>
                         <select id="recordsCourseFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
                             <option value="">All Courses</option>
-                            <option value="BSCS">BSCS</option>
-                            <option value="BSN">BSN</option>
-                            <option value="BSA">BSA</option>
-                            <option value="BSEd">BSEd</option>
+                            {% for course in course_options %}
+                            <option value="{{ course }}">{{ course }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                 </div>
@@ -173,17 +171,17 @@
                             </tr>
                         </thead>
                         <tbody id="recordsTableBody">
-                            {% for log in logs %}
+                            {% for record in records %}
                             <tr class="student-record-row"
-                                data-id="{{ log.id | lower }}"
-                                data-name="{{ log.name | lower }}"
-                                data-course="{{ log.course | lower }}">
-                                <td class="font-monospace text-white-50 ps-4">{{ log.id }}</td>
-                                <td class="fw-bold text-white">{{ log.name }}</td>
-                                <td class="text-white-50">{{ log.course }}</td>
+                                data-id="{{ record.id | lower }}"
+                                data-name="{{ record.name | lower }}"
+                                data-course="{{ record.course | lower }}">
+                                <td class="font-monospace text-white-50 ps-4">{{ record.id }}</td>
+                                <td class="fw-bold text-white">{{ record.name }}</td>
+                                <td class="text-white-50">{{ record.course }}</td>
                                 <td class="text-center">
-                                    <span class="badge bg-success bg-opacity-25 border border-success text-success rounded-pill px-3">
-                                        Active
+                                    <span class="badge bg-{{ record.status_class }} bg-opacity-25 border border-{{ record.status_class }} text-{{ record.status_class }} rounded-pill px-3">
+                                        {{ record.status }}
                                     </span>
                                 </td>
                                 <td class="text-center align-middle" style="width: 80px;">
@@ -192,15 +190,15 @@
                                             &hellip;
                                         </button>
                                         <ul class="dropdown-menu dropdown-menu-end shadow-sm student-action-menu">
-                                            <li><button type="button" class="dropdown-item edit-student-record text-white" data-id="{{ log.id }}">Edit</button></li>
-                                            <li><button type="button" class="dropdown-item text-danger delete-student-record" data-id="{{ log.id }}">Delete</button></li>
+                                            <li><button type="button" class="dropdown-item edit-student-record text-white" data-id="{{ record.id }}">Edit</button></li>
+                                            <li><button type="button" class="dropdown-item text-danger delete-student-record" data-id="{{ record.id }}">Delete</button></li>
                                         </ul>
                                     </div>
                                 </td>
                             </tr>
                             {% else %}
                             <tr id="recordsEmptyRow">
-                                <td colspan="4" class="text-center text-white-50 py-5">
+                                <td colspan="5" class="text-center text-white-50 py-5">
                                     <i class="bi bi-people display-4 d-block mb-3"></i>
                                     No student records found.
                                 </td>
@@ -772,6 +770,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const courseFilter = document.getElementById('courseFilter');
     const dateFilter   = document.getElementById('dateFilter');
     const tableCard    = document.getElementById('tableCard');
+    const tableResponsive = tableCard ? tableCard.querySelector('.table-responsive') : null;
     const noResults    = document.getElementById('noResults');
     const resultCount  = document.getElementById('resultCount');
     const paginationContainer = document.getElementById('paginationContainer');
@@ -945,13 +944,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (getRows().length > 0) {
             if (visible === 0 && hasFilters) {
-                tableCard.style.display  = 'none';
+                if (tableResponsive) tableResponsive.style.display = 'none';
                 paginationContainer.classList.remove('show');
                 paginationContainer.style.display = 'none';
                 noResults.style.display  = 'block';
                 resultCount.textContent  = '';
             } else {
-                tableCard.style.display  = '';
+                if (tableResponsive) tableResponsive.style.display = '';
                 noResults.style.display  = 'none';
                 resultCount.textContent  = hasFilters
                     ? 'Showing up to ' + Math.min(ITEMS_PER_PAGE, visible) + ' of ' + visible + ' record' + (visible !== 1 ? 's' : '')
@@ -975,6 +974,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const recordsPaginationContainer = document.getElementById('recordsPaginationContainer');
     const recordsPaginationList = document.getElementById('recordsPaginationList');
     const recordsTableCard = document.getElementById('recordsTableCard');
+    const recordsTableResponsive = recordsTableCard ? recordsTableCard.querySelector('.table-responsive') : null;
     const recordsNoResults = document.getElementById('recordsNoResults');
     const recordsResultCount = document.getElementById('recordsResultCount');
     
@@ -1092,13 +1092,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (recordsRows.length > 0) {
             if (visible === 0 && hasFilters) {
-                recordsTableCard.style.display = 'none';
+                if (recordsTableResponsive) recordsTableResponsive.style.display = 'none';
                 recordsPaginationContainer.classList.remove('show');
                 recordsPaginationContainer.style.display = 'none';
                 recordsNoResults.style.display = 'block';
                 recordsResultCount.textContent = '';
             } else {
-                recordsTableCard.style.display = '';
+                if (recordsTableResponsive) recordsTableResponsive.style.display = '';
                 recordsNoResults.style.display = 'none';
                 recordsResultCount.textContent = hasFilters
                     ? `Showing up to ${Math.min(ITEMS_PER_PAGE, visible)} of ${visible} record${visible !== 1 ? 's' : ''}`

@@ -1,5 +1,7 @@
 /* Reports management functionality */
 
+const frontendBaseUrl = window.location.origin;
+
 function generateReport() {
 
     const category = document.getElementById('report-category').value;
@@ -100,7 +102,7 @@ function formatReportDate(dateString) {
 }
 
 function fetch_events() {
-    fetch('http://127.0.0.1:5000/api/retrieve/events')
+    fetch(`${frontendBaseUrl}/api/retrieve/events`)
         .then(response => response.json())
         .then(data => {   
             // Clear existing event mapping to avoid duplicates on re-fetch
@@ -159,7 +161,7 @@ function populateReportTypes(category) {
 }
 
 function fetch_departments() {
-    fetch('http://127.0.0.1:5000/api/retrieve/departments')
+    fetch(`${frontendBaseUrl}/api/retrieve/departments`)
         .then(response => response.json())
         .then(data => {
             populateDepartmentTypes(data);
@@ -181,7 +183,7 @@ function populateDepartmentTypes(departments) {
             const option = document.createElement('option');
             
             option.value = dept.department_id; 
-            option.textContent = 'College of ' + dept.department_name;
+            option.textContent = dept.department_name;
             
             filterSelect.appendChild(option);
         });
@@ -246,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // =====================================================================================
 
     async function authenticateRequest(studentId) {
-        const url = "http://localhost:5000/authenticate";
+        const url = `${frontendBaseUrl}/authenticate`;
         const data = { student_id: studentId,
                        date: new Date().toISOString().split('T')[0],
                        time: new Date().toISOString().split('T')[1].split('.')[0],

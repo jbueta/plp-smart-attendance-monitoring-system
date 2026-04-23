@@ -118,13 +118,15 @@ INSERT INTO `departments` (`department_id`, `department_name`, `created_at`) VAL
 
 DROP TABLE IF EXISTS `employees`;
 CREATE TABLE `employees` (
+  `seq` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
   `employee_id` varchar(8) NOT NULL,
   `employee_name` varchar(80) DEFAULT NULL,
   `department_id` int(11) NOT NULL,
   `position` varchar(100) DEFAULT NULL,
-  `status` enum('Inside','Outside') DEFAULT NULL,
-  `emp_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `status` enum('Inside','Outside') DEFAULT 'Outside',
+  `emp_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  UNIQUE KEY `employees_seq_unique` (`seq`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -135,15 +137,6 @@ TRUNCATE TABLE `employees`;
 --
 -- Dumping data for table `employees`
 --
-
-INSERT INTO `employees` (`user_id`, `employee_id`, `employee_name`, `department_id`, `position`, `status`, `emp_last_updated`) VALUES
-(23, 'EMP-0001', 'Gregoria De Jesus', 3, 'Professor', 'Outside', '2026-04-15 08:56:17'),
-(24, 'EMP-0002', 'Melchora Aquino', 4, 'Dean', 'Outside', '2026-04-15 08:56:17'),
-(25, 'EMP-0003', 'Antonio Luna', 5, 'Faculty', 'Outside', '2026-04-15 08:56:17'),
-(26, 'EMP-0004', 'Gabriela Silang', 6, 'Department Chair', 'Outside', '2026-04-15 08:56:17'),
-(27, 'EMP-0005', 'Josefa Llanes Escoda', 7, 'Registrar', 'Outside', '2026-04-15 08:56:17'),
-(5, 'EMP-1098', 'Apolinario Mabini', 2, 'Dean', 'Outside', '2026-04-15 13:36:17'),
-(4, 'EMP-2015', 'Juan Dela Cruz', 1, 'Faculty', 'Inside', '2026-03-12 14:22:44');
 
 -- --------------------------------------------------------
 
@@ -496,7 +489,6 @@ INSERT INTO `users` (`user_id`, `role`, `active`) VALUES
 (17, 'employee', 1),
 (18, 'visitor', 1),
 (19, 'student', 1),
-(20, '', 1),
 (21, 'admin', 1),
 (22, 'student', 1),
 (23, 'employee', 1),
@@ -532,12 +524,14 @@ TRUNCATE TABLE `violations`;
 
 DROP TABLE IF EXISTS `visitors`;
 CREATE TABLE `visitors` (
+  `seq` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) DEFAULT NULL,
   `visitor_id` varchar(8) NOT NULL,
   `visitor_name` varchar(80) DEFAULT NULL,
   `purpose` varchar(100) DEFAULT NULL,
-  `status` enum('Inside','Outside') DEFAULT NULL,
-  `visitor_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `status` enum('Inside','Outside') DEFAULT 'Outside',
+  `visitor_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  UNIQUE KEY `visitors_seq_unique` (`seq`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -773,9 +767,70 @@ ALTER TABLE `violations`
 --
 ALTER TABLE `visitors`
   ADD CONSTRAINT `visitors_usersFK` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`);
+
+DROP TRIGGER IF EXISTS `employee_id_format`;
+DELIMITER //
+CREATE TRIGGER `employee_id_format`
+BEFORE INSERT ON `employees`
+FOR EACH ROW
+BEGIN
+    DECLARE next_seq INT;
+
+    SELECT AUTO_INCREMENT INTO next_seq
+    FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employees';
+
+    IF next_seq IS NULL THEN
+        SET next_seq = 1;
+    END IF;
+
+    SET NEW.employee_id = CONCAT('EMP-', LPAD(next_seq, 4, '0'));
+END//
+DELIMITER ;
+
+DROP TRIGGER IF EXISTS `visitor_id_format`;
+DELIMITER //
+CREATE TRIGGER `visitor_id_format`
+BEFORE INSERT ON `visitors`
+FOR EACH ROW
+BEGIN
+    DECLARE next_seq INT;
+
+    SELECT AUTO_INCREMENT INTO next_seq
+    FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'visitors';
+
+    IF next_seq IS NULL THEN
+        SET next_seq = 1;
+    END IF;
+
+    SET NEW.visitor_id = CONCAT('VT-', LPAD(next_seq, 5, '0'));
+END//
+DELIMITER ;
+
 SET FOREIGN_KEY_CHECKS=1;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+ALTER TABLE departments
+MODIFY department_id INT(11) NOT NULL AUTO_INCREMENT;
+TRUNCATE TABLE `departments`;
+
+INSERT INTO departments (department_name) VALUES
+('College of Engineering'),
+('College of Nursing'),
+('College of Computer Studies'),
+('College of Business and Accountancy'),
+('College of Education'),
+('College of Arts and Sciences'),
+('College of International Hospitality Management');
+
+INSERT INTO departments (department_name) VALUES
+("Registrar's Office"),
+("Accounting Office"),
+("Human Resources"),
+("MIS Office"),
+("Library");

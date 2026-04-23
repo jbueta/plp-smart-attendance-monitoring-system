@@ -5,34 +5,59 @@
 
 :root {
     /* Brand Core */
-    --plp-green: #0B7D3F;
-    --plp-gold: #F5DD00;
+    --plp-gold: #FFD700;
+    /* Deeper gold to be exquisitely legible on white */
 
     /* Theme Colors (Overriding Bootstrap logic visually) */
-    --bg-deep: #051a10;
-    --glass-surface: rgba(7, 36, 22, 0.85);
-    --glass-border: rgba(255, 255, 255, 0.1);
+    --bg-deep: #051A0A;
+    --glass-surface: rgba(255, 255, 255, 0.08);
+    /* Authentic, light translucent glass */
+    --glass-border: rgba(255, 255, 255, 0.35);
+    /* Crisp, high-intensity border */
+    --text-main: #ffffff;
+    --text-light: #ffffff;
+    --text-dark: #ffffff;
+    /* Deepest green for perfect readability */
 
     /* Gradients */
-    --gold-gradient: linear-gradient(135deg, #F5DD00 0%, #D4AF37 100%);
+    --gold-gradient: linear-gradient(135deg, #FFF38F 0%, #FFDE21 100%);
 }
 
 body {
     background-color: var(--bg-deep);
-    background-image: url('../images/bg-main.png');
+    /* We move the background image to a pseudo-element for blurring */
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
     background-repeat: no-repeat;
-    color: #fff;
+    color: var(--text-light);
     font-family: 'Outfit', sans-serif;
     min-height: 100vh;
     position: relative;
     overflow-x: hidden;
 }
 
-/* Animated Ambient Background Overlay */
+/* Blurred, dimmed actual background image layer */
 body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -2;
+    background-image: url('../images/bg-main-deep-green.png');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    filter: blur(14px) brightness(0.65);
+    /* Heavily blurred and dimmed to push background backwards */
+    transform: scale(1.05);
+    /* Prevent blur edges from showing */
+}
+
+/* Ambient glows */
+body::after {
     content: "";
     position: fixed;
     top: 0;
@@ -41,10 +66,23 @@ body::before {
     height: 100%;
     z-index: -1;
     background-image:
-        radial-gradient(circle at 15% 50%, rgba(11, 125, 63, 0.4), transparent 50%),
-        radial-gradient(circle at 85% 30%, rgba(212, 175, 55, 0.4), transparent 50%);
+        radial-gradient(circle at 15% 50%, rgba(30, 200, 110, 0.2), transparent 50%),
+        radial-gradient(circle at 85% 30%, rgba(200, 255, 100, 0.15), transparent 50%);
     background-size: 200% 200%;
     animation: ambientShift 20s ease-in-out infinite alternate;
+    pointer-events: none;
+}
+
+/* Vignette and dimming overlay for better background readability */
+.vignette-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    /* Very light, minimal vignette so it sits idly */
+    background: radial-gradient(circle at center, transparent 40%, rgba(0, 30, 10, 0.4) 150%);
     pointer-events: none;
 }
 
@@ -54,18 +92,35 @@ body::before {
 /* Glass Cards - Used globally for main panels and widget containers across portals */
 .card-glass {
     background: var(--glass-surface);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    color: var(--text-light);
+    backdrop-filter: blur(16px) saturate(200%);
+    -webkit-backdrop-filter: blur(16px) saturate(200%);
     border: 1px solid var(--glass-border);
     border-radius: 1rem;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(255, 255, 255, 0.05);
+    /* Deep outer shadow, subtle inner glow for intensity */
+}
+
+/* Portal Card Hover Effects (for index and modal cards) */
+.portal-card {
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
+    cursor: pointer;
+}
+
+.portal-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3), inset 0 0 10px rgba(255, 255, 255, 0.05);
 }
 
 /* Sidebar - Primarily used in base.html and admin dashboards */
 .sidebar {
     width: 280px;
     height: 100vh;
-    background: rgba(5, 26, 16, 0.95);
+    background: rgba(255, 255, 255, 0.05);
+    /* True glass */
+    backdrop-filter: blur(16px) saturate(200%);
+    -webkit-backdrop-filter: blur(16px) saturate(200%);
+    color: var(--text-light);
     border-right: 1px solid var(--glass-border);
     position: fixed;
     top: 0;
@@ -102,18 +157,20 @@ body::before {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    font-weight: 500;
 }
 
 .nav-pills .nav-link:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-light);
 }
 
 .nav-pills .nav-link.active {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.15);
     border-left: 4px solid var(--plp-gold);
     border-radius: 0.25rem 0.5rem 0.5rem 0.25rem;
-    color: #fff;
+    color: var(--text-light);
+    font-weight: 600;
 }
 
 /* Typography Overrides */
@@ -125,10 +182,12 @@ h5,
 h6 {
     font-weight: 600;
     letter-spacing: -0.02em;
+    color: inherit;
 }
 
 .text-gold {
     color: var(--plp-gold) !important;
+    font-weight: 600;
 }
 
 .text-gold-gradient {
@@ -154,27 +213,32 @@ h6 {
 }
 
 .btn-glass {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: var(--text-light);
+    font-weight: 600;
 }
 
 .btn-glass:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--text-light);
+}
+
+.hover-text-dark:hover {
+    color: var(--bg-deep) !important;
 }
 
 /* Tables - Used extensively in admin dashboards, logs, and reports */
 .table-dark-glass {
-    color: #fff;
+    color: var(--text-light);
     --bs-table-bg: transparent;
-    --bs-table-border-color: rgba(255, 255, 255, 0.1);
+    --bs-table-border-color: rgba(255, 255, 255, 0.15);
 }
 
 .table-dark-glass th {
     font-size: 0.8rem;
     text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.6);
     font-weight: 600;
     letter-spacing: 0.05em;
 }
@@ -252,25 +316,57 @@ h6 {
    PAGE: LOGIN - Specific styles for login.html
    ========================================================================== */
 .login-card {
-    background: rgba(20, 20, 35, 0.6);
-    backdrop-filter: blur(15px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-light);
+    backdrop-filter: blur(20px) saturate(200%);
+    -webkit-backdrop-filter: blur(20px) saturate(200%);
+    border: 1px solid rgba(255, 255, 255, 0.35);
     border-radius: 16px;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
 }
 
 .login-card .form-control {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: white;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-light);
+    font-weight: 500;
 }
 
 .login-card .form-control:focus {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: #d4af37;
-    box-shadow: 0 0 0 0.25rem rgba(212, 175, 55, 0.25);
-    color: white;
+    background: rgba(255, 255, 255, 0.15);
+    border-color: var(--plp-gold);
+    box-shadow: 0 0 0 0.25rem rgba(255, 222, 33, 0.25);
+    color: var(--text-light);
 }
+
+/* ==========================================================================
+   UTILITY COLOR ADJUSTMENTS FOR GLASS UI
+   ========================================================================== */
+.text-success {
+    color: #50d287 !important;
+}
+
+/* Vibrant readable green */
+.text-danger {
+    color: #ff6b81 !important;
+}
+
+/* Bright red */
+.text-warning {
+    color: #ffd166 !important;
+}
+
+/* Luminous yellow */
+.text-info {
+    color: #48cae4 !important;
+}
+
+/* Cyan */
+.text-primary {
+    color: #82b1ff !important;
+}
+
+/* Soft blue */
 
 /* ==========================================================================
    PAGE: EVENTS - Base style for the department boxes
