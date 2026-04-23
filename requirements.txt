@@ -19,3 +19,11 @@ pycparser==3.0
 SQLAlchemy==2.0.47
 typing_extensions==4.15
 requests
+
+
+# pip install pdfkit yagmail
+# pdfkit → Python wrapper for wkhtmltopdf
+# wkhtmltopdf (system software, NOT pip)
+# Download:
+# https://wkhtmltopdf.org/downloads.html
+# yagmail → simple Gmail SMTP email sender

@@ -31,6 +31,20 @@
         </svg>
         Print / Save as PDF
     </button>
+     <form action="/send_report_email" method="POST">
+
+    <input type="email" name="email" placeholder="Enter email" required>
+
+    <input type="hidden" name="category" value="{{ request.args.get('category') }}">
+    <input type="hidden" name="type" value="{{ request.args.get('type') }}">
+    <input type="hidden" name="start" value="{{ request.args.get('start') }}">
+    <input type="hidden" name="end" value="{{ request.args.get('end') }}">
+
+    <button type="submit" class="btn btn-success">
+        Send Report as PDF
+    </button>
+
+</form>
 
     <div class="report-header d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center">

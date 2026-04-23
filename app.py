@@ -5,12 +5,17 @@ import requests
 import csv
 import io
 import uuid
+import pdfkit
+import yagmail
+import os
+from flask import render_template
 
 from app_tasks import fetch_report_data     #reports generator
 from extensions import cache
 
 app = Flask(__name__)
 app.secret_key = 'plp_secure_key_2026'  # Required for session management
+app.config['SERVER_NAME'] = None
 
 # Configure and initialize cache (SimpleCache for development)
 app.config['CACHE_TYPE'] = 'SimpleCache'
@@ -202,6 +207,109 @@ def kiosk_employee():
                        event_id=event_id,
                        instance_id=instance_id,          # Pass instance_id
                        kiosk_data=MOCK_KIOSK_DATA)
+# ==============================================================================
+# EMAIL SENDER ROUTE (TEST)
+# ==============================================================================
+def send_report_email(email, report, metrics, logs, category, report_type):
+    import pdfkit
+    import yagmail
+    import os
+    import uuid
+
+    try:
+        print("STEP 1: Rendering HTML")
+
+        # IMPORTANT: force correct context
+        html = render_template(
+            "sample_report.html",
+            report=report,
+            metrics=metrics,
+            logs=logs,
+            category=category,
+            report_type=report_type,
+            current_date=datetime.now().strftime('%B %d, %Y - %I:%M %p')
+        )
+
+        print("STEP 2: HTML rendered")
+
+        # UNIQUE FILE NAME (fix overwrite issues)
+        pdf_file = f"report_{uuid.uuid4().hex}.pdf"
+
+        print("STEP 3: Generating PDF")
+
+        # FIXED wkhtmltopdf config (Windows safe)
+        config = pdfkit.configuration(
+            wkhtmltopdf=r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
+        )
+
+        options = {
+            "enable-local-file-access": ""
+        }
+
+        pdfkit.from_string(html, pdf_file, configuration=config, options=options)
+
+        print("STEP 4: PDF created:", os.path.exists(pdf_file))
+
+        if not os.path.exists(pdf_file):
+            return False
+
+        print("STEP 5: Sending email")
+
+        yag = yagmail.SMTP(
+            user="amarelle2025@gmail.com",
+            password="momk krrn fcip dijh"
+        )
+
+        yag.send(
+            to=email,
+            subject="Attendance Report PDF",
+            contents="Attached is your generated report.",
+            attachments=pdf_file
+        )
+
+        print("STEP 6: Email sent")
+
+        # CLEAN UP FILE
+        os.remove(pdf_file)
+
+        return True
+
+    except Exception as e:
+        print("🔥 ERROR:", str(e))
+        return False
+
+    
+@app.route('/send_report_email', methods=['POST'])
+def send_report_email_route():
+
+    email = request.form.get('email')
+
+    category = request.form.get('category')
+    report_type = request.form.get('type')
+
+    start_date = request.form.get('start')
+    end_date = request.form.get('end')
+
+    report_results = fetch_report_data(category, report_type, 'All', start_date, end_date)
+
+    if "error" in report_results:
+        return "Report error", 500
+
+    success = send_report_email(
+    email,
+    report_results['report_data'],
+    report_results['metrics_data'],
+    report_results['logs'],
+    category,
+    report_type
+)
+
+    if success is True:
+        return "Email sent successfully!"
+    else:
+        return "Failed to send email"
+    
+    
 
 @app.route('/kiosk/visitor')
 def kiosk_visitor():
