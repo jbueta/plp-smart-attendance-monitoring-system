@@ -10,6 +10,18 @@ def _format_hour_label(hour_value):
     return datetime.strptime(f"{int(hour_value):02d}:00", "%H:%M").strftime("%I:%M %p").lstrip("0")
 
 
+def _format_department_label(department_name):
+    if not department_name:
+        return "N/A"
+
+    initials = [
+        token[0].upper()
+        for token in str(department_name).replace("&", " ").split()
+        if token.lower() not in {"college", "of", "and"}
+    ]
+    return "".join(initials) or str(department_name)[:6]
+
+
 class Database:
     def __init__(self, conn, parameter=None):
         if not conn:
@@ -1655,12 +1667,41 @@ class Database:
 
             cursor.execute(
                 """
-                SELECT status, COUNT(*) AS cnt
-                FROM event_attendance
-                WHERE event_date = %s
-                GROUP BY status
+                SELECT MAX(ea.event_date) AS latest
+                FROM event_attendance ea
+                JOIN employees emp ON ea.user_id = emp.user_id
+                JOIN users u ON emp.user_id = u.user_id
+                WHERE u.active = 1
+                """,
+            )
+            latest_row = cursor.fetchone()
+            latest_date = latest_row["latest"] if latest_row and latest_row["latest"] else today
+
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM event_attendance ea
+                JOIN employees emp ON ea.user_id = emp.user_id
+                JOIN users u ON emp.user_id = u.user_id
+                WHERE ea.event_date = %s
+                  AND u.active = 1
                 """,
                 (today,),
+            )
+            today_count = cursor.fetchone()["cnt"] or 0
+            target_date = today if today_count > 0 else latest_date
+
+            cursor.execute(
+                """
+                SELECT ea.status, COUNT(*) AS cnt
+                FROM event_attendance ea
+                JOIN employees emp ON ea.user_id = emp.user_id
+                JOIN users u ON emp.user_id = u.user_id
+                WHERE ea.event_date = %s
+                  AND u.active = 1
+                GROUP BY ea.status
+                """,
+                (target_date,),
             )
             attendance_map = {row["status"]: row["cnt"] for row in cursor.fetchall()}
             attendance_data = [
@@ -1669,12 +1710,27 @@ class Database:
                 attendance_map.get("Absent", 0),
             ]
 
-            total_attendance = sum(attendance_data)
+            total_invited = sum(attendance_map.values())
+            present_count = attendance_map.get("Present", 0)
+            late_count = attendance_map.get("Late", 0)
+            attendees_count = present_count + late_count
+
             on_time_rate = (
-                f"{round((attendance_data[0] / total_attendance) * 100)}%"
-                if total_attendance
+                f"{round((present_count / attendees_count) * 100)}%"
+                if attendees_count
                 else "N/A"
             )
+            on_time_percentage = round((present_count / attendees_count) * 100) if attendees_count > 0 else 0
+
+            participation_pct = (attendees_count / total_invited * 100) if total_invited > 0 else 0
+            if total_invited == 0:
+                participation_level = "N/A"
+            elif participation_pct > 80:
+                participation_level = "High"
+            elif participation_pct > 50:
+                participation_level = "Medium"
+            else:
+                participation_level = "Low"
 
             cursor.execute(
                 """
@@ -1688,9 +1744,13 @@ class Database:
                 FROM event_attendance ea
                 JOIN event_instances ei ON ea.instance_id = ei.instance_id
                 JOIN events e ON ei.event_id = e.event_id
-                WHERE ea.event_date = %s AND ea.status = 'Late'
+                JOIN employees emp ON ea.user_id = emp.user_id
+                JOIN users u ON emp.user_id = u.user_id
+                WHERE ea.event_date = %s
+                  AND ea.status = 'Late'
+                  AND u.active = 1
                 """,
-                (today,),
+                (target_date,),
             )
             avg_late = cursor.fetchone()["avg_late"] or 0
             avg_tardiness = f"{int(avg_late)} mins"
@@ -1719,15 +1779,17 @@ class Database:
                 ORDER BY avg_late DESC
                 LIMIT 7
                 """,
-                (today,),
+                (target_date,),
             )
-            tardiness_data = [round(row["avg_late"] or 0) for row in cursor.fetchall()]
+            tardiness_rows = cursor.fetchall()
+            tardiness_data = [int(round(row["avg_late"] or 0)) for row in tardiness_rows]
+            tardiness_labels = [_format_department_label(row["dept"]) for row in tardiness_rows]
 
             cursor.execute(
                 """
                 SELECT
                     d.department_name AS name,
-                    ROUND(SUM(ea.status IN ('Present', 'Late')) / COUNT(*) * 100) AS value
+                    CAST(ROUND(SUM(ea.status IN ('Present', 'Late')) / COUNT(*) * 100) AS UNSIGNED) AS value
                 FROM event_attendance ea
                 JOIN employees emp ON ea.user_id = emp.user_id
                 JOIN users u ON emp.user_id = u.user_id
@@ -1735,22 +1797,108 @@ class Database:
                 WHERE ea.event_date = %s
                   AND u.active = 1
                 GROUP BY d.department_name
-                ORDER BY value DESC
+                ORDER BY value DESC, d.department_name ASC
                 LIMIT 5
                 """,
-                (today,),
+                (target_date,),
             )
             dept_participation = [
                 {"name": row["name"], "value": row["value"]}
                 for row in cursor.fetchall()
             ]
 
+            cursor.execute(
+                """
+                SELECT
+                    e.event_name,
+                    DATE_FORMAT(ei.event_date, '%b %d') AS date,
+                    TIME_FORMAT(e.time_start, '%h:%i %p') AS time,
+                    e.location
+                FROM event_instances ei
+                JOIN events e ON ei.event_id = e.event_id
+                JOIN event_participants ep ON ei.event_id = ep.event_id
+                JOIN employees emp ON ep.user_id = emp.user_id
+                JOIN users u ON emp.user_id = u.user_id
+                WHERE ei.event_date >= CURDATE()
+                  AND ei.status = 'Scheduled'
+                  AND u.active = 1
+                GROUP BY ei.instance_id, e.event_name, ei.event_date, e.time_start, e.location
+                ORDER BY ei.event_date ASC, e.time_start ASC
+                LIMIT 3
+                """
+            )
+            upcoming_events = cursor.fetchall()
+
+            cursor.execute(
+                """
+                SELECT
+                    emp.employee_name,
+                    el.log_type AS type,
+                    TIME_FORMAT(el.timestamp, '%h:%i %p') AS time,
+                    e.event_name AS event
+                FROM event_log el
+                JOIN employees emp ON el.user_id = emp.user_id
+                JOIN users u ON emp.user_id = u.user_id
+                JOIN events e ON el.event_id = e.event_id
+                WHERE u.active = 1
+                ORDER BY el.timestamp DESC
+                LIMIT 5
+                """
+            )
+            recent_activity = cursor.fetchall()
+
+            cursor.execute(
+                """
+                SELECT
+                    emp.employee_name,
+                    COUNT(*) AS present_count
+                FROM event_attendance ea
+                JOIN employees emp ON ea.user_id = emp.user_id
+                JOIN users u ON emp.user_id = u.user_id
+                WHERE ea.status = 'Present'
+                  AND ea.event_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                  AND u.active = 1
+                GROUP BY emp.user_id, emp.employee_name
+                ORDER BY present_count DESC, emp.employee_name ASC
+                LIMIT 5
+                """
+            )
+            leaderboard = cursor.fetchall()
+
+            cursor.execute(
+                """
+                SELECT
+                    d.department_name AS dept,
+                    COUNT(*) AS invited,
+                    SUM(ea.status IN ('Present', 'Late')) AS attended,
+                    CAST(ROUND(SUM(ea.status IN ('Present', 'Late')) / COUNT(*) * 100) AS UNSIGNED) AS rate
+                FROM event_attendance ea
+                JOIN employees emp ON ea.user_id = emp.user_id
+                JOIN users u ON emp.user_id = u.user_id
+                JOIN departments d ON emp.department_id = d.department_id
+                WHERE ea.event_date = %s
+                  AND u.active = 1
+                GROUP BY d.department_id, d.department_name
+                ORDER BY rate DESC, d.department_name ASC
+                """,
+                (target_date,),
+            )
+            dept_comparison = cursor.fetchall()
+
             return {
                 "attendance_data": attendance_data,
                 "tardiness_data": tardiness_data if tardiness_data else [0] * 7,
+                "tardiness_labels": tardiness_labels if tardiness_labels else ["N/A"] * 7,
                 "dept_participation": dept_participation,
                 "avg_tardiness": avg_tardiness,
                 "on_time_rate": on_time_rate,
+                "on_time_percentage": on_time_percentage,
+                "participation_level": participation_level,
+                "target_date": str(target_date),
+                "upcoming_events": upcoming_events,
+                "recent_activity": recent_activity,
+                "leaderboard": leaderboard,
+                "dept_comparison": dept_comparison,
             }
         except connector.Error as err:
             print(f"Error fetching employee dashboard stats: {err}")

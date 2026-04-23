@@ -49,9 +49,17 @@ MOCK_DASHBOARD_STATS = {
 MOCK_EMPLOYEE_STATS = {
     "attendance_data": [0, 0, 0],
     "tardiness_data": [0] * 7,
+    "tardiness_labels": ["N/A"] * 7,
     "dept_participation": [],
     "avg_tardiness": "0 mins",
     "on_time_rate": "N/A",
+    "on_time_percentage": 0,
+    "participation_level": "N/A",
+    "target_date": "N/A",
+    "upcoming_events": [],
+    "recent_activity": [],
+    "leaderboard": [],
+    "dept_comparison": [],
 }
 
 MOCK_STUDENT_STATS = {
