@@ -118,13 +118,15 @@ INSERT INTO `departments` (`department_id`, `department_name`, `created_at`) VAL
 
 DROP TABLE IF EXISTS `employees`;
 CREATE TABLE `employees` (
+  `seq` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
   `employee_id` varchar(8) NOT NULL,
   `employee_name` varchar(80) DEFAULT NULL,
   `department_id` int(11) NOT NULL,
   `position` varchar(100) DEFAULT NULL,
-  `status` enum('Inside','Outside') DEFAULT NULL,
-  `emp_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `status` enum('Inside','Outside') DEFAULT 'Outside',
+  `emp_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  UNIQUE KEY `employees_seq_unique` (`seq`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -496,7 +498,6 @@ INSERT INTO `users` (`user_id`, `role`, `active`) VALUES
 (17, 'employee', 1),
 (18, 'visitor', 1),
 (19, 'student', 1),
-(20, '', 1),
 (21, 'admin', 1),
 (22, 'student', 1),
 (23, 'employee', 1),
@@ -532,12 +533,14 @@ TRUNCATE TABLE `violations`;
 
 DROP TABLE IF EXISTS `visitors`;
 CREATE TABLE `visitors` (
+  `seq` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) DEFAULT NULL,
   `visitor_id` varchar(8) NOT NULL,
   `visitor_name` varchar(80) DEFAULT NULL,
   `purpose` varchar(100) DEFAULT NULL,
-  `status` enum('Inside','Outside') DEFAULT NULL,
-  `visitor_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `status` enum('Inside','Outside') DEFAULT 'Outside',
+  `visitor_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  UNIQUE KEY `visitors_seq_unique` (`seq`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -773,6 +776,47 @@ ALTER TABLE `violations`
 --
 ALTER TABLE `visitors`
   ADD CONSTRAINT `visitors_usersFK` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`);
+
+DROP TRIGGER IF EXISTS `employee_id_format`;
+DELIMITER //
+CREATE TRIGGER `employee_id_format`
+BEFORE INSERT ON `employees`
+FOR EACH ROW
+BEGIN
+    DECLARE next_seq INT;
+
+    SELECT AUTO_INCREMENT INTO next_seq
+    FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employees';
+
+    IF next_seq IS NULL THEN
+        SET next_seq = 1;
+    END IF;
+
+    SET NEW.employee_id = CONCAT('EMP-', LPAD(next_seq, 4, '0'));
+END//
+DELIMITER ;
+
+DROP TRIGGER IF EXISTS `visitor_id_format`;
+DELIMITER //
+CREATE TRIGGER `visitor_id_format`
+BEFORE INSERT ON `visitors`
+FOR EACH ROW
+BEGIN
+    DECLARE next_seq INT;
+
+    SELECT AUTO_INCREMENT INTO next_seq
+    FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'visitors';
+
+    IF next_seq IS NULL THEN
+        SET next_seq = 1;
+    END IF;
+
+    SET NEW.visitor_id = CONCAT('VT-', LPAD(next_seq, 5, '0'));
+END//
+DELIMITER ;
+
 SET FOREIGN_KEY_CHECKS=1;
 COMMIT;
 

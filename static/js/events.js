@@ -1,6 +1,8 @@
 /* Event management functionality */
 
 var selectionMode = false;
+const frontendBaseUrl = window.location.origin;
+const backendBaseUrl = window.APP_CONFIG?.backendApiUrl || 'http://127.0.0.1:5001';
 
 function toggleSelectionMode() {
     selectionMode = !selectionMode;
@@ -89,7 +91,7 @@ function fetchEventInstances(eventId) {
     
     tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-white-50"><div class="spinner-border spinner-border-sm text-info me-2"></div> Loading instances...</td></tr>';
     
-    fetch(`http://127.0.0.1:5001/admin/event/${eventId}/instances`)
+    fetch(`${backendBaseUrl}/admin/event/${eventId}/instances`)
         .then(response => response.json())
         .then(instances => {
             console.log("Fetched instances:", instances);
@@ -128,7 +130,7 @@ function fetchAttendanceData(instanceId) {
     
     tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-white-50"><div class="spinner-border spinner-border-sm text-info me-2"></div> Loading attendance...</td></tr>';
 
-    fetch(`http://127.0.0.1:5001/admin/instances/${instanceId}/get-attendance`)
+    fetch(`${backendBaseUrl}/admin/instances/${instanceId}/get-attendance`)
         .then(response => response.json())
         .then(data => {
             console.log("Fetched attendance:", data);
@@ -235,7 +237,7 @@ function deleteSingleEvent(eventId) {
         return;
     }
 
-    fetch(`http://127.0.0.1:5000/admin/events/delete/${eventId}`, {
+    fetch(`${frontendBaseUrl}/admin/events/delete/${eventId}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -278,7 +280,7 @@ function deleteSelectedEvents() {
         return;
     }
 
-    fetch(`http://127.0.0.1:5000/admin/events/bulk-delete`, {
+    fetch(`${frontendBaseUrl}/admin/events/bulk-delete`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'

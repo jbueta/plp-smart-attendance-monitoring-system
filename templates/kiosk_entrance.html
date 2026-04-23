@@ -80,7 +80,7 @@
                     <i class="bi bi-broadcast text-success me-2"></i>Live Feed
                 </h4>
                 <div class="vstack gap-2" id="live-feed-list">
-                    {% for log in kiosk_data.recent_student_logs %}
+                    {% for log in kiosk_data.recent_activity_logs %}
                     <div class="d-flex align-items-center p-2 rounded live-feed-item"
                         style="background: rgba(255,255,255,0.03);">
                         {% if log.type == 'in' %}
@@ -188,7 +188,7 @@
                                 <div class="col-md-6">
                                     <label class="form-label text-white-50">Purpose <span
                                             class="text-danger">*</span></label>
-                                    <select name="purpose" class="form-select bg-dark text-white border-secondary"
+                                    <select name="purpose" class="form-select bg-dark text-white border-secondary visitor-purpose-select"
                                         required>
                                         <option value="" selected disabled>Select Purpose</option>
                                         <option>Official Business</option>
@@ -199,11 +199,11 @@
                                         <option>Other</option>
                                     </select>
                                 </div>
-                                <div class="col-12">
-                                    <label class="form-label text-white-50">Person/Office to Visit</label>
+                                <div class="col-12 d-none visitor-details-group">
+                                    <label class="form-label text-white-50">Specify Purpose <span class="text-danger">*</span></label>
                                     <input type="text" name="details"
-                                        class="form-control bg-dark text-white border-secondary"
-                                        placeholder="e.g. Registrar's Office">
+                                        class="form-control bg-dark text-white border-secondary visitor-details-input"
+                                        placeholder="Enter the custom purpose">
                                 </div>
                                 <div class="col-12 mt-4">
                                     <div class="d-grid">
@@ -229,6 +229,26 @@
 <script src="{{ url_for('static', filename='js/kiosk.js') }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('form').forEach(form => {
+            const purposeSelect = form.querySelector('.visitor-purpose-select');
+            const detailsGroup = form.querySelector('.visitor-details-group');
+            const detailsInput = form.querySelector('.visitor-details-input');
+
+            if (!purposeSelect || !detailsGroup || !detailsInput) return;
+
+            const syncVisitorDetails = () => {
+                const isOther = (purposeSelect.value || '').trim().toLowerCase() === 'other';
+                detailsGroup.classList.toggle('d-none', !isOther);
+                detailsInput.required = isOther;
+                if (!isOther) {
+                    detailsInput.value = '';
+                }
+            };
+
+            purposeSelect.addEventListener('change', syncVisitorDetails);
+            syncVisitorDetails();
+        });
+
         // --- 1. LIVE CLOCK LOGIC ---
         function updateClock() {
             const now = new Date();
@@ -333,7 +353,7 @@
                     feedText.innerText = "READING ID...";
                     feedText.className = "position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-warning font-monospace fw-bold scanning-text";
 
-                    fetch('http://127.0.0.1:5001/admin/user/authentication', {
+                    fetch(`${window.APP_CONFIG.backendApiUrl}/admin/user/authentication`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({

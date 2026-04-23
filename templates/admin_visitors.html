@@ -351,13 +351,18 @@
                 <tbody>
                     {% for visitor in visitors %}
                     <tr class="visitor-row"
+                        data-id="{{ visitor.id }}"
                         data-visitor-id="{{ visitor.id | lower }}"
+                        data-visitor-id-original="{{ visitor.id }}"
                         data-visitor-name="{{ visitor.name | lower }}"
-                        data-purpose="{{ visitor.purpose }}"
-                        data-date="{{ visitor.date }}">
+                        data-purpose="{{ visitor.purpose | lower }}"
+                        data-purpose-label="{{ visitor.purpose }}"
+                        data-details="{{ visitor.details or '' }}"
+                        data-date="{{ visitor.date }}"
+                        data-status="{{ visitor.status }}">
                         <td class="fw-bold text-white ps-4"><span>{{ visitor.name }}</span></td>
-                        <td>{{ visitor.purpose }}</td>
-                        <td class="text-white-50 small">{{ visitor.details }}</td>
+                        <td class="text-white-50 small">{{ visitor.purpose }}</td>
+                        <td class="text-white-50 small">{{ visitor.details or '--' }}</td>
                         <td class="text-white-50 font-monospace small">{{ visitor.date }}</td>
                         <td class="text-success font-monospace small">{{ visitor.time_in }}</td>
                         <td class="text-danger font-monospace small">{{ visitor.time_out or '--:--' }}</td>
@@ -409,7 +414,18 @@
                             </div>
                             <div class="mb-3">
                                 <label for="editVisitorPurpose" class="form-label">Purpose</label>
-                                <input type="text" class="form-control" id="editVisitorPurpose" required>
+                                <select class="form-select" id="editVisitorPurpose" required>
+                                    <option value="Official Business">Official Business</option>
+                                    <option value="Document Submission">Document Submission</option>
+                                    <option value="Inquiry">Inquiry</option>
+                                    <option value="Meeting">Meeting</option>
+                                    <option value="Delivery">Delivery</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div class="mb-3 d-none" id="editVisitorDetailsGroup">
+                                <label for="editVisitorDetails" class="form-label">Custom Purpose Detail</label>
+                                <input type="text" class="form-control" id="editVisitorDetails" placeholder="Specify the custom purpose">
                             </div>
                         </form>
                     </div>
@@ -477,14 +493,17 @@
                         <tbody id="recordsTableBody">
                             {% for visitor in visitors %}
                             <tr class="visitor-record-row"
-                                data-id="{{ visitor.id | lower }}"
+                                data-id="{{ visitor.id }}"
                                 data-name="{{ visitor.name | lower }}"
-                                data-purpose="{{ visitor.purpose | lower }}">
+                                data-purpose="{{ visitor.purpose | lower }}"
+                                data-purpose-label="{{ visitor.purpose }}"
+                                data-details="{{ visitor.details or '' }}"
+                                data-status="{{ visitor.status }}">
                                 <td class="fw-bold text-white ps-4">{{ visitor.name }}</td>
                                 <td class="text-white-50">{{ visitor.purpose }}</td>
                                 <td class="text-center">
-                                    <span class="badge bg-success bg-opacity-25 border border-success text-success rounded-pill px-3">
-                                        Active
+                                    <span class="badge {% if visitor.status == 'Checked In' %}bg-success bg-opacity-25 border border-success text-success{% else %}bg-secondary bg-opacity-25 border border-secondary text-white{% endif %} rounded-pill px-3">
+                                        {% if visitor.status == 'Checked In' %}Active{% else %}Checked Out{% endif %}
                                     </span>
                                 </td>
                                 <td class="text-center align-middle" style="width: 80px;">
@@ -501,7 +520,7 @@
                             </tr>
                             {% else %}
                             <tr id="recordsEmptyRow">
-                                <td colspan="3" class="text-center text-white-50 py-5">
+                                <td colspan="4" class="text-center text-white-50 py-5">
                                     <i class="bi bi-people display-4 d-block mb-3"></i>
                                     No visitor records found.
                                 </td>
@@ -621,6 +640,7 @@
             const searchInput  = document.getElementById('searchInput');
             const dateFilter   = document.getElementById('dateFilter');
             const tableCard    = document.getElementById('tableCard');
+            const tableResponsive = tableCard ? tableCard.querySelector('.table-responsive') : null;
             const noResults    = document.getElementById('noResults');
             const resultCount  = document.getElementById('resultCount');
             const paginationContainer = document.getElementById('paginationContainer');
@@ -792,13 +812,13 @@
 
                 if (getRows().length > 0) {
                     if (visible === 0 && hasFilters) {
-                        tableCard.style.display  = 'none';
+                        if (tableResponsive) tableResponsive.style.display = 'none';
                         paginationContainer.classList.remove('show');
                         paginationContainer.style.display = 'none';
                         noResults.style.display  = 'block';
                         resultCount.textContent  = '';
                     } else {
-                        tableCard.style.display  = '';
+                        if (tableResponsive) tableResponsive.style.display = '';
                         noResults.style.display  = 'none';
                         resultCount.textContent  = hasFilters
                             ? 'Showing up to ' + Math.min(ITEMS_PER_PAGE, visible) + ' of ' + visible + ' record' + (visible !== 1 ? 's' : '')
@@ -821,6 +841,7 @@
             const recordsPaginationContainer = document.getElementById('recordsPaginationContainer');
             const recordsPaginationList = document.getElementById('recordsPaginationList');
             const recordsTableCard = document.getElementById('recordsTableCard');
+            const recordsTableResponsive = recordsTableCard ? recordsTableCard.querySelector('.table-responsive') : null;
             const recordsNoResults = document.getElementById('recordsNoResults');
             const recordsResultCount = document.getElementById('recordsResultCount');
             
@@ -938,13 +959,13 @@
 
                 if (recordsRows.length > 0) {
                     if (visible === 0 && hasFilters) {
-                        recordsTableCard.style.display = 'none';
+                        if (recordsTableResponsive) recordsTableResponsive.style.display = 'none';
                         recordsPaginationContainer.classList.remove('show');
                         recordsPaginationContainer.style.display = 'none';
                         recordsNoResults.style.display = 'block';
                         recordsResultCount.textContent = '';
                     } else {
-                        recordsTableCard.style.display = '';
+                        if (recordsTableResponsive) recordsTableResponsive.style.display = '';
                         recordsNoResults.style.display = 'none';
                         recordsResultCount.textContent = hasFilters
                             ? `Showing up to ${Math.min(ITEMS_PER_PAGE, visible)} of ${visible} record${visible !== 1 ? 's' : ''}`
@@ -968,8 +989,25 @@
             const editVisitorId = document.getElementById('editVisitorId');
             const editVisitorName = document.getElementById('editVisitorName');
             const editVisitorPurpose = document.getElementById('editVisitorPurpose');
+            const editVisitorDetails = document.getElementById('editVisitorDetails');
+            const editVisitorDetailsGroup = document.getElementById('editVisitorDetailsGroup');
 
             let currentVisitorRow = null;
+
+            function syncVisitorDetailsField(isReadOnly = false) {
+                const showDetails = (editVisitorPurpose.value || '').trim().toLowerCase() === 'other';
+                editVisitorDetailsGroup.classList.toggle('d-none', !showDetails);
+                editVisitorDetails.required = showDetails && !isReadOnly;
+                editVisitorDetails.readOnly = isReadOnly;
+                if (!showDetails) {
+                    editVisitorDetails.value = '';
+                }
+            }
+
+            editVisitorPurpose.addEventListener('change', () => {
+                const isReadOnly = editVisitorPurpose.disabled || editVisitorPurpose.readOnly;
+                syncVisitorDetailsField(isReadOnly);
+            });
 
             // Open modal logic
             document.addEventListener('click', function(e) {
@@ -981,7 +1019,7 @@
                     if (row) {
                         const mode = viewBtn ? 'view' : 'edit';
                         currentVisitorRow = row;
-                        editVisitorId.value = row.getAttribute('data-visitor-id') || row.getAttribute('data-id') || '';
+                        editVisitorId.value = row.getAttribute('data-id') || row.getAttribute('data-visitor-id-original') || '';
                         
                         let nameSpan = row.querySelector('td:nth-child(1) span');
                         if (nameSpan) {
@@ -990,19 +1028,23 @@
                             editVisitorName.value = row.querySelector('td:nth-child(1)').textContent.trim();
                         }
                         
-                        editVisitorPurpose.value = row.getAttribute('data-purpose') || row.querySelector('td:nth-child(2)').textContent.trim();
+                        editVisitorPurpose.value = row.getAttribute('data-purpose-label') || row.querySelector('td:nth-child(2)').textContent.trim();
+                        editVisitorDetails.value = row.getAttribute('data-details') || '';
                         
                         const title = document.querySelector('.edit-modal-header h5');
-                        const inputs = [editVisitorName, editVisitorPurpose];
                         
                         if (mode === 'view') {
                             title.textContent = 'View Visitor Details';
                             saveEditVisitor.style.display = 'none';
-                            inputs.forEach(i => i.readOnly = true);
+                            editVisitorPurpose.disabled = true;
+                            [editVisitorName, editVisitorDetails].forEach(i => i.readOnly = true);
+                            syncVisitorDetailsField(true);
                         } else {
                             title.textContent = 'Edit Visitor Record';
                             saveEditVisitor.style.display = 'block';
-                            inputs.forEach(i => i.readOnly = false);
+                            editVisitorPurpose.disabled = false;
+                            [editVisitorName, editVisitorDetails].forEach(i => i.readOnly = false);
+                            syncVisitorDetailsField(false);
                         }
                         
                         editVisitorModal.style.display = 'flex';
@@ -1012,13 +1054,20 @@
                 const deleteBtn = e.target.closest('.delete-visitor') || e.target.closest('.delete-visitor-record');
                 if (deleteBtn) {
                     if (confirm('Are you sure you want to delete this visitor record?')) {
-                        const row = deleteBtn.closest('tr');
-                        if (row) {
-                            row.remove();
-                            applyFilters(); 
-                            if (typeof applyRecordsFilter === 'function') applyRecordsFilter();
-                            alert('Visitor deleted successfully!');
-                        }
+                        const visitorId = deleteBtn.dataset.id;
+                        fetch(`/admin/visitors/${encodeURIComponent(visitorId)}`, {
+                            method: 'DELETE'
+                        })
+                        .then(async response => {
+                            const data = await response.json();
+                            if (!response.ok || !data.success) {
+                                throw new Error(data.message || 'Failed to delete visitor.');
+                            }
+                            window.location.reload();
+                        })
+                        .catch(error => {
+                            alert(error.message || 'Failed to delete visitor.');
+                        });
                     }
                 }
             });
@@ -1038,20 +1087,29 @@
             saveEditVisitor.addEventListener('click', () => {
                 if (editVisitorForm.checkValidity()) {
                     if (currentVisitorRow) {
-                        // Update the row data
-                        currentVisitorRow.querySelector('span').textContent = editVisitorName.value;
-                        currentVisitorRow.setAttribute('data-visitor-name', editVisitorName.value.toLowerCase());
-                        currentVisitorRow.setAttribute('data-purpose', editVisitorPurpose.value);
-                        // Update the displayed cells
-                        const cells = currentVisitorRow.querySelectorAll('td');
-                        cells[1].textContent = editVisitorPurpose.value; // Purpose column
-
-                        // Close modal
-                        editVisitorModal.style.display = 'none';
-                        currentVisitorRow = null;
-
-                        // Show success message (you can replace with actual backend call)
-                        alert('Visitor updated successfully!');
+                        fetch(`/admin/visitors/${encodeURIComponent(editVisitorId.value)}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                name: editVisitorName.value.trim(),
+                                purpose: editVisitorPurpose.value.trim(),
+                                details: editVisitorDetails.value.trim()
+                            })
+                        })
+                        .then(async response => {
+                            const data = await response.json();
+                            if (!response.ok || !data.success) {
+                                throw new Error(data.message || 'Failed to update visitor.');
+                            }
+                            editVisitorModal.style.display = 'none';
+                            currentVisitorRow = null;
+                            window.location.reload();
+                        })
+                        .catch(error => {
+                            alert(error.message || 'Failed to update visitor.');
+                        });
                     }
                 } else {
                     editVisitorForm.reportValidity();

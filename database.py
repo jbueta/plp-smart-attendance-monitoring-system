@@ -1,14 +1,17 @@
-from flask import g, current_app
+from flask import current_app, g
 from mysql.connector import pooling
 
-# 1. Database Configuration
+from config import get_config
+
+config = get_config()
+
 dbconfig = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '',
-    'database': 'smart_monitoring',
-    'port': 3306,
-    'use_pure': True
+    "host": config.DB_HOST,
+    "user": config.DB_USER,
+    "password": config.DB_PASSWORD,
+    "database": config.DB_NAME,
+    "port": config.DB_PORT,
+    "use_pure": True,
 }
 
 global_pool = None
@@ -19,10 +22,10 @@ def init_db_pool():
     try:
         current_app.logger.info("Creating database connection pool...")
         global_pool = pooling.MySQLConnectionPool(
-            pool_name="main_entry_exit", 
-            pool_size=20, 
-            autocommit=True, 
-            **dbconfig
+            pool_name="main_entry_exit",
+            pool_size=config.DB_POOL_SIZE,
+            autocommit=config.DB_AUTOCOMMIT,
+            **dbconfig,
         )
         current_app.logger.info("Database connection pool created.")
         return True
@@ -33,7 +36,7 @@ def init_db_pool():
 
 def connect_db():
     """Gets a connection, retrying pool creation if it failed previously."""
-    if 'db' not in g:        
+    if "db" not in g:
         # AUTO-REBOOT LOGIC
         if global_pool is None:
             current_app.logger.warning("Pool is offline. Attempting auto-reconnect...")
@@ -51,6 +54,6 @@ def connect_db():
 
 def close_db(error=None):
     """Closes the database connection at the end of the request."""
-    db = g.pop('db', None)
+    db = g.pop("db", None)
     if db is not None:
         db.close()

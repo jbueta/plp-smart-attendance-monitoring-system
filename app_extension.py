@@ -1,39 +1,34 @@
 
-from datetime import date, datetime
-from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, request, g
-from datetime import date, timedelta, datetime
-
-from db_connect import Database
-from database import init_db_pool, connect_db, close_db
-
-import json
-import os
 import logging
-import mysql.connector as connector
-from mysql.connector import pooling
+import os
+from datetime import date, datetime
+
+from flask import Flask, jsonify, request
 from flask_cors import CORS
-from functools import wraps
-import jwt  #token based authentication
 
-JWT_SECRET = 'plp_jwt_secret_key_2026'  # Secret key for JWT (to be changed)
-JWT_ALGORITHM = 'HS256'
-JWT_EXPIRATION_DELTA = timedelta(hours=8)  # Token valid for 8 hours
-        
+from config import get_config
+from database import close_db, connect_db, init_db_pool
+from db_connect import Database
+
+
 app = Flask(__name__)
-app.secret_key = 'plp_secure_key_2026'  # Required for session management
+app.config.from_object(get_config())
+app.secret_key = app.config["SECRET_KEY"]
 
-app.logger.setLevel(logging.DEBUG)
-app.logger.addHandler(logging.StreamHandler())
-app.logger.addHandler(logging.FileHandler('logs/app.log'))
+os.makedirs(os.path.dirname(app.config["LOG_FILE"]) or ".", exist_ok=True)
 
-allowed_origins = [
-    "http://localhost:5000",
-    "http://127.0.0.1:5000",
-    "http://192.168.1.3:5000"
-]
+app.logger.setLevel(getattr(logging, app.config["LOG_LEVEL"].upper(), logging.INFO))
+if not any(isinstance(handler, logging.StreamHandler) for handler in app.logger.handlers):
+    app.logger.addHandler(logging.StreamHandler())
 
-CORS(app, origins=allowed_origins)
+log_file = os.path.abspath(app.config["LOG_FILE"])
+if not any(
+    isinstance(handler, logging.FileHandler) and getattr(handler, "baseFilename", None) == log_file
+    for handler in app.logger.handlers
+):
+    app.logger.addHandler(logging.FileHandler(log_file))
+
+CORS(app, origins=app.config["ALLOWED_ORIGINS"])
 
 # ==============================================================================
 # DATABASE INITIALIZATION
@@ -177,8 +172,11 @@ def add_events():
         if not data:
             return jsonify({"error": "No JSON data provided"}), 400
 
-        required_fields = ['event_name', 'event_type', 'frequency', 'location', 'event_date', 'time_start', 'time_end', 'participants_type']
+        frequency = (data.get('frequency') or '').upper()
+        required_fields = ['event_name', 'event_type', 'frequency', 'location', 'time_start', 'time_end', 'participants_type']
         missing_fields = [field for field in required_fields if not data.get(field)]
+        if frequency != 'DAILY' and not data.get('event_date'):
+            missing_fields.append('event_date')
         if missing_fields:
             return jsonify({"success": False, "error": f"Missing required fields: {', '.join(missing_fields)}"}), 400
         
@@ -205,6 +203,9 @@ def add_events():
         ed = data.get('event_date')
         cd = date.today()
 
+        if frequency == 'DAILY' and not ed:
+            ed = cd.isoformat()
+
         try:
             event_date = datetime.strptime(ed, '%Y-%m-%d').date()
             current_date = cd
@@ -214,7 +215,6 @@ def add_events():
         if event_date < current_date:
             return jsonify({"success": False, "error": "Event Date cannot be in the past"}), 400
 
-        frequency = data.get('frequency')
         if frequency == 'WEEKLY':
             day = data.get('day')
             if not day:
@@ -223,7 +223,7 @@ def add_events():
         event_name = data.get('event_name')
         event_type = data.get('event_type')
         day = data.get('day')
-        event_date = data.get('event_date')
+        event_date = ed
         time_start = data.get('time_start')
         time_end = data.get('time_end')
         location = data.get('location')
@@ -365,7 +365,8 @@ def events_authentication():
 # ====================================================
 # ENDPOINT 3: Status Update for Excused Individuals
 # ====================================================
-@app.route("/admin/update-attendance", methods=["PUT"])
+@app.route("/admin/update-attendance", methods=["PUT", "POST"])
+@app.route("/api/attendance/update", methods=["POST"])
 def update_attendance():
     conn = None
     try:
@@ -373,20 +374,23 @@ def update_attendance():
         if not conn:
             return jsonify({"success": False, "message": "Database offline"}), 500
 
-        data = request.get_json()
-        required_fields = ["user_id", "instance_id", "status"]
-        if not data or not all(field in data for field in required_fields):
-            return jsonify({"success": False, "message": "Missing required fields"}), 400
-
-        user_id = data['user_id']
-        instance_id = data['instance_id']
-        status = data['status'] 
+        data = request.get_json() or {}
+        status = data.get('status')
         remarks = data.get('remarks', None)
 
         if status not in ['Present', 'Absent', 'Late', 'Excused']:
             return jsonify({"success": False, "message": "Invalid status option"}), 400
 
-        params = (status, remarks, user_id, instance_id)
+        attendance_id = data.get('attendance_id')
+        if attendance_id:
+            params = (status, remarks, attendance_id)
+        else:
+            user_id = data.get('user_id')
+            instance_id = data.get('instance_id')
+            if not user_id or not instance_id:
+                return jsonify({"success": False, "message": "Missing attendance_id or user_id + instance_id"}), 400
+            params = (status, remarks, user_id, instance_id)
+
         db = Database(conn, params)
         result = db.update_attendance_status()
 
@@ -432,7 +436,7 @@ def update_event_status():
         events = db.get_all_events()
         return jsonify({"success": True, 
                         "message": f"Event status updated to {status}.",
-                        "data": events.get('data')
+                        "data": events
                       }), 200
 
     except Exception as e:
@@ -455,11 +459,9 @@ def delete_event():
         if not data or not all(field in data for field in required_fields):
             return jsonify({"success": False, "message": "Missing required fields"}), 400
 
-        event_id = data['event_id']
-
-        if isinstance(event_id, str):
-            pass
-        else:
+        try:
+            event_id = int(data['event_id'])
+        except (KeyError, TypeError, ValueError):
             return jsonify({"success": False, "message": "Invalid event ID"}), 400
 
         params = (event_id,)
@@ -1070,4 +1072,4 @@ def get_instance_logs(instance_id):
             close_db(conn)
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5001)
+    app.run(debug=app.config["DEBUG"], host='0.0.0.0', port=5001)

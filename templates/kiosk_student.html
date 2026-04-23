@@ -207,7 +207,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-white-50">Purpose <span class="text-danger">*</span></label>
-                            <select name="purpose" class="form-select bg-dark text-white border-secondary" required>
+                            <select name="purpose" class="form-select bg-dark text-white border-secondary visitor-purpose-select" required>
                                 <option value="" selected disabled>Select Purpose</option>
                                 <option>Official Business</option>
                                 <option>Document Submission</option>
@@ -217,11 +217,11 @@
                                 <option>Other</option>
                             </select>
                         </div>
-                        <div class="col-12">
-                            <label class="form-label text-white-50">Person/Office to Visit</label>
+                        <div class="col-12 d-none visitor-details-group">
+                            <label class="form-label text-white-50">Specify Purpose <span class="text-danger">*</span></label>
                             <input type="text" name="details"
-                                class="form-control bg-dark text-white border-secondary"
-                                placeholder="e.g. Registrar's Office">
+                                class="form-control bg-dark text-white border-secondary visitor-details-input"
+                                placeholder="Enter the custom purpose">
                         </div>
                         <div class="col-12 mt-4">
                             <div class="d-grid">
@@ -357,7 +357,7 @@ document.addEventListener('DOMContentLoaded', function () {
     window.processStudentData = function (scanned_id, scanned_name, scanned_department, callback) {
         console.log("🚀 ATTEMPTING TO SEND FETCH REQUEST...");
         console.log("Sending Data:", scanned_id, scanned_name, scanned_department);
-        fetch('http://127.0.0.1:5001/admin/user/authentication', {
+        fetch(`${window.APP_CONFIG.backendApiUrl}/admin/user/authentication`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
