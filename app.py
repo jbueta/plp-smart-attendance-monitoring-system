@@ -963,7 +963,7 @@ def upload_employees():
 
         # Drop fully empty rows
         df.dropna(how="all", inplace=True)
-        df = df.applymap(lambda x: clean(x) if isinstance(x, str) else x)
+        df = df.map(lambda x: clean(x) if isinstance(x, str) else x)
 
         # ----------------------------------------
         # 4. Fix Employee Number
@@ -1012,8 +1012,8 @@ def upload_employees():
                 position        = str(row.get("POSITION")        or "").strip().upper()
 
                 if not employee_id or not employee_name or not department_name:
-                    errors.append(f"Row {i + 2}: Missing required field(s) — "
-                                  f"ID='{employee_id}' Name='{employee_name}' Dept='{department_name}'")
+                    missing = [m for m, v in zip(["Employee Number", "Name", "Department"], [employee_id, employee_name, department_name]) if not v]
+                    errors.append(f"Row {i + 2}: Missing {', '.join(missing)}")
                     continue
 
                 result = employee_model.add_employee_excel(
@@ -1027,7 +1027,7 @@ def upload_employees():
                 if result.get("success"):
                     inserted += 1
                 else:
-                    errors.append(f"Row {i + 2} [{employee_id}]: {result.get('error')}")
+                    errors.append(f"Row {i + 2} (ID: {employee_id}): {result.get('error')}")
 
             except Exception as row_error:
                 errors.append(f"Row {i + 2}: {str(row_error)}")

@@ -505,6 +505,36 @@
 </div>
 
 
+<!-- ========== UPLOAD RESULT MODAL ========== -->
+<div class="modal fade" id="uploadResultModal" tabindex="-1" aria-hidden="true" style="z-index: 1090;">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content card-glass" style="background: rgba(11, 45, 33, 0.85); backdrop-filter: blur(16px); border: 1px solid rgba(212,175,55,0.25); box-shadow: 0 28px 80px rgba(0,0,0,0.5);">
+            <div class="modal-header border-secondary border-opacity-25 pb-3 pt-4 px-4">
+                <div class="d-flex align-items-center gap-4">
+                    <div id="uploadResultIconContainer" class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 64px; height: 64px; background: rgba(25,135,84,0.15);">
+                        <i id="uploadResultIcon" class="bi bi-check-circle-fill text-success" style="font-size: 2.2rem;"></i>
+                    </div>
+                    <div>
+                        <h4 class="modal-title text-white mb-1 fw-bold" id="uploadResultTitle">Upload Successful</h4>
+                        <p class="text-white-50 mb-0" id="uploadResultSubtitle" style="font-size: 0.95rem;">X employees inserted</p>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white opacity-50" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-4 px-4">
+                <div id="uploadResultTipContainer"></div>
+                <div id="uploadResultContent" class="text-white-50 small" style="max-height: 400px; overflow-y: auto;">
+                    <!-- Content populated via JS -->
+                </div>
+                <div id="uploadResultPagination" class="d-flex justify-content-center mt-3 gap-2"></div>
+            </div>
+            <div class="modal-footer border-0 pt-0 pb-4 justify-content-center gap-3" id="uploadResultFooter">
+                <button type="button" class="btn btn-outline-light px-4 rounded-pill" data-bs-dismiss="modal">Exit</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
 .employee-action-menu {
     background: rgba(255,255,255,0.08);
@@ -576,6 +606,11 @@
 
 
 <script>
+window.reopenUploadModal = function() {
+    sessionStorage.setItem('reopenUploadModal', 'true');
+    location.reload();
+};
+
 document.addEventListener('DOMContentLoaded', function () {
 
     // ─── SHARED CONSTANTS ─────────────────────────────────────────────────────
@@ -616,6 +651,13 @@ document.addEventListener('DOMContentLoaded', function () {
             targetView.classList.remove('d-none');
             targetView.style.animation = 'fadeInModal 0.4s ease forwards';
         }
+    }
+    
+    if (sessionStorage.getItem('reopenUploadModal') === 'true') {
+        sessionStorage.removeItem('reopenUploadModal');
+        const addModal = new bootstrap.Modal(addUserModalEl);
+        addModal.show();
+        switchModalView(xlsView);
     }
 
     backBtnsSelection.forEach(btn => btn.addEventListener('click', () => switchModalView(selectionView)));
@@ -731,14 +773,108 @@ document.addEventListener('DOMContentLoaded', function () {
             try {
                 const res = await fetch('/upload_employees', { method: 'POST', body: formData });
                 const result = await res.json();
+                
+                const resultModalEl = document.getElementById('uploadResultModal');
+                const resultModal = new bootstrap.Modal(resultModalEl);
+                const title = document.getElementById('uploadResultTitle');
+                const subtitle = document.getElementById('uploadResultSubtitle');
+                const content = document.getElementById('uploadResultContent');
+                const iconContainer = document.getElementById('uploadResultIconContainer');
+                const icon = document.getElementById('uploadResultIcon');
+                
                 if (result.success) {
-                    let msg = `✅ Successfully inserted ${result.inserted} employee(s).`;
-                    if (result.errors && result.errors.length > 0) msg += `\n\n⚠️ Skipped rows:\n` + result.errors.join('\n');
-                    alert(msg);
+                    const hasErrors = result.errors && result.errors.length > 0;
+                    
+                    if (result.inserted === 0) {
+                        title.textContent = 'Upload Needs Attention';
+                        subtitle.textContent = 'No records were added';
+                    } else {
+                        title.textContent = hasErrors ? 'Upload Partially Successful' : 'Upload Successful';
+                        subtitle.textContent = `${result.inserted} employee(s) added successfully`;
+                    }
+                    
+                    const tipContainer = document.getElementById('uploadResultTipContainer');
+                    const paginationContainer = document.getElementById('uploadResultPagination');
+
+                    if (hasErrors) {
+                        iconContainer.style.background = 'rgba(255, 193, 7, 0.15)';
+                        icon.className = 'bi bi-exclamation-triangle-fill text-warning fs-4';
+                        icon.style.color = '';
+                        
+                        tipContainer.innerHTML = `
+                            <div class="alert border-0 rounded-4 mb-4 px-4 py-3" style="background: rgba(13, 202, 240, 0.12); border: 1px solid rgba(13,202,240,0.2) !important;">
+                                <div class="d-flex gap-3 align-items-start">
+                                    <i class="bi bi-info-circle-fill fs-5 mt-1 text-info"></i>
+                                    <div>
+                                        <strong class="d-block mb-1 text-info" style="font-size: 0.95rem;">Required Excel Format</strong>
+                                        <p class="mb-3 text-white-50" style="font-size: 0.85rem;">To successfully upload records, your file must include these exact column headers. Please ensure no required fields are left blank. If errors persist, verify that your spreadsheet has no hidden columns, empty rows, or duplicate employee IDs.</p>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <span class="badge rounded-pill px-3 py-2" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-weight: 500; letter-spacing: 0.5px;">EMPLOYEE NUMBER</span>
+                                            <span class="badge rounded-pill px-3 py-2" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-weight: 500; letter-spacing: 0.5px;">EMPLOYEE NAME</span>
+                                            <span class="badge rounded-pill px-3 py-2" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-weight: 500; letter-spacing: 0.5px;">DEPARTMENT</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-1 fw-bold text-warning" style="font-size: 0.95rem;">Upload Errors Summary</div>
+                            <p class="text-white-50 mb-3" style="font-size: 0.85rem;">We couldn't add the following rows due to missing information or duplicate employee records:</p>`;
+                            
+                        let ulHtml = '<ul class="list-unstyled mb-0 pe-2" style="opacity: 0.9; font-size: 0.9rem;">';
+                        result.errors.forEach(err => {
+                            ulHtml += `<li class="mb-2 pb-2 border-bottom border-secondary border-opacity-25 d-flex gap-2 align-items-start"><i class="bi bi-x-circle text-danger mt-1"></i> <span class="text-white-50">${err}</span></li>`;
+                        });
+                        ulHtml += '</ul>';
+                        content.innerHTML = ulHtml;
+                        paginationContainer.innerHTML = '';
+                        
+                        document.getElementById('uploadResultFooter').innerHTML = `
+                            <button type="button" class="btn btn-primary-gold px-4 rounded-pill" onclick="window.reopenUploadModal()">Upload a New File</button>
+                            <button type="button" class="btn btn-outline-light px-4 rounded-pill" data-bs-dismiss="modal">Exit</button>
+                        `;
+                    } else {
+                        iconContainer.style.background = 'rgba(25,135,84,0.15)';
+                        icon.className = 'bi bi-check-circle-fill text-success fs-4';
+                        icon.style.color = '';
+                        tipContainer.innerHTML = '';
+                        paginationContainer.innerHTML = '';
+                        content.innerHTML = '<div class="text-center py-2 text-white">All records were uploaded and saved successfully!</div>';
+                        
+                        document.getElementById('uploadResultFooter').innerHTML = `
+                            <button type="button" class="btn btn-primary-gold px-4 rounded-pill" onclick="window.reopenUploadModal()">Add another file</button>
+                            <button type="button" class="btn btn-outline-light px-4 rounded-pill" data-bs-dismiss="modal">Exit</button>
+                        `;
+                    }
+                    
                     const modal = bootstrap.Modal.getInstance(addUserModalEl);
                     if (modal) modal.hide();
-                    location.reload();
-                } else { alert('Error: ' + result.error); }
+                    
+                    resultModalEl.addEventListener('hidden.bs.modal', function() {
+                        location.reload();
+                    }, { once: true });
+                    
+                    resultModal.show();
+                    
+                } else {
+                    title.textContent = 'Upload Failed';
+                    subtitle.textContent = 'An error occurred during upload';
+                    iconContainer.style.background = 'rgba(220,53,69,0.15)';
+                    icon.className = 'bi bi-x-circle-fill text-danger fs-4';
+                    icon.style.color = '';
+                    
+                    document.getElementById('uploadResultTipContainer').innerHTML = '';
+                    document.getElementById('uploadResultPagination').innerHTML = '';
+                    content.innerHTML = `<div class="text-danger"><i class="bi bi-exclamation-triangle me-2"></i> ${result.error}</div>`;
+                    
+                    document.getElementById('uploadResultFooter').innerHTML = `
+                        <button type="button" class="btn btn-primary-gold px-4 rounded-pill" onclick="window.reopenUploadModal()">Upload a New File</button>
+                        <button type="button" class="btn btn-outline-light px-4 rounded-pill" data-bs-dismiss="modal">Exit</button>
+                    `;
+                    
+                    const modal = bootstrap.Modal.getInstance(addUserModalEl);
+                    if (modal) modal.hide();
+                    
+                    resultModal.show();
+                }
             } catch (err) { alert('Request failed: ' + err.message); }
             finally { uploadSubmitBtn.disabled = false; uploadSubmitBtn.textContent = 'Export'; }
         });
