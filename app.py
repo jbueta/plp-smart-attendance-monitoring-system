@@ -2,9 +2,11 @@ from datetime import date, datetime
 from functools import wraps
 import csv
 import io
+import json
 import os
 import re
 import unicodedata
+from urllib.parse import urlencode, urlsplit
 
 import requests
 from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
@@ -93,14 +95,62 @@ MOCK_KIOSK_DATA = {
 _instance_generator_run = False
 
 
+class InternalBackendResponse:
+    def __init__(self, response):
+        self._response = response
+        self.status_code = response.status_code
+        self.ok = 200 <= response.status_code < 300
+        self.text = response.get_data(as_text=True)
+
+    def json(self):
+        data = self._response.get_json(silent=True)
+        if data is not None:
+            return data
+        if not self.text:
+            return {}
+        return json.loads(self.text)
+
+
 def backend_url(path):
     base_url = app.config["BACKEND_API_URL"].rstrip("/")
     return f"{base_url}/{path.lstrip('/')}"
 
 
+def should_use_internal_backend_fallback():
+    parsed = urlsplit(app.config["BACKEND_API_URL"])
+    return parsed.hostname in {"127.0.0.1", "localhost"} and parsed.port == 5001
+
+
+def internal_backend_request(method, path, **kwargs):
+    from app_extension import app as backend_app
+
+    request_path = path
+    params = kwargs.get("params")
+    if params:
+        query_string = urlencode(params, doseq=True)
+        separator = "&" if "?" in request_path else "?"
+        request_path = f"{request_path}{separator}{query_string}"
+
+    request_kwargs = {}
+    if "json" in kwargs:
+        request_kwargs["json"] = kwargs["json"]
+    elif "data" in kwargs:
+        request_kwargs["data"] = kwargs["data"]
+
+    with backend_app.test_client() as client:
+        response = client.open(request_path, method=method.upper(), **request_kwargs)
+    return InternalBackendResponse(response)
+
+
 def backend_request(method, path, **kwargs):
     kwargs.setdefault("timeout", app.config["BACKEND_TIMEOUT"])
-    return requests.request(method, backend_url(path), **kwargs)
+    try:
+        return requests.request(method, backend_url(path), **kwargs)
+    except requests.RequestException:
+        if should_use_internal_backend_fallback():
+            app.logger.warning("Backend service unavailable on port 5001. Falling back to in-process backend for %s %s.", method.upper(), path)
+            return internal_backend_request(method, path, **kwargs)
+        raise
 
 
 @app.context_processor
@@ -342,6 +392,15 @@ def helper_delete_events(event_id, delete_type):
         return {"success": False, "message": "Backend service is unavailable."}
 
 
+def proxy_backend_json(method, path, **kwargs):
+    try:
+        response = backend_request(method, path, **kwargs)
+        return jsonify(response.json()), response.status_code
+    except requests.RequestException as err:
+        app.logger.error("Backend proxy failed for %s %s: %s", method.upper(), path, err)
+        return jsonify({"success": False, "message": "Backend service unavailable."}), 503
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -380,11 +439,14 @@ def index():
 
 @app.route("/kiosk/entrance")
 def kiosk_entrance():
-    session.clear()
+    visitor_welcome = session.pop("visitor_welcome", None)
+    session.pop("logged_in", None)
+    session.pop("admin_username", None)
     return render_template(
         "kiosk_entrance.html",
         active_visitors=fetch_visitor_logs(status="Checked In"),
         kiosk_data=get_kiosk_data_with_live_feed(),
+        visitor_welcome=visitor_welcome,
     )
 
 
@@ -418,10 +480,13 @@ def kiosk_employee():
 
 @app.route("/kiosk/visitor")
 def kiosk_visitor():
-    session.clear()
+    visitor_welcome = session.pop("visitor_welcome", None)
+    session.pop("logged_in", None)
+    session.pop("admin_username", None)
     return render_template(
         "kiosk_visitor.html",
         active_visitors=fetch_visitor_logs(status="Checked In"),
+        visitor_welcome=visitor_welcome,
     )
 
 
@@ -431,17 +496,43 @@ def visitor_checkin():
     purpose = (request.form.get("purpose") or "").strip()
     details = (request.form.get("details") or "").strip()
     source = resolve_visitor_source(request.form.get("source"), fallback="kiosk_visitor")
+    wants_json = request.headers.get("X-Requested-With") == "XMLHttpRequest"
 
     if not name or not purpose:
+        if wants_json:
+            return jsonify({"success": False, "message": "Check-in failed. Name and purpose are required."}), 400
         flash("Check-in failed. Name and purpose are required.", "danger")
         return redirect(url_for(source))
 
     conn = connect_db()
     if not conn:
+        if wants_json:
+            return jsonify({"success": False, "message": "Check-in failed. Visitor database is unavailable."}), 503
         flash("Check-in failed. Visitor database is unavailable.", "danger")
         return redirect(url_for(source))
 
     result = Database(conn, (name, purpose, details, "Gate 1")).add_visitor_log()
+    if result.get("success"):
+        session["visitor_welcome"] = {
+            "name": name,
+            "visitor_id": result.get("visitor_id") or "Pending ID",
+        }
+        if wants_json:
+            return jsonify(
+                {
+                    "success": True,
+                    "message": f"Welcome, {name}. Check-in successful.",
+                    "visitor": {
+                        "name": name,
+                        "visitor_id": result.get("visitor_id") or "Pending ID",
+                        "purpose": details if purpose.lower() == "other" and details else purpose,
+                    },
+                }
+            ), 200
+
+    if wants_json:
+        return jsonify({"success": False, "message": result.get("message", "Check-in failed.")}), 400
+
     flash(
         f"Welcome, {name}. Check-in successful." if result.get("success") else result.get("message", "Check-in failed."),
         "success" if result.get("success") else "danger",
@@ -734,6 +825,31 @@ def admin_live_departments():
     except requests.RequestException as err:
         app.logger.error("Admin live departments bridge failed: %s", err)
         return jsonify({"success": False, "message": "Backend service unavailable."}), 503
+
+
+@app.route("/api/backend/admin/user/authentication", methods=["POST"])
+def backend_user_authentication_proxy():
+    return proxy_backend_json("POST", "/admin/user/authentication", json=request.get_json(silent=True) or {})
+
+
+@app.route("/api/backend/events/manual-entry", methods=["POST"])
+def backend_manual_event_entry_proxy():
+    return proxy_backend_json("POST", "/api/events/manual_entry", json=request.get_json(silent=True) or {})
+
+
+@app.route("/api/backend/admin/event/<int:event_id>/instances")
+def backend_event_instances_proxy(event_id):
+    return proxy_backend_json("GET", f"/admin/event/{event_id}/instances")
+
+
+@app.route("/api/backend/admin/instances/<int:instance_id>/attendance")
+def backend_instance_attendance_proxy(instance_id):
+    return proxy_backend_json("GET", f"/admin/instances/{instance_id}/get-attendance")
+
+
+@app.route("/api/backend/admin/instances/<int:instance_id>/logs")
+def backend_instance_logs_proxy(instance_id):
+    return proxy_backend_json("GET", f"/admin/instances/{instance_id}/get-logs")
 
 
 @app.route("/api/retrieve/events")

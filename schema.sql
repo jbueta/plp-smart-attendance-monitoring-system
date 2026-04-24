@@ -816,7 +816,7 @@ BEGIN
             SET next_seq = 1;
         END IF;
 
-        SET NEW.`visitor_id` = CONCAT('VT-', LPAD(next_seq, 9, '0'));
+        SET NEW.`visitor_id` = CONCAT('VT-', LPAD(next_seq, 5, '0'));
     END IF;
 END
 $$

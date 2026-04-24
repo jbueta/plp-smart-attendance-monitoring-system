@@ -7,6 +7,36 @@
 <!-- Page content -->
 {% block content %}
 <div class="container py-5 min-vh-100 d-flex flex-column justify-content-center">
+    {% if visitor_welcome %}
+    <div id="visitor-welcome-overlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center px-3"
+        style="z-index: 2000; background: rgba(3, 17, 8, 0.72); backdrop-filter: blur(10px);">
+        <div class="card-glass p-4 p-md-5 position-relative text-center shadow-lg w-100"
+            style="max-width: 540px; border-color: rgba(245, 221, 0, 0.28);">
+            <button type="button" id="close-visitor-welcome"
+                class="btn btn-glass rounded-circle position-absolute top-0 end-0 mt-3 me-3 d-inline-flex align-items-center justify-content-center"
+                style="width: 42px; height: 42px;" aria-label="Close welcome panel">
+                <i class="bi bi-x-lg"></i>
+            </button>
+
+            <div class="rounded-circle border border-5 border-success p-1 mb-3 d-inline-block">
+                <div class="rounded-circle bg-success bg-opacity-10 d-flex align-items-center justify-content-center"
+                    style="width: 92px; height: 92px;">
+                    <i class="bi bi-person-check text-success display-5 mb-0"></i>
+                </div>
+            </div>
+
+            <div class="text-gold text-uppercase small fw-bold mb-2" style="letter-spacing: 0.18em;">Visitor Verified</div>
+            <h2 class="display-6 fw-bold text-success mb-2">Access Granted</h2>
+            <h3 class="h2 text-white mb-2">{{ visitor_welcome.name }}</h3>
+            <p class="text-white-50 mb-4">Welcome to Pamantasan ng Lungsod ng Pasig.</p>
+
+            <div class="card-glass px-4 py-3 mx-auto" style="max-width: 320px; background: rgba(255,255,255,0.05);">
+                <div class="text-white-50 text-uppercase small mb-1" style="letter-spacing: 0.14em;">Visitor ID</div>
+                <div class="h4 font-monospace text-white mb-0">{{ visitor_welcome.visitor_id }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Header -->
     <div class="text-center mb-5">
@@ -84,6 +114,18 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const welcomeOverlay = document.getElementById('visitor-welcome-overlay');
+        const closeWelcomeButton = document.getElementById('close-visitor-welcome');
+
+        if (welcomeOverlay && closeWelcomeButton) {
+            const closeWelcomePanel = () => {
+                welcomeOverlay.classList.remove('d-flex');
+                welcomeOverlay.classList.add('d-none');
+            };
+
+            closeWelcomeButton.addEventListener('click', closeWelcomePanel);
+        }
+
         document.querySelectorAll('form').forEach(form => {
             const purposeSelect = form.querySelector('.visitor-purpose-select');
             const detailsGroup = form.querySelector('.visitor-details-group');

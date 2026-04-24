@@ -2,7 +2,7 @@
 
 var selectionMode = false;
 const frontendBaseUrl = window.location.origin;
-const backendBaseUrl = window.APP_CONFIG?.backendApiUrl || 'http://127.0.0.1:5001';
+const backendProxyBaseUrl = `${frontendBaseUrl}/api/backend`;
 
 function toggleSelectionMode() {
     selectionMode = !selectionMode;
@@ -91,7 +91,7 @@ function fetchEventInstances(eventId) {
     
     tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-white-50"><div class="spinner-border spinner-border-sm text-info me-2"></div> Loading instances...</td></tr>';
     
-    fetch(`${backendBaseUrl}/admin/event/${eventId}/instances`)
+    fetch(`${backendProxyBaseUrl}/admin/event/${eventId}/instances`)
         .then(response => response.json())
         .then(instances => {
             console.log("Fetched instances:", instances);
@@ -130,7 +130,7 @@ function fetchAttendanceData(instanceId) {
     
     tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-white-50"><div class="spinner-border spinner-border-sm text-info me-2"></div> Loading attendance...</td></tr>';
 
-    fetch(`${backendBaseUrl}/admin/instances/${instanceId}/get-attendance`)
+    fetch(`${backendProxyBaseUrl}/admin/instances/${instanceId}/attendance`)
         .then(response => response.json())
         .then(data => {
             console.log("Fetched attendance:", data);
