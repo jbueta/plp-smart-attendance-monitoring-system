@@ -19,3 +19,5 @@ pycparser==3.0
 SQLAlchemy==2.0.47
 typing_extensions==4.15
 requests
+Flask-Caching==2.3.0
+PyJWT==2.9.0
