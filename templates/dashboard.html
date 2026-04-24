@@ -323,13 +323,13 @@
                                     <i class="bi bi-person-check-fill text-primary fs-3"></i>
                                 </div>
                                 <div>
-                                    <h6 class="text-white-50 small text-uppercase mb-0">Daily On-Time Rate</h6>
-                                    <h3 class="text-white fw-bold mb-0">{{ employee_stats.on_time_rate }}</h3>
-                                </div>
-                            </div>
-                            <div class="progress" style="height: 4px; background-color: rgba(255,255,255,0.05);">
-                                <div class="progress-bar bg-primary" style="width: 88%;"></div>
-                            </div>
+                                     <h6 class="text-white-50 small text-uppercase mb-0">Daily On-Time Rate</h6>
+                                     <h3 class="text-white fw-bold mb-0">{{ employee_stats.on_time_rate }}</h3>
+                                 </div>
+                             </div>
+                             <div class="progress" style="height: 4px; background-color: rgba(255,255,255,0.05);">
+                                 <div class="progress-bar bg-primary" style="width: {{ employee_stats.on_time_percentage }}%;"></div>
+                             </div>
                         </div>
                     </div>
                     <div class="col-md-4">
@@ -352,12 +352,12 @@
                                 <div class="rounded-circle bg-info bg-opacity-10 p-3 me-3">
                                     <i class="bi bi-building-fill-check text-info fs-3"></i>
                                 </div>
-                                <div>
-                                    <h6 class="text-white-50 small text-uppercase mb-0">Participation Level</h6>
-                                    <h3 class="text-white fw-bold mb-0">High</h3>
-                                </div>
-                            </div>
-                            <p class="text-white-50 small mb-0">Based on active events</p>
+                                 <div>
+                                     <h6 class="text-white-50 small text-uppercase mb-0">Participation Level</h6>
+                                     <h3 class="text-white fw-bold mb-0">{{ employee_stats.participation_level }}</h3>
+                                 </div>
+                             </div>
+                             <p class="text-white-50 small mb-0">Based on active events ({{ employee_stats.target_date }})</p>
                         </div>
                     </div>
                 </div> <!-- Close Row (Employee Summary Cards) -->
@@ -392,6 +392,143 @@
                         </div>
                     </div>
                 </div> <!-- Close Row (Employee Charts) -->
+                <div class="row g-4 mb-4">
+                    <!-- Punctuality Leaderboard -->
+                    <div class="col-md-4">
+                        <div class="card-glass p-4" style="height: 400px;">
+                            <h5 class="text-white mb-4"><i class="bi bi-trophy me-2 text-gold"></i>Punctuality Leaders</h5>
+                            <p class="text-white-50 small mb-4">Top performers (Last 30 Days)</p>
+
+                            <div class="list-group list-group-flush bg-transparent">
+                                {% for entry in employee_stats.leaderboard %}
+                                <div class="list-group-item bg-transparent border-0 d-flex justify-content-between align-items-center px-0 py-2">
+                                    <div class="d-flex align-items-center">
+                                        <span class="badge bg-gold bg-opacity-25 text-gold me-3 rounded-circle" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">{{ loop.index }}</span>
+                                        <span class="text-white small">{{ entry.employee_name }}</span>
+                                    </div>
+                                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-10 small" style="font-size: 0.65rem;">{{ entry.present_count }} Present</span>
+                                </div>
+                                {% endfor %}
+                                {% if not employee_stats.leaderboard %}
+                                <div class="text-center py-5">
+                                    <div class="rounded-circle bg-white bg-opacity-10 p-3 d-inline-block mb-3">
+                                        <i class="bi bi-award text-white-50 fs-2"></i>
+                                    </div>
+                                    <p class="text-white-50">No leaderboard data available.</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Departmental Comparison Table -->
+                    <div class="col-md-8">
+                        <div class="card-glass p-4" style="height: 400px; overflow-y: auto;">
+                            <h5 class="text-white mb-4"><i class="bi bi-table me-2 text-info"></i>Departmental Participation Details</h5>
+                            <div class="table-responsive">
+                                <table class="table table-dark table-hover bg-transparent mb-0" style="border-collapse: separate; border-spacing: 0 8px;">
+                                    <thead>
+                                        <tr class="text-white-50 x-small border-secondary text-uppercase tracking-wider">
+                                            <th class="border-0">Department</th>
+                                            <th class="text-center border-0">Invited</th>
+                                            <th class="text-center border-0">Attended</th>
+                                            <th class="text-end border-0">Rate</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in employee_stats.dept_comparison %}
+                                        <tr class="border-0 card-glass bg-opacity-10" style="background-color: rgba(255,255,255,0.02);">
+                                            <td class="text-white py-3 border-0 rounded-start small">{{ row.dept }}</td>
+                                            <td class="text-center text-white-50 border-0 small">{{ row.invited }}</td>
+                                            <td class="text-center text-white-50 border-0 small">{{ row.attended }}</td>
+                                            <td class="text-end border-0 rounded-end">
+                                                <span class="badge bg-{{ 'success' if (row.rate | int) >= 80 else 'warning' if (row.rate | int) >= 50 else 'danger' }} bg-opacity-10 text-{{ 'success' if (row.rate | int) >= 80 else 'warning' if (row.rate | int) >= 50 else 'danger' }} border border-{{ 'success' if (row.rate | int) >= 80 else 'warning' if (row.rate | int) >= 50 else 'danger' }} border-opacity-25" style="font-size: 0.7rem;">
+                                                    {{ row.rate }}%
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                        {% if not employee_stats.dept_comparison %}
+                                        <tr>
+                                            <td colspan="4" class="text-center py-5 text-white-50 border-0">No data available for this date.</td>
+                                        </tr>
+                                        {% endif %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div> <!-- Close Row (Leaderboard & Dept Comparison) -->
+
+                <div class="row g-4 mb-4">
+                    <!-- Upcoming Events -->
+                    <div class="col-md-6">
+                        <div class="card-glass p-4" style="height: 350px;">
+                            <h5 class="text-white mb-4"><i class="bi bi-calendar-check me-2 text-primary"></i>Upcoming Employee Events</h5>
+                            <div class="list-group list-group-flush bg-transparent">
+                                {% for event in employee_stats.upcoming_events %}
+                                <div class="list-group-item bg-transparent border-0 border-bottom border-secondary border-opacity-25 px-0 py-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <div class="fw-bold text-white">{{ event.event_name }}</div>
+                                            <div class="text-white-50 small"><i class="bi bi-geo-alt me-1"></i>{{ event.location }}</div>
+                                        </div>
+                                        <div class="text-end">
+                                            <div class="badge bg-primary bg-opacity-10 text-primary mb-1">{{ event.date }}</div>
+                                            <div class="text-white-50 small">{{ event.time }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                                {% if not employee_stats.upcoming_events %}
+                                <div class="text-center py-5">
+                                    <div class="rounded-circle bg-white bg-opacity-10 p-3 d-inline-block mb-3">
+                                        <i class="bi bi-calendar-x text-white-50 fs-2"></i>
+                                    </div>
+                                    <p class="text-white-50">No upcoming events scheduled.</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Activity Stream -->
+                    <div class="col-md-6">
+                        <div class="card-glass p-4" style="height: 350px; overflow-y: auto;">
+                            <h5 class="text-white mb-4"><i class="bi bi-lightning-charge me-2 text-gold"></i>Recent Activity</h5>
+                            <div class="activity-timeline">
+                                {% for log in employee_stats.recent_activity %}
+                                <div class="d-flex mb-4">
+                                    <div class="flex-shrink-0 me-3">
+                                        <div class="rounded-circle bg-{{ 'success' if log.type == 'Entry' else 'danger' }} bg-opacity-10 p-2" style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;">
+                                            <i class="bi bi-person-{{ 'check' if log.type == 'Entry' else 'dash' }} text-{{ 'success' if log.type == 'Entry' else 'danger' }}"></i>
+                                        </div>
+                                    </div>
+                                    <div class="flex-grow-1 border-bottom border-secondary border-opacity-10 pb-2">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <span class="fw-bold text-white small">{{ log.employee_name }}</span>
+                                                <span class="text-white-50 x-small ms-1">{{ 'checked in to' if log.type == 'Entry' else 'checked out from' }}</span>
+                                                <div class="text-primary-gold x-small fw-bold mt-1">{{ log.event }}</div>
+                                            </div>
+                                            <span class="text-white-50" style="font-size: 0.65rem;">{{ log.time }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                                {% if not employee_stats.recent_activity %}
+                                <div class="text-center py-5">
+                                    <div class="rounded-circle bg-white bg-opacity-10 p-3 d-inline-block mb-3">
+                                        <i class="bi bi-activity text-white-50 fs-2"></i>
+                                    </div>
+                                    <p class="text-white-50">No recent activity recorded.</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div> <!-- Close Row (Upcoming & Activity) -->
+
                 <div class="text-end mt-4">
                     <a href="{{ url_for('admin_employees') }}" class="btn btn-outline-primary btn-sm">
                         <i class="bi bi-arrow-right-circle me-2"></i>View Detailed Employee Attendance Logs
@@ -611,17 +748,26 @@
                 });
             }
 
-            // Attendance Doughnut (Employee View)
+            // Participation Doughnut (Employee View)
             const attendanceCanvas = document.getElementById('attendanceChart');
             if (attendanceCanvas) {
-                const attendanceData = {{ employee_stats.attendance_data | tojson | safe }};
+                const deptData = {{ employee_stats.dept_participation | tojson | safe }};
+                const labels = deptData.map(d => d.name);
+                const values = deptData.map(d => d.value);
+
                 new Chart(attendanceCanvas, {
                     type: 'doughnut',
                     data: {
-                        labels: ['Present', 'Late', 'Absent'],
+                        labels: labels.length > 0 ? labels : ['No Data'],
                         datasets: [{
-                            data: attendanceData,
-                            backgroundColor: ['rgba(11, 125, 63, 0.8)', 'rgba(212, 175, 55, 0.8)', 'rgba(220, 53, 69, 0.8)'],
+                            data: values.length > 0 ? values : [100],
+                            backgroundColor: [
+                                'rgba(11, 125, 63, 0.8)',
+                                'rgba(212, 175, 55, 0.8)',
+                                'rgba(0, 123, 255, 0.8)',
+                                'rgba(111, 66, 193, 0.8)',
+                                'rgba(255, 193, 7, 0.8)'
+                            ],
                             borderColor: 'transparent',
                             hoverOffset: 15
                         }]
@@ -630,8 +776,8 @@
                         responsive: true,
                         maintainAspectRatio: false,
                         cutout: '75%',
-                        plugins: { 
-                            legend: { position: 'bottom', labels: { color: '#fff', usePointStyle: true, padding: 20 } }
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: '#fff', usePointStyle: true, padding: 10, font: { size: 10 } } }
                         }
                     }
                 });
@@ -641,10 +787,12 @@
             const tardinessCanvas = document.getElementById('tardinessChart');
             if (tardinessCanvas) {
                 const tardinessData = {{ employee_stats.tardiness_data | tojson | safe }};
+                const tardinessLabels = {{ employee_stats.tardiness_labels | tojson | safe }};
+
                 new Chart(tardinessCanvas, {
                     type: 'bar',
                     data: {
-                        labels: ['Educ', 'Eng', 'Nur', 'A&S', 'BA', 'IHM', 'CS'],
+                        labels: tardinessLabels,
                         datasets: [{
                             label: 'Avg Min Late',
                             data: tardinessData,

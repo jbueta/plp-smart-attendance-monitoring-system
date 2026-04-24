@@ -5,225 +5,126 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PLP Report - {{ report.title }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
-        body { background-color: #fff; color: #000; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 2rem; font-size: 14px; }
-        .report-header { border-bottom: 2px solid #000; padding-bottom: 1rem; margin-bottom: 2rem; }
-        .report-title { font-size: 24px; font-weight: bold; text-transform: uppercase; }
-        .logo-placeholder { width: 80px; height: 80px; background-color: #f8f9fa; border: 1px solid #dee2e6; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #6c757d; }
-        .meta-box { border: 1px solid #000; padding: 1rem; background-color: #f8f9fa; }
-        .summary-metric { text-align: center; padding: 1rem; border: 1px solid #dee2e6; }
-        .summary-metric h3 { margin: 0; font-size: 28px; font-weight: bold; color: #0b7d3f; }
-        th { background-color: #0b7d3f !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        .footer { margin-top: 3rem; border-top: 1px solid #dee2e6; padding-top: 1rem; font-size: 12px; color: #6c757d; }
+        body { font-family: Arial, sans-serif; padding: 2rem 0; background: #e9ecef; color: #000; font-size: 13px; }
+
+        .document-container {
+            background: #fff;
+            max-width: 950px;
+            margin: 0 auto;
+            padding: 40px 50px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+        }
+        .header-container { display: flex; align-items: flex-start; margin-bottom: 20px; }
+        .logos { display: flex; align-items: center; gap: 12px; }
+        .logo-img { height: 75px; object-fit: contain; }
+        .header-text { margin-left: auto; text-align: right; }
+        .header-blue-bar { background-color: #215A8E; color: white; padding: 4px 15px; font-weight: bold; font-size: 16px; letter-spacing: 1px; }
+        .header-subtext { font-size: 11px; margin-top: 2px; }
+        .report-title { text-align: center; font-weight: bold; text-transform: uppercase; font-size: 16px; margin-top: 15px; }
+        .report-date { text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 20px; text-transform: uppercase; }
+        .office-name { font-weight: bold; font-size: 13px; text-transform: uppercase; margin-bottom: 2px; }
+        .instruction { font-style: italic; font-size: 12px; margin-bottom: 5px; }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 50px;
+            font-weight: bold;
+            font-size: 11px;
+            text-transform: uppercase;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .badge-success { background-color: #d1e7dd !important; color: #0f5132 !important; border: 1px solid #badbcc !important; }
+        .badge-warning { background-color: #fff3cd !important; color: #664d03 !important; border: 1px solid #ffecb5 !important; }
+        .badge-danger { background-color: #f8d7da !important; color: #842029 !important; border: 1px solid #f5c2c7 !important; }
+        .badge-info { background-color: #cff4fc !important; color: #055160 !important; border: 1px solid #b6effb !important; }
+
+        table.report-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; border: 2px solid black !important; }
+        table.report-table th, table.report-table td { border: 1px solid black !important; padding: 6px 10px; font-size: 13px; vertical-align: middle; }
+        table.report-table th { background-color: #e9ecef !important; text-align: center; font-weight: bold; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+        .footer-section { margin-top: 30px; font-size: 12px; }
+        .signature-line { border-bottom: 1px solid black; width: 250px; margin-top: 40px; margin-bottom: 5px; }
+
         @media print {
-            body { padding: 0; }
-            button { display: none; }
+            body { padding: 0; background: #fff; }
+            .document-container { box-shadow: none; padding: 0; max-width: none; margin: 0; }
+            .d-print-none { display: none !important; }
             @page { margin: 1cm; }
         }
     </style>
 </head>
 <body>
 
-    <button onclick="window.print()" class="btn btn-primary d-print-none mb-4">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-printer me-2" viewBox="0 0 16 16">
-            <path d="M2.5 8a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z" />
-            <path d="M5 1a2 2 0 0 0-2 2v2H2a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1v1a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1V3a2 2 0 0 0-2-2H5zM4 3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2H4V3zm1 5a2 2 0 0 0-2 2v1H2a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v-1a2 2 0 0 0-2-2H5zm7 2v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1z" />
-        </svg>
-        Print / Save as PDF
-    </button>
+<div class="document-container" id="report-content">
 
-    <div class="report-header d-flex justify-content-between align-items-center">
-        <div class="d-flex align-items-center">
-            <div class="logo-placeholder me-3">
-                <img src="{{ url_for('static', filename='images/plp_logo.png') }}" alt="PLP Logo" style="max-width: 100%; max-height: 100%; object-fit: contain;"></div>
-            <div>
-                <div class="report-title">Pamantasan ng Lungsod ng Pasig</div>
-                <div class="text-secondary">Official Data Monitoring System</div>
-            </div>
+    <div class="header-container">
+        <div class="logos">
+            <img src="{{ url_for('static', filename='images/LOGO_Pasig Seal.png') }}" class="logo-img" alt="Pasig Seal">
+            <img src="{{ url_for('static', filename='images/LOGO_Pasig.png') }}" class="logo-img" alt="Pasig Umaagos">
+            <img src="{{ url_for('static', filename='images/plp_logo.png') }}" class="logo-img" alt="PLP Logo">
         </div>
-        <div class="text-end text-muted small">
-            Generated: <strong>{{ current_date }}</strong><br>
-            Reference: <strong>{{ report.reference_id }}</strong>
-        </div>
-    </div>
-
-    <div class="row mb-4">
-        <div class="col-8">
-            <h5 class="mb-3 text-uppercase">{{ report.title }}</h5>
-            <p class="mb-0"><strong>Event/Scope:</strong> {{ report.event_name }}</p>
-            <p class="mb-0"><strong>Target Department:</strong> {{ report.department }}</p>
-            <p class="mb-0"><strong>Date Filter:</strong> {{ report.date_range }}</p>
-        </div>
-        <div class="col-4">
-            <div class="meta-box small">
-                <strong>Prepared By:</strong> System Administrator<br>
-                <strong>Status:</strong> <span class="text-success fw-bold">FINAL</span><br>
-                <strong>Confidentiality:</strong> Internal Use Only
+        <div class="header-text">
+            <div class="header-blue-bar">PAMANTASAN NG LUNGSOD NG PASIG</div>
+            <div style="font-weight: bold; font-size: 13px; margin-top: 4px;">Office of the Human Resource Development</div>
+            <div class="header-subtext">Alkalde Jose St., Kapasigan Pasig City, Philippines 1600</div>
+            <div class="header-subtext">
+                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="currentColor" class="bi bi-telephone-fill" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.885.511a1.745 1.745 0 0 1 2.61.163L6.29 2.98c.329.423.445.974.315 1.494l-.547 2.19a.678.678 0 0 0 .178.643l2.457 2.457a.678.678 0 0 0 .644.178l2.189-.547a1.745 1.745 0 0 1 1.494.315l2.306 1.794c.829.645.905 1.87.163 2.611l-1.034 1.034c-.74.74-1.846 1.065-2.877.702a18.634 18.634 0 0 1-7.01-4.42 18.634 18.634 0 0 1-4.42-7.009c-.362-1.03-.037-2.137.703-2.877L1.885.511z"/></svg>
+                628-1014 Loc. 106 &nbsp;&nbsp;
+                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="currentColor" class="bi bi-envelope-fill" viewBox="0 0 16 16"><path d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555zM0 4.697v7.104l5.803-3.558L0 4.697zM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757zm3.436-.586L16 11.801V4.697l-5.803 3.546z"/></svg>
+                hrd@plpasig.edu.ph
             </div>
         </div>
     </div>
 
-    <div class="row g-3 mb-4">
-        {% set category = request.args.get('category', '').lower() %}
-        {% set type = request.args.get('type', '').lower() %}
-        
-        {% if category == 'general' %}
-            {% if type == 'student_entry_exit' %}
-                <!-- General Logs for Daily Student Entry/Exit Logs Metrics -->
-                <div class="col-4">
-                    <div class="summary-metric border rounded bg-light">
-                        <div class="text-secondary text-uppercase small fw-bold mb-1">Total Entry</div>
-                        <h3>{{ metrics.total_entry }}</h3>
-                    </div>
-                </div>
-                <div class="col-4">
-                    <div class="summary-metric border rounded bg-light">
-                        <div class="text-secondary text-uppercase small fw-bold mb-1">Peak Time Hour</div>
-                        <h3 style="color: #FF9800;">{{ metrics.peak_hour }}</h3>
-                    </div>
-                </div>
-                <div class="col-4">
-                    <div class="summary-metric border rounded bg-light">
-                        <div class="text-secondary text-uppercase small fw-bold mb-1">Avg Time Spent</div>
-                        <h3>{{ metrics.avg_time_spent }}</h3>
-                    </div>
-                </div>
-            {% elif type == 'daily_traffic' %}
-                <!-- General Logs for Daily Traffic Analysis Metrics -->
-                    <div class="col-4">
-                        <div class="summary-metric border rounded bg-light">
-                            <div class="text-secondary text-uppercase small fw-bold mb-1">Total Entry</div>
-                            <!-- <h3>{{ metrics.total_entry }}</h3> -->
-                             <h3>{{ metrics.total_entry }}</h3>
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <div class="summary-metric border rounded bg-light">
-                            <div class="text-secondary text-uppercase small fw-bold mb-1">Total Foot Traffic</div>
-                            <!-- <h3 style="color: #FF9800;">{{ metrics.total_foot_traffic }}</h3> -->
-                             <h3>{{ metrics.peak_hour }}</h3>
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <div class="summary-metric border rounded bg-light">
-                            <div class="text-secondary text-uppercase small fw-bold mb-1">Net Campus Population</div>
-                            <!-- <h3>{{ metrics.campus_population }}</h3> -->
-                            <h3>{{ metrics.avg_time_spent }}</h3>
-                        </div>
-                    </div>
-                </div>
-                <div class="row g-3 mb-4">
-                    <div class="col-4">
-                        <div class="summary-metric border rounded bg-light">
-                            <div class="text-secondary text-uppercase small fw-bold mb-1">Faculty/Staff Footprint</div>
-                            <h3>{{ metrics.total_entry }}</h3>
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <div class="summary-metric border rounded bg-light">
-                            <div class="text-secondary text-uppercase small fw-bold mb-1">Student Footprint</div>
-                            <h3 style="color: #FF9800;">{{ metrics.peak_hour }}</h3>
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <div class="summary-metric border rounded bg-light">
-                            <div class="text-secondary text-uppercase small fw-bold mb-1">Visitor Footprint</div>
-                            <h3>{{ metrics.avg_time_spent }}</h3>
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
+    <div class="report-title">{{ report.event_name if report.event_name else report.title }}</div>
+    <div class="report-date">DATE: {{ report.date_range }}</div>
 
-        {% elif category == 'visitor' %}
-            <!-- General Logs for Daily Student Entry/Exit Logs Metrics -->
-            <div class="col-4">
-                <div class="summary-metric border rounded bg-light">
-                    <div class="text-secondary text-uppercase small fw-bold mb-1">Total Entry</div>
-                    <h3>{{ metrics.total_entry }}</h3>
-                </div>
-            </div>
-            <div class="col-4">
-                <div class="summary-metric border rounded bg-light">
-                    <div class="text-secondary text-uppercase small fw-bold mb-1">Peak Time Hour</div>
-                    <h3 style="color: #FF9800;">{{ metrics.peak_hour }}</h3>
-                </div>
-            </div>
-            <div class="col-4">
-                <div class="summary-metric border rounded bg-light">
-                    <div class="text-secondary text-uppercase small fw-bold mb-1">Avg Time Spent</div>
-                    <h3>{{ metrics.avg_time_spent }}</h3>
-                </div>
-            </div>
-        {% elif category == 'event' %}
-        
-        {% elif category == 'violation' %}
+    <div class="office-name">NAME OF OFFICE: {{ report.department if report.department else 'ALL DEPARTMENTS' }}</div>
+    <div class="instruction">Please put a check (✔) in the opposite box if present; if absent write A and if late write L.</div>
 
-        {% else %}
-            <!-- Standard Event/Visitor Metrics -->
-            <div class="col-4">
-                <div class="summary-metric border rounded bg-light">
-                    <div class="text-secondary text-uppercase small fw-bold mb-1">Total Expected</div>
-                    <h3>{{ metrics.expected }}</h3>
-                </div>
-            </div>
-            <div class="col-4">
-                <div class="summary-metric border rounded bg-light">
-                    <div class="text-secondary text-uppercase small fw-bold mb-1">Total Present</div>
-                    <h3 style="color: #198754;">{{ metrics.present }}</h3>
-                </div>
-            </div>
-            <div class="col-4">
-                <div class="summary-metric border rounded bg-light">
-                    <div class="text-secondary text-uppercase small fw-bold mb-1">Attendance Rate</div>
-                    <h3>{{ metrics.rate }}</h3>
-                </div>
-            </div>
-        {% endif %}
-    </div>
-    
-    <h5 class="mb-3 text-uppercase">Detailed Action Logs</h5>
-    <table class="table table-bordered table-striped" style="border-color: #dee2e6;">
+    <table class="report-table">
         <thead>
             {% set category = request.args.get('category', '').lower() %}
-
             {% if category == 'general' %}
                 <tr>
-                    <th>#</th>
-                    <th>Name</th>
-                    <th>Role / Affiliation</th>
-                    <th>Time In</th>
-                    <th>Time Out</th>
-                    <th>Status</th>
-                    <th>Gate</th>
+                    <th style="width: 5%;">No.</th>
+                    <th style="width: 25%; text-align: left;">Name</th>
+                    <th style="width: 15%;">Role / Affiliation</th>
+                    <th style="width: 15%;">Time In</th>
+                    <th style="width: 15%;">Time Out</th>
+                    <th style="width: 15%;">Status</th>
+                    <th style="width: 10%;">Remarks</th>
                 </tr>
             {% elif category == 'visitor' %}
                 <tr>
-                    <th>#</th>
-                    <th>Visitor Name</th>
-                    <th>Purpose</th>
-                    <th>Time In</th>
-                    <th>Time Out</th>
-                    <th>Status</th>
+                    <th style="width: 5%;">No.</th>
+                    <th style="width: 25%; text-align: left;">Visitor Name</th>
+                    <th style="width: 20%;">Purpose</th>
+                    <th style="width: 15%;">Time In</th>
+                    <th style="width: 15%;">Time Out</th>
+                    <th style="width: 20%;">Status</th>
                 </tr>
             {% elif category == 'event' %}
                 <tr>
-                    <th>#</th>
-                    <th>Participant Name</th>
-                    <th>Role / Affiliation</th>
-                    <th>Time In</th>
-                    <th>Time Out</th>
-                    <th>Status</th>
-                    <th>Remarks</th>
+                    <th style="width: 5%;">No.</th>
+                    <th style="width: 25%; text-align: left;">Participant Name</th>
+                    <th style="width: 20%;">Role / Affiliation</th>
+                    <th style="width: 15%;">Time In</th>
+                    <th style="width: 15%;">Time Out</th>
+                    <th style="width: 20%;">Status</th>
                 </tr>
             {% else %}
                 <tr>
-                    <th>#</th>
-                    <th>Name</th>
-                    <th>Detail</th>
-                    <th>Time In</th>
-                    <th>Time Out</th>
-                    <th>Status</th>
-                    <th>Remarks</th>
+                    <th style="width: 5%;">No.</th>
+                    <th style="width: 30%; text-align: left;">Name</th>
+                    <th style="width: 20%;">Detail</th>
+                    <th style="width: 15%;">Time In</th>
+                    <th style="width: 15%;">Time Out</th>
+                    <th style="width: 15%;">Status</th>
                 </tr>
             {% endif %}
         </thead>
@@ -232,107 +133,173 @@
                 {% if category == 'general' %}
                     {% for log in logs %}
                     <tr>
-                        <td>{{ log.id }}</td>
-                        <td>{{ log.name }}</td>
-                        <td>{{ log.detail }}</td>
-                        <td>{{ log.time_in }}</td>
-                        <td>{{ log.time_out }}</td>
-                        <td>
+                        <td class="text-center">{{ loop.index }}</td>
+                        <td class="text-start">{{ log.name }}</td>
+                        <td class="text-center">{{ log.detail }}</td>
+                        <td class="text-center">{{ log.time_in }}</td>
+                        <td class="text-center">{{ log.time_out }}</td>
+                        <td class="text-center">
                             {% if log.status in ['Present', 'Entry'] %}
-                                <strong class="text-success">{{ log.status }}</strong>
+                                <span class="status-badge badge-success">{{ log.status }}</span>
                             {% elif log.status in ['Exit', 'Absent'] %}
-                                <strong class="text-danger">{{ log.status }}</strong>
+                                <span class="status-badge badge-danger">{{ log.status }}</span>
                             {% elif log.status == 'In Progress' %}
-                                <strong class="text-warning text-dark">In Progress</strong>
+                                <span class="status-badge badge-warning">{{ log.status }}</span>
                             {% else %}
-                                <strong class="text-info">{{ log.status }}</strong>
+                                <span class="status-badge badge-info">{{ log.status }}</span>
                             {% endif %}
                         </td>
-                        <td>{{ log.remarks }}</td>
+                        <td class="text-center">{{ log.remarks }}</td>
                     </tr>
                     {% endfor %}
-                    
+
                 {% elif category == 'visitor' %}
                     {% for log in logs %}
                     <tr>
-                        <td>{{ log.id }}</td>
-                        <td>{{ log.name }}</td>
-                        <td>{{ log.detail }}</td>
-                        <td>{{ log.time_in }}</td>
-                        <td>{{ log.time_out }}</td>
-                        <td>
+                        <td class="text-center">{{ loop.index }}</td>
+                        <td class="text-start">{{ log.name }}</td>
+                        <td class="text-center">{{ log.detail }}</td>
+                        <td class="text-center">{{ log.time_in }}</td>
+                        <td class="text-center">{{ log.time_out }}</td>
+                        <td class="text-center">
                             {% if log.status in ['Present', 'Entry'] %}
-                                <strong class="text-success">{{ log.status }}</strong>
+                                <span class="status-badge badge-success">{{ log.status }}</span>
                             {% elif log.status in ['Exit', 'Absent'] %}
-                                <strong class="text-danger">{{ log.status }}</strong>
+                                <span class="status-badge badge-danger">{{ log.status }}</span>
                             {% else %}
-                                <strong class="text-info">{{ log.status }}</strong>
+                                <span class="status-badge badge-info">{{ log.status }}</span>
                             {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
-                    
+
                 {% elif category == 'event' %}
                     {% for log in logs %}
                     <tr>
-                        <td>{{ log.id }}</td>
-                        <td>{{ log.name }}</td>
-                        <td>{{ log.detail }}</td>
-                        <td>{{ log.time_in }}</td>
-                        <td>{{ log.time_out }}</td>
-                        <td>
-                            {% if log.status in ['Present', 'Late'] %}
-                                <strong class="text-success">{{ log.status }}</strong>
+                        <td class="text-center">{{ loop.index }}</td>
+                        <td class="text-start">{{ log.name }}</td>
+                        <td class="text-center">{{ log.detail }}</td>
+                        <td class="text-center">{{ log.time_in }}</td>
+                        <td class="text-center">{{ log.time_out }}</td>
+                        <td class="text-center">
+                            {% if log.status in ['Present'] %}
+                                <span class="status-badge badge-success">{{ log.status }}</span>
+                            {% elif log.status in ['Late'] %}
+                                <span class="status-badge badge-warning">{{ log.status }}</span>
                             {% elif log.status in ['Absent', 'Excused'] %}
-                                <strong class="text-danger">{{ log.status }}</strong>
+                                <span class="status-badge badge-danger">{{ log.status }}</span>
                             {% else %}
-                                <strong class="text-info">{{ log.status }}</strong>
+                                <span class="status-badge badge-info">{{ log.status }}</span>
                             {% endif %}
                         </td>
-                        <td>{{ log.remarks }}</td>
                     </tr>
                     {% endfor %}
-                    
+
                 {% else %}
                     {% for log in logs %}
                     <tr>
-                        <td>{{ log.id }}</td>
-                        <td>{{ log.name }}</td>
-                        <td>{{ log.detail }}</td>
-                        <td>{{ log.time_in if log.time_in else 'N/A' }}</td>
-                        <td>{{ log.time_out if log.time_out else 'N/A' }}</td>
-                        <td>
+                        <td class="text-center">{{ loop.index }}</td>
+                        <td class="text-start">{{ log.name }}</td>
+                        <td class="text-center">{{ log.detail }}</td>
+                        <td class="text-center">{{ log.time_in if log.time_in else 'N/A' }}</td>
+                        <td class="text-center">{{ log.time_out if log.time_out else 'N/A' }}</td>
+                        <td class="text-center">
                             {% if log.status in ['Present', 'Late'] %}
-                                <strong class="text-success">{{ log.status }}</strong>
+                                <span class="status-badge badge-success">{{ log.status }}</span>
                             {% elif log.status in ['Absent', 'Exit'] %}
-                                <strong class="text-danger">{{ log.status }}</strong>
+                                <span class="status-badge badge-danger">{{ log.status }}</span>
                             {% else %}
-                                <strong class="text-info">{{ log.status }}</strong>
+                                <span class="status-badge badge-info">{{ log.status }}</span>
                             {% endif %}
                         </td>
-                        <td>{{ log.remarks }}</td>
                     </tr>
                     {% endfor %}
-                    
                 {% endif %}
             {% else %}
                 <tr>
-                    <td colspan="8" class="text-center py-3">No records found for this date range.</td>
+                    <td colspan="10" class="text-center py-4">No records found for this date range.</td>
                 </tr>
             {% endif %}
         </tbody>
     </table>
 
-    <div class="mt-5">
-        <p class="mb-5">Certified Correct By:</p>
-        <div style="width: 250px; border-bottom: 1px solid #000; margin-bottom: 5px;"></div>
-        <p class="text-muted small">Signature over Printed Name</p>
+    <div class="footer-section">
+        <div>Recorded by HRD Personnel</div>
+        <div style="margin-bottom: 20px;">Attendance checked/monitored by:</div>
+
+        <div class="signature-line"></div>
+        <div style="padding-left: 20px;">Signature Over Printed Name</div>
+        <div style="padding-left: 60px;">Head of Office</div>
+        <div style="margin-top: 30px; font-size: 11px;">* All erasures / corrections shall be countersigned by the HRD Head</div>
     </div>
 
-    <div class="footer d-flex justify-content-between">
-        <span>Pamantasan ng Lungsod ng Pasig - Data Privacy Compliance</span>
-        <span>Page 1 of 1</span>
+    <div class="d-flex justify-content-end mt-5 d-print-none pb-4">
+        <div class="btn-group">
+            <button type="button" class="btn btn-primary px-4 py-2" onclick="window.print()">
+                <i class="bi bi-file-earmark-bar-graph me-2"></i> Export Options
+            </button>
+            <button type="button" class="btn btn-primary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                <span class="visually-hidden">Toggle Dropdown</span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow">
+                <li><a class="dropdown-item py-2 fw-bold" href="#" onclick="window.print()"><i class="bi bi-printer me-2 text-primary"></i> Print Document</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item py-2 fw-bold" href="#" onclick="downloadPDF()"><i class="bi bi-file-pdf me-2 text-danger"></i> Download as PDF</a></li>
+                <li><a class="dropdown-item py-2 fw-bold" href="#" onclick="exportTableToCSV('Report_{{ report.date_range | replace(' ', '_') }}.csv')"><i class="bi bi-filetype-csv me-2 text-success"></i> Download as CSV</a></li>
+            </ul>
+        </div>
     </div>
+</div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <script>
+        function downloadPDF() {
+            // Hide the button container during PDF generation
+            const printBtn = document.querySelector('.d-print-none');
+            printBtn.style.display = 'none';
+
+            var opt = {
+                margin:       0.5,
+                filename:     'Report_{{ report.date_range | replace(" ", "_") }}.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2 },
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(document.getElementById('report-content')).save().then(() => {
+                printBtn.style.display = 'flex';
+            });
+        }
+
+        function exportTableToCSV(filename) {
+            let csv = [];
+            let rows = document.querySelectorAll("table.report-table tr");
+
+            for (let i = 0; i < rows.length; i++) {
+                let row = [], cols = rows[i].querySelectorAll("td, th");
+
+                for (let j = 0; j < cols.length; j++) {
+                    let text = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, "").trim();
+                    text = text.replace(/"/g, '""');
+                    if (text.search(/("|,|\n)/g) >= 0) {
+                        text = '"' + text + '"';
+                    }
+                    row.push(text);
+                }
+                csv.push(row.join(","));
+            }
+
+            let csvFile = new Blob([csv.join("\n")], {type: "text/csv"});
+            let downloadLink = document.createElement("a");
+            downloadLink.download = filename;
+            downloadLink.href = window.URL.createObjectURL(csvFile);
+            downloadLink.style.display = "none";
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+        }
+    </script>
 </body>
 </html>

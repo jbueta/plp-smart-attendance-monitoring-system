@@ -32,6 +32,7 @@
                     <!-- Check In Form -->
                     <div class="tab-pane fade show active" id="checkin" role="tabpanel">
                         <form action="{{ url_for('visitor_checkin') }}" method="POST">
+                            <input type="hidden" name="source" value="kiosk_visitor">
                             <div class="mb-3">
                                 <label class="form-label text-white-50">Full Name <span
                                         class="text-danger">*</span></label>
@@ -41,7 +42,7 @@
                             <div class="mb-3">
                                 <label class="form-label text-white-50">Purpose of Visit <span
                                         class="text-danger">*</span></label>
-                                <select name="purpose" class="form-select bg-dark text-white border-secondary" required>
+                                <select name="purpose" class="form-select bg-dark text-white border-secondary visitor-purpose-select" required>
                                     <option value="" selected disabled>Select Purpose</option>
                                     <option>Official Business</option>
                                     <option>Document Submission</option>
@@ -51,11 +52,10 @@
                                     <option>Other</option>
                                 </select>
                             </div>
-                            <div class="mb-4">
-                                <label class="form-label text-white-50">Person/Office to Visit</label>
-                                <input type="text" name="details"
-                                    class="form-control bg-dark text-white border-secondary"
-                                    placeholder="e.g. Registrar's Office">
+                            <div class="mb-3 d-none visitor-details-group">
+                                <label class="form-label text-white-50">Specify Purpose <span class="text-danger">*</span></label>
+                                <input type="text" name="details" class="form-control bg-dark text-white border-secondary visitor-details-input"
+                                    placeholder="Enter the custom purpose">
                             </div>
                             <div class="d-grid">
                                 <button type="submit" class="btn btn-primary-gold p-3 fw-bold text-uppercase">
@@ -79,4 +79,30 @@
     </div>
 
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('form').forEach(form => {
+            const purposeSelect = form.querySelector('.visitor-purpose-select');
+            const detailsGroup = form.querySelector('.visitor-details-group');
+            const detailsInput = form.querySelector('.visitor-details-input');
+
+            if (!purposeSelect || !detailsGroup || !detailsInput) return;
+
+            const syncVisitorDetails = () => {
+                const isOther = (purposeSelect.value || '').trim().toLowerCase() === 'other';
+                detailsGroup.classList.toggle('d-none', !isOther);
+                detailsInput.required = isOther;
+                if (!isOther) {
+                    detailsInput.value = '';
+                }
+            };
+
+            purposeSelect.addEventListener('change', syncVisitorDetails);
+            syncVisitorDetails();
+        });
+    });
+</script>
 {% endblock %}

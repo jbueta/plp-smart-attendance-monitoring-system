@@ -76,11 +76,11 @@
 {% block extra_js %}
 <script>
     function fetchLiveEvents() {
-        fetch('http://127.0.0.1:5000/api/kiosk/live-events')
+        fetch('/api/kiosk/live-events')
             .then(response => response.json())
             .then(data => {
                 console.log(data);
-                if (data.status === 'success') {
+                if (data.success) {
                     updateEventsGrid(data.events);
                 }
             })

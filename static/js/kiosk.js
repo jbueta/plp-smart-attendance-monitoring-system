@@ -1,5 +1,7 @@
 /* Kiosk functionality - Student and Employee */
 
+const backendBaseUrl = window.APP_CONFIG?.backendApiUrl || 'http://127.0.0.1:5001';
+
 /**
  * Format a datetime string to 12-hour time (e.g., "7:45 AM")
  */
@@ -136,7 +138,7 @@ function appendToLiveFeed(name, affiliation, logType) {
  */
 function loadEventAttendance(instanceId) {
     console.log(`Loading event logs for instance ${instanceId}`);
-    fetch(`http://127.0.0.1:5001/admin/instances/${instanceId}/get-logs`)
+    fetch(`${backendBaseUrl}/admin/instances/${instanceId}/get-logs`)
         .then(response => {
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             return response.json();
@@ -178,7 +180,7 @@ function submitManualEntry(type, manualId = null) {
     
     if (isEventKiosk) {
         console.log('Sending manual entry request:', { employee_id: id, event_id: window.currentEventId });
-        fetch('http://127.0.0.1:5001/api/events/manual_entry', {
+        fetch(`${backendBaseUrl}/api/events/manual_entry`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -227,7 +229,7 @@ function submitManualEntry(type, manualId = null) {
         });
     } else {
         // Fallback to general authentication (students, visitor, etc.)
-        fetch('http://127.0.0.1:5001/admin/user/authentication', {
+        fetch(`${backendBaseUrl}/admin/user/authentication`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: id })

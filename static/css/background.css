@@ -1,9 +1,9 @@
 /* Background Styles */
 body {
-    background-color: #051a10;
+    background-color: #051A0A;
     /* Fallback */
     /* Set the static image as the primary background */
-    background-image: url('../images/bg-main.png');
+    background-image: url('../images/bg-main-minimal-green.png');
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
@@ -13,8 +13,27 @@ body {
     min-height: 100vh;
 }
 
-/* Create the animated overlay */
+/* Blurred, dimmed actual background image layer */
 body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -2;
+    background-image: url('../images/bg-main-deep-green.png');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    filter: blur(14px) brightness(0.65);
+    /* Heavily blurred and dimmed to push background backwards */
+    transform: scale(1.05);
+    /* Prevent blur edges from showing */
+}
+
+/* Create the animated overlay */
+body::after {
     content: "";
     /* Required for pseudo-element */
     position: fixed;
@@ -23,20 +42,12 @@ body::before {
     width: 100%;
     height: 100%;
     z-index: -1;
-    /* Place it behind the content but (conceptually) "above" the static bg image if we weren't on the body itself. 
-                  Since it's a child of body, we need to be careful. 
-                  Actually, if it's z-index -1, it goes behind the body content.
-                  To ensure it overlays the background image but stays under content:
-                  1. The body has the image.
-                  2. This element covers the body.
-                  3. If body content has z-index > -1 (default auto is stack context), it should be fine.
-                  */
 
     /* The moving gradients - boosted visibility */
     background-image:
-        radial-gradient(circle at 15% 50%, rgba(11, 125, 63, 0.4), transparent 50%),
+        radial-gradient(circle at 15% 50%, rgba(30, 200, 110, 0.2), transparent 50%),
         /* Stronger Green */
-        radial-gradient(circle at 85% 30%, rgba(212, 175, 55, 0.4), transparent 50%);
+        radial-gradient(circle at 85% 30%, rgba(200, 255, 100, 0.15), transparent 50%);
     /* Stronger Gold */
 
     background-size: 200% 200%;
@@ -44,6 +55,19 @@ body::before {
     pointer-events: none;
     /* Ensure clicks pass through */
     /* Removed mix-blend-mode for better visibility */
+}
+
+/* Vignette and dimming overlay for better background readability */
+.vignette-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    /* Very light, minimal vignette so it sits idly */
+    background: radial-gradient(circle at center, transparent 40%, rgba(0, 30, 10, 0.4) 150%);
+    pointer-events: none;
 }
 
 @keyframes ambientShift {

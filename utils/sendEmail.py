@@ -1,33 +1,33 @@
+import os
 import smtplib
 from email.message import EmailMessage
 
+from dotenv import load_dotenv
 
-function sendEmail(str:subject, str:body, str:recipient):
-    # CREDENTIALS
-    SENDER_EMAIL = "your_email@gmail.com"
-    SENDER_PASSWORD = "your_16_digit_app_password_here" 
-    RECEIVER_EMAIL = recipient
+load_dotenv()
 
-    # CONSTRUCT
-    msg = EmailMessage()
-    msg['Subject'] = subject
-    msg['From'] = SENDER_EMAIL
-    msg['To'] = RECEIVER_EMAIL
-    msg.set_content(body)
 
-    # SEND
-    SMTP_SERVER = "smtp.gmail.com"
-    PORT = 465 
+def send_email(subject, body, recipient, sender_email=None, sender_password=None):
+    """Send a plain-text email using SMTP credentials from the environment."""
 
-    try:
-        print("Connecting to server...")
-        # Using 'with' ensures the server connection is closed automatically
-        with smtplib.SMTP_SSL(SMTP_SERVER, PORT) as server:
-            server.login(SENDER_EMAIL, SENDER_PASSWORD)
-            server.send_message(msg)
-            
-        print("Success! Email sent.")
-    except smtplib.SMTPAuthenticationError:
-        print("Error: Authentication failed. Did you use an App Password?")
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+    sender_email = sender_email or os.getenv("SENDER_EMAIL", "")
+    sender_password = sender_password or os.getenv("SENDER_PASSWORD", "")
+    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "465"))
+
+    if not sender_email or not sender_password:
+        raise ValueError("Missing SMTP credentials. Set SENDER_EMAIL and SENDER_PASSWORD in .env.")
+
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["From"] = sender_email
+    message["To"] = recipient
+    message.set_content(body)
+
+    with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
+        server.login(sender_email, sender_password)
+        server.send_message(message)
+
+
+# Backward-compatible alias for older imports.
+sendEmail = send_email
