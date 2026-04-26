@@ -823,6 +823,9 @@ END
 $$
 DELIMITER ;
 
+ALTER TABLE `visitors`
+MODIFY COLUMN `purpose` ENUM('Official Business', 'Document Submission', 'Inquiry', 'Meeting', 'Delivery', 'Other') NOT NULL;
+
 SET FOREIGN_KEY_CHECKS=1;
 COMMIT;
 
