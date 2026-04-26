@@ -1,6 +1,9 @@
 /* Reports management functionality */
 
 const frontendBaseUrl = window.location.origin;
+let reportDepartments = [];
+let reportCourses = [];
+let visitorPurposes = ['Official Business', 'Document Submission', 'Inquiry', 'Meeting', 'Delivery', 'Other'];
 
 function generateReport() {
 
@@ -164,30 +167,76 @@ function fetch_departments() {
     fetch(`${frontendBaseUrl}/api/retrieve/departments`)
         .then(response => response.json())
         .then(data => {
-            populateDepartmentTypes(data);
+            reportDepartments = Array.isArray(data) ? data : [];
+            populateFilterOptions(document.getElementById('report-category').value);
         })
         .catch(error => console.error("Error fetching departments:", error));
 }
 
-function populateDepartmentTypes(departments) {
+function fetch_courses() {
+    fetch(`${frontendBaseUrl}/api/retrieve/courses`)
+        .then(response => response.json())
+        .then(data => {
+            reportCourses = Array.isArray(data) ? data : [];
+            populateFilterOptions(document.getElementById('report-category').value);
+        })
+        .catch(error => console.error("Error fetching courses:", error));
+}
+
+function fetch_visitor_purposes() {
+    fetch(`${frontendBaseUrl}/api/retrieve/visitor-purposes`)
+        .then(response => response.json())
+        .then(data => {
+            visitorPurposes = Array.isArray(data) && data.length > 0 ? data : visitorPurposes;
+            populateFilterOptions(document.getElementById('report-category').value);
+        })
+        .catch(error => console.error("Error fetching visitor purposes:", error));
+}
+
+function addFilterOption(select, value, text) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = text;
+    select.appendChild(option);
+}
+
+function populateFilterOptions(category) {
     const filterSelect = document.getElementById('report-filter');
+    const filterLabel = document.getElementById('report-filter-label');
     filterSelect.innerHTML = ''; 
 
-    const defaultOption = document.createElement('option');
-    defaultOption.value = 'All'; 
-    defaultOption.textContent = 'All Departments';
-    filterSelect.appendChild(defaultOption);
-
-    if (departments && departments.length > 0) {
-        departments.forEach(dept => {
-            const option = document.createElement('option');
-            
-            option.value = dept.department_id; 
-            option.textContent = dept.department_name;
-            
-            filterSelect.appendChild(option);
+    if (category === 'general') {
+        filterLabel.textContent = 'Student Program';
+        addFilterOption(filterSelect, 'All', 'All Programs');
+        reportCourses.forEach(course => {
+            addFilterOption(filterSelect, course.course_id, course.course_name);
         });
+        return;
     }
+
+    if (category === 'visitor') {
+        filterLabel.textContent = 'Visitor Purpose';
+        addFilterOption(filterSelect, 'All', 'All Purposes');
+        visitorPurposes.forEach(purpose => {
+            addFilterOption(filterSelect, purpose, purpose);
+        });
+        return;
+    }
+
+    if (category === 'event') {
+        filterLabel.textContent = 'Employee Department';
+        addFilterOption(filterSelect, 'All', 'All Departments');
+        reportDepartments.forEach(dept => {
+            addFilterOption(filterSelect, dept.department_id, dept.department_name);
+        });
+        return;
+    }
+
+    filterLabel.textContent = 'Violation Subject';
+    addFilterOption(filterSelect, 'All', 'All Subjects');
+    addFilterOption(filterSelect, 'student', 'Students');
+    addFilterOption(filterSelect, 'visitor', 'Visitors');
+    addFilterOption(filterSelect, 'employee', 'Employees');
 }
 
 function handleDateConstraint() {
@@ -230,6 +279,8 @@ function handleDateConstraint() {
 document.addEventListener('DOMContentLoaded', () => {
     
     fetch_departments();
+    fetch_courses();
+    fetch_visitor_purposes();
     fetch_events();
 
     const categorySelect = document.getElementById('report-category');
@@ -238,6 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. Listen for Category Changes to populate the Detailed Report Type dropdown
     categorySelect.addEventListener('change', function() {
         populateReportTypes(this.value);
+        populateFilterOptions(this.value);
     });
 
     // 3. Listen for Report Type changes to toggle the Date Constraint UI

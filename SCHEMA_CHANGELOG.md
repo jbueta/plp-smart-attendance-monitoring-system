@@ -2,6 +2,31 @@
 
 This file tracks schema decisions, repo-to-database alignment, and proposed DB changes for team discussion.
 
+## 2026-04-26
+
+### Event Creation Required Fields
+
+Event creation is now guarded in the UI, frontend bridge, backend API, and database model before inserts are attempted.
+
+Schema impact in `schema.sql`:
+- `events.event_name`, `event_type`, `frequency`, `event_date`, `time_start`, `time_end`, `location`, and `active` are marked `NOT NULL`
+- `events.frequency` and `events.active` keep their defaults
+- `events.day` remains nullable because it is required only for weekly events
+
+For an existing local database, apply equivalent `ALTER TABLE events ... MODIFY ... NOT NULL` changes after cleaning any incomplete event rows.
+
+### Visitor Purpose Enum Alignment
+
+The checked-in visitor schema is aligned with the live `visitors.purpose` enum:
+- `Official Business`
+- `Document Submission`
+- `Inquiry`
+- `Meeting`
+- `Delivery`
+- `Other`
+
+Application validation now rejects purposes outside that enum. When purpose is `Other`, `visitors.details` is treated as the required visit description. The schema includes a check constraint for that conditional requirement.
+
 ## 2026-04-23
 
 ### Repo Realigned To Current Local MariaDB Schema

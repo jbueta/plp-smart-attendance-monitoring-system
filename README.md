@@ -103,3 +103,13 @@ plp_monitoring_system/
 
 `app.py` serves the frontend/UI on port `5000`.
 `app_extension.py` serves the API/backend on port `5001`.
+
+### Event Instance Background Job
+
+`app_extension.py` starts a dependency-free background scheduler with the backend API. While the backend is running, it checks every `INSTANCE_GENERATOR_CHECK_SECONDS` seconds and runs the weekly event instance generator once on Sundays. The generation endpoint remains available for Windows Task Scheduler or another external cron:
+
+```bash
+curl -X POST http://127.0.0.1:5001/admin/generate-daily-instances
+```
+
+The frontend polls `/admin/generate-daily-instances/status` and shows a bottom-left notification while the job is running or when it finishes.

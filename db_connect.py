@@ -5,6 +5,24 @@ import mysql.connector as connector
 from werkzeug.security import check_password_hash
 
 
+VISITOR_PURPOSES = (
+    "Official Business",
+    "Document Submission",
+    "Inquiry",
+    "Meeting",
+    "Delivery",
+    "Other",
+)
+
+
+def normalize_visitor_purpose(value):
+    raw_value = (value or "").strip()
+    for purpose in VISITOR_PURPOSES:
+        if raw_value.lower() == purpose.lower():
+            return purpose
+    return None
+
+
 def _format_hour_label(hour_value):
     if hour_value is None:
         return "N/A"
@@ -124,7 +142,8 @@ class Database:
 
     def change_status(self):
         try:
-            user_id, current_status, role = self.parameter
+            user_id, current_status, role = self.parameter[:3]
+            requested_log_type = self.parameter[3] if len(self.parameter) > 3 else None
             current_status = (current_status or "Outside").lower()
 
             self.cursor.execute(
@@ -143,7 +162,11 @@ class Database:
             today_date = now.date()
             forgot_to_timeout = False
 
-            if current_status == "inside":
+            if requested_log_type == "Entry":
+                new_status = "Inside"
+            elif requested_log_type == "Exit":
+                new_status = "Outside"
+            elif current_status == "inside":
                 if last_log and last_log["timestamp"].date() == today_date:
                     new_status = "Outside"
                 else:
@@ -197,16 +220,18 @@ class Database:
     def add_visitor_log(self):
         try:
             visitor_name = (self.parameter[0] or "").strip()
-            purpose = (self.parameter[1] or "").strip()
+            purpose = normalize_visitor_purpose(self.parameter[1])
             details = (self.parameter[2] or "").strip() if len(self.parameter) > 2 else ""
             gate = self.parameter[3] if len(self.parameter) > 3 else "Gate 1"
 
-            if not visitor_name or not purpose:
-                return {"success": False, "message": "Visitor name and purpose are required."}
-            if purpose.lower() == "other" and not details:
-                return {"success": False, "message": "Please specify the visitor purpose details."}
+            if not visitor_name:
+                return {"success": False, "message": "Visitor name is required."}
+            if not purpose:
+                return {"success": False, "message": "Select a valid visitor purpose."}
+            if purpose == "Other" and not details:
+                return {"success": False, "message": "Visit description is required when purpose is Other."}
 
-            normalized_details = details if purpose.lower() == "other" else None
+            normalized_details = details if purpose == "Other" else None
 
             self.cursor.execute(
                 "INSERT INTO users (role, active) VALUES (%s, %s)",
@@ -370,18 +395,19 @@ class Database:
         try:
             visitor_id = self.parameter[0]
             visitor_name = self.parameter[1]
-            purpose = self.parameter[2]
+            purpose = normalize_visitor_purpose(self.parameter[2])
             details = self.parameter[3] if len(self.parameter) > 3 else ""
             visitor_name = (visitor_name or "").strip()
-            purpose = (purpose or "").strip()
             details = (details or "").strip()
 
-            if not visitor_name or not purpose:
-                return {"success": False, "message": "Visitor name and purpose are required."}
-            if purpose.lower() == "other" and not details:
-                return {"success": False, "message": "Please specify the visitor purpose details."}
+            if not visitor_name:
+                return {"success": False, "message": "Visitor name is required."}
+            if not purpose:
+                return {"success": False, "message": "Select a valid visitor purpose."}
+            if purpose == "Other" and not details:
+                return {"success": False, "message": "Visit description is required when purpose is Other."}
 
-            normalized_details = details if purpose.lower() == "other" else None
+            normalized_details = details if purpose == "Other" else None
 
             self.cursor.execute(
                 """
@@ -561,8 +587,78 @@ class Database:
                 participants_type,
             ) = self.parameter
 
+            def is_blank(value):
+                return value is None or str(value).strip() == ""
+
+            required_values = {
+                "event name": event_name,
+                "event type": event_type,
+                "frequency": frequency,
+                "start time": time_start,
+                "end time": time_end,
+                "location": location,
+                "participants type": participants_type,
+            }
+            missing_values = [label for label, value in required_values.items() if is_blank(value)]
+            if missing_values:
+                return {"success": False, "message": f"Missing required fields: {', '.join(missing_values)}."}
+
+            event_name = str(event_name).strip()
+            event_type = str(event_type).strip()
+            frequency = str(frequency).strip().upper()
+            day = str(day).strip() if day is not None else None
+            location = str(location).strip()
+            participants_type = str(participants_type).strip().lower()
+            if frequency not in {"ONCE", "DAILY", "WEEKLY"}:
+                return {"success": False, "message": "Invalid event frequency."}
+
             if frequency == "DAILY" and not event_date:
                 event_date = date.today().isoformat()
+
+            if frequency != "DAILY" and is_blank(event_date):
+                return {"success": False, "message": "Event date is required."}
+
+            if frequency == "WEEKLY" and str(day or "").strip() not in {
+                "Sunday",
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday",
+                "Saturday",
+            }:
+                return {"success": False, "message": "Event day is required for weekly events."}
+
+            try:
+                parsed_event_date = (
+                    event_date
+                    if isinstance(event_date, date)
+                    else datetime.strptime(str(event_date), "%Y-%m-%d").date()
+                )
+            except ValueError:
+                return {"success": False, "message": "Event date must use YYYY-MM-DD format."}
+
+            if parsed_event_date < date.today():
+                return {"success": False, "message": "Event date cannot be in the past."}
+
+            try:
+                parsed_start = datetime.strptime(str(time_start), "%H:%M:%S").time()
+            except ValueError:
+                try:
+                    parsed_start = datetime.strptime(str(time_start), "%H:%M").time()
+                except ValueError:
+                    return {"success": False, "message": "Start time must use HH:MM format."}
+
+            try:
+                parsed_end = datetime.strptime(str(time_end), "%H:%M:%S").time()
+            except ValueError:
+                try:
+                    parsed_end = datetime.strptime(str(time_end), "%H:%M").time()
+                except ValueError:
+                    return {"success": False, "message": "End time must use HH:MM format."}
+
+            if parsed_end <= parsed_start:
+                return {"success": False, "message": "End time must be later than start time."}
 
             if frequency == "WEEKLY":
                 query = """
@@ -1228,18 +1324,28 @@ class Database:
         raw_logs = []
         total_expected = 0
         total_present = 0
+        filter_display = "All"
 
         try:
-            dept_condition = ""
-            dept_params = []
-            if department_filter and str(department_filter).lower() != "all":
-                dept_condition = "AND d.department_id = %s"
-                dept_params = [department_filter]
+            filter_value = str(department_filter or "All").strip()
 
             if normalized_category == "Event Attendance":
                 report_title = "Event Attendance Report"
                 event_name_display = "Scheduled Event"
                 col_headers = ["Participant Name", "Role / Affiliation", "Time In", "Time Out", "Status", "Remarks"]
+                dept_condition = ""
+                dept_params = []
+                if filter_value.lower() != "all":
+                    dept_condition = "AND d.department_id = %s"
+                    dept_params = [filter_value]
+                    cursor.execute(
+                        "SELECT department_name FROM departments WHERE department_id = %s",
+                        (filter_value,),
+                    )
+                    dept_row = cursor.fetchone()
+                    filter_display = dept_row["department_name"] if dept_row else filter_value
+                else:
+                    filter_display = "All Departments"
 
                 cursor.execute("SELECT event_name FROM events WHERE event_id = %s", (report_type,))
                 event_info = cursor.fetchone()
@@ -1248,20 +1354,10 @@ class Database:
 
                 query = f"""
                     SELECT
-                        COALESCE(e.employee_name, s.student_name, v.visitor_name, a.username, 'Unknown User') AS name,
+                        COALESCE(e.employee_name, 'Unknown Employee') AS name,
                         CONCAT(
-                            UPPER(u.role),
-                            ' - ',
-                            COALESCE(
-                                d.department_name,
-                                c.course_name,
-                                CASE
-                                    WHEN LOWER(COALESCE(v.purpose, '')) = 'other'
-                                    THEN NULLIF(TRIM(v.details), '')
-                                    ELSE NULLIF(TRIM(v.purpose), '')
-                                END,
-                                'N/A'
-                            )
+                            'EMPLOYEE - ',
+                            COALESCE(d.department_name, 'N/A')
                         ) AS detail,
                         LOWER(TRIM(DATE_FORMAT(ea.first_in, '%l:%i %p'))) AS time_in,
                         LOWER(TRIM(DATE_FORMAT(ea.last_out, '%l:%i %p'))) AS time_out,
@@ -1270,24 +1366,28 @@ class Database:
                     FROM event_attendance ea
                     JOIN event_instances ei ON ea.instance_id = ei.instance_id
                     JOIN users u ON ea.user_id = u.user_id
-                    LEFT JOIN employees e ON u.user_id = e.user_id
+                    JOIN employees e ON u.user_id = e.user_id
                     LEFT JOIN departments d ON e.department_id = d.department_id
-                    LEFT JOIN students s ON u.user_id = s.user_id
-                    LEFT JOIN courses c ON s.course_id = c.course_id
-                    LEFT JOIN visitors v ON u.user_id = v.user_id
-                    LEFT JOIN admin a ON u.user_id = a.user_id
                     WHERE ei.event_id = %s
                       AND ei.event_date BETWEEN %s AND %s
+                      AND u.role = 'employee'
                       {dept_condition}
                     ORDER BY ea.first_in ASC, name ASC
                 """
                 cursor.execute(query, [report_type, start_date, end_date] + dept_params)
                 raw_logs = cursor.fetchall()
 
-                cursor.execute(
-                    "SELECT COUNT(*) AS count FROM event_participants WHERE event_id = %s",
-                    (report_type,),
-                )
+                expected_query = f"""
+                    SELECT COUNT(*) AS count
+                    FROM event_participants ep
+                    JOIN users u ON ep.user_id = u.user_id
+                    JOIN employees e ON ep.user_id = e.user_id
+                    LEFT JOIN departments d ON e.department_id = d.department_id
+                    WHERE ep.event_id = %s
+                      AND u.role = 'employee'
+                      {dept_condition}
+                """
+                cursor.execute(expected_query, [report_type] + dept_params)
                 expected_result = cursor.fetchone()
                 total_expected = expected_result["count"] if expected_result else 0
                 total_present = sum(1 for log in raw_logs if log["status"] in {"Present", "Late"})
@@ -1295,29 +1395,34 @@ class Database:
             elif normalized_category == "Visitor Logs":
                 report_title = "Visitor Logs Report"
                 event_name_display = "Visitor Activity"
-                col_headers = ["Visitor Name", "Purpose", "Time In", "Time Out", "Status", "Visitor ID"]
+                col_headers = ["Visitor Name", "Purpose", "Time In", "Time Out", "Visitor ID"]
+                purpose_condition = ""
+                purpose_params = []
+                if filter_value.lower() != "all":
+                    purpose_condition = "AND COALESCE(NULLIF(TRIM(v.purpose), ''), 'N/A') = %s"
+                    purpose_params = [filter_value]
+                    filter_display = filter_value
+                else:
+                    filter_display = "All Purposes"
 
-                query = """
+                query = f"""
                     SELECT
                         v.visitor_name AS name,
                         COALESCE(NULLIF(TRIM(v.purpose), ''), 'N/A') AS detail,
                         LOWER(TRIM(DATE_FORMAT(MIN(CASE WHEN gl.log_type = 'Entry' THEN gl.timestamp END), '%l:%i %p'))) AS time_in,
                         LOWER(TRIM(DATE_FORMAT(MAX(CASE WHEN gl.log_type = 'Exit' THEN gl.timestamp END), '%l:%i %p'))) AS time_out,
-                        CASE WHEN v.status = 'Inside' THEN 'Checked In' ELSE 'Checked Out' END AS status,
-                        CASE
-                            WHEN LOWER(COALESCE(v.purpose, '')) = 'other'
-                            THEN COALESCE(NULLIF(TRIM(v.details), ''), v.visitor_id)
-                            ELSE v.visitor_id
-                        END AS remarks
+                        v.visitor_id AS remarks
                     FROM visitors v
                     JOIN users u ON v.user_id = u.user_id
                     LEFT JOIN general_log gl ON gl.user_id = v.user_id
                     WHERE COALESCE(u.active, 1) = 1
-                    GROUP BY v.seq, v.visitor_id, v.visitor_name, v.purpose, v.status
+                      AND u.role = 'visitor'
+                      {purpose_condition}
+                    GROUP BY v.seq, v.visitor_id, v.visitor_name, v.purpose
                     HAVING DATE(MIN(CASE WHEN gl.log_type = 'Entry' THEN gl.timestamp END)) BETWEEN %s AND %s
                     ORDER BY MIN(CASE WHEN gl.log_type = 'Entry' THEN gl.timestamp END) DESC
                 """
-                cursor.execute(query, (start_date, end_date))
+                cursor.execute(query, purpose_params + [start_date, end_date])
                 raw_logs = cursor.fetchall()
                 total_expected = len(raw_logs)
                 total_present = len(raw_logs)
@@ -1326,6 +1431,14 @@ class Database:
                 report_title = "Violations Report"
                 event_name_display = "Security Violations"
                 col_headers = ["User Name", "Description", "Time", "Status", "Remarks"]
+                role_condition = ""
+                role_params = []
+                if filter_value.lower() in {"student", "visitor", "employee"}:
+                    role_condition = "AND u.role = %s"
+                    role_params = [filter_value.lower()]
+                    filter_display = f"{filter_value.capitalize()}s"
+                else:
+                    filter_display = "All Subjects"
 
                 query = f"""
                     SELECT
@@ -1341,52 +1454,49 @@ class Database:
                     LEFT JOIN students s ON u.user_id = s.user_id
                     LEFT JOIN visitors v ON u.user_id = v.user_id
                     WHERE DATE(violation.created_at) BETWEEN %s AND %s
-                      {dept_condition}
+                      {role_condition}
                     ORDER BY violation.created_at DESC
                 """
-                cursor.execute(query, [start_date, end_date] + dept_params)
+                cursor.execute(query, [start_date, end_date] + role_params)
                 raw_logs = cursor.fetchall()
                 total_expected = len(raw_logs)
                 total_present = len(raw_logs)
 
             else:
-                report_title = "General Campus Access Logs"
-                event_name_display = "Campus Gates Entry / Exit"
-                col_headers = ["User Name", "Role / Affiliation", "Time", "Action", "Gate"]
+                report_title = "Student Campus Access Logs"
+                event_name_display = "Student Gates Entry / Exit"
+                col_headers = ["Student Name", "Program", "Time In", "Time Out", "Gate"]
+                course_condition = ""
+                course_params = []
+                if filter_value.lower() != "all":
+                    course_condition = "AND c.course_id = %s"
+                    course_params = [filter_value]
+                    cursor.execute(
+                        "SELECT course_name FROM courses WHERE course_id = %s",
+                        (filter_value,),
+                    )
+                    course_row = cursor.fetchone()
+                    filter_display = course_row["course_name"] if course_row else filter_value
+                else:
+                    filter_display = "All Programs"
 
                 query = f"""
                     SELECT
-                        COALESCE(e.employee_name, s.student_name, v.visitor_name, a.username, 'Unknown User') AS name,
-                        CONCAT(
-                            UPPER(u.role),
-                            ' - ',
-                            COALESCE(
-                                d.department_name,
-                                c.course_name,
-                                CASE
-                                    WHEN LOWER(COALESCE(v.purpose, '')) = 'other'
-                                    THEN NULLIF(TRIM(v.details), '')
-                                    ELSE NULLIF(TRIM(v.purpose), '')
-                                END,
-                                'N/A'
-                            )
-                        ) AS detail,
+                        COALESCE(s.student_name, 'Unknown Student') AS name,
+                        COALESCE(c.course_name, 'N/A') AS detail,
                         TIME_FORMAT(gl.timestamp, '%h:%i %p') AS time,
                         gl.log_type AS status,
                         COALESCE(gl.gate, 'Main Gate') AS remarks
                     FROM general_log gl
                     JOIN users u ON gl.user_id = u.user_id
-                    LEFT JOIN employees e ON u.user_id = e.user_id
-                    LEFT JOIN departments d ON e.department_id = d.department_id
-                    LEFT JOIN students s ON u.user_id = s.user_id
+                    JOIN students s ON u.user_id = s.user_id
                     LEFT JOIN courses c ON s.course_id = c.course_id
-                    LEFT JOIN visitors v ON u.user_id = v.user_id
-                    LEFT JOIN admin a ON u.user_id = a.user_id
                     WHERE DATE(gl.timestamp) BETWEEN %s AND %s
-                      {dept_condition}
+                      AND u.role = 'student'
+                      {course_condition}
                     ORDER BY gl.timestamp DESC
                 """
-                cursor.execute(query, [start_date, end_date] + dept_params)
+                cursor.execute(query, [start_date, end_date] + course_params)
                 raw_logs = cursor.fetchall()
                 total_expected = len(raw_logs)
                 total_present = len(raw_logs)
@@ -1398,6 +1508,7 @@ class Database:
                 "raw_logs": raw_logs,
                 "total_expected": total_expected,
                 "total_present": total_present,
+                "filter_display": filter_display,
             }
         except connector.Error as err:
             print(f"Error fetching report data: {err}")

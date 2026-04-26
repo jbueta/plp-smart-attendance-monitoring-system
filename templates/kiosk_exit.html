@@ -132,7 +132,7 @@
                     <label for="manual-student-id" class="form-label text-white-50">Student ID Number</label>
                     <input type="text" class="form-control text-black border-secondary"
                         id="manual-student-id" 
-                        placeholder="e.g. 23-00312" pattern="[0-9]{2}-[0-9]{5}" title="Format: 00-00000">
+                        placeholder="e.g. 23-00312" pattern="[0-9]{2}-[0-9]{5}" title="Format: 00-00000" required>
                 </div>
                 <div class="d-grid gap-2">
                     <button type="button" class="btn btn-secondary" onclick="submitManualEntry('student')">Time
@@ -193,10 +193,10 @@
                                     </select>
                                 </div>
                                 <div class="col-12 d-none visitor-details-group">
-                                    <label class="form-label text-white-50">Specify Purpose <span class="text-danger">*</span></label>
+                                    <label class="form-label text-white-50">Visit Description <span class="text-danger">*</span></label>
                                     <input type="text" name="details"
                                         class="form-control bg-dark text-white border-secondary visitor-details-input"
-                                        placeholder="Enter the custom purpose">
+                                        placeholder="Describe the visit">
                                 </div>
                                 <div class="col-12 mt-4">
                                     <div class="d-grid">
@@ -221,6 +221,8 @@
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/kiosk.js') }}"></script>
 <script>
+    window.GENERAL_KIOSK_ACTION = 'Exit';
+
     document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('form').forEach(form => {
             const purposeSelect = form.querySelector('.visitor-purpose-select');
@@ -354,12 +356,10 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             id: extractedId,
+                            requested_log_type: window.GENERAL_KIOSK_ACTION,
                         })
                     })
-                    .then(r => {
-                        if (!r.ok && r.status !== 404) throw new Error('Server error');
-                        return r.json();
-                    })
+                    .then(r => r.json())
                     .then(data => {
                         if (data.success) {
                             const logType = data.attendance_status ? data.attendance_status.toLowerCase() : 'entry';
@@ -382,7 +382,7 @@
                             appendToLiveFeed(data.name, data.affiliation, logType);
                         } else {
                             frame.style.borderColor = '#ef4444'; 
-                            feedText.innerText = data.message || "SCAN FAILED";
+                            feedText.innerText = data.message || data.Invalid || "SCAN FAILED";
                         }
 
                         setTimeout(() => {

@@ -164,10 +164,16 @@ function loadEventAttendance(instanceId) {
  */
 function submitManualEntry(type, manualId = null) {
     const idField = type === 'employee' ? 'manual-employee-id' : 'manual-student-id';
-    const id = manualId !== null ? manualId : document.getElementById(idField).value.trim();
+    const inputElement = manualId === null ? document.getElementById(idField) : null;
+    const id = manualId !== null ? manualId : inputElement.value.trim();
     
     if (!id) {
         alert("Please enter an ID");
+        return;
+    }
+
+    if (inputElement && !inputElement.checkValidity()) {
+        inputElement.reportValidity();
         return;
     }
     
@@ -229,15 +235,16 @@ function submitManualEntry(type, manualId = null) {
         });
     } else {
         // Fallback to general authentication (students, visitor, etc.)
+        const requestedLogType = window.GENERAL_KIOSK_ACTION || null;
         fetch(`${backendBaseUrl}/admin/user/authentication`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: id })
+            body: JSON.stringify({
+                id: id,
+                requested_log_type: requestedLogType
+            })
         })
-        .then(r => {
-            if (!r.ok && r.status !== 404) throw new Error('Server error');
-            return r.json();
-        })
+        .then(r => r.json())
         .then(data => {
             if (data.success) {
                 const logType = data.attendance_status.toLowerCase();
@@ -264,7 +271,7 @@ function submitManualEntry(type, manualId = null) {
 
                 appendToLiveFeed(data.name, data.affiliation, logType);
             } else {
-                alert(data.Invalid || "ID not found!");
+                alert(data.message || data.Invalid || "ID not found!");
                 if (typeof showScanBanner === 'function') showScanBanner('error', { id: id });
             }
         })

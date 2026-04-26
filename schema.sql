@@ -156,15 +156,15 @@ DELIMITER ;
 DROP TABLE IF EXISTS `events`;
 CREATE TABLE `events` (
   `event_id` int(11) NOT NULL,
-  `event_name` varchar(200) DEFAULT NULL,
-  `event_type` enum('Meeting','Training','Seminar','Workshop','Drill','Activity','Flag Ceremony','Other') DEFAULT NULL,
-  `frequency` enum('ONCE','DAILY','WEEKLY') DEFAULT 'ONCE',
+  `event_name` varchar(200) NOT NULL,
+  `event_type` enum('Meeting','Training','Seminar','Workshop','Drill','Activity','Flag Ceremony','Other') NOT NULL,
+  `frequency` enum('ONCE','DAILY','WEEKLY') NOT NULL DEFAULT 'ONCE',
   `day` enum('Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday') DEFAULT NULL,
-  `event_date` date DEFAULT NULL,
-  `time_start` time DEFAULT NULL,
-  `time_end` time DEFAULT NULL,
-  `location` varchar(200) DEFAULT NULL,
-  `active` tinyint(1) DEFAULT 1
+  `event_date` date NOT NULL,
+  `time_start` time NOT NULL,
+  `time_end` time NOT NULL,
+  `location` varchar(200) NOT NULL,
+  `active` tinyint(1) NOT NULL DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -499,10 +499,11 @@ CREATE TABLE `visitors` (
   `user_id` int(11) DEFAULT NULL,
   `visitor_id` varchar(12) NOT NULL,
   `visitor_name` varchar(80) DEFAULT NULL,
-  `purpose` varchar(100) DEFAULT NULL,
+  `purpose` enum('Official Business','Document Submission','Inquiry','Meeting','Delivery','Other') NOT NULL,
   `details` varchar(200) DEFAULT NULL,
   `status` enum('Inside','Outside') DEFAULT 'Outside',
-  `visitor_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `visitor_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  CONSTRAINT `chk_visitor_other_details` CHECK (`purpose` <> 'Other' OR (`details` IS NOT NULL AND trim(`details`) <> ''))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --

@@ -12,7 +12,7 @@ from flask import Flask, flash, jsonify, redirect, render_template, request, ses
 from app_tasks import fetch_report_data
 from config import get_config
 from database import close_db, connect_db, init_db_pool
-from db_connect import Database, EmployeeModel
+from db_connect import Database, EmployeeModel, VISITOR_PURPOSES, normalize_visitor_purpose
 from extensions import cache
 
 
@@ -90,7 +90,37 @@ MOCK_KIOSK_DATA = {
     ],
 }
 
-_instance_generator_run = False
+EVENT_TYPES = {"Meeting", "Training", "Seminar", "Workshop", "Drill", "Activity", "Flag Ceremony", "Other"}
+EVENT_FREQUENCIES = {"ONCE", "DAILY", "WEEKLY"}
+EVENT_DAYS = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
+
+def normalize_event_frequency(value):
+    frequency = (value or "").strip().upper().replace("_", "-")
+    if frequency in {"ONE-TIME", "ONETIME"}:
+        return "ONCE"
+    return frequency
+
+
+def split_manual_participant_ids(values):
+    participant_ids = []
+    for value in values:
+        for token in re.split(r"[,;\n\r]+", value or ""):
+            participant_id = token.strip()
+            if participant_id:
+                participant_ids.append(participant_id)
+    return participant_ids
+
+
+def unique_values(values):
+    seen = set()
+    unique = []
+    for value in values:
+        key = value.upper() if isinstance(value, str) else value
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(value)
+    return unique
 
 
 def backend_url(path):
@@ -106,32 +136,6 @@ def backend_request(method, path, **kwargs):
 @app.context_processor
 def inject_template_config():
     return {"backend_api_url": app.config["BACKEND_API_URL"]}
-
-
-@app.before_request
-def generate_instances_on_sunday():
-    global _instance_generator_run
-
-    if _instance_generator_run:
-        return
-
-    _instance_generator_run = True
-    if date.today().weekday() != 6:
-        return
-
-    try:
-        response = backend_request("POST", "/admin/generate-daily-instances", timeout=10)
-        if response.ok:
-            payload = response.json()
-            app.logger.info(
-                "Generated weekly instances: created=%s failed=%s",
-                payload.get("created", 0),
-                payload.get("failed", 0),
-            )
-        else:
-            app.logger.error("Failed generating weekly instances: status=%s", response.status_code)
-    except requests.RequestException as err:
-        app.logger.error("Could not generate weekly instances on startup: %s", err)
 
 
 def login_required(view_func):
@@ -428,12 +432,18 @@ def kiosk_visitor():
 @app.route("/api/visitor/checkin", methods=["POST"])
 def visitor_checkin():
     name = (request.form.get("name") or "").strip()
-    purpose = (request.form.get("purpose") or "").strip()
+    purpose = normalize_visitor_purpose(request.form.get("purpose"))
     details = (request.form.get("details") or "").strip()
     source = resolve_visitor_source(request.form.get("source"), fallback="kiosk_visitor")
 
-    if not name or not purpose:
-        flash("Check-in failed. Name and purpose are required.", "danger")
+    if not name:
+        flash("Check-in failed. Visitor name is required.", "danger")
+        return redirect(url_for(source))
+    if not purpose:
+        flash("Check-in failed. Select a valid visitor purpose.", "danger")
+        return redirect(url_for(source))
+    if purpose == "Other" and not details:
+        flash("Check-in failed. Visit description is required when purpose is Other.", "danger")
         return redirect(url_for(source))
 
     conn = connect_db()
@@ -537,8 +547,15 @@ def admin_visitors():
 def update_visitor(visitor_id):
     data = request.get_json(silent=True) or {}
     name = (data.get("name") or "").strip()
-    purpose = (data.get("purpose") or "").strip()
+    purpose = normalize_visitor_purpose(data.get("purpose"))
     details = (data.get("details") or "").strip()
+
+    if not name:
+        return jsonify({"success": False, "message": "Visitor name is required."}), 400
+    if not purpose:
+        return jsonify({"success": False, "message": "Select a valid visitor purpose."}), 400
+    if purpose == "Other" and not details:
+        return jsonify({"success": False, "message": "Visit description is required when purpose is Other."}), 400
 
     conn = connect_db()
     if not conn:
@@ -586,27 +603,67 @@ def sample_report():
 @app.route("/admin/events/add", methods=["POST"])
 @login_required
 def add_event():
-    name = request.form.get("name")
-    event_type = request.form.get("type")
-    event_date = request.form.get("event_date")
-    day_of_week = request.form.get("day_of_week")
-    time_start = request.form.get("time_start")
-    time_end = request.form.get("time_end")
-    location = request.form.get("location")
-    department_ids = request.form.getlist("dept")
+    name = (request.form.get("name") or "").strip()
+    event_type = (request.form.get("type") or "").strip()
+    event_date = (request.form.get("event_date") or "").strip()
+    day_of_week = (request.form.get("day_of_week") or "").strip()
+    time_start = (request.form.get("time_start") or "").strip()
+    time_end = (request.form.get("time_end") or "").strip()
+    location = (request.form.get("location") or "").strip()
+    department_ids = [
+        dept_id.strip()
+        for dept_id in request.form.getlist("dept")
+        if dept_id and dept_id.strip().isdigit()
+    ]
+    manual_participant_ids = split_manual_participant_ids(request.form.getlist("custom_dept"))
     roster_file = request.files.get("roster_file")
 
-    frequency = (request.form.get("frequency") or "").upper()
-    if frequency == "ONE-TIME":
-        frequency = "ONCE"
+    frequency = normalize_event_frequency(request.form.get("frequency"))
+
+    validation_errors = []
+    if not name:
+        validation_errors.append("Event name is required.")
+    if event_type not in EVENT_TYPES:
+        validation_errors.append("Select a valid event type.")
+    if frequency not in EVENT_FREQUENCIES:
+        validation_errors.append("Select a valid event frequency.")
+    if not location:
+        validation_errors.append("Location is required.")
+    if not time_start:
+        validation_errors.append("Start time is required.")
+    if not time_end:
+        validation_errors.append("End time is required.")
+    if frequency != "DAILY" and not event_date:
+        validation_errors.append("Event date is required.")
+    if frequency == "WEEKLY" and day_of_week not in EVENT_DAYS:
+        validation_errors.append("Event day is required for weekly events.")
+
+    if event_date:
+        try:
+            parsed_event_date = datetime.strptime(event_date, "%Y-%m-%d").date()
+            if parsed_event_date < date.today():
+                validation_errors.append("Event date cannot be in the past.")
+        except ValueError:
+            validation_errors.append("Event date must use YYYY-MM-DD format.")
+
+    if time_start and time_end:
+        try:
+            parsed_start = datetime.strptime(time_start, "%H:%M").time()
+            parsed_end = datetime.strptime(time_end, "%H:%M").time()
+            if parsed_end <= parsed_start:
+                validation_errors.append("End time must be later than start time.")
+        except ValueError:
+            validation_errors.append("Start time and end time must use HH:MM format.")
 
     has_file = bool(roster_file and roster_file.filename)
-    if not department_ids and not has_file:
-        flash("Failed to add event. Select at least one department or upload a roster file.", "danger")
+    if not department_ids and not has_file and not manual_participant_ids:
+        validation_errors.append("Select at least one department, upload a CSV roster, or enter participant IDs.")
+
+    if validation_errors:
+        flash(" ".join(validation_errors), "danger")
         return redirect(url_for("manage_events"))
 
-    participants_type = "hybrid" if department_ids and has_file else "grouped" if department_ids else "custom"
-    custom_participants = []
+    custom_participants = list(manual_participant_ids)
 
     if has_file:
         if not roster_file.filename.lower().endswith(".csv"):
@@ -621,6 +678,13 @@ def add_event():
         except Exception as err:
             flash(f"Failed to process the CSV file: {err}", "danger")
             return redirect(url_for("manage_events"))
+
+    custom_participants = unique_values(custom_participants)
+    if not department_ids and not custom_participants:
+        flash("Failed to add event. Provide at least one valid participant ID or select a department.", "danger")
+        return redirect(url_for("manage_events"))
+
+    participants_type = "hybrid" if department_ids and custom_participants else "grouped" if department_ids else "custom"
 
     payload = {
         "event_name": name,
@@ -642,10 +706,13 @@ def add_event():
         if response.ok and api_data.get("success"):
             flash(f'Event "{name}" added successfully.', "success")
         else:
-            flash(f'Failed to add event: {api_data.get("message", "Unknown API error")}', "danger")
+            api_error = api_data.get("message") or api_data.get("error") or "Unknown API error"
+            flash(f"Failed to add event: {api_error}", "danger")
     except requests.RequestException as err:
         app.logger.error("Could not add event: %s", err)
         flash(f'Event "{name}" failed to add. Could not connect to the backend.', "danger")
+    except ValueError:
+        flash(f'Event "{name}" failed to add. Backend returned an invalid response.', "danger")
 
     return redirect(url_for("manage_events"))
 
@@ -744,6 +811,31 @@ def retrieve_all_events_for_reports():
 @app.route("/api/retrieve/departments")
 def retrieve_departments():
     return jsonify(fetch_departments())
+
+
+@app.route("/api/retrieve/courses")
+def retrieve_courses():
+    conn = connect_db()
+    if not conn:
+        return jsonify([])
+
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """
+            SELECT course_id, course_name
+            FROM courses
+            ORDER BY course_name ASC
+            """
+        )
+        return jsonify(cursor.fetchall())
+    finally:
+        cursor.close()
+
+
+@app.route("/api/retrieve/visitor-purposes")
+def retrieve_visitor_purposes():
+    return jsonify(list(VISITOR_PURPOSES))
 
 
 @app.route("/api/attendance/update", methods=["POST"])

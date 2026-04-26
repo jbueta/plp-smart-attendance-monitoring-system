@@ -4,6 +4,19 @@ var selectionMode = false;
 const frontendBaseUrl = window.location.origin;
 const backendBaseUrl = window.APP_CONFIG?.backendApiUrl || 'http://127.0.0.1:5001';
 
+function getLocalDateString(date = new Date()) {
+    const localDate = new Date(date);
+    localDate.setMinutes(localDate.getMinutes() - localDate.getTimezoneOffset());
+    return localDate.toISOString().split('T')[0];
+}
+
+function parseTimeToMinutes(value) {
+    if (!value) return null;
+    const parts = value.split(':').map(Number);
+    if (parts.length < 2 || parts.some(Number.isNaN)) return null;
+    return (parts[0] * 60) + parts[1];
+}
+
 function toggleSelectionMode() {
     selectionMode = !selectionMode;
     const btn = document.getElementById('select-mode-btn');
@@ -361,6 +374,55 @@ document.addEventListener('DOMContentLoaded', function () {
     const dateLabel = document.getElementById('date-label');
     const wrapper = document.querySelector('.date-filter-wrapper');
     const datepicker = document.getElementById('dateFilter');
+    const addEventForm = document.getElementById('add-event-form');
+    const rosterInput = addEventForm ? addEventForm.querySelector('input[name="roster_file"]') : null;
+    const startInput = addEventForm ? addEventForm.querySelector('input[name="time_start"]') : null;
+    const endInput = addEventForm ? addEventForm.querySelector('input[name="time_end"]') : null;
+    const todayString = getLocalDateString();
+
+    if (dateInput) {
+        dateInput.min = todayString;
+    }
+
+    if (daySelect && frequencySelect && frequencySelect.value !== 'weekly') {
+        daySelect.disabled = true;
+    }
+
+    function validateAddEventForm() {
+        if (!addEventForm) return true;
+
+        if (allDeptCheck) allDeptCheck.setCustomValidity('');
+        if (rosterInput) rosterInput.setCustomValidity('');
+        if (dateInput) dateInput.setCustomValidity('');
+        if (endInput) endInput.setCustomValidity('');
+
+        const hasDepartment = Array.from(document.querySelectorAll('.dept-cb')).some(cb => cb.checked);
+        const hasRoster = Boolean(rosterInput && rosterInput.files && rosterInput.files.length > 0);
+        const hasManualParticipants = Array.from(addEventForm.querySelectorAll('input[name="custom_dept"]'))
+            .some(input => input.value.trim() !== '');
+
+        if (!hasDepartment && !hasRoster && !hasManualParticipants && allDeptCheck) {
+            allDeptCheck.setCustomValidity('Select a department, upload a CSV roster, or enter participant IDs.');
+        }
+
+        if (hasRoster && rosterInput && !rosterInput.files[0].name.toLowerCase().endsWith('.csv')) {
+            rosterInput.setCustomValidity('Upload a CSV roster file.');
+        }
+
+        if (frequencySelect && frequencySelect.value !== 'daily' && dateInput && !dateInput.value) {
+            dateInput.setCustomValidity('Event date is required.');
+        } else if (dateInput && dateInput.value && dateInput.value < todayString) {
+            dateInput.setCustomValidity('Event date cannot be in the past.');
+        }
+
+        const startMinutes = startInput ? parseTimeToMinutes(startInput.value) : null;
+        const endMinutes = endInput ? parseTimeToMinutes(endInput.value) : null;
+        if (startMinutes !== null && endMinutes !== null && endMinutes <= startMinutes && endInput) {
+            endInput.setCustomValidity('End time must be later than start time.');
+        }
+
+        return addEventForm.checkValidity();
+    }
 
     if (wrapper && datepicker) {
         wrapper.addEventListener('click', function(e) {
@@ -383,21 +445,22 @@ document.addEventListener('DOMContentLoaded', function () {
     if (frequencySelect) {
         frequencySelect.addEventListener('change', function () {
             if (this.value === 'weekly') {
-                dateInput.classList.add('d-none');
-                dateInput.removeAttribute('required');
+                dateInput.classList.remove('d-none');
+                dateInput.setAttribute('required', 'required');
                 dateInput.disabled = false;
                 
                 daySelect.classList.remove('d-none');
                 daySelect.setAttribute('required', 'required');
                 daySelect.disabled = false;
                 
-                dateLabel.innerHTML = 'Event Day <span class="text-danger">*</span>';
+                dateLabel.innerHTML = 'Start Date / Event Day <span class="text-danger">*</span>';
                 
             } else if (this.value === 'daily') {
                 daySelect.classList.add('d-none');
                 daySelect.removeAttribute('required');
+                daySelect.disabled = true;
                 
-                dateInput.classList.remove('d-none');
+                dateInput.classList.add('d-none');
                 dateInput.removeAttribute('required');
                 dateInput.disabled = true;
                 dateInput.value = ''; 
@@ -407,6 +470,7 @@ document.addEventListener('DOMContentLoaded', function () {
             } else {
                 daySelect.classList.add('d-none');
                 daySelect.removeAttribute('required');
+                daySelect.disabled = true;
                 
                 dateInput.classList.remove('d-none');
                 dateInput.setAttribute('required', 'required');
@@ -414,6 +478,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 
                 dateLabel.innerHTML = 'Event Date <span class="text-danger">*</span>';
             }
+
+            validateAddEventForm();
         });
     }
 
@@ -423,12 +489,14 @@ document.addEventListener('DOMContentLoaded', function () {
     if (allDeptCheck && deptChecks.length > 0) {
         allDeptCheck.addEventListener('change', function () {
             deptChecks.forEach(cb => cb.checked = this.checked);
+            validateAddEventForm();
         });
 
         deptChecks.forEach(cb => {
             cb.addEventListener('change', function () {
                 const allChecked = Array.from(deptChecks).every(c => c.checked);
                 allDeptCheck.checked = allChecked;
+                validateAddEventForm();
             });
         });
     }
@@ -441,7 +509,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const row = document.createElement('div');
             row.className = 'd-flex align-items-center mt-2';
             row.innerHTML = `
-                <input type="text" name="custom_dept" class="form-control bg-dark text-white border-secondary form-control-sm" placeholder="e.g. Parents, Sponsors">
+                <input type="text" name="custom_dept" class="form-control bg-dark text-white border-secondary form-control-sm" placeholder="e.g. EMP-0001, ST-0001">
                 <button type="button" class="btn btn-sm btn-outline-danger ms-2 remove-custom-btn" title="Remove">
                     <i class="bi bi-x"></i>
                 </button>
@@ -454,6 +522,7 @@ document.addEventListener('DOMContentLoaded', function () {
             removeBtn.addEventListener('click', function () {
                 row.remove();
                 updateRemoveButtons();
+                validateAddEventForm();
             });
         });
 
@@ -466,6 +535,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
         }
+    }
+
+    if (addEventForm) {
+        addEventForm.addEventListener('input', validateAddEventForm);
+        addEventForm.addEventListener('change', validateAddEventForm);
+        addEventForm.addEventListener('submit', function (event) {
+            if (!validateAddEventForm()) {
+                event.preventDefault();
+                event.stopPropagation();
+                addEventForm.classList.add('was-validated');
+                addEventForm.reportValidity();
+            }
+        });
     }
     
     const instanceSelect = document.getElementById('instanceSelect');

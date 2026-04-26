@@ -1,7 +1,9 @@
 
 import logging
 import os
-from datetime import date, datetime
+import threading
+import time
+from datetime import date, datetime, timedelta
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -29,6 +31,262 @@ if not any(
     app.logger.addHandler(logging.FileHandler(log_file))
 
 CORS(app, origins=app.config["ALLOWED_ORIGINS"])
+
+EVENT_TYPES = {"Meeting", "Training", "Seminar", "Workshop", "Drill", "Activity", "Flag Ceremony", "Other"}
+EVENT_FREQUENCIES = {"ONCE", "DAILY", "WEEKLY"}
+EVENT_DAYS = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
+
+
+def clean_text(value):
+    return str(value).strip() if value is not None else ""
+
+
+def normalize_event_frequency(value):
+    frequency = clean_text(value).upper().replace("_", "-")
+    if frequency in {"ONE-TIME", "ONETIME"}:
+        return "ONCE"
+    return frequency
+
+
+def parse_event_time(value):
+    for time_format in ("%H:%M", "%H:%M:%S"):
+        try:
+            return datetime.strptime(value, time_format).time()
+        except ValueError:
+            continue
+    raise ValueError("Invalid time format")
+
+
+def normalize_requested_log_type(value):
+    action = clean_text(value).lower().replace("_", " ").replace("-", " ")
+    if action in {"entry", "entrance", "in", "time in"}:
+        return "Entry"
+    if action in {"exit", "out", "outside", "time out"}:
+        return "Exit"
+    return None
+
+
+def validation_error(errors):
+    message = " ".join(errors)
+    return jsonify({"success": False, "message": message, "error": message, "errors": errors}), 400
+
+
+INSTANCE_GENERATOR_CHECK_SECONDS = int(os.getenv("INSTANCE_GENERATOR_CHECK_SECONDS", "60"))
+INSTANCE_GENERATOR_STATE = {
+    "running": False,
+    "last_started_at": None,
+    "last_finished_at": None,
+    "last_success_at": None,
+    "last_error": None,
+    "last_result": None,
+    "last_trigger": None,
+    "next_check_at": None,
+}
+_instance_generator_lock = threading.Lock()
+_instance_generator_thread_started = False
+_last_scheduled_generation_date = None
+
+
+def _iso_timestamp(value):
+    return value.isoformat(sep=" ", timespec="seconds") if value else None
+
+
+def _copy_instance_generator_state():
+    with _instance_generator_lock:
+        return dict(INSTANCE_GENERATOR_STATE)
+
+
+def generate_event_instances_for_range(start_date=None, days=7, trigger="manual"):
+    conn = connect_db()
+    if not conn:
+        return {
+            "success": False,
+            "message": "Database offline",
+            "created": 0,
+            "existing": 0,
+            "matched": 0,
+            "failed": 0,
+            "trigger": trigger,
+        }
+
+    start_date = start_date or date.today()
+    upcoming_week = [start_date + timedelta(days=i) for i in range(days)]
+    created_count = 0
+    existing_count = 0
+    matched_count = 0
+    failed_count = 0
+
+    for target_date in upcoming_week:
+        day_name = target_date.strftime("%A")
+        cursor = conn.cursor(dictionary=True)
+        try:
+            cursor.execute(
+                """
+                SELECT event_id, event_name, frequency, event_date
+                FROM events
+                WHERE active = 1 AND (
+                    (frequency = 'WEEKLY' AND day = %s AND event_date <= %s) OR
+                    (frequency = 'DAILY' AND event_date <= %s) OR
+                    (frequency = 'ONCE' AND event_date = %s)
+                )
+                """,
+                (day_name, target_date, target_date, target_date),
+            )
+            events = cursor.fetchall()
+        finally:
+            cursor.close()
+
+        matched_count += len(events)
+        for event in events:
+            event_id = event["event_id"]
+            check_cursor = conn.cursor(dictionary=True)
+            try:
+                check_cursor.execute(
+                    """
+                    SELECT instance_id
+                    FROM event_instances
+                    WHERE event_id = %s AND event_date = %s
+                    LIMIT 1
+                    """,
+                    (event_id, target_date),
+                )
+                already_exists = bool(check_cursor.fetchone())
+            finally:
+                check_cursor.close()
+
+            instance_result = Database(conn, (event_id, target_date)).add_event_instances()
+            if instance_result.get("success"):
+                if already_exists:
+                    existing_count += 1
+                else:
+                    created_count += 1
+            else:
+                failed_count += 1
+                app.logger.error(
+                    "Failed to add instance for event_id=%s date=%s: %s",
+                    event_id,
+                    target_date,
+                    instance_result.get("message"),
+                )
+
+    return {
+        "success": failed_count == 0,
+        "message": "Event instances generated for the upcoming week.",
+        "created": created_count,
+        "existing": existing_count,
+        "matched": matched_count,
+        "failed": failed_count,
+        "date_range": f"{upcoming_week[0]} to {upcoming_week[-1]}",
+        "trigger": trigger,
+    }
+
+
+def run_instance_generation_job(trigger="manual"):
+    now = datetime.now()
+    with _instance_generator_lock:
+        if INSTANCE_GENERATOR_STATE["running"]:
+            return {
+                "success": False,
+                "message": "Event instance generation is already running.",
+                "state": dict(INSTANCE_GENERATOR_STATE),
+            }
+        INSTANCE_GENERATOR_STATE.update(
+            {
+                "running": True,
+                "last_started_at": _iso_timestamp(now),
+                "last_finished_at": None,
+                "last_error": None,
+                "last_trigger": trigger,
+            }
+        )
+
+    try:
+        result = generate_event_instances_for_range(trigger=trigger)
+        finished_at = datetime.now()
+        with _instance_generator_lock:
+            INSTANCE_GENERATOR_STATE.update(
+                {
+                    "running": False,
+                    "last_finished_at": _iso_timestamp(finished_at),
+                    "last_success_at": _iso_timestamp(finished_at) if result.get("success") else INSTANCE_GENERATOR_STATE["last_success_at"],
+                    "last_error": None if result.get("success") else result.get("message"),
+                    "last_result": result,
+                }
+            )
+        app.logger.info(
+            "Event instance generation finished: trigger=%s created=%s existing=%s failed=%s",
+            trigger,
+            result.get("created", 0),
+            result.get("existing", 0),
+            result.get("failed", 0),
+        )
+        return result
+    except Exception as err:
+        finished_at = datetime.now()
+        result = {
+            "success": False,
+            "message": str(err),
+            "created": 0,
+            "existing": 0,
+            "matched": 0,
+            "failed": 1,
+            "trigger": trigger,
+        }
+        with _instance_generator_lock:
+            INSTANCE_GENERATOR_STATE.update(
+                {
+                    "running": False,
+                    "last_finished_at": _iso_timestamp(finished_at),
+                    "last_error": str(err),
+                    "last_result": result,
+                }
+            )
+        app.logger.exception("Event instance generation failed")
+        return result
+
+
+def _instance_generation_scheduler_loop():
+    global _last_scheduled_generation_date
+
+    while True:
+        now = datetime.now()
+        next_check = now + timedelta(seconds=INSTANCE_GENERATOR_CHECK_SECONDS)
+        with _instance_generator_lock:
+            INSTANCE_GENERATOR_STATE["next_check_at"] = _iso_timestamp(next_check)
+
+        should_run = (
+            now.weekday() == 6
+            and _last_scheduled_generation_date != now.date()
+            and not _copy_instance_generator_state().get("running")
+        )
+
+        if should_run:
+            app.logger.info("Sunday event instance scheduler starting.")
+            with app.app_context():
+                result = run_instance_generation_job(trigger="scheduler")
+                close_db(None)
+            if result.get("success"):
+                _last_scheduled_generation_date = now.date()
+
+        time.sleep(INSTANCE_GENERATOR_CHECK_SECONDS)
+
+
+def start_instance_generation_scheduler():
+    global _instance_generator_thread_started
+
+    if _instance_generator_thread_started:
+        return
+    if app.debug and os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+        return
+
+    scheduler_thread = threading.Thread(
+        target=_instance_generation_scheduler_loop,
+        name="event-instance-generator",
+        daemon=True,
+    )
+    scheduler_thread.start()
+    _instance_generator_thread_started = True
+    app.logger.info("Event instance background scheduler started.")
 
 # ==============================================================================
 # DATABASE INITIALIZATION
@@ -77,13 +335,18 @@ def user_authenticate():
     conn = None
     try:
         print("Authenticating...")
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         print(data)
 
         if not data or not data.get('id'):
-            return jsonify({"error": "ID is required. No ID string attached"}), 400
+            return jsonify({"success": False, "message": "ID is required. No ID string attached"}), 400
         
-        scan_id = data.get('id')
+        scan_id = clean_text(data.get('id'))
+        requested_log_type = None
+        if data.get('requested_log_type'):
+            requested_log_type = normalize_requested_log_type(data.get('requested_log_type'))
+            if not requested_log_type:
+                return jsonify({"success": False, "message": "Invalid kiosk action requested."}), 400
         
         conn = connect_db()
         if not conn:
@@ -104,14 +367,37 @@ def user_authenticate():
         user_id = user_data['user_id']
         role = user_data['role']
         current_status = user_data['current_status']
+        current_status_normalized = clean_text(current_status).lower() or "outside"
 
         full_name = user_data.get('full_name', 'Unknown User')
         affiliation = user_data.get('affiliation', 'N/A')
 
         print(f"User found: ID {user_id}, Role: {role}, Status: {current_status}")
 
+        if requested_log_type == "Entry" and current_status_normalized == "inside":
+            return jsonify({
+                "success": False,
+                "message": "Cannot allow entrance. User current status is already Inside.",
+                "status": "blocked",
+                "current_status": "Inside",
+                "requested_log_type": requested_log_type,
+                "name": full_name,
+                "affiliation": affiliation,
+            }), 409
+
+        if requested_log_type == "Exit" and current_status_normalized != "inside":
+            return jsonify({
+                "success": False,
+                "message": "Cannot allow exit. User current status is already Outside.",
+                "status": "blocked",
+                "current_status": "Outside",
+                "requested_log_type": requested_log_type,
+                "name": full_name,
+                "affiliation": affiliation,
+            }), 409
+
         # 3. CHANGE STATUS
-        db_status_param = (user_id, current_status, role)
+        db_status_param = (user_id, current_status, role, requested_log_type)
         db_status = Database(conn, db_status_param)
         
         db_status_result = db_status.change_status()
@@ -168,39 +454,70 @@ def add_events():
         if not conn:
             return jsonify({"success": False, "message": "Database offline"}), 500  
 
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         if not data:
-            return jsonify({"error": "No JSON data provided"}), 400
+            return validation_error(["No JSON data provided."])
 
-        frequency = (data.get('frequency') or '').upper()
-        required_fields = ['event_name', 'event_type', 'frequency', 'location', 'time_start', 'time_end', 'participants_type']
-        missing_fields = [field for field in required_fields if not data.get(field)]
-        if frequency != 'DAILY' and not data.get('event_date'):
-            missing_fields.append('event_date')
-        if missing_fields:
-            return jsonify({"success": False, "error": f"Missing required fields: {', '.join(missing_fields)}"}), 400
-        
-        participants_type = data.get('participants_type')
+        event_name = clean_text(data.get('event_name'))
+        event_type = clean_text(data.get('event_type'))
+        frequency = normalize_event_frequency(data.get('frequency'))
+        ed = clean_text(data.get('event_date'))
+        day = clean_text(data.get('day'))
+        time_start = clean_text(data.get('time_start'))
+        time_end = clean_text(data.get('time_end'))
+        location = clean_text(data.get('location'))
+        participants_type = clean_text(data.get('participants_type')).lower()
+
+        validation_errors = []
+        if not event_name:
+            validation_errors.append("Event name is required.")
+        if event_type not in EVENT_TYPES:
+            validation_errors.append("Select a valid event type.")
+        if frequency not in EVENT_FREQUENCIES:
+            validation_errors.append("Select a valid event frequency.")
+        if not location:
+            validation_errors.append("Location is required.")
+        if not time_start:
+            validation_errors.append("Start time is required.")
+        if not time_end:
+            validation_errors.append("End time is required.")
+        if frequency != 'DAILY' and not ed:
+            validation_errors.append("Event date is required.")
+        if frequency == 'WEEKLY' and day not in EVENT_DAYS:
+            validation_errors.append("Event day is required for weekly events.")
+
         participants = None
-        match (participants_type):
-            case 'grouped':
-                participants = data.get('grouped_participants')
-                if not participants:
-                    return jsonify({"success": False, "error": "Participants are required"}), 400
-            case 'custom':
-                participants = data.get('custom_participants')
-                if not participants:
-                    return jsonify({"success": False, "error": "Participants are required"}), 400
-            case 'hybrid':
-                participants = {"grouped_participants": data.get('grouped_participants') or [], 
-                                "custom_participants": data.get('custom_participants') or []
-                               }
-                if not participants["grouped_participants"] and not participants["custom_participants"]:
-                    return jsonify({"success": False, "error": "At least one participant type is required for hybrid"}), 400
-            case _:
-                return jsonify({"success": False, "error": "Invalid participants type"}), 400
+        if participants_type == 'grouped':
+            participants = [
+                clean_text(item)
+                for item in data.get('grouped_participants') or []
+                if clean_text(item).isdigit()
+            ]
+            if not participants:
+                validation_errors.append("Select at least one participant department.")
+        elif participants_type == 'custom':
+            participants = [clean_text(item) for item in data.get('custom_participants') or [] if clean_text(item)]
+            if not participants:
+                validation_errors.append("Provide at least one participant ID.")
+        elif participants_type == 'hybrid':
+            participants = {
+                "grouped_participants": [
+                    clean_text(item)
+                    for item in data.get('grouped_participants') or []
+                    if clean_text(item).isdigit()
+                ],
+                "custom_participants": [
+                    clean_text(item) for item in data.get('custom_participants') or [] if clean_text(item)
+                ],
+            }
+            if not participants["grouped_participants"] and not participants["custom_participants"]:
+                validation_errors.append("Select departments or provide participant IDs.")
+        else:
+            validation_errors.append("Select a valid participants type.")
 
-        ed = data.get('event_date')
+        if validation_errors:
+            return validation_error(validation_errors)
+
         cd = date.today()
 
         if frequency == 'DAILY' and not ed:
@@ -210,23 +527,21 @@ def add_events():
             event_date = datetime.strptime(ed, '%Y-%m-%d').date()
             current_date = cd
         except ValueError:
-            return jsonify({"success": False, "error": "Invalid date format. Use YYYY-MM-DD"}), 400
+            return validation_error(["Event date must use YYYY-MM-DD format."])
             
         if event_date < current_date:
-            return jsonify({"success": False, "error": "Event Date cannot be in the past"}), 400
+            return validation_error(["Event date cannot be in the past."])
 
-        if frequency == 'WEEKLY':
-            day = data.get('day')
-            if not day:
-                return jsonify({"success": False, "error": "Day is required"}), 400
-            
-        event_name = data.get('event_name')
-        event_type = data.get('event_type')
-        day = data.get('day')
+        try:
+            parsed_start = parse_event_time(time_start)
+            parsed_end = parse_event_time(time_end)
+        except ValueError:
+            return validation_error(["Start time and end time must use HH:MM format."])
+
+        if parsed_end <= parsed_start:
+            return validation_error(["End time must be later than start time."])
+
         event_date = ed
-        time_start = data.get('time_start')
-        time_end = data.get('time_end')
-        location = data.get('location')
 
         db = Database(conn, (event_name, event_type, frequency, day, event_date, time_start, time_end, location, participants, participants_type))
         db_result = db.add_event()
@@ -251,67 +566,20 @@ def add_events():
 @app.route("/admin/generate-daily-instances", methods=["POST"])
 def generate_daily_instances():
     """
-    Triggered every Sunday at midnight by a cron job or cloud scheduler.
+    Triggered by the background scheduler or an external cron/Task Scheduler.
     Generates instances for the upcoming 7 days including:
     - WEEKLY events for their scheduled days
     - DAILY events for every day
     - ONCE events on their scheduled date
     """
-    conn = None
-    try:
-        conn = connect_db()
-        if not conn:
-            return jsonify({"success": False, "message": "Database offline"}), 500
+    result = run_instance_generation_job(trigger="manual")
+    return jsonify(result), (200 if result.get("success") else 409)
 
-        today = date.today()
-        upcoming_week = [today + timedelta(days=i) for i in range(7)]
-        
-        created_count = 0
-        failed_count = 0
 
-        for target_date in upcoming_week:
-            day_name = target_date.strftime("%A")
-            
-            cursor = conn.cursor(dictionary=True)
-            
-            # Get all active events matching this day
-            # WEEKLY events: match day name and event_date <= target_date
-            # DAILY events: all active daily events
-            # ONCE events: event_date == target_date
-            query = """
-                SELECT event_id, event_name, frequency, event_date
-                FROM events
-                WHERE active = 1 AND (
-                    (frequency = 'WEEKLY' AND day = %s AND event_date <= %s) OR
-                    (frequency = 'DAILY' AND event_date <= %s) OR
-                    (frequency = 'ONCE' AND event_date = %s)
-                )
-            """
-            cursor.execute(query, (day_name, target_date, target_date, target_date))
-            events = cursor.fetchall()
-            
-            for event in events:
-                event_id = event['event_id']
-                new_db = Database(conn, (event_id, target_date))
-                instance_result = new_db.add_event_instances()
-                
-                if instance_result.get('success'):
-                    created_count += 1
-                else:
-                    failed_count += 1
-                    print(f"Failed to add instance for Event {event_id} on {target_date}: {instance_result.get('message')}")
-        
-        return jsonify({
-            "success": True,
-            "message": f"Daily instances generated for the upcoming week",
-            "created": created_count,
-            "failed": failed_count,
-            "date_range": f"{today} to {upcoming_week[-1]}"
-        }), 200
+@app.route("/admin/generate-daily-instances/status", methods=["GET"])
+def generate_daily_instances_status():
+    return jsonify({"success": True, "job": _copy_instance_generator_state()}), 200
 
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-    
 
 # ==========================================
 # ENDPOINT 2: The Gate Swipe Webhook
@@ -1070,6 +1338,8 @@ def get_instance_logs(instance_id):
     finally:
         if conn:
             close_db(conn)
+
+start_instance_generation_scheduler()
 
 if __name__ == '__main__':
     app.run(debug=app.config["DEBUG"], host='0.0.0.0', port=5001)

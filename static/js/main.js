@@ -3,8 +3,92 @@
 document.addEventListener('DOMContentLoaded', () => {
     initClock();
     initAnimations();
+    initInstanceGeneratorToast();
     populateRandomStudentRecords();
 });
+
+function initInstanceGeneratorToast() {
+    const toast = document.getElementById('instance-generator-toast');
+    if (!toast) return;
+
+    const title = document.getElementById('instance-generator-title');
+    const message = document.getElementById('instance-generator-message');
+    const spinner = document.getElementById('instance-generator-spinner');
+    const successIcon = document.getElementById('instance-generator-success');
+    const errorIcon = document.getElementById('instance-generator-error');
+    const backendUrl = window.APP_CONFIG?.backendApiUrl || 'http://127.0.0.1:5001';
+    const statusUrl = `${backendUrl}/admin/generate-daily-instances/status`;
+    let lastShownFinishedAt = sessionStorage.getItem('instanceGeneratorLastShown') || '';
+    let hideTimer = null;
+
+    function showToast(mode, heading, details) {
+        title.textContent = heading;
+        message.textContent = details;
+        spinner.classList.toggle('d-none', mode !== 'running');
+        successIcon.classList.toggle('d-none', mode !== 'success');
+        errorIcon.classList.toggle('d-none', mode !== 'error');
+        toast.classList.remove('d-none');
+
+        if (hideTimer) {
+            clearTimeout(hideTimer);
+            hideTimer = null;
+        }
+
+        if (mode !== 'running') {
+            hideTimer = setTimeout(() => toast.classList.add('d-none'), 9000);
+        }
+    }
+
+    function hideToast() {
+        if (hideTimer) {
+            clearTimeout(hideTimer);
+            hideTimer = null;
+        }
+        toast.classList.add('d-none');
+    }
+
+    function formatResult(result) {
+        if (!result) return 'No run details available yet.';
+        const created = Number(result.created || 0);
+        const existing = Number(result.existing || 0);
+        const failed = Number(result.failed || 0);
+        const range = result.date_range ? ` ${result.date_range}` : '';
+        return `Created ${created}, already existing ${existing}, failed ${failed}.${range}`;
+    }
+
+    async function pollStatus() {
+        try {
+            const response = await fetch(statusUrl, { cache: 'no-store' });
+            if (!response.ok) {
+                hideToast();
+                return;
+            }
+
+            const payload = await response.json();
+            const job = payload.job || {};
+            if (job.running) {
+                showToast('running', 'Generating event instances', 'Preparing upcoming event attendance records...');
+                return;
+            }
+
+            if (job.last_finished_at && job.last_finished_at !== lastShownFinishedAt) {
+                lastShownFinishedAt = job.last_finished_at;
+                sessionStorage.setItem('instanceGeneratorLastShown', lastShownFinishedAt);
+
+                if (job.last_error) {
+                    showToast('error', 'Event generation failed', job.last_error);
+                } else {
+                    showToast('success', 'Event instances ready', formatResult(job.last_result));
+                }
+            }
+        } catch (error) {
+            hideToast();
+        }
+    }
+
+    pollStatus();
+    setInterval(pollStatus, 8000);
+}
 
 // --- Real-time Clock ---
 function initClock() {
