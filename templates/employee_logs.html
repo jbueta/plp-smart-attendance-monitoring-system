@@ -85,9 +85,13 @@
                             {% for log in logs %}
                             <tr class="employee-row"
                                 data-employee-id="{{ log.id | lower }}"
+                                data-employee-id-original="{{ log.id }}"
                                 data-employee-name="{{ log.name | lower }}"
+                                data-employee-name-original="{{ log.name }}"
                                 data-department="{{ log.dept }}"
+                                data-department-original="{{ log.dept }}"
                                 data-position="{{ log.position or '' }}"
+                                data-position-original="{{ log.position or 'N/A' }}"
                                 data-date="{{ log.date or '' }}">
                                 <td class="fw-bold text-white ps-4">
                                     <div class="d-flex align-items-center">
@@ -189,8 +193,12 @@
                             {% for emp in employees %}
                             <tr class="employee-record-row"
                                 data-id="{{ emp.id | lower }}"
+                                data-id-original="{{ emp.id }}"
                                 data-name="{{ emp.name | lower }}"
-                                data-dept="{{ emp.dept | lower }}">
+                                data-name-original="{{ emp.name }}"
+                                data-dept="{{ emp.dept | lower }}"
+                                data-dept-original="{{ emp.dept }}"
+                                data-position-original="{{ emp.position or 'N/A' }}">
                                 <td class="font-monospace text-white-50 ps-4">{{ emp.id }}</td>
                                 <td class="fw-bold text-white">{{ emp.name }}</td>
                                 <td class="text-white-50">{{ emp.dept }}</td>
@@ -910,6 +918,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const departmentFilter    = document.getElementById('departmentFilter');
     const dateFilter          = document.getElementById('dateFilter');
     const tableCard           = document.getElementById('tableCard');
+    const activityTableResponsive = tableCard ? tableCard.querySelector('.table-responsive') : null;
     const noResults           = document.getElementById('noResults');
     const resultCount         = document.getElementById('resultCount');
     const paginationContainer = document.getElementById('paginationContainer');
@@ -1013,6 +1022,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (getActivityRows().length === 0) {
             // No rows at all — keep table visible (shows built-in empty row), hide pagination & count
             tableCard.style.display  = '';
+            if (activityTableResponsive) activityTableResponsive.style.display = '';
             noResults.style.display  = 'none';
             resultCount.textContent  = '';
             paginationContainer.classList.remove('show');
@@ -1022,13 +1032,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (visible === 0 && hasFilters) {
             // Rows exist but none match the current filter
-            tableCard.style.display  = 'none';
+            tableCard.style.display  = '';
+            if (activityTableResponsive) activityTableResponsive.style.display = 'none';
             noResults.style.display  = 'block';
             resultCount.textContent  = '';
             paginationContainer.classList.remove('show');
             paginationContainer.style.display = 'none';
         } else {
             tableCard.style.display  = '';
+            if (activityTableResponsive) activityTableResponsive.style.display = '';
             noResults.style.display  = 'none';
             // Only show count text when a filter is actually active
             resultCount.textContent  = hasFilters
@@ -1145,10 +1157,20 @@ document.addEventListener('DOMContentLoaded', function () {
     const cancelEdit       = document.getElementById('cancelEditEmployee');
 
     function showEditCard(row, mode) {
-        const id       = row.querySelector('td:nth-child(1)').textContent.trim();
-        const name     = row.querySelector('td:nth-child(2)').textContent.trim();
-        const dept     = row.querySelector('td:nth-child(3)').textContent.trim();
-        const position = row.querySelector('td:nth-child(4)').textContent.trim();
+        const isActivityRow = row.classList.contains('employee-row');
+        const id = isActivityRow
+            ? (row.getAttribute('data-employee-id-original') || row.getAttribute('data-employee-id') || '')
+            : (row.getAttribute('data-id-original') || row.getAttribute('data-id') || '');
+        const name = isActivityRow
+            ? (row.getAttribute('data-employee-name-original') || row.querySelector('td:nth-child(1) span')?.textContent.trim() || '')
+            : (row.getAttribute('data-name-original') || row.querySelector('td:nth-child(2)')?.textContent.trim() || '');
+        const dept = isActivityRow
+            ? (row.getAttribute('data-department-original') || row.getAttribute('data-department') || '')
+            : (row.getAttribute('data-dept-original') || row.querySelector('td:nth-child(3)')?.textContent.trim() || '');
+        const position = row.getAttribute('data-position-original')
+            || row.getAttribute('data-position')
+            || (isActivityRow ? 'N/A' : row.querySelector('td:nth-child(4)')?.textContent.trim())
+            || 'N/A';
 
         editEmployeeId.value   = id;
         editEmployeeName.value = name;

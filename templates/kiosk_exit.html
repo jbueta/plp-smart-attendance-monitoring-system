@@ -129,10 +129,15 @@
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label for="manual-student-id" class="form-label text-white-50">Student ID Number</label>
+                    <label for="manual-student-id" class="form-label text-white-50">Student or Visitor ID</label>
                     <input type="text" class="form-control text-black border-secondary"
                         id="manual-student-id" 
-                        placeholder="e.g. 23-00312" pattern="[0-9]{2}-[0-9]{5}" title="Format: 00-00000" required>
+                        placeholder="e.g. 23-00312 or VT-00001"
+                        title="Enter a student ID like 23-00312 or a visitor ID like VT-00001"
+                        style="text-transform: uppercase;">
+                    <div class="form-text text-white-50">
+                        You can use either a student ID or a visitor ID for time out.
+                    </div>
                 </div>
                 <div class="d-grid gap-2">
                     <button type="button" class="btn btn-secondary" onclick="submitManualEntry('student')">Time
@@ -224,6 +229,13 @@
     window.GENERAL_KIOSK_ACTION = 'Exit';
 
     document.addEventListener('DOMContentLoaded', function () {
+        const manualExitInput = document.getElementById('manual-student-id');
+        if (manualExitInput) {
+            manualExitInput.addEventListener('input', () => {
+                manualExitInput.value = manualExitInput.value.toUpperCase();
+            });
+        }
+
         document.querySelectorAll('form').forEach(form => {
             const purposeSelect = form.querySelector('.visitor-purpose-select');
             const detailsGroup = form.querySelector('.visitor-details-group');
@@ -351,7 +363,7 @@
                     feedText.className = "position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-warning font-monospace fw-bold scanning-text";
 
                     // Hit the Backend API
-                    fetch(`${window.APP_CONFIG.backendApiUrl}/admin/user/authentication`, {
+                    fetch(`/api/backend/admin/user/authentication`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({

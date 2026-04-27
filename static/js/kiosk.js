@@ -1,6 +1,7 @@
 /* Kiosk functionality - Student and Employee */
 
-const backendBaseUrl = window.APP_CONFIG?.backendApiUrl || 'http://127.0.0.1:5001';
+const frontendBaseUrl = window.location.origin;
+const backendProxyBaseUrl = `${frontendBaseUrl}/api/backend`;
 
 /**
  * Format a datetime string to 12-hour time (e.g., "7:45 AM")
@@ -138,7 +139,7 @@ function appendToLiveFeed(name, affiliation, logType) {
  */
 function loadEventAttendance(instanceId) {
     console.log(`Loading event logs for instance ${instanceId}`);
-    fetch(`${backendBaseUrl}/admin/instances/${instanceId}/get-logs`)
+    fetch(`${backendProxyBaseUrl}/admin/instances/${instanceId}/logs`)
         .then(response => {
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             return response.json();
@@ -186,7 +187,7 @@ function submitManualEntry(type, manualId = null) {
     
     if (isEventKiosk) {
         console.log('Sending manual entry request:', { employee_id: id, event_id: window.currentEventId });
-        fetch(`${backendBaseUrl}/api/events/manual_entry`, {
+        fetch(`${backendProxyBaseUrl}/events/manual-entry`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -236,7 +237,7 @@ function submitManualEntry(type, manualId = null) {
     } else {
         // Fallback to general authentication (students, visitor, etc.)
         const requestedLogType = window.GENERAL_KIOSK_ACTION || null;
-        fetch(`${backendBaseUrl}/admin/user/authentication`, {
+        fetch(`${backendProxyBaseUrl}/admin/user/authentication`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -244,7 +245,10 @@ function submitManualEntry(type, manualId = null) {
                 requested_log_type: requestedLogType
             })
         })
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok && r.status !== 404) throw new Error('Server error');
+            return r.json();
+        })
         .then(data => {
             if (data.success) {
                 const logType = data.attendance_status.toLowerCase();
