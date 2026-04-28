@@ -334,10 +334,6 @@
                                 <h6 class="text-white fw-bold mb-3 tracking-wider">INFORMATION DETAILS</h6>
                                 <div class="vstack gap-2 text-start flex-grow-1">
                                     <div class="row align-items-center">
-                                        <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0" for="manualAddId">EMPLOYEE ID:</label></div>
-                                        <div class="col-sm-8"><input type="text" id="manualAddId" class="form-control form-control-sm bg-transparent text-white border-secondary rounded-3 shadow-none" placeholder="e.g. 00-00000" pattern="^[0-9]{2}-[0-9]{5}$" required></div>
-                                    </div>
-                                    <div class="row align-items-center">
                                         <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0" for="manualAddName">FULL NAME:</label></div>
                                         <div class="col-sm-8"><input type="text" id="manualAddName" class="form-control form-control-sm bg-transparent text-white border-secondary rounded-3 shadow-none" placeholder="e.g. Juan Dela Cruz" required></div>
                                     </div>
@@ -416,7 +412,7 @@
                                     </div>
                                 </div>
                                 <div class="mt-3 pt-2 border-top border-secondary">
-                                    <span class="text-white-50" style="font-size: 0.70rem;">Once complete, click generate QR</span>
+                                    <span class="text-white-50" style="font-size: 0.70rem;">Employee ID will be generated automatically after the record is saved.</span>
                                 </div>
                             </form>
                         </div>
@@ -701,7 +697,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Manual Add — dynamic fields & validation
-    const manualIdInput               = document.getElementById('manualAddId');
     const manualNameInput             = document.getElementById('manualAddName');
     const typeTeachingRadio           = document.getElementById('typeTeaching');
     const typeNonTeachingRadio        = document.getElementById('typeNonTeaching');
@@ -729,26 +724,24 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function validateManualForm() {
-        const idOk   = manualIdInput && manualIdInput.value.trim().length > 0;
         const nameOk = manualNameInput && manualNameInput.value.trim().length > 0;
         let typeOk   = false;
         if (typeTeachingRadio && typeTeachingRadio.checked)
             typeOk = manualAddCollege.value !== '' && manualAddTeachingPosition.value !== '';
         else if (typeNonTeachingRadio && typeNonTeachingRadio.checked)
             typeOk = manualAddOffice.value !== '' && manualAddNonTeachingPos.value !== '';
-        if (submitManualBtn) submitManualBtn.disabled = !(idOk && nameOk && typeOk);
+        if (submitManualBtn) submitManualBtn.disabled = !(nameOk && typeOk);
     }
 
     if (typeTeachingRadio)    typeTeachingRadio.addEventListener('change', togglePersonnelFields);
     if (typeNonTeachingRadio) typeNonTeachingRadio.addEventListener('change', togglePersonnelFields);
-    [manualIdInput, manualNameInput, manualAddCollege, manualAddTeachingPosition, manualAddOffice, manualAddNonTeachingPos]
+    [manualNameInput, manualAddCollege, manualAddTeachingPosition, manualAddOffice, manualAddNonTeachingPos]
         .forEach(el => el && el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', validateManualForm));
 
     if (submitManualBtn) {
         submitManualBtn.addEventListener('click', async function () {
             const isTeaching = typeTeachingRadio && typeTeachingRadio.checked;
             const payload = {
-                employee_id:   manualIdInput.value.trim(),
                 employee_name: manualNameInput.value.trim(),
                 department_id: isTeaching ? manualAddCollege.value : manualAddOffice.value,
                 position:      isTeaching ? manualAddTeachingPosition.value : manualAddNonTeachingPos.value
@@ -813,11 +806,11 @@ document.addEventListener('DOMContentLoaded', function () {
                                     <i class="bi bi-info-circle-fill fs-5 mt-1 text-info"></i>
                                     <div>
                                         <strong class="d-block mb-1 text-info" style="font-size: 0.95rem;">Required Excel Format</strong>
-                                        <p class="mb-3 text-white-50" style="font-size: 0.85rem;">To successfully upload records, your file must include these exact column headers. Please ensure no required fields are left blank. If errors persist, verify that your spreadsheet has no hidden columns, empty rows, or duplicate employee IDs.</p>
+                                        <p class="mb-3 text-white-50" style="font-size: 0.85rem;">To successfully upload records, your file must include at least these employee information columns. Please ensure required fields are not left blank. If errors persist, verify that your spreadsheet has no hidden columns, empty rows, or duplicate employee entries.</p>
                                         <div class="d-flex flex-wrap gap-2">
-                                            <span class="badge rounded-pill px-3 py-2" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-weight: 500; letter-spacing: 0.5px;">EMPLOYEE NUMBER</span>
                                             <span class="badge rounded-pill px-3 py-2" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-weight: 500; letter-spacing: 0.5px;">EMPLOYEE NAME</span>
                                             <span class="badge rounded-pill px-3 py-2" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-weight: 500; letter-spacing: 0.5px;">DEPARTMENT</span>
+                                            <span class="badge rounded-pill px-3 py-2" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-weight: 500; letter-spacing: 0.5px;">POSITION (OPTIONAL)</span>
                                         </div>
                                     </div>
                                 </div>

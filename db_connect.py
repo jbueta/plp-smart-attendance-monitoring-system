@@ -2020,19 +2020,18 @@ class Database:
 
 
 class EmployeeModel:
-    def add_employee(self, employee_id, employee_name, department_id, position):
+    def add_employee(self, employee_name, department_id, position):
         conn = connect_db()
         if conn is None:
             return {"success": False, "error": "Database connection failed"}
 
         cursor = None
         try:
-            employee_id = str(employee_id or "").strip()
             employee_name = str(employee_name or "").strip()
             department_id = str(department_id or "").strip()
             position = str(position or "").strip()
 
-            if not employee_id or not employee_name or not department_id or not position:
+            if not employee_name or not department_id or not position:
                 return {"success": False, "error": "All employee fields are required."}
 
             cursor = conn.cursor()
@@ -2053,13 +2052,19 @@ class EmployeeModel:
                 """
                 SELECT employee_id
                 FROM employees
-                WHERE employee_id = %s
+                WHERE UPPER(TRIM(employee_name)) = UPPER(TRIM(%s))
+                  AND department_id = %s
+                  AND UPPER(TRIM(COALESCE(position, ''))) = UPPER(TRIM(%s))
                 LIMIT 1
                 """,
-                (employee_id,),
+                (employee_name, department_id, position),
             )
-            if cursor.fetchone():
-                return {"success": False, "error": f"Employee already exists: {employee_id}"}
+            existing_employee = cursor.fetchone()
+            if existing_employee:
+                return {
+                    "success": False,
+                    "error": f"Employee already exists with ID {existing_employee[0]}",
+                }
 
             cursor.execute(
                 """
@@ -2073,13 +2078,27 @@ class EmployeeModel:
             cursor.execute(
                 """
                 INSERT INTO employees
-                    (user_id, employee_id, employee_name, department_id, position, status)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                    (user_id, employee_name, department_id, position, status)
+                VALUES (%s, %s, %s, %s, %s)
                 """,
-                (user_id, employee_id, employee_name, department_id, position, "Outside"),
+                (user_id, employee_name, department_id, position, "Outside"),
             )
+
+            cursor.execute(
+                """
+                SELECT employee_id
+                FROM employees
+                WHERE user_id = %s
+                LIMIT 1
+                """,
+                (user_id,),
+            )
+            created_employee = cursor.fetchone()
             conn.commit()
-            return {"success": True}
+            return {
+                "success": True,
+                "employee_id": created_employee[0] if created_employee else None,
+            }
         except Exception as err:
             conn.rollback()
             return {"success": False, "error": str(err)}
@@ -2088,17 +2107,16 @@ class EmployeeModel:
                 cursor.close()
             conn.close()
 
-    def add_employee_excel(self, conn, employee_id, employee_name, department_name, position):
+    def add_employee_excel(self, conn, employee_name, department_name, position):
         cursor = None
         try:
             cursor = conn.cursor()
 
-            employee_id = str(employee_id or "").strip()
             employee_name = str(employee_name or "").strip().title()
             department_name = str(department_name or "").strip().upper().replace("\u2019", "'")
             position = str(position or "").strip()
 
-            if not employee_id or not employee_name or not department_name:
+            if not employee_name or not department_name:
                 return {"success": False, "error": "Missing required fields"}
 
             cursor.execute(
@@ -2120,13 +2138,19 @@ class EmployeeModel:
                 """
                 SELECT employee_id
                 FROM employees
-                WHERE employee_id = %s
+                WHERE UPPER(TRIM(employee_name)) = UPPER(TRIM(%s))
+                  AND department_id = %s
+                  AND UPPER(TRIM(COALESCE(position, ''))) = UPPER(TRIM(%s))
                 LIMIT 1
                 """,
-                (employee_id,),
+                (employee_name, department_id, position),
             )
-            if cursor.fetchone():
-                return {"success": False, "error": f"Employee already exists: {employee_id}"}
+            existing_employee = cursor.fetchone()
+            if existing_employee:
+                return {
+                    "success": False,
+                    "error": f"Employee already exists with ID {existing_employee[0]}",
+                }
 
             cursor.execute(
                 """
@@ -2140,13 +2164,27 @@ class EmployeeModel:
             cursor.execute(
                 """
                 INSERT INTO employees
-                    (user_id, employee_id, employee_name, department_id, position, status)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                    (user_id, employee_name, department_id, position, status)
+                VALUES (%s, %s, %s, %s, %s)
                 """,
-                (user_id, employee_id, employee_name, department_id, position or None, "Outside"),
+                (user_id, employee_name, department_id, position or None, "Outside"),
             )
+
+            cursor.execute(
+                """
+                SELECT employee_id
+                FROM employees
+                WHERE user_id = %s
+                LIMIT 1
+                """,
+                (user_id,),
+            )
+            created_employee = cursor.fetchone()
             conn.commit()
-            return {"success": True}
+            return {
+                "success": True,
+                "employee_id": created_employee[0] if created_employee else None,
+            }
         except Exception as err:
             if conn:
                 conn.rollback()

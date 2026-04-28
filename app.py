@@ -1010,7 +1010,6 @@ def add_employee():
     data = request.get_json(silent=True) or {}
 
     result = employee_model.add_employee(
-        employee_id=(data.get("employee_id") or "").strip(),
         employee_name=(data.get("employee_name") or "").strip(),
         department_id=(data.get("department_id") or "").strip(),
         position=(data.get("position") or "").strip(),
@@ -1047,16 +1046,24 @@ def upload_employees():
 
         reader = pd.read_csv if file_ext == ".csv" else pd.read_excel
         raw = reader(file, dtype=str, header=None)
+        required_columns = ["EMPLOYEE NAME", "DEPARTMENT"]
+        optional_columns = ["POSITION"]
+        required_column_set = set(required_columns)
 
         header_row = None
         for idx, row in raw.iterrows():
-            row_values = row.astype(str).str.strip().str.upper()
-            if "EMPLOYEE NUMBER" in row_values.values:
+            row_values = {clean(value).upper() for value in row.tolist() if pd.notna(value)}
+            if required_column_set.issubset(row_values):
                 header_row = idx
                 break
 
         if header_row is None:
-            return jsonify({"success": False, "error": "Could not find 'Employee Number' header in the file"}), 400
+            return jsonify(
+                {
+                    "success": False,
+                    "error": "Could not find the required headers: Employee Name and Department.",
+                }
+            ), 400
 
         file.seek(0)
         df = reader(file, dtype=str, header=header_row)
@@ -1064,25 +1071,46 @@ def upload_employees():
         df.dropna(how="all", inplace=True)
         df = df.applymap(lambda value: clean(value) if isinstance(value, str) else value)
 
-        if "EMPLOYEE NUMBER" not in df.columns:
-            return jsonify({"success": False, "error": "Missing 'Employee Number' column in the file"}), 400
-
-        df["EMPLOYEE NUMBER"] = (
-            df["EMPLOYEE NUMBER"]
-            .fillna("")
-            .astype(str)
-            .str.strip()
-            .str.replace(r"\.0$", "", regex=True)
-        )
-        df = df[df["EMPLOYEE NUMBER"].str.strip().astype(bool)]
-
-        duplicates = df[df["EMPLOYEE NUMBER"].duplicated(keep=False)]
-        if not duplicates.empty:
-            duplicate_ids = duplicates["EMPLOYEE NUMBER"].unique().tolist()
+        missing_columns = [column.title() for column in required_columns if column not in df.columns]
+        if missing_columns:
             return jsonify(
                 {
                     "success": False,
-                    "error": f"Duplicate Employee IDs found in uploaded file: {', '.join(duplicate_ids)}",
+                    "error": f"Missing required column(s): {', '.join(missing_columns)}",
+                }
+            ), 400
+
+        for column in required_columns:
+            df[column] = df[column].fillna("").astype(str).str.strip()
+        for column in optional_columns:
+            if column not in df.columns:
+                df[column] = ""
+            df[column] = df[column].fillna("").astype(str).str.strip()
+
+        df = df[
+            df[required_columns + optional_columns]
+            .apply(lambda row: any(str(value).strip() for value in row), axis=1)
+        ]
+
+        duplicate_labels = {}
+        for index, row in df.iterrows():
+            signature = (
+                str(row.get("EMPLOYEE NAME") or "").strip().upper(),
+                str(row.get("DEPARTMENT") or "").strip().upper(),
+                str(row.get("POSITION") or "").strip().upper(),
+            )
+            duplicate_labels.setdefault(signature, []).append(header_row + index + 2)
+
+        duplicate_rows = [
+            f"rows {', '.join(str(row_number) for row_number in row_numbers)}"
+            for signature, row_numbers in duplicate_labels.items()
+            if all(signature) and len(row_numbers) > 1
+        ]
+        if duplicate_rows:
+            return jsonify(
+                {
+                    "success": False,
+                    "error": f"Duplicate employee entries found in the uploaded file: {'; '.join(duplicate_rows)}",
                 }
             ), 400
 
@@ -1094,27 +1122,25 @@ def upload_employees():
         errors = []
 
         for index, row in df.iterrows():
-            employee_id = str(row.get("EMPLOYEE NUMBER") or "").strip()
             employee_name = str(row.get("EMPLOYEE NAME") or "").strip()
             department_name = str(row.get("DEPARTMENT") or "").strip()
             position = str(row.get("POSITION") or "").strip()
+            row_number = header_row + index + 2
 
-            if not employee_id or not employee_name or not department_name:
+            if not employee_name or not department_name:
                 missing = [
                     label
                     for label, value in (
-                        ("Employee Number", employee_id),
                         ("Employee Name", employee_name),
                         ("Department", department_name),
                     )
                     if not value
                 ]
-                errors.append(f"Row {index + 2}: Missing {', '.join(missing)}")
+                errors.append(f"Row {row_number}: Missing {', '.join(missing)}")
                 continue
 
             result = employee_model.add_employee_excel(
                 conn=conn,
-                employee_id=employee_id,
                 employee_name=employee_name,
                 department_name=department_name,
                 position=position,
@@ -1123,7 +1149,7 @@ def upload_employees():
             if result.get("success"):
                 inserted += 1
             else:
-                errors.append(f"Row {index + 2} (ID: {employee_id}): {result.get('error')}")
+                errors.append(f"Row {row_number}: {result.get('error')}")
 
         return jsonify({"success": True, "inserted": inserted, "errors": errors})
     except Exception as err:
