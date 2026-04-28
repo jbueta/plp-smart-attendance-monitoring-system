@@ -7,7 +7,7 @@ dbconfig = {
     'user': 'root',
     'password': '',
     'database': 'smart_monitoring',
-    'port': 3306,
+    'port': 3307,
     'use_pure': True
 }
 
@@ -48,6 +48,28 @@ def connect_db():
                 current_app.logger.error(f"Pool exhausted or connection error: {err}")
                 g.db = None
     return g.db
+
+def get_employee_dashboard_stats():
+    db = connect_db()
+    cursor = db.cursor(dictionary=True)
+    
+    # 1. Currently Inside (Live Tracking)
+    cursor.execute("SELECT COUNT(*) as count FROM event_log WHERE time_out IS NULL AND date = CURDATE()")
+    live = cursor.fetchone()['count']
+    
+    # 2. Avg Stay Duration (Hours)
+    cursor.execute("SELECT AVG(TIMESTAMPDIFF(HOUR, time_in, time_out)) as avg_stay FROM event_log WHERE time_out IS NOT NULL")
+    stay = cursor.fetchone()['avg_stay'] or 0.0
+    
+    # 3. Peak Entry Hour
+    cursor.execute("""
+        SELECT HOUR(time_in) as hr, COUNT(*) as count 
+        FROM event_log GROUP BY hr ORDER BY count DESC LIMIT 1
+    """)
+    peak_data = cursor.fetchone()
+    peak = f"{peak_data['hr']}:00" if peak_data else "N/A"
+    
+    return {"live": live, "stay": round(stay, 1), "peak": peak}
 
 def close_db(error=None):
     """Closes the database connection at the end of the request."""
