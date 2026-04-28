@@ -949,6 +949,7 @@ class Database:
                 WHERE ei.event_date = CURDATE()
                   AND ei.status = 'Scheduled'
                   AND e.active = 1
+                  AND e.time_end >= CURTIME()
                 ORDER BY e.time_start ASC, e.event_name ASC
                 """
             )
@@ -1941,9 +1942,10 @@ class Database:
                 JOIN event_participants ep ON ei.event_id = ep.event_id
                 JOIN employees emp ON ep.user_id = emp.user_id
                 JOIN users u ON emp.user_id = u.user_id
-                WHERE ei.event_date >= CURDATE()
+                WHERE (ei.event_date > CURDATE() OR (ei.event_date = CURDATE() AND e.time_end >= CURTIME()))
                   AND ei.status = 'Scheduled'
                   AND u.active = 1
+                  AND e.active = 1
                 GROUP BY ei.instance_id, e.event_name, ei.event_date, e.time_start, e.location
                 ORDER BY ei.event_date ASC, e.time_start ASC
                 LIMIT 3
