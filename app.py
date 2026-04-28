@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from functools import wraps
 import csv
 import io
@@ -9,7 +9,7 @@ import unicodedata
 from urllib.parse import urlencode, urlsplit
 
 import requests
-from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
+from flask import Flask, Response, flash, jsonify, redirect, render_template, request, session, url_for
 
 from app_tasks import fetch_report_data
 from config import get_config
@@ -20,6 +20,7 @@ from extensions import cache
 
 app = Flask(__name__)
 app.config.from_object(get_config())
+app.permanent_session_lifetime = timedelta(minutes=3)
 
 os.makedirs(os.path.dirname(app.config["LOG_FILE"]) or ".", exist_ok=True)
 employee_model = EmployeeModel()
@@ -95,6 +96,8 @@ MOCK_KIOSK_DATA = {
 EVENT_TYPES = {"Meeting", "Training", "Seminar", "Workshop", "Drill", "Activity", "Flag Ceremony", "Other"}
 EVENT_FREQUENCIES = {"ONCE", "DAILY", "WEEKLY"}
 EVENT_DAYS = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
+EMPLOYEE_UPLOAD_REQUIRED_COLUMNS = ["EMPLOYEE NAME", "DEPARTMENT"]
+EMPLOYEE_UPLOAD_OPTIONAL_COLUMNS = ["POSITION"]
 
 def normalize_event_frequency(value):
     frequency = (value or "").strip().upper().replace("_", "-")
@@ -123,6 +126,168 @@ def unique_values(values):
         seen.add(key)
         unique.append(value)
     return unique
+
+
+def clean_upload_text(text):
+    if not isinstance(text, str):
+        text = str(text) if text is not None else ""
+    text = unicodedata.normalize("NFKC", text)
+    text = re.sub(r"[\u2018\u2019\u02bc\u0060\u00b4]", "'", text)
+    text = re.sub(r"[\u2013\u2014]", "-", text)
+    text = text.replace("\u00a0", " ").replace("\u200b", "")
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
+def parse_employee_upload_file(file):
+    import pandas as pd
+
+    if not file or not file.filename:
+        return {"success": False, "error": "No file uploaded"}
+
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in {".xls", ".xlsx", ".csv"}:
+        return {"success": False, "error": "Please upload a valid Excel or CSV file."}
+
+    reader = pd.read_csv if file_ext == ".csv" else pd.read_excel
+    raw = reader(file, dtype=str, header=None)
+    required_column_set = set(EMPLOYEE_UPLOAD_REQUIRED_COLUMNS)
+
+    header_row = None
+    for idx, row in raw.iterrows():
+        row_values = {clean_upload_text(value).upper() for value in row.tolist() if pd.notna(value)}
+        if required_column_set.issubset(row_values):
+            header_row = idx
+            break
+
+    if header_row is None:
+        return {
+            "success": False,
+            "error": "Could not find the required headers: Employee Name and Department.",
+        }
+
+    file.seek(0)
+    df = reader(file, dtype=str, header=header_row)
+    df.columns = [clean_upload_text(col).upper() for col in df.columns]
+    df.dropna(how="all", inplace=True)
+    df = df.applymap(lambda value: clean_upload_text(value) if isinstance(value, str) else value)
+
+    missing_columns = [column.title() for column in EMPLOYEE_UPLOAD_REQUIRED_COLUMNS if column not in df.columns]
+    if missing_columns:
+        return {
+            "success": False,
+            "error": f"Missing required column(s): {', '.join(missing_columns)}",
+        }
+
+    for column in EMPLOYEE_UPLOAD_REQUIRED_COLUMNS:
+        df[column] = df[column].fillna("").astype(str).str.strip()
+    for column in EMPLOYEE_UPLOAD_OPTIONAL_COLUMNS:
+        if column not in df.columns:
+            df[column] = ""
+        df[column] = df[column].fillna("").astype(str).str.strip()
+
+    df = df[
+        df[EMPLOYEE_UPLOAD_REQUIRED_COLUMNS + EMPLOYEE_UPLOAD_OPTIONAL_COLUMNS]
+        .apply(lambda row: any(str(value).strip() for value in row), axis=1)
+    ]
+
+    parsed_rows = []
+    for index, row in df.iterrows():
+        parsed_rows.append(
+            {
+                "row_number": header_row + index + 2,
+                "employee_name": str(row.get("EMPLOYEE NAME") or "").strip(),
+                "department_name": str(row.get("DEPARTMENT") or "").strip(),
+                "position": str(row.get("POSITION") or "").strip(),
+            }
+        )
+
+    return {
+        "success": True,
+        "required_columns": EMPLOYEE_UPLOAD_REQUIRED_COLUMNS,
+        "optional_columns": EMPLOYEE_UPLOAD_OPTIONAL_COLUMNS,
+        "parsed_rows": parsed_rows,
+    }
+
+
+def validate_employee_upload_rows(conn, parsed_rows):
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT department_id, department_name
+            FROM departments
+            """
+        )
+        department_lookup = {}
+        for department_id, department_name in cursor.fetchall():
+            key = clean_upload_text(department_name).upper()
+            if key:
+                department_lookup[key] = department_id
+
+        cursor.execute(
+            """
+            SELECT
+                UPPER(TRIM(employee_name)) AS employee_name_key,
+                department_id,
+                UPPER(TRIM(COALESCE(position, ''))) AS position_key
+            FROM employees
+            """
+        )
+        existing_signatures = {(row[0], str(row[1]), row[2]) for row in cursor.fetchall()}
+
+        valid_rows = []
+        errors = []
+        seen_signatures = {}
+
+        for row in parsed_rows:
+            employee_name = clean_upload_text(row.get("employee_name"))
+            department_name = clean_upload_text(row.get("department_name"))
+            position = clean_upload_text(row.get("position"))
+            row_number = row.get("row_number")
+
+            missing_fields = []
+            if not employee_name:
+                missing_fields.append("Employee Name")
+            if not department_name:
+                missing_fields.append("Department")
+            if missing_fields:
+                errors.append(f"Row {row_number}: Missing {', '.join(missing_fields)}")
+                continue
+
+            dept_key = department_name.upper()
+            department_id = department_lookup.get(dept_key)
+            if not department_id:
+                errors.append(f"Row {row_number}: Department not found: {department_name}")
+                continue
+
+            signature = (employee_name.upper(), str(department_id), position.upper())
+            if signature in seen_signatures:
+                errors.append(
+                    f"Row {row_number}: Duplicate of row {seen_signatures[signature]} in the uploaded file."
+                )
+                continue
+            seen_signatures[signature] = row_number
+
+            if signature in existing_signatures:
+                errors.append(
+                    f"Row {row_number}: Employee already exists ({employee_name} / {department_name} / {position or 'N/A'})."
+                )
+                continue
+
+            valid_rows.append(
+                {
+                    "row_number": row_number,
+                    "employee_name": employee_name,
+                    "department_name": department_name,
+                    "department_id": department_id,
+                    "position": position,
+                }
+            )
+
+        return {"success": True, "valid_rows": valid_rows, "errors": errors}
+    finally:
+        cursor.close()
 
 
 class InternalBackendResponse:
@@ -185,7 +350,10 @@ def backend_request(method, path, **kwargs):
 
 @app.context_processor
 def inject_template_config():
-    return {"backend_api_url": app.config["BACKEND_API_URL"]}
+    return {
+        "backend_api_url": app.config["BACKEND_API_URL"],
+        "is_logged_in": bool(session.get("logged_in")),
+    }
 
 
 def login_required(view_func):
@@ -336,6 +504,35 @@ def fetch_admin_students_page_data():
         }
     )
     return logs, records, course_options
+
+
+def split_employee_departments(departments):
+    office_keywords = (
+        "office",
+        "library",
+        "human resources",
+        "hr",
+        "registrar",
+        "accounting",
+        "mis",
+    )
+
+    teaching_departments = []
+    office_departments = []
+
+    for dept in departments:
+        dept_name = str(dept.get("department_name") or "").strip()
+        if not dept_name:
+            continue
+
+        target_list = (
+            office_departments
+            if any(keyword in dept_name.lower() for keyword in office_keywords)
+            else teaching_departments
+        )
+        target_list.append(dept)
+
+    return teaching_departments, office_departments
 
 
 def fetch_admin_employees_page_data():
@@ -612,7 +809,16 @@ def admin_students():
 @login_required
 def admin_employees():
     logs, records, department_options = fetch_admin_employees_page_data()
-    departments = [{"name": department} for department in department_options]
+    departments = fetch_departments()
+    teaching_departments, office_departments = split_employee_departments(departments)
+
+    if not departments:
+        departments = [
+            {"department_id": "", "department_name": department}
+            for department in department_options
+        ]
+        teaching_departments, office_departments = departments, []
+
     return render_template(
         "employee_logs.html",
         logs=logs,
@@ -620,6 +826,8 @@ def admin_employees():
         employees=records,
         department_options=department_options,
         departments=departments,
+        teaching_departments=teaching_departments,
+        office_departments=office_departments,
     )
 
 
@@ -1021,122 +1229,81 @@ def add_employee():
 @app.route("/upload_employees", methods=["POST"])
 @login_required
 def upload_employees():
+    preview_response, preview_status = preview_employees_upload()
+    if preview_status != 200:
+        return preview_response, preview_status
+
+    preview_data = preview_response.get_json(silent=True) or {}
+    valid_rows = preview_data.get("preview_rows", [])
+    if not valid_rows:
+        return jsonify({"success": False, "error": "No valid employee rows to upload."}), 400
+
+    return commit_employees_upload_payload(valid_rows)
+
+
+@app.route("/upload_employees/template.csv", methods=["GET"])
+@login_required
+def download_employee_upload_template():
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(EMPLOYEE_UPLOAD_REQUIRED_COLUMNS + EMPLOYEE_UPLOAD_OPTIONAL_COLUMNS)
+    writer.writerow(["Juan Dela Cruz", "College of Information Technology", "Instructor I"])
+    writer.writerow(["Maria Santos", "Registrar's Office", "Admin Officer"])
+
+    csv_content = output.getvalue()
+    output.close()
+
+    return Response(
+        csv_content,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=employee_upload_template.csv"},
+    )
+
+
+@app.route("/upload_employees/preview", methods=["POST"])
+@login_required
+def preview_employees_upload():
     file = request.files.get("file")
+    parsed = parse_employee_upload_file(file)
+    if not parsed.get("success"):
+        return jsonify(parsed), 400
 
-    if not file or not file.filename:
-        return jsonify({"success": False, "error": "No file uploaded"}), 400
-
-    file_ext = os.path.splitext(file.filename)[1].lower()
-    if file_ext not in {".xls", ".xlsx", ".csv"}:
-        return jsonify({"success": False, "error": "Please upload a valid Excel or CSV file."}), 400
-
-    def clean(text):
-        if not isinstance(text, str):
-            text = str(text) if text is not None else ""
-        text = unicodedata.normalize("NFKC", text)
-        text = re.sub(r"[\u2018\u2019\u02bc\u0060\u00b4]", "'", text)
-        text = re.sub(r"[\u2013\u2014]", "-", text)
-        text = text.replace("\u00a0", " ").replace("\u200b", "")
-        text = re.sub(r"\s+", " ", text)
-        return text.strip()
-
-    conn = None
+    conn = connect_db()
+    if conn is None:
+        return jsonify({"success": False, "error": "Database connection failed"}), 500
     try:
-        import pandas as pd
+        validation = validate_employee_upload_rows(conn, parsed.get("parsed_rows", []))
+        return jsonify(
+            {
+                "success": True,
+                "required_columns": parsed.get("required_columns", []),
+                "optional_columns": parsed.get("optional_columns", []),
+                "preview_rows": validation.get("valid_rows", []),
+                "errors": validation.get("errors", []),
+            }
+        )
+    except Exception as err:
+        return jsonify({"success": False, "error": str(err)}), 500
+    finally:
+        conn.close()
 
-        reader = pd.read_csv if file_ext == ".csv" else pd.read_excel
-        raw = reader(file, dtype=str, header=None)
-        required_columns = ["EMPLOYEE NAME", "DEPARTMENT"]
-        optional_columns = ["POSITION"]
-        required_column_set = set(required_columns)
 
-        header_row = None
-        for idx, row in raw.iterrows():
-            row_values = {clean(value).upper() for value in row.tolist() if pd.notna(value)}
-            if required_column_set.issubset(row_values):
-                header_row = idx
-                break
+def commit_employees_upload_payload(rows):
+    conn = connect_db()
+    if conn is None:
+        return jsonify({"success": False, "error": "Database connection failed"}), 500
 
-        if header_row is None:
-            return jsonify(
-                {
-                    "success": False,
-                    "error": "Could not find the required headers: Employee Name and Department.",
-                }
-            ), 400
-
-        file.seek(0)
-        df = reader(file, dtype=str, header=header_row)
-        df.columns = [clean(col).upper() for col in df.columns]
-        df.dropna(how="all", inplace=True)
-        df = df.applymap(lambda value: clean(value) if isinstance(value, str) else value)
-
-        missing_columns = [column.title() for column in required_columns if column not in df.columns]
-        if missing_columns:
-            return jsonify(
-                {
-                    "success": False,
-                    "error": f"Missing required column(s): {', '.join(missing_columns)}",
-                }
-            ), 400
-
-        for column in required_columns:
-            df[column] = df[column].fillna("").astype(str).str.strip()
-        for column in optional_columns:
-            if column not in df.columns:
-                df[column] = ""
-            df[column] = df[column].fillna("").astype(str).str.strip()
-
-        df = df[
-            df[required_columns + optional_columns]
-            .apply(lambda row: any(str(value).strip() for value in row), axis=1)
-        ]
-
-        duplicate_labels = {}
-        for index, row in df.iterrows():
-            signature = (
-                str(row.get("EMPLOYEE NAME") or "").strip().upper(),
-                str(row.get("DEPARTMENT") or "").strip().upper(),
-                str(row.get("POSITION") or "").strip().upper(),
-            )
-            duplicate_labels.setdefault(signature, []).append(header_row + index + 2)
-
-        duplicate_rows = [
-            f"rows {', '.join(str(row_number) for row_number in row_numbers)}"
-            for signature, row_numbers in duplicate_labels.items()
-            if all(signature) and len(row_numbers) > 1
-        ]
-        if duplicate_rows:
-            return jsonify(
-                {
-                    "success": False,
-                    "error": f"Duplicate employee entries found in the uploaded file: {'; '.join(duplicate_rows)}",
-                }
-            ), 400
-
-        conn = connect_db()
-        if conn is None:
-            return jsonify({"success": False, "error": "Database connection failed"}), 500
-
-        inserted = 0
-        errors = []
-
-        for index, row in df.iterrows():
-            employee_name = str(row.get("EMPLOYEE NAME") or "").strip()
-            department_name = str(row.get("DEPARTMENT") or "").strip()
-            position = str(row.get("POSITION") or "").strip()
-            row_number = header_row + index + 2
+    inserted = 0
+    errors = []
+    try:
+        for row in rows:
+            employee_name = clean_upload_text(row.get("employee_name"))
+            department_name = clean_upload_text(row.get("department_name"))
+            position = clean_upload_text(row.get("position"))
+            row_number = row.get("row_number") or "Unknown"
 
             if not employee_name or not department_name:
-                missing = [
-                    label
-                    for label, value in (
-                        ("Employee Name", employee_name),
-                        ("Department", department_name),
-                    )
-                    if not value
-                ]
-                errors.append(f"Row {row_number}: Missing {', '.join(missing)}")
+                errors.append(f"Row {row_number}: Missing Employee Name or Department.")
                 continue
 
             result = employee_model.add_employee_excel(
@@ -1145,18 +1312,28 @@ def upload_employees():
                 department_name=department_name,
                 position=position,
             )
-
             if result.get("success"):
                 inserted += 1
             else:
                 errors.append(f"Row {row_number}: {result.get('error')}")
 
-        return jsonify({"success": True, "inserted": inserted, "errors": errors})
+        return jsonify({"success": True, "inserted": inserted, "errors": errors}), 200
     except Exception as err:
+        conn.rollback()
         return jsonify({"success": False, "error": str(err)}), 500
     finally:
-        if conn:
-            conn.close()
+        conn.close()
+
+
+@app.route("/upload_employees/commit", methods=["POST"])
+@login_required
+def commit_employees_upload():
+    data = request.get_json(silent=True) or {}
+    rows = data.get("rows", [])
+    if not isinstance(rows, list) or not rows:
+        return jsonify({"success": False, "error": "No employee rows provided for upload."}), 400
+
+    return commit_employees_upload_payload(rows)
 
 
 @app.route("/update_employee", methods=["POST"])

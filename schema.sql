@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 24, 2026 at 12:14 AM
+-- Generation Time: Apr 28, 2026 at 07:02 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -93,7 +93,12 @@ INSERT INTO `departments` (`department_id`, `department_name`, `created_at`) VAL
 (4, 'College of Information Technology', '2026-04-15 00:00:00'),
 (5, 'College of Business and Accountancy', '2026-04-15 00:00:00'),
 (6, 'College of International Hospitality Management', '2026-04-15 00:00:00'),
-(7, 'College of Education', '2026-04-15 00:00:00');
+(7, 'College of Education', '2026-04-15 00:00:00'),
+(8, 'Registrar''s Office', '2026-04-15 00:00:00'),
+(9, 'Accounting Office', '2026-04-15 00:00:00'),
+(10, 'Human Resources Office', '2026-04-15 00:00:00'),
+(11, 'MIS Office', '2026-04-15 00:00:00'),
+(12, 'Library', '2026-04-15 00:00:00');
 
 -- --------------------------------------------------------
 
@@ -123,6 +128,7 @@ INSERT INTO `employees` (`seq`, `user_id`, `employee_id`, `employee_name`, `depa
 (3, 25, 'EMP-0003', 'Antonio Luna', 5, 'Faculty', 'Outside', '2026-04-15 08:56:17'),
 (4, 26, 'EMP-0004', 'Gabriela Silang', 6, 'Department Chair', 'Outside', '2026-04-15 08:56:17'),
 (5, 27, 'EMP-0005', 'Josefa Llanes Escoda', 7, 'Registrar', 'Outside', '2026-04-15 08:56:17'),
+(8, 29, 'EMP-0008', 'Jason Jay M. Recto', 3, 'Professor I', 'Outside', '2026-04-27 15:51:55'),
 (6, 5, 'EMP-1098', 'Apolinario Mabini', 2, 'Dean', 'Outside', '2026-04-15 13:36:17'),
 (7, 4, 'EMP-2015', 'Juan Dela Cruz', 1, 'Faculty', 'Inside', '2026-03-12 14:22:44');
 
@@ -156,15 +162,15 @@ DELIMITER ;
 DROP TABLE IF EXISTS `events`;
 CREATE TABLE `events` (
   `event_id` int(11) NOT NULL,
-  `event_name` varchar(200) NOT NULL,
-  `event_type` enum('Meeting','Training','Seminar','Workshop','Drill','Activity','Flag Ceremony','Other') NOT NULL,
-  `frequency` enum('ONCE','DAILY','WEEKLY') NOT NULL DEFAULT 'ONCE',
+  `event_name` varchar(200) DEFAULT NULL,
+  `event_type` enum('Meeting','Training','Seminar','Workshop','Drill','Activity','Flag Ceremony','Other') DEFAULT NULL,
+  `frequency` enum('ONCE','DAILY','WEEKLY') DEFAULT 'ONCE',
   `day` enum('Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday') DEFAULT NULL,
-  `event_date` date NOT NULL,
-  `time_start` time NOT NULL,
-  `time_end` time NOT NULL,
-  `location` varchar(200) NOT NULL,
-  `active` tinyint(1) NOT NULL DEFAULT 1
+  `event_date` date DEFAULT NULL,
+  `time_start` time DEFAULT NULL,
+  `time_end` time DEFAULT NULL,
+  `location` varchar(200) DEFAULT NULL,
+  `active` tinyint(1) DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -175,7 +181,10 @@ INSERT INTO `events` (`event_id`, `event_name`, `event_type`, `frequency`, `day`
 (1, 'Flag Ceremony', 'Flag Ceremony', 'WEEKLY', 'Monday', '2026-04-20', '08:00:00', '08:40:00', 'Facade', 1),
 (2, 'Flag Retreat', 'Other', 'WEEKLY', 'Monday', '2026-04-20', '09:00:00', '09:40:00', 'Facade', 1),
 (3, 'Wildrift Tournament', 'Activity', 'ONCE', NULL, '2026-04-15', '22:00:00', '23:30:00', 'COMSOC', 0),
-(4, 'Wildrift Tournament', 'Activity', 'ONCE', NULL, '2026-04-15', '23:00:00', '12:30:00', 'COMSOC', 1);
+(4, 'Wildrift Tournament', 'Activity', 'ONCE', NULL, '2026-04-15', '23:00:00', '12:30:00', 'COMSOC', 1),
+(5, 'ML', 'Activity', 'ONCE', NULL, '2026-04-24', '10:53:00', '10:55:00', 'Auditorium', 0),
+(6, 'test', 'Meeting', 'ONCE', NULL, '2026-05-09', '10:00:00', '14:00:00', 'COMSOC', 1),
+(7, 'ML', 'Flag Ceremony', 'ONCE', NULL, '2026-04-30', '06:22:00', '22:27:00', 'COMSOC', 0);
 
 -- --------------------------------------------------------
 
@@ -208,7 +217,42 @@ INSERT INTO `event_attendance` (`attendance_id`, `instance_id`, `user_id`, `even
 (7, 2, 24, '2026-04-15', 'Absent', NULL, NULL, NULL),
 (8, 2, 25, '2026-04-15', 'Absent', NULL, NULL, NULL),
 (9, 2, 26, '2026-04-15', 'Absent', NULL, NULL, NULL),
-(10, 2, 27, '2026-04-15', 'Absent', NULL, NULL, NULL);
+(10, 2, 27, '2026-04-15', 'Absent', NULL, NULL, NULL),
+(11, 3, 4, '2026-04-24', 'Absent', NULL, NULL, NULL),
+(12, 3, 5, '2026-04-24', 'Absent', NULL, NULL, NULL),
+(13, 3, 23, '2026-04-24', 'Absent', NULL, NULL, NULL),
+(14, 3, 24, '2026-04-24', 'Absent', NULL, NULL, NULL),
+(15, 3, 25, '2026-04-24', 'Absent', NULL, NULL, NULL),
+(16, 3, 26, '2026-04-24', 'Absent', NULL, NULL, NULL),
+(17, 3, 27, '2026-04-24', 'Absent', NULL, NULL, NULL),
+(18, 4, 4, '2026-05-09', 'Absent', NULL, NULL, NULL),
+(19, 4, 5, '2026-05-09', 'Absent', NULL, NULL, NULL),
+(20, 4, 23, '2026-05-09', 'Absent', NULL, NULL, NULL),
+(21, 4, 24, '2026-05-09', 'Absent', NULL, NULL, NULL),
+(22, 4, 25, '2026-05-09', 'Absent', NULL, NULL, NULL),
+(23, 4, 26, '2026-05-09', 'Absent', NULL, NULL, NULL),
+(24, 4, 27, '2026-05-09', 'Absent', NULL, NULL, NULL),
+(25, 5, 4, '2026-04-30', 'Absent', NULL, NULL, NULL),
+(26, 5, 5, '2026-04-30', 'Absent', NULL, NULL, NULL),
+(27, 5, 23, '2026-04-30', 'Absent', NULL, NULL, NULL),
+(28, 5, 24, '2026-04-30', 'Absent', NULL, NULL, NULL),
+(29, 5, 25, '2026-04-30', 'Absent', NULL, NULL, NULL),
+(30, 5, 26, '2026-04-30', 'Absent', NULL, NULL, NULL),
+(31, 5, 27, '2026-04-30', 'Absent', NULL, NULL, NULL),
+(32, 6, 4, '2026-04-27', 'Absent', NULL, NULL, NULL),
+(33, 6, 5, '2026-04-27', 'Absent', NULL, NULL, NULL),
+(34, 6, 23, '2026-04-27', 'Absent', NULL, NULL, NULL),
+(35, 6, 24, '2026-04-27', 'Absent', NULL, NULL, NULL),
+(36, 6, 25, '2026-04-27', 'Absent', NULL, NULL, NULL),
+(37, 6, 26, '2026-04-27', 'Absent', NULL, NULL, NULL),
+(38, 6, 27, '2026-04-27', 'Absent', NULL, NULL, NULL),
+(39, 7, 4, '2026-04-27', 'Absent', NULL, NULL, NULL),
+(40, 7, 5, '2026-04-27', 'Absent', NULL, NULL, NULL),
+(41, 7, 23, '2026-04-27', 'Absent', NULL, NULL, NULL),
+(42, 7, 24, '2026-04-27', 'Absent', NULL, NULL, NULL),
+(43, 7, 25, '2026-04-27', 'Absent', NULL, NULL, NULL),
+(44, 7, 26, '2026-04-27', 'Absent', NULL, NULL, NULL),
+(45, 7, 27, '2026-04-27', 'Absent', NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -230,7 +274,12 @@ CREATE TABLE `event_instances` (
 
 INSERT INTO `event_instances` (`instance_id`, `event_id`, `event_date`, `status`) VALUES
 (1, 3, '2026-04-15', 'Scheduled'),
-(2, 4, '2026-04-15', 'Scheduled');
+(2, 4, '2026-04-15', 'Scheduled'),
+(3, 5, '2026-04-24', 'Scheduled'),
+(4, 6, '2026-05-09', 'Scheduled'),
+(5, 7, '2026-04-30', 'Scheduled'),
+(6, 1, '2026-04-27', 'Scheduled'),
+(7, 2, '2026-04-27', 'Scheduled');
 
 -- --------------------------------------------------------
 
@@ -297,7 +346,28 @@ INSERT INTO `event_participants` (`event_id`, `user_id`) VALUES
 (4, 24),
 (4, 25),
 (4, 26),
-(4, 27);
+(4, 27),
+(5, 4),
+(5, 5),
+(5, 23),
+(5, 24),
+(5, 25),
+(5, 26),
+(5, 27),
+(6, 4),
+(6, 5),
+(6, 23),
+(6, 24),
+(6, 25),
+(6, 26),
+(6, 27),
+(7, 4),
+(7, 5),
+(7, 23),
+(7, 24),
+(7, 25),
+(7, 26),
+(7, 27);
 
 -- --------------------------------------------------------
 
@@ -385,7 +455,15 @@ INSERT INTO `general_log` (`log_id`, `user_id`, `timestamp`, `log_type`, `gate`)
 (64, 28, '2026-04-24 04:11:23', 'Exit', 'Gate 2'),
 (65, 28, '2026-04-24 04:15:47', 'Entry', 'Gate 1'),
 (66, 28, '2026-04-24 04:16:21', 'Exit', 'Gate 2'),
-(67, 28, '2026-04-24 04:16:25', 'Entry', 'Gate 1');
+(67, 28, '2026-04-24 04:16:25', 'Entry', 'Gate 1'),
+(68, 1, '2026-04-26 17:35:27', 'Entry', 'Gate 1'),
+(69, 1, '2026-04-26 17:35:46', 'Exit', 'Gate 2'),
+(70, 1, '2026-04-26 17:35:53', 'Entry', 'Gate 1'),
+(71, 1, '2026-04-26 22:56:55', 'Exit', 'Gate 2'),
+(72, 1, '2026-04-26 22:57:07', 'Entry', 'Gate 1'),
+(73, 1, '2026-04-26 22:57:23', 'Exit', 'Gate 2'),
+(74, 1, '2026-04-27 22:43:09', 'Entry', 'Gate 1'),
+(75, 1, '2026-04-27 22:43:20', 'Exit', 'Gate 2');
 
 -- --------------------------------------------------------
 
@@ -424,7 +502,7 @@ CREATE TABLE `students` (
 INSERT INTO `students` (`user_id`, `student_id`, `student_name`, `course_id`, `status`, `stud_last_updated`) VALUES
 (2, '22-01582', 'Jose Rizal', 1, 'Outside', '2026-03-12 14:32:43'),
 (19, '23-00312', 'JERICHO PAUL D. SALVADOR', 4, 'Outside', '2026-03-17 16:11:32'),
-(1, '23-00314', 'Maria Clara', 5, 'Outside', '2026-04-15 12:22:42'),
+(1, '23-00314', 'Maria Clara', 5, 'Outside', '2026-04-27 14:43:20'),
 (3, '24-00101', 'Andres Bonifacio', 3, 'Inside', '2026-03-12 14:32:52');
 
 -- --------------------------------------------------------
@@ -471,7 +549,8 @@ INSERT INTO `users` (`user_id`, `role`, `active`) VALUES
 (25, 'employee', 1),
 (26, 'employee', 1),
 (27, 'employee', 1),
-(28, 'visitor', 1);
+(28, 'visitor', 1),
+(29, 'employee', 1);
 
 -- --------------------------------------------------------
 
@@ -502,8 +581,7 @@ CREATE TABLE `visitors` (
   `purpose` enum('Official Business','Document Submission','Inquiry','Meeting','Delivery','Other') NOT NULL,
   `details` varchar(200) DEFAULT NULL,
   `status` enum('Inside','Outside') DEFAULT 'Outside',
-  `visitor_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  CONSTRAINT `chk_visitor_other_details` CHECK (`purpose` <> 'Other' OR (`details` IS NOT NULL AND trim(`details`) <> ''))
+  `visitor_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -511,7 +589,7 @@ CREATE TABLE `visitors` (
 --
 
 INSERT INTO `visitors` (`seq`, `user_id`, `visitor_id`, `visitor_name`, `purpose`, `details`, `status`, `visitor_last_updated`) VALUES
-(1, 28, 'VT-00001', 'Vico Sotto', 'Other', 'Monitor Campus facilities and staff', 'Inside', '2026-04-23 20:16:25');
+(1, 28, 'VT-00001', 'Vico Sotto', 'Other', 'Monitor Campus facilities and staff', 'Inside', '2026-04-26 15:44:03');
 
 --
 -- Triggers `visitors`
@@ -653,31 +731,31 @@ ALTER TABLE `visitors`
 -- AUTO_INCREMENT for table `departments`
 --
 ALTER TABLE `departments`
-  MODIFY `department_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `department_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT for table `employees`
 --
 ALTER TABLE `employees`
-  MODIFY `seq` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `seq` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `events`
 --
 ALTER TABLE `events`
-  MODIFY `event_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `event_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `event_attendance`
 --
 ALTER TABLE `event_attendance`
-  MODIFY `attendance_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `attendance_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=48;
 
 --
 -- AUTO_INCREMENT for table `event_instances`
 --
 ALTER TABLE `event_instances`
-  MODIFY `instance_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `instance_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `event_log`
@@ -689,13 +767,13 @@ ALTER TABLE `event_log`
 -- AUTO_INCREMENT for table `general_log`
 --
 ALTER TABLE `general_log`
-  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=68;
+  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=76;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=30;
 
 --
 -- AUTO_INCREMENT for table `visitors`
@@ -776,56 +854,6 @@ ALTER TABLE `violations`
 --
 ALTER TABLE `visitors`
   ADD CONSTRAINT `visitors_usersFK` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`);
-
-DROP TRIGGER IF EXISTS `employee_id_format`;
-DELIMITER $$
-CREATE TRIGGER `employee_id_format`
-BEFORE INSERT ON `employees`
-FOR EACH ROW
-BEGIN
-    DECLARE next_seq INT DEFAULT 1;
-
-    IF NEW.`employee_id` IS NULL OR NEW.`employee_id` = '' THEN
-        SELECT AUTO_INCREMENT INTO next_seq
-        FROM information_schema.TABLES
-        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employees';
-
-        IF next_seq IS NULL THEN
-            SET next_seq = 1;
-        END IF;
-
-        SET NEW.`employee_id` = CONCAT('EMP-', LPAD(next_seq, 8, '0'));
-    END IF;
-END
-$$
-DELIMITER ;
-
-DROP TRIGGER IF EXISTS `visitor_id_format`;
-DELIMITER $$
-CREATE TRIGGER `visitor_id_format`
-BEFORE INSERT ON `visitors`
-FOR EACH ROW
-BEGIN
-    DECLARE next_seq INT DEFAULT 1;
-
-    IF NEW.`visitor_id` IS NULL OR NEW.`visitor_id` = '' THEN
-        SELECT AUTO_INCREMENT INTO next_seq
-        FROM information_schema.TABLES
-        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'visitors';
-
-        IF next_seq IS NULL THEN
-            SET next_seq = 1;
-        END IF;
-
-        SET NEW.`visitor_id` = CONCAT('VT-', LPAD(next_seq, 5, '0'));
-    END IF;
-END
-$$
-DELIMITER ;
-
-ALTER TABLE `visitors`
-MODIFY COLUMN `purpose` ENUM('Official Business', 'Document Submission', 'Inquiry', 'Meeting', 'Delivery', 'Other') NOT NULL;
-
 SET FOREIGN_KEY_CHECKS=1;
 COMMIT;
 
