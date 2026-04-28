@@ -1,6 +1,6 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Flask, current_app, render_template, request, redirect, url_for, flash, session, jsonify
 import requests
 import csv
 import io
@@ -9,6 +9,9 @@ import pdfkit
 import yagmail
 import os
 from flask import render_template
+import pandas as pd
+from database import connect_db
+from db_connect import EmployeeModel, StudentModel
 
 from app_tasks import fetch_report_data     #reports generator
 from extensions import cache
@@ -17,9 +20,47 @@ app = Flask(__name__)
 app.secret_key = 'plp_secure_key_2026'  # Required for session management
 app.config['SERVER_NAME'] = None
 
+employee_model = EmployeeModel()
+   # ← add StudentModel here
+student_model = StudentModel() 
+
+
+
 # Configure and initialize cache (SimpleCache for development)
 app.config['CACHE_TYPE'] = 'SimpleCache'
 cache.init_app(app)
+
+# ==============================================================================
+# STARTUP: Generate instances for the week every Sunday
+# ==============================================================================
+_instance_generator_run = False
+
+@app.before_request
+def generate_instances_on_sunday():
+    """
+    Runs only once per app startup.
+    If today is Sunday, generates event instances for the upcoming week.
+    """
+    global _instance_generator_run
+    
+    if not _instance_generator_run:
+        _instance_generator_run = True
+        today = date.today()
+        
+        # Check if today is Sunday (weekday() returns 6 for Sunday)
+        if today.weekday() == 6:
+            try:
+                print(f"[STARTUP] Today is Sunday. Generating instances for upcoming week...")
+                response = requests.post("http://127.0.0.1:5001/admin/generate-daily-instances", timeout=10)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    print(f"[SUCCESS] Generated {data.get('created', 0)} instances, {data.get('failed', 0)} failures")
+                else:
+                    print(f"[ERROR] Backend returned status {response.status_code}")
+            except Exception as e:
+                print(f"[ERROR] Failed to generate instances: {str(e)}")
+
 
 # ==============================================================================
 # MOCK DATA (Prototype State)
@@ -70,9 +111,16 @@ MOCK_EMPLOYEE_STATS = {
 }
 
 MOCK_EMPLOYEE_LOGS = [
-    {"initials": "JD", "name": "Juan Dela Cruz", "dept": "Civil Engineering", "in": "07:45 AM", "out": "05:00 PM", "status": "Present", "status_class": "success"},
-    {"initials": "MS", "name": "Maria Santos", "dept": "College of Nursing", "in": "08:15 AM", "out": "--:--", "status": "Late +15m", "status_class": "warning"},
-    {"initials": "AL", "name": "Antonio Luna", "dept": "Arts & Letters", "in": "08:30 AM", "out": "04:30 PM", "status": "Late", "status_class": "warning"}
+    {"id": "EMP-001", "initials": "JD", "name": "Juan Dela Cruz", "dept": "Civil Engineering", "position": "Professor", "in": "07:45 AM", "out": "05:00 PM", "status": "Present", "status_class": "success", "date": "2026-04-09"},
+    {"id": "EMP-002", "initials": "MS", "name": "Maria Santos", "dept": "College of Nursing", "position": "Dean", "in": "08:15 AM", "out": "--:--", "status": "Late +15m", "status_class": "warning", "date": "2026-04-09"},
+    {"id": "EMP-003", "initials": "AL", "name": "Antonio Luna", "dept": "Arts & Letters", "position": "Lecturer", "in": "08:30 AM", "out": "04:30 PM", "status": "Late", "status_class": "warning", "date": "2026-04-09"},
+    {"id": "EMP-004", "initials": "CR", "name": "Carmen Reyes", "dept": "Business Admin", "position": "Assistant Professor", "in": "07:30 AM", "out": "05:30 PM", "status": "Present", "status_class": "success", "date": "2026-04-09"},
+    {"id": "EMP-005", "initials": "RG", "name": "Roberto Garcia", "dept": "Engineering", "position": "Instructor", "in": "08:00 AM", "out": "--:--", "status": "Inside", "status_class": "success", "date": "2026-04-09"},
+    {"id": "EMP-006", "initials": "LM", "name": "Lourdes Mendoza", "dept": "Education", "position": "Professor", "in": "07:50 AM", "out": "04:45 PM", "status": "Present", "status_class": "success", "date": "2026-04-09"},
+    {"id": "EMP-007", "initials": "FT", "name": "Fernando Torres", "dept": "Arts & Sciences", "position": "Lecturer", "in": "08:20 AM", "out": "--:--", "status": "Late +20m", "status_class": "warning", "date": "2026-04-09"},
+    {"id": "EMP-008", "initials": "EV", "name": "Elena Valdez", "dept": "Nursing", "position": "Clinical Instructor", "in": "07:40 AM", "out": "05:10 PM", "status": "Present", "status_class": "success", "date": "2026-04-09"},
+    {"id": "EMP-009", "initials": "HP", "name": "Hector Perez", "dept": "Business Admin", "position": "Department Head", "in": "08:10 AM", "out": "04:50 PM", "status": "Late", "status_class": "warning", "date": "2026-04-09"},
+    {"id": "EMP-010", "initials": "IS", "name": "Isabel Santos", "dept": "Education", "position": "Assistant Professor", "in": "07:55 AM", "out": "--:--", "status": "Inside", "status_class": "success", "date": "2026-04-09"}
 ]
 
 MOCK_STUDENT_STATS = {
@@ -256,8 +304,8 @@ def send_report_email(email, report, metrics, logs, category, report_type):
         print("STEP 5: Sending email")
 
         yag = yagmail.SMTP(
-            user="amarelle2025@gmail.com",
-            password="momk krrn fcip dijh"
+            user="plpmonitor2026@gmail.com",
+            password="apft dsha isbp mtmt"
         )
 
         yag.send(
@@ -396,13 +444,90 @@ def manage_events():
 @app.route('/admin/students')
 @login_required
 def admin_students():
-    return render_template('student_logs.html', logs=MOCK_STUDENT_LOGS)
+    conn = connect_db()
+    if conn is None:
+        return render_template('student_logs.html', logs=[], students=[])
 
+    try:
+        cursor = conn.cursor()
+
+        # =========================
+        # FIX: JOIN COURSE NAME
+        # =========================
+        cursor.execute("""
+            SELECT 
+                s.student_id,
+                s.student_name,
+                c.course_name,
+                s.status
+            FROM students s
+            LEFT JOIN courses c
+                ON s.course_id = c.course_id
+            ORDER BY s.student_name ASC
+        """)
+
+        rows = cursor.fetchall()
+
+        students = [
+            {
+                "id": r[0],
+                "name": r[1],
+                "course": (r[2].upper() if r[2] else "UNKNOWN"),
+                "status": r[3]
+            }
+            for r in rows
+        ]
+
+        return render_template(
+            'student_logs.html',
+            logs=students,
+            students=students
+        )
+
+    except Exception as e:
+        print("Error:", e)
+        return render_template('student_logs.html', logs=[], students=[])
+
+    finally:
+        conn.close()
 @app.route('/admin/employees')
 @login_required
 def admin_employees():
     logs = helper_employee_attendance()
-    return render_template('employee_logs.html', logs=logs)
+    conn = connect_db()
+    employees = []
+    departments = []
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT e.employee_id, e.employee_name, d.department_name, e.position, e.status
+            FROM employees e
+            LEFT JOIN departments d ON e.department_id = d.department_id
+            ORDER BY e.employee_name ASC
+        """)
+        rows = cursor.fetchall()
+        employees = [
+            {
+                "id": row[0],
+                "name": row[1],
+                "dept": row[2] or "N/A",
+                "position": row[3] or "",
+                "status": row[4] or "Active",
+            }
+            for row in rows
+        ]
+
+        # Fetch departments
+        cursor.execute("SELECT department_id, department_name FROM departments ORDER BY department_name ASC")
+        departments = [{"id": row[0], "name": row[1]} for row in cursor.fetchall()]
+
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+    return render_template('employee_logs.html', logs=logs, employees=employees, departments=departments)
 
 @app.route('/admin/visitors')
 @login_required
@@ -647,6 +772,7 @@ def helper_employee_attendance():
     except requests.exceptions.RequestException as e:
         print(f"Backend API Error: {e}")
     return []
+    
 
 def helper_admin_login(username, password):
     url = "http://127.0.0.1:5001/admin/login/auth"
@@ -659,9 +785,41 @@ def helper_admin_login(username, password):
         return response.json()   
     except requests.exceptions.RequestException as e:
         print(f"API for admin authentication bridge error: {e}")
-        return {"success": False, "message": f"Authentication service unavailable: {str(e)}"}
+        return {"success": False, "message": f"Authentication service unavailable: {str(e)}"} 
 
 @app.route('/api/retrieve/events')
+def retrieve_all_events_for_reports():    
+    current_events = list(DEFAULT_EVENTS)
+    
+    try:
+        response = requests.get("http://127.0.0.1:5001/api/reports/all-events", timeout=5)
+        
+        if response.status_code == 200:
+            api_data = response.json()
+            
+            if api_data.get('success'):
+                real_events = []
+                for event in api_data.get('events', []):
+                    real_events.append({
+                        'instance_id': event.get('instance_id', ''),
+                        'event_id': event.get('event_id', ''),
+                        'name': event.get('name', 'Unknown'),
+                        'type': event.get('type', 'Unknown'),
+                        'frequency': event.get('frequency', 'dd/mm/yyyy'),
+                        'date': event.get('date', 'Unknown'),
+                        'time_start': event.get('time_start', 'Unknown'),
+                        'time_end': event.get('time_end', 'Unknown'),
+                        'location': event.get('location', 'Unknown'),
+                        'active': event.get('active', 1)
+                    })
+                
+                current_events = real_events
+                
+    except requests.exceptions.RequestException as e:
+        print(f"Backend API Error: {e}")
+        
+    return current_events
+
 def helper_kiosk_live_events():    
     current_kiosk_events = list(DEFAULT_EVENTS)
     
@@ -786,7 +944,7 @@ def helper_admin_delete_events(event_id, delete_type):
     elif delete_type == 'bulk':
         url = "http://127.0.0.1:5001/admin/events/delete-events"
     headers = {"Content-Type": "application/json"}
-    payload = {"event_id": str(event_id)}   
+    payload = {"event_ids": event_id}
 
     try:
         response = requests.put(url, headers=headers, json=payload, timeout=5)
@@ -872,7 +1030,376 @@ def helper_dashboard_employee_stats():
     except requests.exceptions.RequestException as e:
         print(f"Backend API Error (employee stats): {e}")
     return stats
-    
+
+# ==============================================================================
+# STUDENT LOGS HELPER
+# ==============================================================================
+
+
+
+@app.route("/get_courses")
+def get_courses():
+    try:
+        conn = connect_db()
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute("SELECT course_id, course_name FROM courses")
+        rows = cursor.fetchall()
+
+        # FORCE UPPERCASE HERE (backend safety)
+        for r in rows:
+            r["name"] = r["course_name"].upper()
+
+        return jsonify(rows)
+
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+    finally:
+        cursor.close()
+        conn.close()
+
+@app.route("/add_student_manual", methods=["POST"])
+def add_student_manual():
+    data = request.get_json()
+ 
+    conn = connect_db()
+    if not conn:
+        return jsonify({"success": False, "error": "Database connection failed"})
+ 
+    try:
+        cursor = conn.cursor()
+ 
+        # ── Get fields ──────────────────────────────────────────
+        student_id    = str(data.get("student_id",   "")).strip()
+        student_name  = str(data.get("student_name", "")).upper().strip()
+        course_id_raw = str(data.get("course_id",    "")).strip()
+        status        = str(data.get("status", "OUTSIDE")).upper().strip()
+ 
+        # ── Validation ──────────────────────────────────────────
+        if not student_id or not student_name or not course_id_raw:
+            return jsonify({"success": False, "error": "Missing required fields"})
+ 
+        # ── Resolve course_id (accepts int PK or name string) ───
+        if course_id_raw.isdigit():
+            cursor.execute(
+                "SELECT course_id FROM courses WHERE course_id = %s",
+                (int(course_id_raw),)
+            )
+        else:
+            cursor.execute(
+                "SELECT course_id FROM courses WHERE UPPER(course_name) = %s",
+                (course_id_raw.upper(),)
+            )
+ 
+        course_row = cursor.fetchone()
+        if not course_row:
+            return jsonify({"success": False, "error": "Invalid course selected"})
+ 
+        course_id = course_row[0]
+ 
+        # ── Check duplicate student_id ───────────────────────────
+        cursor.execute(
+            "SELECT student_id FROM students WHERE student_id = %s",
+            (student_id,)
+        )
+        if cursor.fetchone():
+            return jsonify({"success": False, "error": f"Student ID '{student_id}' already exists"})
+ 
+        # ── Step 1: Insert into users (role='student', active=1) ─
+        # users table: user_id (auto), role (enum), active (tinyint default 1)
+        cursor.execute(
+            "INSERT INTO users (role, active) VALUES ('student', 1)"
+        )
+        new_user_id = cursor.lastrowid      # FK value for students row
+ 
+        # ── Step 2: Insert into students ─────────────────────────
+        cursor.execute("""
+            INSERT INTO students (user_id, student_id, student_name, course_id, status)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (new_user_id, student_id, student_name, course_id, status))
+ 
+        conn.commit()
+ 
+        return jsonify({
+            "success": True,
+            "message": "Student added successfully",
+            "user_id": new_user_id
+        })
+ 
+    except Exception as e:
+        try:
+            conn.rollback()     # undo both inserts if anything fails
+        except:
+            pass
+        return jsonify({"success": False, "error": str(e)})
+ 
+    finally:
+        conn.close()
+
+@app.route("/upload_students", methods=["POST"])
+def upload_students():
+    file = request.files.get("file")
+
+    if not file:
+        return jsonify({"success": False, "error": "No file uploaded"})
+
+    try:
+        import pandas as pd
+        import re
+        import unicodedata
+
+        # =========================
+        # CLEAN FUNCTION
+        # =========================
+        def norm(x):
+            if not isinstance(x, str):
+                x = str(x) if x is not None else ""
+            x = unicodedata.normalize("NFKC", x)
+            x = x.replace("\xa0", " ")
+            x = re.sub(r"\s+", " ", x)
+            return x.strip().upper()
+
+        # =========================
+        # READ RAW EXCEL
+        # =========================
+        file.seek(0)
+        raw = pd.read_excel(file, header=None, dtype=str, engine="openpyxl")
+
+        raw = raw.applymap(lambda x: norm(x) if isinstance(x, str) else "")
+
+        # =========================
+        # FIND HEADER ROW
+        # =========================
+        header_row = None
+
+        for i, row in raw.iterrows():
+            cells = [norm(v) for v in row.values]
+
+            has_id = any("STUDENT" in c and "ID" in c for c in cells)
+            has_name = any("STUDENT" in c and "NAME" in c for c in cells)
+
+            if has_id and has_name:
+                header_row = i
+                break
+
+        if header_row is None:
+            return jsonify({
+                "success": False,
+                "error": "Cannot detect header row"
+            })
+
+        # =========================
+        # READ WITH HEADER
+        # =========================
+        file.seek(0)
+        df = pd.read_excel(file, header=header_row, dtype=str, engine="openpyxl")
+
+        df.columns = [norm(c) for c in df.columns]
+
+        # =========================
+        # VALIDATE COLUMNS
+        # =========================
+        required = ["STUDENT ID", "STUDENT NAME", "COURSE ID"]
+
+        for col in required:
+            if col not in df.columns:
+                return jsonify({
+                    "success": False,
+                    "error": f"Missing column: {col}"
+                })
+
+        df = df.dropna(how="all")
+
+        # =========================
+        # CLEAN DATA
+        # =========================
+        df["STUDENT ID"] = df["STUDENT ID"].astype(str).str.strip()
+        df["STUDENT NAME"] = df["STUDENT NAME"].astype(str).str.upper().str.strip()
+        df["COURSE ID"] = df["COURSE ID"].astype(str).str.replace(".0", "", regex=False).str.strip()
+
+        if "STATUS" not in df.columns:
+            df["STATUS"] = "OUTSIDE"
+        else:
+            df["STATUS"] = df["STATUS"].astype(str).str.upper().str.strip()
+
+        df = df[df["STUDENT ID"].str.len() > 0]
+
+        # =========================
+        # DB CONNECTION
+        # =========================
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "error": "Database connection failed"})
+
+        cursor = conn.cursor()
+
+        # =========================
+        # LOAD COURSE MAP (ID → NAME)
+        # =========================
+        cursor.execute("SELECT course_id, course_name FROM courses")
+        course_map = {
+            str(row[0]).strip(): row[1].upper().strip()
+            for row in cursor.fetchall()
+        }
+
+        model = StudentModel()
+
+        inserted = 0
+        errors = []
+
+        # =========================
+        # INSERT LOOP
+        # =========================
+        for i, row in df.iterrows():
+
+            student_id = row["STUDENT ID"]
+            student_name = row["STUDENT NAME"]
+
+            course_id_raw = str(row["COURSE ID"]).strip()
+            course_name = course_map.get(course_id_raw)
+
+            status = row["STATUS"]
+
+            if not course_name:
+                errors.append(f"Row {i+2}: Invalid course ID {course_id_raw}")
+                continue
+
+            result = model.add_student(
+                conn,
+                student_id,
+                student_name,
+                course_name,   # ✅ NOW COURSE NAME (UPPERCASE)
+                status
+            )
+
+            if result["success"]:
+                inserted += 1
+            else:
+                errors.append(f"Row {i+2}: {result['error']}")
+
+        conn.close()
+
+        return jsonify({
+            "success": True,
+            "inserted": inserted,
+            "errors": errors
+        })
+
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route("/students")
+def students():
+    conn = connect_db()
+
+    if conn is None:
+        return render_template("student_logs.html", logs=[])
+
+    try:
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT 
+                s.student_id,
+                s.student_name,
+                c.course_name,
+                s.status
+            FROM students s
+            LEFT JOIN courses c 
+                ON s.course_id = c.course_id
+            ORDER BY s.student_name ASC
+        """)
+
+        rows = cursor.fetchall()
+
+        logs = [
+            {
+                "id": r[0],
+                "name": r[1],
+                "course": (r[2].upper() if r[2] else "UNKNOWN"),
+                "status": r[3]
+            }
+            for r in rows
+        ]
+
+        return render_template("student_logs.html", logs=logs)
+
+    except Exception as e:
+        print(e)
+        return render_template("student_logs.html", logs=[])
+
+    finally:
+        conn.close()
+
+@app.route("/update_student", methods=["POST"])
+def update_student():
+    data = request.get_json()
+
+    conn = connect_db()
+
+    try:
+        cursor = conn.cursor()
+
+        # =========================
+        # IF FRONTEND SENDS COURSE NAME → CONVERT TO ID
+        # =========================
+        course_value = data["course_id"]
+
+        cursor.execute("""
+            SELECT course_id 
+            FROM courses 
+            WHERE UPPER(course_name) = %s OR course_id = %s
+        """, (course_value.upper(), course_value))
+
+        result = cursor.fetchone()
+
+        if not result:
+            return jsonify({"success": False, "error": "Invalid course"})
+
+        course_id = result[0]
+
+        cursor.execute("""
+            UPDATE students
+            SET student_name=%s,
+                course_id=%s,
+                status=%s
+            WHERE student_id=%s
+        """, (
+            data["student_name"].upper(),
+            course_id,
+            data["status"].upper(),
+            data["student_id"]
+        ))
+
+        conn.commit()
+
+        return jsonify({"success": True})
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+    finally:
+        conn.close()
+
+@app.route("/delete_student", methods=["POST"])
+def delete_student():
+    data = request.get_json()
+
+    conn = connect_db()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM students WHERE student_id=%s", (data["student_id"],))
+        conn.commit()
+        return jsonify({"success": True})
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+    finally:
+        conn.close()
 
 # ==============================================================================
 # EMPLOYEE LOGS HELPER
@@ -888,6 +1415,238 @@ def helper_employee_attendance():
     except requests.exceptions.RequestException as e:
         print(f"Backend API Error: {e}")
     return []
+
+@app.route("/add_employee", methods=["POST"])
+def add_employee():
+    data = request.get_json()
+
+    model = EmployeeModel()
+
+    result = model.add_employee(
+        employee_id=data["employee_id"],
+        employee_name=data["employee_name"],
+        department_id=data["department_id"],
+        position=data["position"]
+    )
+
+    return jsonify(result)
+
+
+@app.route("/upload_employees", methods=["POST"])
+def upload_employees():
+    file = request.files.get("file")
+
+    if not file:
+        return jsonify({"success": False, "error": "No file uploaded"})
+
+    try:
+        import pandas as pd
+        import re
+        import unicodedata
+
+        # ----------------------------------------
+        # Helper: deep-clean any string
+        # ----------------------------------------
+        def clean(text):
+            if not isinstance(text, str):
+                text = str(text) if text is not None else ""
+            text = unicodedata.normalize("NFKC", text)
+            text = re.sub(r"[\u2018\u2019\u02bc\u0060\u00b4]", "'", text)
+            text = re.sub(r"[\u2013\u2014]", "-", text)
+            text = text.replace("\u00a0", " ").replace("\u200b", "")
+            text = re.sub(r"\s+", " ", text)
+            return text.strip()
+
+        # ----------------------------------------
+        # 1. Read raw file (no header assumed)
+        # ----------------------------------------
+        raw = pd.read_excel(file, dtype=str, header=None)
+
+        # ----------------------------------------
+        # 2. Find the header row dynamically
+        # ----------------------------------------
+        header_row = None
+        for idx, row in raw.iterrows():
+            row_values = row.astype(str).str.strip().str.upper()
+            if "EMPLOYEE NUMBER" in row_values.values:
+                header_row = idx
+                break
+
+        if header_row is None:
+            return jsonify({
+                "success": False,
+                "error": "Could not find 'Employee Number' header in the file"
+            })
+
+        # ----------------------------------------
+        # 3. Re-read using the correct header row
+        # ----------------------------------------
+        file.seek(0)
+        df = pd.read_excel(file, dtype=str, header=header_row)
+
+        # Normalize column names
+        df.columns = [clean(c).upper() for c in df.columns]
+
+        # Drop fully empty rows
+        df.dropna(how="all", inplace=True)
+        df = df.applymap(lambda x: clean(x) if isinstance(x, str) else x)
+
+        # ----------------------------------------
+        # 4. Fix Employee Number
+        # ----------------------------------------
+        df["EMPLOYEE NUMBER"] = (
+            df["EMPLOYEE NUMBER"]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .str.replace(r"\.0$", "", regex=True)
+            .str.zfill(5)
+        )
+
+        # Drop rows with no employee number
+        df = df[df["EMPLOYEE NUMBER"].str.strip().astype(bool)]
+
+        # ----------------------------------------
+        # 5. Check for duplicates within the file
+        # ----------------------------------------
+        dupes = df[df["EMPLOYEE NUMBER"].duplicated(keep=False)]
+        if not dupes.empty:
+            dupe_ids = dupes["EMPLOYEE NUMBER"].unique().tolist()
+            return jsonify({
+                "success": False,
+                "error": f"Duplicate Employee IDs found in uploaded file: {', '.join(dupe_ids)}"
+            })
+
+        # ----------------------------------------
+        # 6. Connect to DB
+        # ----------------------------------------
+        conn = connect_db()
+        if conn is None:
+            return jsonify({"success": False, "error": "Database connection failed"})
+
+        inserted = 0
+        errors = []
+
+        # ----------------------------------------
+        # 7. Process each row
+        # ----------------------------------------
+        for i, row in df.iterrows():
+            try:
+                employee_id     = str(row.get("EMPLOYEE NUMBER") or "").strip()
+                employee_name   = str(row.get("EMPLOYEE NAME")   or "").strip().upper()
+                department_name = str(row.get("DEPARTMENT")      or "").strip().upper()
+                position        = str(row.get("POSITION")        or "").strip().upper()
+
+                if not employee_id or not employee_name or not department_name:
+                    errors.append(f"Row {i + 2}: Missing required field(s) — "
+                                  f"ID='{employee_id}' Name='{employee_name}' Dept='{department_name}'")
+                    continue
+
+                result = employee_model.add_employee_excel(
+                    conn=conn,
+                    employee_id=employee_id,
+                    employee_name=employee_name,
+                    department_name=department_name,
+                    position=position,
+                )
+
+                if result.get("success"):
+                    inserted += 1
+                else:
+                    errors.append(f"Row {i + 2} [{employee_id}]: {result.get('error')}")
+
+            except Exception as row_error:
+                errors.append(f"Row {i + 2}: {str(row_error)}")
+    
+        return jsonify({
+            "success": True,
+            "inserted": inserted,
+            "errors": errors
+        })
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+    finally:
+        if "conn" in locals() and conn:
+            conn.close()
+            
+
+@app.route("/employees")
+def employees():
+    conn = connect_db()
+    if conn is None:
+        return render_template("employee_logs.html", logs=[])
+        
+    try:
+        cursor = conn.cursor()
+        # Ensure your table names 'employees' and 'departments' match your DB exactly
+        cursor.execute("""
+            SELECT e.employee_id, e.employee_name, d.department_name, e.position, e.status
+            FROM employees e
+            LEFT JOIN departments d ON e.department_id = d.department_id
+            ORDER BY e.employee_name ASC
+        """)
+        rows = cursor.fetchall()
+        
+        logs = [
+            {
+                "id": row[0],
+                "name": row[1],
+                "dept": row[2] or "N/A",
+                "position": row[3] or "",
+                "status": row[4] or "Active",
+            }
+            for row in rows
+        ]
+        return render_template("employee_logs.html", logs=logs)
+        
+    except Exception as e:
+        # Check your console/logs for this error message if it still doesn't work
+        print(f"Database error: {e}") 
+        return render_template("employee_logs.html", logs=[])
+        
+    finally:
+        if conn:
+            conn.close()
+            
+@app.route("/update_employee", methods=["POST"])
+@login_required
+def update_employee():
+    data = request.get_json()
+    # employee_id is read-only so we use it only as the WHERE key
+    conn = connect_db()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE employees
+            SET employee_name = %s,
+                department_id = (SELECT department_id FROM departments WHERE department_name = %s),
+                position = %s
+            WHERE employee_id = %s
+        """, (data["employee_name"], data["department_id"], data["position"], data["employee_id"]))
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+    finally:
+        conn.close()
+        
+        
+@app.route("/delete_employee", methods=["POST"])
+@login_required
+def delete_employee():
+    data = request.get_json()
+    conn = connect_db()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM employees WHERE employee_id = %s", (data["employee_id"],))
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+    finally:
+        conn.close()
 # ==============================================================================
 # MAIN ENTRY POINT
 # ==============================================================================

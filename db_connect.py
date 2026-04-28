@@ -1,3 +1,4 @@
+from database import connect_db
 import mysql.connector as connector
 from datetime import date, datetime, timedelta
 
@@ -33,21 +34,6 @@ class Database:
 
     def authenticate_user(self):
         try:
-            # query = """ 
-            #     SELECT u.user_id, u.role, u.active,
-            #         COALESCE(s.student_id, e.employee_id, CAST(v.visitor_id AS CHAR)) as scan_id,
-            #         COALESCE(s.status, e.status, v.status) as current_status,
-            #         COALESCE(CONCAT(s.first_name, ' ', s.last_name), CONCAT(e.first_name, ' ', e.last_name), v.name) as full_name,
-            #         COALESCE(c.course_name, d.department_name, 'Visitor') as affiliation
-            #     FROM users u 
-            #     LEFT JOIN students s ON u.user_id = s.user_id 
-            #     LEFT JOIN employees e ON u.user_id = e.user_id
-            #     LEFT JOIN visitors v ON u.user_id = v.user_id
-            #     LEFT JOIN courses c ON s.course_id = c.course_id
-            #     LEFT JOIN departments d ON e.department_id = d.department_id
-            #     WHERE s.student_id = %s OR e.employee_id = %s OR v.visitor_id = %s
-            # """
-            
             query = """ 
                 SELECT u.user_id, u.role, u.active,
                     COALESCE(s.student_id, e.employee_id, CAST(v.visitor_id AS CHAR)) as scan_id,
@@ -68,7 +54,7 @@ class Database:
             return result if result else []
             
         except connector.Error as err:
-            print(f"Error authenticating authenticating: {err}")
+            print(f"Error authenticating: {err}")
             return err
 
     def change_status(self):
@@ -88,47 +74,6 @@ class Database:
             last_log = self.cursor.fetchone()
 
             new_status = 'Inside'
-            
-            now = datetime.now()
-            today_date = now.date()
-            forgot_to_timeout = False
-
-            if last_log:
-                last_time = last_log['timestamp']
-                last_type = last_log['log_type']
-                last_date = last_time.date()
-
-                if current_status.lower() == 'inside':
-                    if last_date < today_date:
-                        forgot_to_timeout = True
-                        new_status = 'Inside'
-                    else:
-                        new_status = 'Outside'
-                else:
-                    new_status = 'Inside'
-            else:
-                 new_status = 'Inside'
-
-            if role == 'student':
-                query = "UPDATE students SET status = %s WHERE user_id = %s"
-            elif role == 'employee':
-                query = "UPDATE employees SET status = %s WHERE user_id = %s"
-            user_id = self.parameter[0]
-            current_status = self.parameter[1]
-            role = self.parameter[2]
-
-            # check user last scanned
-            last_log_query = """
-                SELECT timestamp, log_type 
-                FROM general_log 
-                WHERE user_id = %s 
-                ORDER BY timestamp DESC LIMIT 1
-            """
-            self.cursor.execute(last_log_query, (user_id,))
-            last_log = self.cursor.fetchone()
-
-            new_status = 'Inside'
-            
             now = datetime.now()
             today_date = now.date()
             forgot_to_timeout = False
@@ -180,26 +125,19 @@ class Database:
                 return "Log inserted successfully!"
             return None 
             
-            return None 
-            
         except connector.Error as err:
             self.conn.rollback()
-            print(f"Error inserting log: {err}")
             print(f"Error inserting log: {err}")
             return None
 
     def retrieve_log(self):
         try:
-            # Fixed 'person_id' to 'user_id'
-            log_query = """SELECT * FROM general_log WHERE user_id = %s AND DATE(timestamp) = %s"""
-            # Fixed 'person_id' to 'user_id'
             log_query = """SELECT * FROM general_log WHERE user_id = %s AND DATE(timestamp) = %s"""
             self.cursor.execute(log_query, self.parameter)
             result = self.cursor.fetchall()
             return result if result else []
             
         except connector.Error as err:
-            print(f"Error retrieving log: {err}")
             print(f"Error retrieving log: {err}")
             return None
 
@@ -589,14 +527,24 @@ class Database:
 
     def delete_bulk_events(self):
         """
-        Soft deletion of events to prevent data loss if needed
+        Soft deletion of multiple events to prevent data loss if needed
         """
         try: 
-            query = "UPDATE events SET active = 0 WHERE event_id = %s"
-            self.cursor.execute(query, self.parameter)
+            event_ids_list = self.parameter[0]
+
+            if not event_ids_list:
+                return {"message": "No valid event IDs provided.", "success": False}
+
+            placeholders = ', '.join(['%s'] * len(event_ids_list))
+            
+            query = f"UPDATE events SET active = 0 WHERE event_id IN ({placeholders})"
+            
+            self.cursor.execute(query, tuple(event_ids_list))
             self.conn.commit()
-            return {"message": "Event deleted successfully!", "success": True}
-        except connector.Error as err:
+            
+            return {"message": f"{len(event_ids_list)} events deleted successfully!", "success": True}
+            
+        except Exception as err:
             self.conn.rollback()
             return {"message": f"Database Error: {err}", "success": False}
 
@@ -1032,6 +980,55 @@ class Database:
             
         except connector.Error as err:
             print(f"Error fetching events: {err}")
+            return None
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+
+    @staticmethod
+    def get_all_events_for_reports(conn):
+        """
+        Fetches all scheduled event instances for reports dropdown.
+        Used in the Reports tab detailed report type selection.
+        """
+        try:
+            if conn:
+                cursor = conn.cursor(dictionary=True)
+            else:
+                raise Exception("Failed to connect to the database.")
+            query = """
+                        SELECT DISTINCT
+                            ei.instance_id AS instance_id,
+                            e.event_id AS event_id,
+                            e.event_name AS name, 
+                            e.event_type AS type, 
+                            e.frequency AS frequency,
+                            ei.event_date AS date, 
+                            e.time_start, 
+                            e.time_end, 
+                            e.location AS location,
+                            e.active AS active
+                        FROM event_instances ei
+                        JOIN events e ON ei.event_id = e.event_id
+                        WHERE ei.status = 'Scheduled'
+                        ORDER BY ei.event_date DESC
+                    """
+            cursor.execute(query)
+            result = cursor.fetchall()
+
+            if result:
+                for row in result:
+                    if row.get('date'):
+                        row['date'] = str(row['date'])
+                    if row.get('time_start'):
+                        row['time_start'] = str(row['time_start'])
+                    if row.get('time_end'):
+                        row['time_end'] = str(row['time_end'])
+                        
+            return result if result else []
+            
+        except connector.Error as err:
+            print(f"Error fetching events for reports: {err}")
             return None
         finally:
             if 'cursor' in locals():
@@ -1657,4 +1654,184 @@ class Database:
             return None
         finally:
             if 'cursor' in locals():
+                cursor.close()
+                
+class EmployeeModel:
+
+    def add_employee(self, employee_id, employee_name, department_id, position):
+        conn = connect_db()
+
+        if conn is None:
+            return {"success": False, "error": "Database connection failed"}
+
+        try:
+            cursor = conn.cursor(dictionary=True)
+
+            # Force capitalization
+            employee_name = employee_name.upper()
+            position = position.upper()
+
+            # 1. Insert into users
+            cursor.execute("""
+                INSERT INTO users (role, active)
+                VALUES (%s, %s)
+            """, ("employee", 1))
+
+            user_id = cursor.lastrowid
+
+            # 2. Insert into employees
+            cursor.execute("""
+                INSERT INTO employees
+                (user_id, employee_id, employee_name, department_id, position, status)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (
+                user_id,
+                employee_id,
+                employee_name,
+                department_id,
+                position,
+                "Outside"
+            ))
+
+            conn.commit()
+
+            return {"success": True}
+
+        except Exception as e:
+            conn.rollback()
+            return {"success": False, "error": str(e)}
+
+        finally:
+            conn.close()
+
+    def add_employee_excel(self, conn, employee_id, employee_name, department_name, position):
+        cursor = None
+        try:
+            cursor = conn.cursor()
+
+            employee_id     = str(employee_id or "").strip()
+            employee_name   = str(employee_name or "").strip().title()   # "Juan Dela Cruz"
+            department_name = str(department_name or "").strip().upper().replace('\u2019', "'")
+            position        = str(position or "").strip().upper()
+
+            if not employee_id or not employee_name or not department_name:
+                return {"success": False, "error": "Missing required fields"}
+
+            # TRIM on both sides handles trailing spaces in Excel cells
+            cursor.execute("""
+                SELECT department_id
+                FROM departments
+                WHERE UPPER(TRIM(department_name)) = TRIM(%s)
+            """, (department_name,))
+
+            dept = cursor.fetchone()
+            if not dept:
+                return {"success": False, "error": f"Department not found: {department_name}"}
+
+            department_id = dept[0]
+
+            cursor.execute("""
+                SELECT employee_id FROM employees WHERE employee_id = %s
+            """, (employee_id,))
+            if cursor.fetchone():
+                return {"success": False, "error": f"Employee already exists: {employee_id}"}
+
+            cursor.execute("""
+                INSERT INTO users (role, active) VALUES (%s, %s)
+            """, ("employee", 1))
+            user_id = cursor.lastrowid
+
+            cursor.execute("""
+                INSERT INTO employees
+                (user_id, employee_id, employee_name, department_id, position, status)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (user_id, employee_id, employee_name, department_id, position, "Outside"))
+
+            conn.commit()
+            return {"success": True}
+
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            return {"success": False, "error": str(e)}
+
+        finally:
+            if cursor:
+                cursor.close()
+
+class StudentModel:
+
+    def add_student(self, conn, student_id, student_name, course_name, status="Outside"):
+        cursor = None
+
+        try:
+            cursor = conn.cursor()
+
+            student_id = str(student_id or "").strip()
+            student_name = str(student_name or "").strip().upper()
+            course_name = str(course_name or "").strip().upper()
+            status = str(status or "Outside").strip()
+
+            if not student_id or not student_name or not course_name:
+                return {"success": False, "error": "Missing required fields"}
+
+            # =========================
+            # CHECK DUPLICATE
+            # =========================
+            cursor.execute(
+                "SELECT student_id FROM students WHERE student_id = %s",
+                (student_id,)
+            )
+            if cursor.fetchone():
+                return {"success": False, "error": f"Student already exists: {student_id}"}
+
+            # =========================
+            # REMOVE COURSE ID CHECK (NO LONGER NEEDED)
+            # =========================
+            cursor.execute("""
+                SELECT course_id FROM courses WHERE UPPER(course_name) = %s
+            """, (course_name,))
+            
+            course_row = cursor.fetchone()
+
+            if not course_row:
+                return {"success": False, "error": f"Invalid course: {course_name}"}
+
+            course_id = course_row[0]
+
+            # =========================
+            # INSERT USER
+            # =========================
+            cursor.execute(
+                "INSERT INTO users (role, active) VALUES (%s, %s)",
+                ("student", 1)
+            )
+            user_id = cursor.lastrowid
+
+            # =========================
+            # INSERT STUDENT (NOW REAL FIX)
+            # =========================
+            cursor.execute("""
+                INSERT INTO students
+                (user_id, student_id, student_name, course_id, status)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (
+                user_id,
+                student_id,
+                student_name,
+                course_id,   # still ID in DB (correct design)
+                status
+            ))
+
+            conn.commit()
+
+            return {"success": True}
+
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            return {"success": False, "error": str(e)}
+
+        finally:
+            if cursor:
                 cursor.close()

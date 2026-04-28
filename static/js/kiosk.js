@@ -84,6 +84,52 @@ function addNewLog(log, logType) {
 }
 
 /**
+ * Add a log entry to the live feed for general kiosk (entrance/exit)
+ * @param {string} name - participant name
+ * @param {string} affiliation - department/course affiliation
+ * @param {string} logType - 'entry', 'exit', 'Entry', 'Exit'
+ */
+function appendToLiveFeed(name, affiliation, logType) {
+    const feedContainer = document.getElementById('live-feed-list');
+    if (!feedContainer) {
+        console.warn('Live feed container not found');
+        return;
+    }
+
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    
+    const isEntry = logType.toLowerCase() === 'entry';
+    const iconBg = isEntry ? 'bg-success text-success' : 'bg-secondary text-white';
+    const iconClass = isEntry ? 'bi-check-lg' : 'bi-arrow-right';
+    const badgeClass = isEntry ? 'bg-success text-success' : 'bg-secondary text-white';
+    const badgeText = isEntry ? 'TIME IN' : 'TIME OUT';
+
+    const logHtml = `
+        <div class="d-flex align-items-center p-2 rounded live-feed-item" style="background: rgba(255,255,255,0.03);">
+            <div class="rounded-circle ${iconBg} bg-opacity-25 p-2 me-3">
+                <i class="bi ${iconClass}"></i>
+            </div>
+            <div class="flex-grow-1 lh-1">
+                <h6 class="mb-0 small">${name}</h6>
+                <small class="text-white-50" style="font-size: 0.75rem">${affiliation || 'N/A'}</small>
+            </div>
+            <div class="text-end">
+                <div class="badge ${badgeClass} bg-opacity-10 mb-1">${badgeText}</div>
+                <div class="font-monospace small text-white-50">${timeString}</div>
+            </div>
+        </div>
+    `;
+
+    feedContainer.insertAdjacentHTML('afterbegin', logHtml);
+
+    // Keep only the latest 6 logs
+    while (feedContainer.children.length > 6) {
+        feedContainer.lastElementChild.remove();
+    }
+}
+
+/**
  * Load attendance for a specific event instance and populate the live feed
  * This loads initial entry logs only (since backend returns only first_in for each user).
  * To also show exit logs on load, you would need a separate endpoint for general_log.
@@ -168,6 +214,7 @@ function submitManualEntry(type, manualId = null) {
                 if (manualId === null) {
                     document.getElementById(idField).value = '';
                 }
+
             } else {
                 alert(data.message || "Failed to log attendance.");
                 if (typeof showScanBanner === 'function') showScanBanner('error', { id: id });
@@ -212,6 +259,8 @@ function submitManualEntry(type, manualId = null) {
                 if (manualId === null) {
                     document.getElementById(idField).value = '';
                 }
+
+                appendToLiveFeed(data.name, data.affiliation, logType);
             } else {
                 alert(data.Invalid || "ID not found!");
                 if (typeof showScanBanner === 'function') showScanBanner('error', { id: id });
@@ -219,7 +268,7 @@ function submitManualEntry(type, manualId = null) {
         })
         .catch(err => {
             console.error('General auth error:', err);
-            alert("Connection error. Please try again.");
+            alert("Connection error: " + err.message + ". Please try again.");
             if (typeof showScanBanner === 'function') showScanBanner('error', { id: id });
         });
     }

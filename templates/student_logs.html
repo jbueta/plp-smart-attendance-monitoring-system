@@ -33,159 +33,1281 @@
             <h1 class="h2">Student Activity Logs</h1>
             <p class="text-white-50 mb-0">Detailed list of student campus entry and exit records.</p>
         </div>
-        <div class="d-flex gap-2">
-            <div class="input-group input-group-sm" style="width: 200px;">
-                <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
-                <input type="text" id="searchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search ID or Name...">
+        <div class="d-flex flex-column align-items-end mb-2 mb-md-0">
+            <div class="btn-group border border-secondary rounded-pill p-1 bg-dark bg-opacity-50 shadow-sm" role="group" aria-label="View Toggle">
+                <input type="radio" class="btn-check view-toggle" name="viewToggle" id="viewActivity" value="activity" autocomplete="off" checked>
+                <label class="btn btn-outline-light rounded-pill border-0 px-4 fw-bold" for="viewActivity"><i class="bi bi-activity me-2"></i>Activity Logs</label>
+                <input type="radio" class="btn-check view-toggle" name="viewToggle" id="viewRecords" value="records" autocomplete="off">
+                <label class="btn btn-outline-light rounded-pill border-0 px-4 fw-bold" for="viewRecords"><i class="bi bi-people me-2"></i>Student Records</label>
             </div>
-            <select id="courseFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
-                <option value="">All Courses</option>
-                <option value="BSCS">BSCS</option>
-                <option value="BSN">BSN</option>
-                <option value="BSA">BSA</option>
-                <option value="BSEd">BSEd</option>
-            </select>
-            <input type="date" id="dateFilter" class="form-control form-control-sm bg-dark text-white border-secondary w-auto">
-            <button type="button" id="applyBtn" class="btn btn-sm btn-primary-gold px-3"><i class="bi bi-filter me-1"></i>Apply</button>
-            <button type="button" id="exportBtn" class="btn btn-sm btn-outline-light"><i class="bi bi-download me-1"></i>Export</button>
         </div>
     </div>
 
-    <!-- Student Logs Table -->
-    <div class="card-glass p-0 mb-4 overflow-hidden" id="tableCard">
-        <div class="table-responsive">
-            <table class="table table-dark-glass table-hover align-middle mb-0">
-                <thead>
-                    <tr>
-                        <th class="ps-4">Student ID</th>
-                        <th>Name</th>
-                        <th>Course</th>
-                        <th>Time In</th>
-                        <th>Time Out</th>
-                        <th class="text-end pe-4">Status</th>
-                    </tr>
-                </thead>
-                <tbody id="studentTableBody">
-                    {% for log in logs %}
-                    <tr class="student-row"
-                        data-id="{{ log.id | lower }}"
-                        data-name="{{ log.name | lower }}"
-                        data-course="{{ log.course }}"
-                        data-date="{{ log.date }}">
-                        <td class="font-monospace text-white-50 ps-4">{{ log.id }}</td>
-                        <td class="fw-bold text-white">{{ log.name }}</td>
-                        <td class="text-white-50">{{ log.course }}</td>
-                        <td class="text-success font-monospace small">{{ log.time_in }}</td>
-                        <td class="text-danger font-monospace small">{{ log.time_out }}</td>
-                        <td class="text-end pe-4">
-                            <span class="badge bg-{{ log.status_class }} bg-opacity-25 border border-{{ log.status_class }} text-{{ log.status_class }} rounded-pill px-3">
-                                {{ log.status }}
-                            </span>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr id="emptyRow">
-                        <td colspan="6" class="text-center text-white-50 py-5">
-                            <i class="bi bi-inbox display-4 d-block mb-3"></i>
-                            No activity logs recorded for this period.
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    <!-- MAIN CONTAINER -->
+    <div id="student-content-area" class="position-relative overflow-hidden" style="min-height: 500px;">
+
+        <!-- ACTIVITY LOGS VIEW -->
+        <div id="activity-view" class="student-view active-view">
+            <div class="card-glass p-0 mb-4 overflow-hidden" id="tableCard">
+                <div class="d-flex flex-wrap gap-2 p-3 justify-content-end">
+                    <div class="input-group input-group-sm" style="width: 200px;">
+                        <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
+                        <input type="text" id="searchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search ID or Name...">
+                    </div>
+                    <select id="courseFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
+                        <option value="">All Courses</option>
+                    </select>
+                    <input type="date" id="dateFilter" class="form-control form-control-sm bg-dark text-white border-secondary w-auto">
+                </div>
+                <div class="table-responsive pb-3">
+                    <table class="table table-dark-glass table-hover align-middle mb-0" id="studentTable">
+                        <thead>
+                            <tr>
+                                <th class="ps-4">Student ID</th>
+                                <th>Name</th>
+                                <th>Course</th>
+                                <th>Time In</th>
+                                <th>Time Out</th>
+                                <th class="text-end" style="padding-right: 3rem;">Status</th>
+                                <th class="text-end pe-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="studentTableBody">
+                            {% for log in logs %}
+                            <tr class="student-row"
+                                data-id="{{ log.id | lower }}"
+                                data-name="{{ log.name | lower }}"
+                                data-course="{{ log.course }}"
+                                data-date="{{ log.date }}">
+                                <td class="font-monospace text-white-50 ps-4">{{ log.id }}</td>
+                                <td class="fw-bold text-white">{{ log.name }}</td>
+                                <td class="text-white-50">{{ log.course }}</td>
+                                <td class="text-success font-monospace small">{{ log.time_in }}</td>
+                                <td class="text-danger font-monospace small">{{ log.time_out }}</td>
+                                <td class="text-end" style="padding-right: 3rem;">
+                                    <span class="badge bg-{{ log.status_class }} bg-opacity-25 border border-{{ log.status_class }} text-{{ log.status_class }} rounded-pill px-3">
+                                        {{ log.status }}
+                                    </span>
+                                </td>
+                                <td class="text-center align-middle" style="width: 80px;">
+                                    <div class="dropdown h-100 d-flex align-items-center justify-content-center">
+                                        <button class="btn btn-sm btn-outline-light p-0 border-0 d-flex align-items-center justify-content-center fs-4" type="button" data-bs-toggle="dropdown" aria-expanded="false">&hellip;</button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow-sm student-action-menu">
+                                            <li><button type="button" class="dropdown-item view-student text-white" data-id="{{ log.id }}">View Details</button></li>
+                                            <li><button type="button" class="dropdown-item text-danger delete-student" data-id="{{ log.id }}">Delete</button></li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr id="emptyRow">
+                                <td colspan="7" class="text-center text-white-50 py-5">
+                                    <i class="bi bi-inbox display-4 d-block mb-3"></i>
+                                    No activity logs recorded for this period.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="noResults" style="display: none;" class="card-glass text-center text-white-50 py-5 mb-4">
+                <i class="bi bi-search display-4 d-block mb-3"></i>
+                <p class="mb-0">No records found matching your search criteria.</p>
+            </div>
+            <p id="resultCount" class="text-white-50 small ms-1"></p>
+            <div id="paginationContainer" class="pagination-footer" style="display: none;">
+                <nav aria-label="Page navigation">
+                    <ul id="paginationList" class="pagination pagination-custom mb-0 gap-1"></ul>
+                </nav>
+            </div>
+        </div>
+
+        <!-- RECORDS VIEW -->
+        <div id="records-view" class="student-view">
+            <div class="card-glass p-0 mb-4 overflow-hidden" id="recordsTableCard">
+                <div class="d-flex flex-wrap gap-3 p-3 justify-content-between align-items-center">
+                    <div class="me-3">
+                        <button type="button" id="addStudentBtn" class="btn btn-primary-gold btn-sm px-3 py-1" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                            <i class="bi bi-person-plus me-2"></i>Add Student
+                        </button>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <div class="input-group input-group-sm" style="width: 220px;">
+                            <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
+                            <input type="text" id="recordsSearchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search Name or Course...">
+                        </div>
+                        <select id="recordsCourseFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
+                            <option value="">All Courses</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="table-responsive pb-3">
+                    <table class="table table-dark-glass table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-4">Student ID</th>
+                                <th>Name</th>
+                                <th>Course</th>
+                                <th class="text-center">Status</th>
+                                <th class="text-end pe-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recordsTableBody">
+                            {% for log in logs %}
+                            <tr class="student-record-row"
+                                data-id="{{ log.id | lower }}"
+                                data-name="{{ log.name | lower }}"
+                                data-course="{{ log.course | lower }}">
+                                <td class="font-monospace text-white-50 ps-4">{{ log.id }}</td>
+                                <td class="fw-bold text-white">{{ log.name }}</td>
+                                <td class="text-white-50">{{ log.course }}</td>
+                                <td class="text-center">
+                                    <span class="badge bg-success bg-opacity-25 border border-success text-success rounded-pill px-3">Active</span>
+                                </td>
+                                <td class="text-center align-middle" style="width: 80px;">
+                                    <div class="dropdown h-100 d-flex align-items-center justify-content-center">
+                                        <button class="btn btn-sm btn-outline-light p-0 border-0 d-flex align-items-center justify-content-center fs-4" type="button" data-bs-toggle="dropdown" aria-expanded="false">&hellip;</button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow-sm student-action-menu">
+                                            <li><button type="button" class="dropdown-item edit-student-record text-white" data-id="{{ log.id }}">Edit</button></li>
+                                            <li><button type="button" class="dropdown-item text-danger delete-student-record" data-id="{{ log.id }}">Delete</button></li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr id="recordsEmptyRow">
+                                <td colspan="5" class="text-center text-white-50 py-5">
+                                    <i class="bi bi-people display-4 d-block mb-3"></i>
+                                    No student records found.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div id="recordsNoResults" style="display: none;" class="card-glass text-center text-white-50 py-5 mb-4">
+                <i class="bi bi-search display-4 d-block mb-3"></i>
+                <p class="mb-0">No records found matching your search criteria.</p>
+            </div>
+            <p id="recordsResultCount" class="text-white-50 small ms-1"></p>
+            <div id="recordsPaginationContainer" class="pagination-footer" style="display: none;">
+                <nav aria-label="Page navigation">
+                    <ul id="recordsPaginationList" class="pagination pagination-custom mb-0 gap-1"></ul>
+                </nav>
+            </div>
         </div>
     </div>
-
-    <!-- No results (shown only when filters return nothing) -->
-    <div id="noResults" style="display: none;" class="card-glass text-center text-white-50 py-5 mb-4">
-        <i class="bi bi-search display-4 d-block mb-3"></i>
-        <p class="mb-0">No records found matching your search criteria.</p>
-    </div>
-
-    <!-- Result count -->
-    <p id="resultCount" class="text-white-50 small ms-1"></p>
 </div>
 
+<!-- ===================== ADD USER MODAL ===================== -->
+<div class="modal fade" id="addUserModal" tabindex="-1" aria-hidden="true" style="backdrop-filter: blur(5px);">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="background-color: #07271d; border-radius: 20px;">
+            <div class="modal-body p-5 position-relative">
+                <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-4" data-bs-dismiss="modal" aria-label="Close" style="z-index: 10;"></button>
+
+                <!-- View 1: Selection -->
+                <div id="addSelectionView">
+                    <div class="text-center mb-5 mt-2">
+                        <h4 class="text-white fw-bold">Select Addition Method</h4>
+                        <p class="text-white-50">Choose how you want to add new student records.</p>
+                    </div>
+                    <div class="row g-4 justify-content-center">
+                        <div class="col-md-6">
+                            <div class="add-option-card xls-card h-100 p-5 rounded-4 border text-center d-flex flex-column justify-content-center align-items-center">
+                                <i class="bi bi-file-earmark-spreadsheet display-3 text-light mb-4"></i>
+                                <h5 class="fw-bold text-white mb-2">EXPORT XLS FILE</h5>
+                                <p class="text-white-50 small mb-0">Add all the records from the excel</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="add-option-card manual-card h-100 p-5 rounded-4 border text-center d-flex flex-column justify-content-center align-items-center">
+                                <i class="bi bi-person-plus display-3 mb-4" style="color: #d4af37;"></i>
+                                <h5 class="fw-bold mb-2" style="color: #d4af37;">ADD MANUALLY</h5>
+                                <p class="text-white-50 small mb-0">Add one user only</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- View 2: XLS Upload -->
+                <div id="xlsUploadView" class="d-none w-100">
+                    <div class="d-flex justify-content-between align-items-start mb-4 pe-5">
+                        <div>
+                            <h4 class="fw-bold text-white mb-1">EXPORT XLS FILE</h4>
+                            <p class="text-white-50 small mb-0">Add all the records from the excel</p>
+                        </div>
+                        <button type="button" id="exportStudentsBtn" class="btn btn-sm btn-primary-gold rounded-3 px-3 fw-bold shadow-sm mt-1">EXPORT</button>
+                    </div>
+                    <div class="upload-zone border border-secondary rounded-4 d-flex flex-column align-items-center justify-content-center p-5" style="border-style: dashed !important; border-width: 2px !important; cursor: pointer; background: rgba(255,255,255,0.02); min-height: 250px;">
+                        <input type="file" id="xlsFileInput" accept=".xls,.xlsx,.csv" class="d-none">
+                        <i class="bi bi-file-earmark-spreadsheet display-4 text-white-50 mb-3"></i>
+                        <span class="text-white-50">Click to select xls file</span>
+                    </div>
+                    <div class="mt-4">
+                        <button type="button" class="btn btn-link text-white-50 text-decoration-none p-0 btn-back-selection">
+                            <i class="bi bi-arrow-left me-2"></i>Back to selection
+                        </button>
+                    </div>
+                </div>
+
+                <!-- View 3: Manual Add -->
+                <div id="manualAddView" class="d-none w-100">
+                    <div class="d-flex justify-content-between align-items-start mb-3 pe-5">
+                        <div>
+                            <h4 class="fw-bold mb-1" style="color: #d4af37;">ADD STUDENT</h4>
+                            <p class="text-white-50 small mb-0">Fill in student information below</p>
+                        </div>
+                        <button type="button" id="submitManualAddBtn"
+                            class="btn btn-warning btn-sm px-3 fw-bold text-dark shadow-sm"
+                            style="min-width:90px;" disabled>
+                            <span id="saveBtnLabel"><i class="bi bi-plus me-1"></i>ADD STUDENT</span>
+                            <span id="saveBtnSpinner" class="d-none">
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>Saving…
+                            </span>
+                        </button>
+                    </div>
+
+                    <!-- Inline feedback banner (hidden by default) -->
+                    <div id="manualAddAlert" class="d-none rounded-3 px-3 py-2 mb-3 small fw-semibold"></div>
+
+                    <div class="row g-3">
+                        <!-- LEFT: QR Preview -->
+                        <div class="col-md-5">
+                            <div class="card-glass p-4 text-center h-100 d-flex flex-column justify-content-center">
+                                <div id="qrPreview" class="border border-secondary rounded-4 mb-3 d-flex align-items-center justify-content-center" style="height:180px;">
+                                    <span class="text-white-50 small">QR PREVIEW</span>
+                                </div>
+                                <button type="button" id="generateQRBtn" class="btn btn-light btn-sm fw-bold text-dark">GENERATE QR</button>
+                            </div>
+                        </div>
+
+                        <!-- RIGHT: Form -->
+                        <div class="col-md-7">
+                            <div class="card-glass p-4 h-100">
+                                <!-- Student ID -->
+                                <div class="mb-3">
+                                    <label class="form-label text-white-50 small fw-semibold">Student ID</label>
+                                    <input type="text" id="manualAddId"
+                                        class="form-control bg-dark text-white border-secondary"
+                                        placeholder="e.g. 2026-00001" autocomplete="off">
+                                    <div id="idFeedback" class="form-text text-danger d-none small mt-1">
+                                        Format must be YYYY-NNNNN (e.g. 2026-00001)
+                                    </div>
+                                </div>
+                                <!-- Full Name -->
+                                <div class="mb-3">
+                                    <label class="form-label text-white-50 small fw-semibold">Full Name</label>
+                                    <input type="text" id="manualAddName"
+                                        class="form-control bg-dark text-white border-secondary"
+                                        placeholder="Juan Dela Cruz" autocomplete="off">
+                                </div>
+                                <!-- Course -->
+                                <div class="mb-0">
+                                    <label class="form-label text-white-50 small fw-semibold">Course</label>
+                                    <select id="manualAddCourse" class="form-select bg-dark text-white border-secondary">
+                                        <option value="" selected disabled>— Select Course —</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 d-flex justify-content-between align-items-center">
+                        <button type="button" class="btn btn-link text-white-50 text-decoration-none p-0 btn-back-selection">
+                            <i class="bi bi-arrow-left me-2"></i>Back to selection
+                        </button>
+                        <span class="text-white-50 small">All fields are required to save</span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== CONFIRM DIALOG ===================== -->
+<div id="confirmOverlay" class="d-none position-fixed top-0 start-0 w-100 h-100"
+    style="background: rgba(0,0,0,0.55); backdrop-filter: blur(6px); z-index: 9998; display: flex; align-items: center; justify-content: center;">
+    <div style="
+        background: rgba(10,40,25,0.98);
+        border: 1px solid rgba(239,68,68,0.3);
+        border-radius: 20px;
+        padding: 32px 28px;
+        min-width: 320px;
+        max-width: 400px;
+        box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+        text-align: center;
+        animation: toastSlideIn 0.25s cubic-bezier(0.34,1.56,0.64,1) forwards;
+    ">
+        <!-- Icon -->
+        <div style="
+            width:52px; height:52px; border-radius:50%;
+            background:#ef4444; margin: 0 auto 16px;
+            display:flex; align-items:center; justify-content:center;
+            box-shadow: 0 0 0 8px rgba(239,68,68,0.15);
+        ">
+            <i class="bi bi-exclamation-triangle-fill" style="font-size:1.4rem; color:#fff;"></i>
+        </div>
+        <h6 id="confirmTitle" style="color:#fff; font-weight:700; font-size:1rem; margin-bottom:8px;"></h6>
+        <p  id="confirmSubtitle" style="color:rgba(255,255,255,0.55); font-size:0.83rem; margin-bottom:24px;"></p>
+        <div class="d-flex gap-3 justify-content-center">
+            <button id="confirmCancelBtn" style="
+                flex:1; padding:10px; border-radius:12px;
+                background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15);
+                color:#fff; font-weight:600; cursor:pointer; font-size:0.9rem;
+                transition: background 0.2s;
+            " onmouseover="this.style.background='rgba(255,255,255,0.15)'"
+               onmouseout="this.style.background='rgba(255,255,255,0.08)'">Cancel</button>
+            <button id="confirmOkBtn" style="
+                flex:1; padding:10px; border-radius:12px;
+                background:#ef4444; border:none;
+                color:#fff; font-weight:700; cursor:pointer; font-size:0.9rem;
+                transition: background 0.2s;
+            " onmouseover="this.style.background='#dc2626'"
+               onmouseout="this.style.background='#ef4444'">Delete</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast notification -->
+<div id="toastContainer" class="position-fixed" style="z-index: 9999; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; pointer-events: none;"></div>
+
+<!-- ===================== EDIT / VIEW OVERLAY ===================== -->
+<div id="editOverlay" class="d-none position-fixed top-0 start-0 w-100 h-100" style="background: rgba(10,12,20,0.56); backdrop-filter: blur(8px); z-index: 1080;">
+    <div id="studentEditCard" class="card-glass p-4 position-absolute top-50 start-50 translate-middle" style="width: min(760px, 94%); border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 28px 80px rgba(0,0,0,0.35);">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h5 class="mb-1">Edit Student Record</h5>
+                <p class="text-white-50 small mb-0">Update the current student details and save the changes.</p>
+            </div>
+        </div>
+        <hr class="border-secondary opacity-25 my-3">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label text-white-50" for="editStudentId">Student ID</label>
+                <input id="editStudentId" class="form-control bg-dark border-secondary" type="text" readonly
+                    style="color: rgba(255,255,255,0.4); cursor: not-allowed;" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label text-white-50" for="editStudentName">Student Name</label>
+                <input id="editStudentName" class="form-control bg-dark text-white border-secondary" type="text" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label text-white-50" for="editCourseId">Course</label>
+                <select id="editCourseId" class="form-select bg-dark text-white border-secondary">
+                    <option value="" disabled>— Select Course —</option>
+                </select>
+            </div>
+        </div>
+        <div class="d-flex justify-content-end gap-2 mt-4">
+            <button id="cancelEditStudent" type="button" class="btn btn-outline-light">Cancel</button>
+            <button id="saveStudentEdit" type="button" class="btn btn-primary-gold">Update</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== STYLES ===================== -->
+<style>
+.student-action-menu {
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.15);
+}
+.student-action-menu .dropdown-item { color: #fff; }
+.student-action-menu .dropdown-item:hover,
+.student-action-menu .dropdown-item:focus { background: #d4af37; color: #051a10; }
+.dropdown .btn { width: 2rem; height: 2rem; border-radius: 50%; }
+.dropdown .btn:hover {
+    background: transparent !important;
+    border: 1px solid #fff !important;
+    border-radius: 50% !important;
+    color: #fff !important;
+}
+.pagination-footer {
+    display: none;
+    position: fixed;
+    bottom: 1rem;
+    left: 60%;
+    transform: translateX(-50%);
+    justify-content: center;
+    pointer-events: none;
+    z-index: 1100;
+    width: auto;
+    max-width: 90vw;
+    padding: 0 0.5rem;
+}
+.pagination-footer.show { display: flex !important; }
+.pagination-footer .pagination { pointer-events: auto; background: transparent; }
+.main-content { padding-bottom: 4rem; }
+.pagination-custom { list-style: none; display: flex; align-items: center; gap: 0.5rem; margin: 0; padding: 0; }
+.pagination-custom .page-item { margin: 0; }
+.pagination-custom .page-link {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 2.75rem; height: 2.75rem; padding: 0 0.85rem;
+    color: #fff; background-color: transparent; border: none;
+    border-radius: 999px; cursor: pointer;
+    transition: all 0.25s ease; font-size: 0.95rem; font-weight: 500;
+}
+.pagination-custom .page-link:hover:not(:disabled) { background-color: rgba(212,175,55,0.18); color: #fff; transform: translateY(-1px); }
+.pagination-custom .page-link.active { background-color: rgba(212,175,55,0.25); color: #fff; font-weight: 700; }
+.pagination-custom .page-link:disabled { opacity: 0.35; cursor: not-allowed; background-color: transparent; }
+.pagination-custom .page-link.page-number-separator { cursor: default; pointer-events: none; color: #b6b6b6; }
+.pagination-custom .page-link.page-prev,
+.pagination-custom .page-link.page-next { min-width: auto; padding: 0.4rem 0.9rem; font-size: 0.9rem; }
+.student-view { display: none; }
+.student-view.active-view { display: block; }
+.view-toggle:checked + label { background-color: #d4af37 !important; color: #ffffff !important; }
+#addStudentBtn { transition: all 0.25s ease; font-weight: 600; border: none; box-shadow: 0 2px 8px rgba(212,175,55,0.3); }
+#addStudentBtn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(212,175,55,0.4); }
+.add-option-card { background-color: #0b3d2e; transition: all 0.3s ease; cursor: pointer; }
+.add-option-card:hover { transform: translateY(-5px); }
+.add-option-card.xls-card { border-color: rgba(255,255,255,0.3) !important; }
+.add-option-card.xls-card:hover { border-color: rgba(255,255,255,0.8) !important; box-shadow: 0 10px 25px rgba(255,255,255,0.1); }
+.add-option-card.manual-card { border-color: #d4af37 !important; }
+.add-option-card.manual-card:hover { border-color: #f5dd00 !important; box-shadow: 0 10px 25px rgba(212,175,55,0.2); }
+.upload-zone { transition: all 0.3s ease; }
+.upload-zone:hover {
+    background: rgba(255,255,255,0.05) !important;
+    border-color: #d4af37 !important;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+}
+.upload-zone:hover i, .upload-zone:hover span { color: #d4af37 !important; transition: color 0.3s ease; }
+@keyframes fadeInModal {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes toastSlideIn {
+    from { opacity: 0; transform: scale(0.88); }
+    to   { opacity: 1; transform: scale(1);    }
+}
+@keyframes toastSlideOut {
+    from { opacity: 1; transform: scale(1);    }
+    to   { opacity: 0; transform: scale(0.88); }
+}
+</style>
+
+<!-- ===================== SCRIPTS ===================== -->
 <script>
-(function () {
-    const searchInput  = document.getElementById('searchInput');
-    const courseFilter = document.getElementById('courseFilter');
-    const dateFilter   = document.getElementById('dateFilter');
-    const applyBtn     = document.getElementById('applyBtn');
-    const exportBtn    = document.getElementById('exportBtn');
-    const tableCard    = document.getElementById('tableCard');
-    const noResults    = document.getElementById('noResults');
-    const resultCount  = document.getElementById('resultCount');
-    const rows         = document.querySelectorAll('.student-row');
+document.addEventListener('DOMContentLoaded', function () {
 
-    function applyFilters() {
-        const search = searchInput.value.trim().toLowerCase();
-        const course = courseFilter.value;
-        const date   = dateFilter.value; // YYYY-MM-DD
+    // ── Toast helper ───────────────────────────────────────────
+    const TOAST_DURATION = 4000;
 
-        let visible = 0;
+    function showToast(message, type = 'success', subtitle = '') {
+        const container = document.getElementById('toastContainer');
+        if (!container) return;
 
-        rows.forEach(function (row) {
-            const matchSearch = !search ||
-                row.dataset.id.includes(search) ||
-                row.dataset.name.includes(search);
-            const matchCourse = !course || row.dataset.course === course;
-            const matchDate   = !date   || row.dataset.date === date;
+        const id = 'toast-' + Date.now();
+        const barId = id + '-bar';
 
-            if (matchSearch && matchCourse && matchDate) {
-                row.style.display = '';
-                visible++;
-            } else {
-                row.style.display = 'none';
-            }
+        const cfg = {
+            success: { icon: 'check-circle-fill',        iconBg: '#22c55e', border: 'rgba(34,197,94,0.35)',   barColor: '#22c55e', title: 'Success' },
+            danger:  { icon: 'x-circle-fill',            iconBg: '#ef4444', border: 'rgba(239,68,68,0.35)',   barColor: '#ef4444', title: 'Error'   },
+            warning: { icon: 'exclamation-circle-fill',   iconBg: '#f59e0b', border: 'rgba(245,158,11,0.35)', barColor: '#f59e0b', title: 'Warning' },
+            info:    { icon: 'info-circle-fill',          iconBg: '#3b82f6', border: 'rgba(59,130,246,0.35)', barColor: '#3b82f6', title: 'Info'    }
+        };
+
+        const c   = cfg[type] || cfg.success;
+        const sub = subtitle || message;
+
+        const html = `
+            <div id="${id}" style="
+                position: relative; overflow: hidden;
+                display: flex; align-items: center; gap: 14px;
+                min-width: 330px; max-width: 420px;
+                padding: 18px 18px 24px;
+                border-radius: 18px;
+                background: rgba(8, 32, 20, 0.98);
+                border: 1px solid ${c.border};
+                box-shadow: 0 24px 60px rgba(0,0,0,0.65);
+                backdrop-filter: blur(20px);
+                animation: toastSlideIn 0.32s cubic-bezier(0.34,1.56,0.64,1) forwards;
+                pointer-events: auto;
+            ">
+                <!-- Glow icon -->
+                <div style="
+                    width:46px; height:46px; border-radius:50%; flex-shrink:0;
+                    background:${c.iconBg};
+                    display:flex; align-items:center; justify-content:center;
+                    box-shadow: 0 0 0 7px ${c.iconBg}28;
+                ">
+                    <i class="bi bi-${c.icon}" style="font-size:1.25rem; color:#fff;"></i>
+                </div>
+
+                <!-- Text -->
+                <div style="flex:1; min-width:0;">
+                    <div style="font-weight:700; font-size:0.95rem; color:#fff; margin-bottom:3px; letter-spacing:0.01em;">${c.title}</div>
+                    <div style="font-size:0.81rem; color:rgba(255,255,255,0.6); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${sub}</div>
+                </div>
+
+                <!-- Close btn -->
+                <button onclick="
+                    const el = document.getElementById('${id}');
+                    if (!el) return;
+                    el.style.animation = 'toastSlideOut 0.22s ease forwards';
+                    setTimeout(() => el?.remove(), 230);
+                " style="
+                    background:none; border:none; cursor:pointer; padding:0; line-height:1; flex-shrink:0;
+                    color:rgba(255,255,255,0.35); font-size:0.9rem; transition:color 0.15s;
+                " onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.35)'">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+
+                <!-- Progress bar -->
+                <div id="${barId}" style="
+                    position:absolute; bottom:0; left:0; height:3px;
+                    width:100%; border-radius:0 0 18px 18px;
+                    background:${c.barColor};
+                    transition: width ${TOAST_DURATION}ms linear;
+                "></div>
+            </div>`;
+
+        container.insertAdjacentHTML('beforeend', html);
+
+        // Kick off progress bar shrink
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                const bar = document.getElementById(barId);
+                if (bar) bar.style.width = '0%';
+            });
         });
 
+        // Auto-dismiss
+        setTimeout(() => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.style.animation = 'toastSlideOut 0.22s ease forwards';
+            setTimeout(() => el?.remove(), 230);
+        }, TOAST_DURATION);
+    }
+
+    // ── Confirm dialog helper ──────────────────────────────────
+    function showConfirm(title, subtitle = '') {
+        return new Promise(resolve => {
+            const overlay  = document.getElementById('confirmOverlay');
+            const titleEl  = document.getElementById('confirmTitle');
+            const subEl    = document.getElementById('confirmSubtitle');
+            const okBtn    = document.getElementById('confirmOkBtn');
+            const cancelBtn = document.getElementById('confirmCancelBtn');
+
+            titleEl.textContent = title;
+            subEl.textContent   = subtitle;
+
+            overlay.classList.remove('d-none');
+            overlay.style.display = 'flex';
+
+            function cleanup(result) {
+                overlay.style.display = 'none';
+                overlay.classList.add('d-none');
+                okBtn.replaceWith(okBtn.cloneNode(true));       // remove old listeners
+                cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+                resolve(result);
+            }
+
+            // Re-query after cloneNode
+            document.getElementById('confirmOkBtn').addEventListener('click',     () => cleanup(true));
+            document.getElementById('confirmCancelBtn').addEventListener('click',  () => cleanup(false));
+            overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(false); }, { once: true });
+        });
+    }
+    const ITEMS_PER_PAGE = 6;
+
+    // ── Element refs ───────────────────────────────────────────
+    const addUserModalEl   = document.getElementById('addUserModal');
+    const selectionView    = document.getElementById('addSelectionView');
+    const xlsView          = document.getElementById('xlsUploadView');
+    const manualView       = document.getElementById('manualAddView');
+    const xlsCard          = document.querySelector('.xls-card');
+    const manualCard       = document.querySelector('.manual-card');
+    const backBtns         = document.querySelectorAll('.btn-back-selection');
+    const uploadZone       = document.querySelector('.upload-zone');
+    const xlsFileInput     = document.getElementById('xlsFileInput');
+    const exportBtn        = document.getElementById('exportStudentsBtn');
+
+    // Manual-add form fields
+    const manualIdInput    = document.getElementById('manualAddId');
+    const manualNameInput  = document.getElementById('manualAddName');
+    const manualCourse     = document.getElementById('manualAddCourse');   // FIX: single course dropdown
+    const submitManualBtn  = document.getElementById('submitManualAddBtn');
+
+    // Activity-log filter elements
+    const searchInput         = document.getElementById('searchInput');
+    const courseFilter        = document.getElementById('courseFilter');
+    const dateFilter          = document.getElementById('dateFilter');
+    const tableCard           = document.getElementById('tableCard');
+    const noResults           = document.getElementById('noResults');
+    const resultCount         = document.getElementById('resultCount');
+    const paginationContainer = document.getElementById('paginationContainer');
+    const paginationList      = document.getElementById('paginationList');
+
+    // Records filter elements
+    const recordsSearch              = document.getElementById('recordsSearchInput');
+    const recordsCourse              = document.getElementById('recordsCourseFilter');
+    const recordsTableCard           = document.getElementById('recordsTableCard');
+    const recordsNoResults           = document.getElementById('recordsNoResults');
+    const recordsResultCount         = document.getElementById('recordsResultCount');
+    const recordsPaginationContainer = document.getElementById('recordsPaginationContainer');
+    const recordsPaginationList      = document.getElementById('recordsPaginationList');
+
+    // Edit overlay
+    const editOverlay     = document.getElementById('editOverlay');
+    const editStudentId   = document.getElementById('editStudentId');
+    const editStudentName = document.getElementById('editStudentName');
+    const editCourseId    = document.getElementById('editCourseId');
+    const saveStudentEdit = document.getElementById('saveStudentEdit');
+    const cancelEdit      = document.getElementById('cancelEditStudent');
+
+    let currentPage        = 1;
+    let recordsCurrentPage = 1;
+    let currentEditRow     = null;
+
+    // ── Helpers ────────────────────────────────────────────────
+    const getActivityRows = () => document.querySelectorAll('.student-row');
+    const getRecordRows   = () => document.querySelectorAll('.student-record-row');
+
+    function showView(target) {
+        [selectionView, xlsView, manualView].forEach(v => v && v.classList.add('d-none'));
+        if (target) {
+            target.classList.remove('d-none');
+            target.style.animation = 'fadeInModal 0.4s ease forwards';
+        }
+    }
+
+    // ── Course loading ─────────────────────────────────────────
+    async function loadCourseFilters() {
+    try {
+        const res     = await fetch('/get_courses');
+        const courses = await res.json();
+
+        // Populate activity + records filter dropdowns
+        [courseFilter, recordsCourse].forEach(sel => {
+            if (!sel) return;
+            sel.innerHTML = '<option value="">All Courses</option>';
+            courses.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.name;
+                opt.textContent = c.name.toUpperCase();
+                sel.appendChild(opt);
+            });
+        });
+
+        // Populate edit overlay course dropdown
+        const editCourseDropdown = document.getElementById('editCourseId');
+        if (editCourseDropdown) {
+            editCourseDropdown.innerHTML = '<option value="" disabled>— Select Course —</option>';
+            courses.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value        = c.name;           // send course name to /update_student
+                opt.textContent  = c.name.toUpperCase();
+                opt.dataset.id   = c.course_id;
+                editCourseDropdown.appendChild(opt);
+            });
+        }
+
+    } catch (err) { console.error('Failed to load course filters:', err); }
+}
+
+    // Populate manual-add dropdown — value = course_id (int), so backend inserts directly
+    async function loadManualCourses() {
+        try {
+            const res     = await fetch('/get_courses');
+            const courses = await res.json();
+            manualCourse.innerHTML = '<option value="" selected disabled>— Select Course —</option>';
+            courses.forEach(c => {
+                const opt        = document.createElement('option');
+                opt.value        = c.course_id;       // integer PK → sent as course_id to backend
+                opt.textContent  = c.course_name;     // original casing shown to user
+                opt.dataset.name = c.course_name;     // stash for row injection
+                manualCourse.appendChild(opt);
+            });
+        } catch (err) { console.error('Failed to load courses:', err); }
+    }
+
+    // ── Manual-add refs (grabbed after HTML is ready) ──────────
+    const idFeedback    = document.getElementById('idFeedback');
+    const manualAlert   = document.getElementById('manualAddAlert');
+    const saveBtnLabel  = document.getElementById('saveBtnLabel');
+    const saveBtnSpinner = document.getElementById('saveBtnSpinner');
+
+    function showManualAlert(msg, type = 'danger') {
+        if (!manualAlert) return;
+        manualAlert.textContent  = msg;
+        manualAlert.className    = `rounded-3 px-3 py-2 mb-3 small fw-semibold bg-${type} bg-opacity-25 text-${type === 'danger' ? 'danger' : 'success'} border border-${type === 'danger' ? 'danger' : 'success'}`;
+    }
+
+    function hideManualAlert() {
+        if (manualAlert) manualAlert.className = 'd-none';
+    }
+
+    function setSaveBtnLoading(loading) {
+        if (!submitManualBtn) return;
+        submitManualBtn.disabled = loading;
+        saveBtnLabel?.classList.toggle('d-none', loading);
+        saveBtnSpinner?.classList.toggle('d-none', !loading);
+    }
+
+    // ── Manual-add validation ──────────────────────────────────
+    const ID_REGEX = /^[0-9]{2,4}-[0-9]{4,6}$/;   // covers 26-12345, 2026-00001, etc.
+
+    function validateManualForm() {
+        const idVal    = (manualIdInput?.value   || '').trim();
+        const nameVal  = (manualNameInput?.value || '').trim();
+        const courseVal = manualCourse?.value    || '';
+
+        const idOk     = ID_REGEX.test(idVal);
+        const nameOk   = nameVal.length > 0;
+        const courseOk = courseVal !== '';
+
+        // Show / hide inline ID hint only after user has typed something
+        if (idFeedback) {
+            idFeedback.classList.toggle('d-none', idVal.length === 0 || idOk);
+        }
+
+        if (submitManualBtn) {
+            submitManualBtn.disabled = !(idOk && nameOk && courseOk);
+        }
+    }
+
+    if (manualIdInput)   manualIdInput.addEventListener('input',  validateManualForm);
+    if (manualNameInput) manualNameInput.addEventListener('input', validateManualForm);
+    if (manualCourse)    manualCourse.addEventListener('change',   validateManualForm);
+
+    // ── Modal navigation ───────────────────────────────────────
+    if (xlsCard)    xlsCard.addEventListener('click',   () => showView(xlsView));
+    if (manualCard) manualCard.addEventListener('click', () => { hideManualAlert(); showView(manualView); });
+    backBtns.forEach(btn => btn.addEventListener('click', () => { hideManualAlert(); showView(selectionView); }));
+
+    if (addUserModalEl) {
+        addUserModalEl.addEventListener('hidden.bs.modal', () => {
+            showView(selectionView);
+            hideManualAlert();
+            if (xlsFileInput) {
+                xlsFileInput.value = '';
+                const span = uploadZone?.querySelector('span');
+                const icon = uploadZone?.querySelector('i');
+                if (span) span.textContent = 'Click to select xls file';
+                if (icon) icon.className = 'bi bi-file-earmark-spreadsheet display-4 text-white-50 mb-3';
+            }
+            if (manualIdInput)    manualIdInput.value = '';
+            if (manualNameInput)  manualNameInput.value = '';
+            if (manualCourse)     manualCourse.selectedIndex = 0;
+            if (idFeedback)       idFeedback.classList.add('d-none');
+            validateManualForm();   // re-run so button resets to disabled
+        });
+    }
+
+    // ── File upload zone ───────────────────────────────────────
+    if (uploadZone && xlsFileInput) {
+        uploadZone.addEventListener('click', () => xlsFileInput.click());
+        xlsFileInput.addEventListener('change', function () {
+            if (this.files?.length) {
+                const span = uploadZone.querySelector('span');
+                const icon = uploadZone.querySelector('i');
+                if (span) span.textContent = this.files[0].name;
+                if (icon) {
+                    icon.classList.replace('bi-file-earmark-spreadsheet', 'bi-file-earmark-check');
+                    icon.classList.replace('text-white-50', 'text-success');
+                }
+            }
+        });
+    }
+
+    // ── Manual Add → POST /add_student_manual ─────────────────
+    if (submitManualBtn) {
+        submitManualBtn.addEventListener('click', async () => {
+            const student_id   = (manualIdInput?.value   || '').trim();
+            const student_name = (manualNameInput?.value || '').trim();
+            const course_id    = manualCourse?.value || '';   // integer course_id PK
+            // Get the display name from the selected option's dataset
+            const selectedOpt  = manualCourse?.options[manualCourse.selectedIndex];
+            const course_name  = selectedOpt?.dataset.name || selectedOpt?.textContent || course_id;
+
+            // Guard: should never reach here disabled, but double-check
+            if (!student_id || !student_name || !course_id) {
+                showManualAlert('Please fill in all fields before saving.', 'danger');
+                return;
+            }
+
+            hideManualAlert();
+            setSaveBtnLoading(true);
+
+            try {
+                const res = await fetch('/add_student_manual', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({
+                        student_id,
+                        student_name,
+                        course_id,      // integer PK — backend inserts directly, no lookup needed
+                        status: 'OUTSIDE'
+                    })
+                });
+
+                const result = await res.json();
+
+                if (result.success) {
+                    // ── Inject new row into Records table live ─────────
+                    const tbody = document.getElementById('recordsTableBody');
+                    const empty = document.getElementById('recordsEmptyRow');
+                    if (empty) empty.remove();
+
+                    const tr = document.createElement('tr');
+                    tr.className        = 'student-record-row';
+                    tr.dataset.id       = student_id.toLowerCase();
+                    tr.dataset.name     = student_name.toLowerCase();
+                    tr.dataset.course   = course_name.toLowerCase();
+                    tr.innerHTML = `
+                        <td class="font-monospace text-white-50 ps-4">${student_id}</td>
+                        <td class="fw-bold text-white">${student_name.toUpperCase()}</td>
+                        <td class="text-white-50">${course_name}</td>
+                        <td class="text-center">
+                            <span class="badge bg-success bg-opacity-25 border border-success text-success rounded-pill px-3">Active</span>
+                        </td>
+                        <td class="text-center align-middle" style="width:80px;">
+                            <div class="dropdown h-100 d-flex align-items-center justify-content-center">
+                                <button class="btn btn-sm btn-outline-light p-0 border-0 d-flex align-items-center justify-content-center fs-4"
+                                    type="button" data-bs-toggle="dropdown" aria-expanded="false">&hellip;</button>
+                                <ul class="dropdown-menu dropdown-menu-end shadow-sm student-action-menu">
+                                    <li><button type="button" class="dropdown-item edit-student-record text-white"
+                                        data-id="${student_id}">Edit</button></li>
+                                    <li><button type="button" class="dropdown-item text-danger delete-student-record"
+                                        data-id="${student_id}">Delete</button></li>
+                                </ul>
+                            </div>
+                        </td>`;
+                    tbody.appendChild(tr);
+                    applyRecordsFilter();
+
+                    // Close modal — the hidden.bs.modal listener will reset the form
+                    bootstrap.Modal.getInstance(document.getElementById('addUserModal'))?.hide();
+
+                    // Switch to Records view so user sees the new row
+                    const recRadio = document.getElementById('viewRecords');
+                    if (recRadio) { recRadio.checked = true; recRadio.dispatchEvent(new Event('change')); }
+
+                    showToast('Student added successfully.', 'success', `${student_name.toUpperCase()} has been added to records.`);
+
+                } else {
+                    showManualAlert(result.error || 'Failed to add student. Please try again.', 'danger');
+                }
+
+            } catch (err) {
+                console.error('Manual add error:', err);
+                showManualAlert('Server error. Please check your connection and try again.', 'danger');
+            } finally {
+                setSaveBtnLoading(false);
+                validateManualForm();   // restore correct disabled state
+            }
+        });
+    }
+
+    // ── XLS Export/Upload ──────────────────────────────────────
+    if (exportBtn) {
+        exportBtn.addEventListener('click', async () => {
+            if (!xlsFileInput?.files?.length) {
+                showToast('No file selected', 'warning', 'Please choose an Excel or CSV file first.');
+                return;
+            }
+
+            // Show loading state on the button
+            exportBtn.disabled = true;
+            const origLabel = exportBtn.textContent;
+            exportBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Uploading…';
+
+            const formData = new FormData();
+            formData.append('file', xlsFileInput.files[0]);
+
+            try {
+                const res    = await fetch('/upload_students', { method: 'POST', body: formData });
+                const result = await res.json();
+
+                if (result.success) {
+                    const errs = result.errors?.length ? ` (${result.errors.length} skipped)` : '';
+                    showToast(
+                        'Upload complete!',
+                        'success',
+                        `${result.inserted} student${result.inserted !== 1 ? 's' : ''} imported successfully${errs}.`
+                    );
+                    // Reload after a short delay so user sees the toast
+                    setTimeout(() => location.reload(), 2200);
+                } else {
+                    showToast('Upload failed', 'danger', result.error || 'Could not process the file.');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('Server error', 'danger', 'Could not reach the server. Please try again.');
+            } finally {
+                exportBtn.disabled = false;
+                exportBtn.textContent = origLabel;
+            }
+        });
+    }
+
+    // ── View toggle (Activity / Records) ──────────────────────
+    const views = {
+        activity: document.getElementById('activity-view'),
+        records:  document.getElementById('records-view')
+    };
+
+    document.querySelectorAll('.view-toggle').forEach(radio => {
+        radio.addEventListener('change', function (e) {
+            Object.values(views).forEach(v => v?.classList.remove('active-view'));
+            views[e.target.value]?.classList.add('active-view');
+            history.replaceState(null, null, '#' + e.target.value);
+        });
+    });
+
+    function handleHash() {
+        const hash  = window.location.hash.replace('#', '');
+        const radio = document.getElementById('view' + hash.charAt(0).toUpperCase() + hash.slice(1));
+        if (radio) { radio.checked = true; radio.dispatchEvent(new Event('change')); }
+    }
+    window.addEventListener('hashchange', handleHash);
+    handleHash();
+
+    // ── Pagination helpers ─────────────────────────────────────
+    function buildPagination(list, curPage, totalPages, onPageClick) {
+        list.innerHTML = '';
+        if (totalPages <= 1) return false;
+
+        const mkBtn = (label, cls, disabled, onClick) => {
+            const li  = document.createElement('li'); li.className = 'page-item';
+            const btn = document.createElement('button'); btn.type = 'button';
+            btn.className = `page-link ${cls}`; btn.innerHTML = label;
+            if (disabled) btn.disabled = true;
+            else btn.addEventListener('click', onClick);
+            li.appendChild(btn); list.appendChild(li);
+            return btn;
+        };
+
+        mkBtn('<i class="bi bi-chevron-left me-1"></i>Previous', 'page-prev', curPage === 1,
+              () => onPageClick(curPage - 1));
+
+        let start = 1, end = totalPages;
+        if (totalPages > 5) {
+            start = Math.max(1, curPage - 2);
+            end   = Math.min(totalPages, start + 4);
+            if (end - start < 4) start = Math.max(1, end - 4);
+        }
+
+        for (let i = start; i <= end; i++) {
+            mkBtn(i, `page-number ${i === curPage ? 'active' : ''}`, false, () => onPageClick(i));
+        }
+
+        if (end < totalPages) {
+            const li = document.createElement('li'); li.className = 'page-item';
+            const sp = document.createElement('span'); sp.className = 'page-link page-number-separator';
+            sp.textContent = '…'; li.appendChild(sp); list.appendChild(li);
+            mkBtn(totalPages, 'page-number', false, () => onPageClick(totalPages));
+        }
+
+        mkBtn('Next <i class="bi bi-chevron-right ms-1"></i>', 'page-next', curPage === totalPages,
+              () => onPageClick(curPage + 1));
+
+        return true;
+    }
+
+    // ── Activity-log pagination & filter ──────────────────────
+    function getActivityVisibleRows() {
+        return Array.from(getActivityRows()).filter(r => r.dataset.filterVisible !== 'false');
+    }
+
+    function updateActivityDisplay() {
+        const visible  = getActivityVisibleRows();
+        const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
+        getActivityRows().forEach(row => {
+            if (row.dataset.filterVisible === 'false') { row.style.display = 'none'; return; }
+            const idx = visible.indexOf(row);
+            row.style.display = (idx >= startIdx && idx < startIdx + ITEMS_PER_PAGE) ? '' : 'none';
+        });
+    }
+
+    function renderActivityPagination(count) {
+        const built = buildPagination(paginationList, currentPage, Math.ceil(count / ITEMS_PER_PAGE),
+            page => { currentPage = page; updateActivityDisplay(); renderActivityPagination(count); });
+        if (built) {
+            paginationContainer.classList.add('show');
+            paginationContainer.style.display = 'flex';
+        } else {
+            paginationContainer.classList.remove('show');
+            paginationContainer.style.display = 'none';
+        }
+    }
+
+    function applyFilters() {
+        const search = (searchInput?.value || '').trim().toLowerCase();
+        const course = courseFilter?.value || '';
+        const date   = dateFilter?.value   || '';
+        let visible  = 0;
+
+        getActivityRows().forEach(row => {
+            const ok = (!search || row.dataset.id.includes(search) || row.dataset.name.includes(search))
+                    && (!course || row.dataset.course === course)
+                    && (!date   || row.dataset.date   === date);
+            row.dataset.filterVisible = ok ? 'true' : 'false';
+            if (ok) visible++;
+        });
+
+        currentPage = 1;
         const hasFilters = search || course || date;
 
-        if (rows.length > 0) {
+        if (getActivityRows().length > 0) {
             if (visible === 0 && hasFilters) {
-                tableCard.style.display  = 'none';
-                noResults.style.display  = 'block';
-                resultCount.textContent  = '';
+                tableCard.style.display = 'none';
+                noResults.style.display = 'block';
+                resultCount.textContent = '';
+                paginationContainer.classList.remove('show');
+                paginationContainer.style.display = 'none';
             } else {
-                tableCard.style.display  = '';
-                noResults.style.display  = 'none';
-                resultCount.textContent  = hasFilters
-                    ? 'Showing ' + visible + ' of ' + rows.length + ' record' + (rows.length !== 1 ? 's' : '')
+                tableCard.style.display = '';
+                noResults.style.display = 'none';
+                resultCount.textContent = hasFilters
+                    ? `Showing up to ${Math.min(ITEMS_PER_PAGE, visible)} of ${visible} record${visible !== 1 ? 's' : ''}`
                     : '';
+                updateActivityDisplay();
+                renderActivityPagination(visible);
             }
         }
     }
 
-    // Apply on button click
-    applyBtn.addEventListener('click', applyFilters);
+    searchInput?.addEventListener('input',  applyFilters);
+    courseFilter?.addEventListener('change', applyFilters);
+    dateFilter?.addEventListener('change',   applyFilters);
 
-    // Live search while typing
-    searchInput.addEventListener('input', applyFilters);
+    // ── Records pagination & filter ───────────────────────────
+    function getRecordsVisibleRows() {
+        return Array.from(getRecordRows()).filter(r => r.dataset.filterVisible !== 'false');
+    }
 
-    // Export visible rows as CSV
-    exportBtn.addEventListener('click', function () {
-        const headers = ['Student ID', 'Name', 'Course', 'Time In', 'Time Out', 'Status'];
-        const csvRows = [headers.join(',')];
+    function updateRecordsDisplay() {
+        const visible  = getRecordsVisibleRows();
+        const startIdx = (recordsCurrentPage - 1) * ITEMS_PER_PAGE;
+        getRecordRows().forEach(row => {
+            if (row.dataset.filterVisible === 'false') { row.style.display = 'none'; return; }
+            const idx = visible.indexOf(row);
+            row.style.display = (idx >= startIdx && idx < startIdx + ITEMS_PER_PAGE) ? '' : 'none';
+        });
+    }
 
-        rows.forEach(function (row) {
-            if (row.style.display !== 'none') {
-                const cells  = row.querySelectorAll('td');
-                const values = Array.from(cells).map(function (td) {
-                    return '"' + td.innerText.replace(/"/g, '""').trim() + '"';
-                });
-                csvRows.push(values.join(','));
-            }
+    function renderRecordsPagination(count) {
+        const built = buildPagination(recordsPaginationList, recordsCurrentPage,
+            Math.ceil(count / ITEMS_PER_PAGE),
+            page => { recordsCurrentPage = page; updateRecordsDisplay(); renderRecordsPagination(count); });
+        if (built) {
+            recordsPaginationContainer.classList.add('show');
+            recordsPaginationContainer.style.display = 'flex';
+        } else {
+            recordsPaginationContainer.classList.remove('show');
+            recordsPaginationContainer.style.display = 'none';
+        }
+    }
+
+    function applyRecordsFilter() {
+        const val       = (recordsSearch?.value || '').trim().toLowerCase();
+        const courseVal = (recordsCourse?.value || '').toLowerCase();
+        let visible     = 0;
+
+        getRecordRows().forEach(row => {
+            const ok = (row.dataset.name.includes(val) || row.dataset.course.includes(val))
+                    && (!courseVal || row.dataset.course === courseVal);
+            row.dataset.filterVisible = ok ? 'true' : 'false';
+            if (ok) visible++;
         });
 
-        const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
-        const url  = URL.createObjectURL(blob);
-        const a    = document.createElement('a');
-        a.href     = url;
-        a.download = 'student_logs_' + (dateFilter.value || 'all') + '.csv';
-        a.click();
-        URL.revokeObjectURL(url);
+        recordsCurrentPage = 1;
+        const hasFilters   = val || courseVal;
+
+        if (getRecordRows().length > 0) {
+            if (visible === 0 && hasFilters) {
+                recordsTableCard.style.display = 'none';
+                recordsNoResults.style.display = 'block';
+                recordsResultCount.textContent = '';
+                recordsPaginationContainer.classList.remove('show');
+                recordsPaginationContainer.style.display = 'none';
+            } else {
+                recordsTableCard.style.display = '';
+                recordsNoResults.style.display = 'none';
+                recordsResultCount.textContent = hasFilters
+                    ? `Showing up to ${Math.min(ITEMS_PER_PAGE, visible)} of ${visible} record${visible !== 1 ? 's' : ''}`
+                    : '';
+                updateRecordsDisplay();
+                renderRecordsPagination(visible);
+            }
+        }
+    }
+
+    recordsSearch?.addEventListener('input',  applyRecordsFilter);
+    recordsCourse?.addEventListener('change', applyRecordsFilter);
+
+    // ── Edit / View overlay ────────────────────────────────────
+    function showEditCard(row, mode = 'edit') {
+    currentEditRow = row;
+
+    const idInput     = document.getElementById('editStudentId');
+    const nameInput   = document.getElementById('editStudentName');
+    const courseSel   = document.getElementById('editCourseId');
+
+    idInput.value   = row.dataset.id || '';
+    nameInput.value = row.querySelector('td:nth-child(2)')?.textContent.trim() || '';
+
+    // Match current course value in the dropdown (case-insensitive)
+    const currentCourse = (row.dataset.course || row.querySelector('td:nth-child(3)')?.textContent.trim() || '').toUpperCase();
+    Array.from(courseSel.options).forEach(opt => {
+        opt.selected = opt.value.toUpperCase() === currentCourse;
     });
-})();
+
+    const title  = document.querySelector('#studentEditCard h5');
+    const desc   = document.querySelector('#studentEditCard p');
+    const isView = mode === 'view';
+
+    title.textContent = isView ? 'View Student Details' : 'Edit Student Record';
+    desc.textContent  = isView
+        ? 'Read-only view of the activity log details.'
+        : 'Update the current student details and save the changes.';
+
+    // Student ID is ALWAYS read-only regardless of mode
+    idInput.readOnly = true;
+
+    // Name and course editable only in edit mode
+    nameInput.readOnly    = isView;
+    courseSel.disabled    = isView;
+
+    saveStudentEdit.style.display = isView ? 'none' : 'block';
+
+    editOverlay.classList.remove('d-none');
+    document.getElementById('studentEditCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+    function hideEditCard() {
+        currentEditRow = null;
+        editOverlay.classList.add('d-none');
+        [editStudentId, editStudentName, editCourseId].forEach(i => i.value = '');
+    }
+
+    saveStudentEdit.addEventListener('click', async () => {
+        if (!currentEditRow) return;
+        const newId     = editStudentId.value.trim();
+        const newName   = editStudentName.value.trim();
+        const newCourse = document.getElementById('editCourseId').value;
+        if (!newId || !newName || !newCourse) { showToast('Missing fields', 'warning', 'Please fill in all fields before updating.'); return; }
+
+        saveStudentEdit.disabled     = true;
+        saveStudentEdit.textContent  = 'Saving…';
+
+        try {
+            const res    = await fetch('/update_student', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ student_id: newId, student_name: newName, course_id: newCourse, status: 'OUTSIDE' })
+            });
+            const result = await res.json();
+
+            if (result.success) {
+                // Update the row in the DOM
+                currentEditRow.dataset.id     = newId;
+                currentEditRow.dataset.name   = newName.toLowerCase();
+                currentEditRow.dataset.course = newCourse.toLowerCase();
+                currentEditRow.querySelector('td:nth-child(1)').textContent = newId;
+                currentEditRow.querySelector('td:nth-child(2)').textContent = newName.toUpperCase();
+                currentEditRow.querySelector('td:nth-child(3)').textContent = newCourse;
+                hideEditCard();
+                showToast('Record updated.', 'success', `${newName.toUpperCase()} has been updated.`);
+            } else {
+                showToast('Update failed.', 'danger', result.error || 'Could not update student.');
+            }
+        } catch (err) {
+            console.error(err);
+            showToast('Server error', 'danger', 'Could not reach the server. Please try again.');
+        } finally {
+            saveStudentEdit.disabled    = false;
+            saveStudentEdit.textContent = 'Update';
+        }
+    });
+
+    cancelEdit.addEventListener('click', hideEditCard);
+    editOverlay.addEventListener('click', e => { if (e.target === editOverlay) hideEditCard(); });
+
+    // ── Row actions via event delegation (no duplicate listeners) ─
+    function setupRowDelegation() {
+        // Activity tbody — view / delete
+        const activityTbody = document.getElementById('studentTableBody');
+        if (activityTbody) {
+            activityTbody.addEventListener('click', function (e) {
+                const btn = e.target.closest('button');
+                if (!btn) return;
+                const row = btn.closest('tr');
+                if (!row) return;
+
+                if (btn.classList.contains('view-student')) {
+                    showEditCard(row, 'view');
+                } else if (btn.classList.contains('delete-student')) {
+                    handleDeleteStudent(row);
+                }
+            });
+        }
+
+        // Records tbody — edit / delete
+        const recordsTbody = document.getElementById('recordsTableBody');
+        if (recordsTbody) {
+            recordsTbody.addEventListener('click', function (e) {
+                const btn = e.target.closest('button');
+                if (!btn) return;
+                const row = btn.closest('tr');
+                if (!row) return;
+
+                if (btn.classList.contains('edit-student-record')) {
+                    showEditCard(row, 'edit');
+                } else if (btn.classList.contains('delete-student-record')) {
+                    handleDeleteStudent(row);
+                }
+            });
+        }
+    }
+
+    async function handleDeleteStudent(row) {
+        const name      = row.querySelector('td:nth-child(2)')?.textContent.trim() || 'this student';
+        const studentId = row.dataset.id;
+
+        // Custom confirm dialog instead of native confirm()
+        const confirmed = await showConfirm(`Delete "${name}"?`, 'This will permanently remove the student from all records.');
+        if (!confirmed) return;
+
+        try {
+            const res    = await fetch('/delete_student', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ student_id: studentId })
+            });
+            const result = await res.json();
+            if (result.success) {
+                if (currentEditRow === row) hideEditCard();
+                row.remove();
+                applyFilters();
+                applyRecordsFilter();
+                showToast('Student removed.', 'danger', `${name} has been deleted from records.`);
+            } else {
+                showToast('Delete failed.', 'danger', result.error || 'Could not delete student.');
+            }
+        } catch (err) {
+            console.error(err);
+            showToast('Server error', 'danger', 'Could not reach the server. Please try again.');
+        }
+    }
+
+    // ── Init ───────────────────────────────────────────────────
+    loadCourseFilters();
+    loadManualCourses();
+    setupRowDelegation();   // single-time delegation setup, covers all current & future rows
+
+    setTimeout(() => {
+        applyFilters();
+        applyRecordsFilter();
+    }, 50);
+});
 </script>
 {% endblock %}

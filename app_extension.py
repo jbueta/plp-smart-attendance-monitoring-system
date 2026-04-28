@@ -83,8 +83,8 @@ def user_authenticate():
     try:
         print("Authenticating...")
         data = request.get_json()
-
         print(data)
+
         if not data or not data.get('id'):
             return jsonify({"error": "ID is required. No ID string attached"}), 400
         
@@ -132,11 +132,11 @@ def user_authenticate():
         # ==========================================
         # SMTP: EMAILING MODULE FOR VIOLATION (optional)
         # ==========================================
-
         if violation:
             # Code goes through here
             pass            
 
+        # 4. INSERT LOG
         log_params = (user_id, formatted_time, log_type, gate)
         db_insert_log = Database(conn, log_params)
         
@@ -246,13 +246,16 @@ def add_events():
 
 
 # ==========================================
-# ENDPOINT 1: The Daily Instance Generator (Triggered by Cron at 00:00)
-# ==========================================
+# ENDPOINT 1: The Weekly Instance Generator (Triggered by Cron Every Sunday)
+
 @app.route("/admin/generate-daily-instances", methods=["POST"])
 def generate_daily_instances():
     """
-    Triggered every midnight by a cron job or cloud scheduler.
-    Preps the database for the current day's events.
+    Triggered every Sunday at midnight by a cron job or cloud scheduler.
+    Generates instances for the upcoming 7 days including:
+    - WEEKLY events for their scheduled days
+    - DAILY events for every day
+    - ONCE events on their scheduled date
     """
     conn = None
     try:
@@ -261,26 +264,50 @@ def generate_daily_instances():
             return jsonify({"success": False, "message": "Database offline"}), 500
 
         today = date.today()
-        day_name = today.strftime("%A") 
-
-        database = Database(conn, (day_name,))
-        events = database.check_events()
-
-        if not events:
-            return jsonify({"success": True, "message": f"No events scheduled for {today}"}), 200
+        upcoming_week = [today + timedelta(days=i) for i in range(7)]
         
-        for event in events:
-            event_id = event['event_id']
-            event_start_date = event['event_date'] 
+        created_count = 0
+        failed_count = 0
 
-            if today >= event_start_date:
-                new_db = Database(conn, (event_id, today))
+        for target_date in upcoming_week:
+            day_name = target_date.strftime("%A")
+            
+            cursor = conn.cursor(dictionary=True)
+            
+            # Get all active events matching this day
+            # WEEKLY events: match day name and event_date <= target_date
+            # DAILY events: all active daily events
+            # ONCE events: event_date == target_date
+            query = """
+                SELECT event_id, event_name, frequency, event_date
+                FROM events
+                WHERE active = 1 AND (
+                    (frequency = 'WEEKLY' AND day = %s AND event_date <= %s) OR
+                    (frequency = 'DAILY' AND event_date <= %s) OR
+                    (frequency = 'ONCE' AND event_date = %s)
+                )
+            """
+            cursor.execute(query, (day_name, target_date, target_date, target_date))
+            events = cursor.fetchall()
+            
+            for event in events:
+                event_id = event['event_id']
+                new_db = Database(conn, (event_id, target_date))
                 instance_result = new_db.add_event_instances()
-
-                if instance_result.get('success') == False:
-                    print(f"Failed to add instance for Event {event_id}: {instance_result['message']}")
+                
+                if instance_result.get('success'):
+                    created_count += 1
+                else:
+                    failed_count += 1
+                    print(f"Failed to add instance for Event {event_id} on {target_date}: {instance_result.get('message')}")
         
-        return jsonify({"success": True, "message": f"Daily instances generated for {today}"}), 200
+        return jsonify({
+            "success": True,
+            "message": f"Daily instances generated for the upcoming week",
+            "created": created_count,
+            "failed": failed_count,
+            "date_range": f"{today} to {upcoming_week[-1]}"
+        }), 200
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -511,6 +538,28 @@ def kiosk_live_events():
         return jsonify({"success": False, "message": str(e)}), 500
     
 
+@app.route("/api/reports/all-events", methods=["GET"])
+def reports_all_events():
+    """
+        Fetches all scheduled events for reports dropdown (Detailed Report Type).
+        Returns all events regardless of date or active status.
+    """
+    conn = None
+    try:
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "message": "Database offline"}), 500
+
+        events = Database.get_all_events_for_reports(conn)
+        
+        if events is None:
+            return jsonify({"success": False, "message": "Error fetching scheduled events"}), 500
+            
+        return jsonify({"success": True, "events": events}), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+    
 
 @app.route("/admin/dashboard/events", methods=["GET"])
 def admin_dashboard_events():
@@ -575,6 +624,33 @@ def live_departments():
             return jsonify({"success": False, "message": "Error fetching departments"}), 500
 
         return jsonify({"success": True, "departments": depts}), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/admin/departments", methods=["GET"])
+def get_all_departments():
+    """
+    Fetches all departments from the departments table for filtering.
+    Returns: [{"id": 1, "name": "College of Electrical Engineering"}, ...]
+    """
+    conn = None
+    try:
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "message": "Database offline"}), 500
+
+        cursor = conn.cursor(dictionary=True)
+        query = "SELECT department_id as id, department_name as name FROM departments ORDER BY department_name ASC"
+        cursor.execute(query)
+        departments = cursor.fetchall()
+        cursor.close()
+
+        return jsonify({
+            "success": True,
+            "departments": departments
+        }), 200
 
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500

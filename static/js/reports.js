@@ -92,6 +92,13 @@ let reportMapping = {
     ]
 };
 
+function formatReportDate(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString + 'T00:00:00');
+    const options = { year: 'numeric', month: 'short', day: 'numeric' };
+    return date.toLocaleDateString('en-US', options);
+}
+
 function fetch_events() {
     fetch('http://127.0.0.1:5000/api/retrieve/events')
         .then(response => response.json())
@@ -100,17 +107,22 @@ function fetch_events() {
             reportMapping.event = []; 
 
             data.forEach(event => {
+                let eventName = event.name;
+                if (!event.active) {
+                    const formattedDate = formatReportDate(event.date);
+                    eventName = event.name + ' (Deleted - ' + formattedDate + ')';
+                }
                 if (event.frequency.toLowerCase() == 'once') {
                     reportMapping.event.push({
                         value: event.event_id.toString(),
-                        text: event.name,
+                        text: eventName,
                         constraint: 'once',
                         date: event.date // Make sure this is in YYYY-MM-DD format from backend
                     });
                 } else {
                     reportMapping.event.push({
                         value: event.event_id.toString(),
-                        text: event.name
+                        text: eventName
                     });
                 }
             });
