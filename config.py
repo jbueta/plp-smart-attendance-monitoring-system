@@ -20,6 +20,7 @@ class Config:
     STATIC_FOLDER = os.path.join(os.path.dirname(__file__), 'static')
     STATIC_URL_PATH = '/static'
     TEMPLATE_FOLDER = os.path.join(os.path.dirname(__file__), 'templates')
+    ALLOWED_ORIGINS = os.getenv('ALLOWED_ORIGINS', 'http://127.0.0.1:5000,http://localhost:5000').split(',')
     
     # Content Security Policy (allows static files)
     TALISMAN_CSP = {

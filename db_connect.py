@@ -1784,6 +1784,7 @@ class Database:
                 FROM event_instances ei
                 JOIN events e ON ei.event_id = e.event_id
                 WHERE ei.event_date <= CURDATE()
+                  AND e.active = 1
                 ORDER BY ei.event_date DESC, ei.instance_id DESC
                 LIMIT 20
                 """
@@ -1801,9 +1802,12 @@ class Database:
                     """
                     SELECT MAX(ea.instance_id) AS latest_instance, MAX(ea.event_date) as latest_date
                     FROM event_attendance ea
+                    JOIN event_instances ei ON ea.instance_id = ei.instance_id
+                    JOIN events e ON ei.event_id = e.event_id
                     JOIN employees emp ON ea.user_id = emp.user_id
                     JOIN users u ON emp.user_id = u.user_id
                     WHERE u.active = 1
+                      AND e.active = 1
                     """
                 )
                 latest_row = cursor.fetchone()
