@@ -8,6 +8,8 @@ import uuid
 
 from app_tasks import fetch_report_data     #reports generator
 from extensions import cache
+from database import connect_db
+from db_connect import Database
 
 app = Flask(__name__)
 app.secret_key = 'plp_secure_key_2026'  # Required for session management
@@ -132,6 +134,19 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def get_active_visitors():
+    conn = connect_db()
+    if conn:
+        try:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("SELECT visitor_id AS id, visitor_name AS name, purpose, status FROM visitors WHERE status = 'Inside'")
+            return cursor.fetchall()
+        except Exception:
+            pass
+        finally:
+            if 'cursor' in locals(): cursor.close()
+    return []
+
 # ==============================================================================
 # AUTHENTICATION ROUTES
 # ==============================================================================
@@ -179,7 +194,7 @@ def index():
 @app.route('/kiosk/entrance')
 def kiosk_entrance():
     session.pop('logged_in', None)
-    active_visitors = [v for v in VISITORS if v['status'] == 'Checked In']
+    active_visitors = get_active_visitors()
     logs = helper_kiosk_live_student_logs()
     return render_template('kiosk_entrance.html', active_visitors=active_visitors, kiosk_data=logs)
 
@@ -208,7 +223,7 @@ def kiosk_employee():
 @app.route('/kiosk/visitor')
 def kiosk_visitor():
     session.pop('logged_in', None)
-    active_visitors = [v for v in VISITORS if v['status'] == 'Checked In']
+    active_visitors = get_active_visitors()
     return render_template('kiosk_visitor.html', active_visitors=active_visitors)
 
 # ==============================================================================
@@ -223,36 +238,59 @@ def visitor_checkin():
     source = request.form.get('source')
     
     if name and purpose:
-        new_id = len(VISITORS) + 1
-        now = datetime.now()
-        
-        VISITORS.append({
-            'id': new_id,
-            'name': name,
-            'purpose': purpose,
-            'details': details or 'N/A',
-            'time_in': now.strftime('%I:%M %p'),
-            'date': now.strftime('%Y-%m-%d'),
-            'time_out': None,
-            'status': 'Checked In'
-        })
-        flash(f'Welcome, {name}. Check-in successful.', 'success')
+        conn = connect_db()
+        if conn:
+            cursor = None
+            try:
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO users (role, active) VALUES ('visitor', 1)")
+                user_id = cursor.lastrowid
+                import uuid
+                visitor_id = f"V-{str(uuid.uuid4())[:6].upper()}"
+                cursor.execute(
+                    "INSERT INTO visitors (user_id, visitor_id, visitor_name, purpose, details, status) VALUES (%s, %s, %s, %s, %s, 'Inside')",
+                    (user_id, visitor_id, name, purpose, details)
+                )
+                cursor.execute("INSERT INTO general_log (user_id, timestamp, log_type, gate) VALUES (%s, NOW(), 'Entry', 'Gate 1')", (user_id,))
+                conn.commit()
+                flash(f'Welcome, {name}. Check-in successful.', 'success')
+            except Exception as e:
+                if conn: conn.rollback()
+                flash(f'Check-in failed. Error: {str(e)}', 'danger')
+            finally:
+                if cursor: cursor.close()
+        else:
+            flash('Check-in failed. Database offline.', 'danger')
     else:
         flash('Check-in failed. Name and Purpose are required.', 'danger')
         
     return redirect(url_for(source if source else 'kiosk_entrance'))
 
-@app.route('/api/visitor/checkout/<int:visitor_id>', methods=['POST'])
+@app.route('/api/visitor/checkout/<string:visitor_id>', methods=['POST'])
 def visitor_checkout(visitor_id):
-    visitor = next((v for v in VISITORS if v['id'] == visitor_id), None)
     source = request.args.get('source', 'kiosk_entrance')
-    
-    if visitor:
-        visitor['status'] = 'Checked Out'
-        visitor['time_out'] = datetime.now().strftime('%I:%M %p')
-        flash(f'Goodbye, {visitor["name"]}. Check-out successful.', 'success')
+    conn = connect_db()
+    if conn:
+        cursor = None
+        try:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("SELECT u.user_id, v.visitor_name FROM visitors v JOIN users u ON v.user_id = u.user_id WHERE v.visitor_id = %s", (visitor_id,))
+            visitor = cursor.fetchone()
+            if visitor:
+                user_id = visitor['user_id']
+                cursor.execute("UPDATE visitors SET status = 'Outside' WHERE user_id = %s", (user_id,))
+                cursor.execute("INSERT INTO general_log (user_id, timestamp, log_type, gate) VALUES (%s, NOW(), 'Exit', 'Gate 1')", (user_id,))
+                conn.commit()
+                flash(f'Goodbye, {visitor["visitor_name"]}. Check-out successful.', 'success')
+            else:
+                flash('Visitor not found.', 'danger')
+        except Exception as e:
+            if conn: conn.rollback()
+            flash(f'Check-out failed. Error: {str(e)}', 'danger')
+        finally:
+            if cursor: cursor.close()
     else:
-        flash('Visitor not found.', 'danger')
+        flash('Check-out failed. Database offline.', 'danger')
         
     return redirect(url_for(source))
 
@@ -286,17 +324,29 @@ def manage_events():
 @app.route('/admin/students')
 @login_required
 def admin_students():
-    return render_template('student_logs.html', logs=MOCK_STUDENT_LOGS)
+    conn = connect_db()
+    db_students = []
+    if conn:
+        db_students = Database.get_student_logs_full(conn)
+    return render_template('student_logs.html', logs=db_students)
 
 @app.route('/admin/employees')
 @login_required
 def admin_employees():
-    return render_template('employee_logs.html', logs=MOCK_EMPLOYEE_LOGS)
+    conn = connect_db()
+    db_employees = []
+    if conn:
+        db_employees = Database.get_employee_logs_full(conn)
+    return render_template('employee_logs.html', logs=db_employees)
 
 @app.route('/admin/visitors')
 @login_required
 def admin_visitors():
-    return render_template('admin_visitors.html', visitors=VISITORS)
+    conn = connect_db()
+    visitors_data = []
+    if conn:
+        visitors_data = Database.get_visitor_logs(conn)
+    return render_template('admin_visitors.html', visitors=visitors_data)
 
 @app.route('/analytics/employee')
 @login_required
@@ -460,6 +510,184 @@ def bulk_delete_events():
 def update_profile():
     flash('Admin profile updated successfully.', 'success')
     return redirect(url_for('dashboard'))
+
+@app.route('/add_student', methods=['POST'])
+@login_required
+def add_student():
+    data = request.get_json(silent=True) or {}
+    student_id = (data.get("id") or "").strip()
+    name = (data.get("name") or "").strip()
+    course = (data.get("course") or "").strip()
+
+    if not student_id or not name or not course:
+        return jsonify({"success": False, "error": "Missing required fields."}), 400
+
+    conn = connect_db()
+    if not conn:
+        return jsonify({"success": False, "error": "Database offline"}), 500
+
+    cursor = None
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT course_id FROM courses WHERE course_name = %s", (course,))
+        res = cursor.fetchone()
+        if res:
+            course_id = res['course_id']
+        else:
+            cursor.execute("INSERT INTO courses (course_name) VALUES (%s)", (course,))
+            course_id = cursor.lastrowid
+            
+        cursor.execute("INSERT INTO users (role, active) VALUES ('student', 1)")
+        user_id = cursor.lastrowid
+
+        cursor.execute(
+            "INSERT INTO students (user_id, student_id, student_name, course_id, status) VALUES (%s, %s, %s, %s, 'Outside')",
+            (user_id, student_id, name, course_id)
+        )
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as err:
+        if conn: conn.rollback()
+        return jsonify({"success": False, "error": str(err)}), 500
+    finally:
+        if cursor: cursor.close()
+
+@app.route('/add_employee', methods=['POST'])
+@login_required
+def add_employee():
+    data = request.get_json(silent=True) or {}
+    emp_id = (data.get("id") or "").strip()
+    name = (data.get("name") or "").strip()
+    dept = (data.get("department") or "").strip()
+    position = (data.get("position") or "").strip()
+
+    if not emp_id or not name or not dept:
+        return jsonify({"success": False, "error": "Missing required fields."}), 400
+
+    conn = connect_db()
+    if not conn:
+        return jsonify({"success": False, "error": "Database offline"}), 500
+
+    cursor = None
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT department_id FROM departments WHERE department_name = %s", (dept,))
+        res = cursor.fetchone()
+        if res:
+            dept_id = res['department_id']
+        else:
+            cursor.execute("INSERT INTO departments (department_name) VALUES (%s)", (dept,))
+            dept_id = cursor.lastrowid
+            
+        cursor.execute("INSERT INTO users (role, active) VALUES ('employee', 1)")
+        user_id = cursor.lastrowid
+
+        cursor.execute(
+            "INSERT INTO employees (user_id, employee_id, employee_name, department_id, position, status) VALUES (%s, %s, %s, %s, %s, 'Outside')",
+            (user_id, emp_id, name, dept_id, position)
+        )
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as err:
+        if conn: conn.rollback()
+        return jsonify({"success": False, "error": str(err)}), 500
+    finally:
+        if cursor: cursor.close()
+
+@app.route('/add_visitor', methods=['POST'])
+@login_required
+def add_visitor():
+    data = request.get_json(silent=True) or {}
+    visitor_id = (data.get("id") or "").strip()
+    visitor_name = (data.get("name") or "").strip()
+    purpose = (data.get("purpose") or "").strip()
+    details = (data.get("details") or "").strip()
+
+    if not visitor_id or not visitor_name or not purpose:
+        return jsonify({"success": False, "error": "Missing required fields."}), 400
+
+    conn = connect_db()
+    if not conn:
+        return jsonify({"success": False, "error": "Database offline"}), 500
+
+    cursor = None
+    try:
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO users (role, active) VALUES ('visitor', 1)")
+        user_id = cursor.lastrowid
+
+        cursor.execute(
+            "INSERT INTO visitors (user_id, visitor_id, visitor_name, purpose, details, status) VALUES (%s, %s, %s, %s, %s, 'Outside')",
+            (user_id, visitor_id, visitor_name, purpose, details)
+        )
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as err:
+        if conn: conn.rollback()
+        return jsonify({"success": False, "error": str(err)}), 500
+    finally:
+        if cursor: cursor.close()
+
+@app.route('/update_student', methods=['POST'])
+@login_required
+def update_student():
+    data = request.get_json(silent=True) or {}
+    student_id = (data.get("student_id") or "").strip()
+    student_name = (data.get("student_name") or "").strip()
+    course = (data.get("course") or "").strip()
+
+    if not student_id or not student_name or not course:
+        return jsonify({"success": False, "error": "All fields are required."}), 400
+
+    conn = connect_db()
+    if conn is None:
+        return jsonify({"success": False, "error": "Database connection failed"}), 500
+
+    cursor = None
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE students SET student_name = %s, course = %s WHERE student_id = %s",
+            (student_name, course, student_id)
+        )
+        conn.commit()
+        if cursor.rowcount == 0:
+            return jsonify({"success": False, "error": "Student not found."}), 404
+        return jsonify({"success": True})
+    except Exception as err:
+        if conn: conn.rollback()
+        return jsonify({"success": False, "error": str(err)}), 500
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+@app.route('/delete_student', methods=['POST'])
+@login_required
+def delete_student():
+    data = request.get_json(silent=True) or {}
+    student_id = (data.get("student_id") or "").strip()
+
+    if not student_id:
+        return jsonify({"success": False, "error": "Missing student_id."}), 400
+
+    conn = connect_db()
+    if conn is None:
+        return jsonify({"success": False, "error": "Database connection failed"}), 500
+
+    cursor = None
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM students WHERE student_id = %s", (student_id,))
+        conn.commit()
+        if cursor.rowcount == 0:
+            return jsonify({"success": False, "error": "Student not found."}), 404
+        return jsonify({"success": True})
+    except Exception as err:
+        if conn: conn.rollback()
+        return jsonify({"success": False, "error": str(err)}), 500
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
 
 # ==============================================================================
 # STUDENT API (MOCK)

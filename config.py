@@ -20,6 +20,7 @@ class Config:
     STATIC_FOLDER = os.path.join(os.path.dirname(__file__), 'static')
     STATIC_URL_PATH = '/static'
     TEMPLATE_FOLDER = os.path.join(os.path.dirname(__file__), 'templates')
+    TEMPLATES_AUTO_RELOAD = True
     
     # Content Security Policy (allows static files)
     TALISMAN_CSP = {

@@ -1105,6 +1105,97 @@ class Database:
                 cursor.close()
 
     @staticmethod
+    def get_visitor_logs(conn):
+        try:
+            cursor = conn.cursor(dictionary=True)
+            query = """
+                SELECT 
+                    v.visitor_id AS id,
+                    v.visitor_name AS name,
+                    v.purpose AS purpose,
+                    COALESCE(v.details, 'N/A') AS details,
+                    DATE_FORMAT(COALESCE(MAX(gl.timestamp), v.visitor_last_updated), '%Y-%m-%d') AS date,
+                    TIME_FORMAT(MIN(CASE WHEN gl.log_type = 'Entry' AND DATE(gl.timestamp) = CURDATE() THEN gl.timestamp END), '%h:%i %p') AS time_in,
+                    TIME_FORMAT(MAX(CASE WHEN gl.log_type = 'Exit' AND DATE(gl.timestamp) = CURDATE() THEN gl.timestamp END), '%h:%i %p') AS time_out,
+                    IF(v.status = 'Inside', 'Checked In', 'Checked Out') AS status
+                FROM visitors v
+                JOIN users u ON v.user_id = u.user_id
+                LEFT JOIN general_log gl ON u.user_id = gl.user_id
+                GROUP BY v.visitor_id, v.visitor_name, v.purpose, v.details, v.status, v.visitor_last_updated
+                ORDER BY v.visitor_id DESC
+            """
+            cursor.execute(query)
+            return cursor.fetchall()
+        except Exception as err:
+            print(f"Error fetching visitor logs: {err}")
+            return []
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+
+    @staticmethod
+    def get_student_logs_full(conn):
+        try:
+            cursor = conn.cursor(dictionary=True)
+            query = """
+                SELECT 
+                    s.student_id AS id,
+                    s.student_name AS name,
+                    c.course_name AS course,
+                    DATE_FORMAT(COALESCE(MAX(gl.timestamp), s.stud_last_updated), '%Y-%m-%d') AS date,
+                    TIME_FORMAT(MIN(CASE WHEN gl.log_type = 'Entry' AND DATE(gl.timestamp) = CURDATE() THEN gl.timestamp END), '%h:%i %p') AS time_in,
+                    TIME_FORMAT(MAX(CASE WHEN gl.log_type = 'Exit' AND DATE(gl.timestamp) = CURDATE() THEN gl.timestamp END), '%h:%i %p') AS time_out,
+                    IF(s.status = 'Inside', 'Inside', 'Out') AS status,
+                    IF(s.status = 'Inside', 'success', 'secondary') AS status_class
+                FROM students s
+                JOIN users u ON s.user_id = u.user_id
+                LEFT JOIN courses c ON s.course_id = c.course_id
+                LEFT JOIN general_log gl ON u.user_id = gl.user_id
+                GROUP BY s.student_id, s.student_name, c.course_name, s.status, s.stud_last_updated
+                ORDER BY s.student_name ASC
+            """
+            cursor.execute(query)
+            return cursor.fetchall()
+        except Exception as err:
+            print(f"Error fetching student logs: {err}")
+            return []
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+
+    @staticmethod
+    def get_employee_logs_full(conn):
+        try:
+            cursor = conn.cursor(dictionary=True)
+            query = """
+                SELECT 
+                    e.employee_id AS id,
+                    e.employee_name AS name,
+                    LEFT(e.employee_name, 2) AS initials,
+                    d.department_name AS dept,
+                    e.position AS position,
+                    DATE_FORMAT(COALESCE(MAX(gl.timestamp), e.emp_last_updated), '%Y-%m-%d') AS date,
+                    TIME_FORMAT(MIN(CASE WHEN gl.log_type = 'Entry' AND DATE(gl.timestamp) = CURDATE() THEN gl.timestamp END), '%h:%i %p') AS `in`,
+                    TIME_FORMAT(MAX(CASE WHEN gl.log_type = 'Exit' AND DATE(gl.timestamp) = CURDATE() THEN gl.timestamp END), '%h:%i %p') AS `out`,
+                    IF(e.status = 'Inside', 'Inside', 'Out') AS status,
+                    IF(e.status = 'Inside', 'success', 'secondary') AS status_class
+                FROM employees e
+                JOIN users u ON e.user_id = u.user_id
+                LEFT JOIN departments d ON e.department_id = d.department_id
+                LEFT JOIN general_log gl ON u.user_id = gl.user_id
+                GROUP BY e.employee_id, e.employee_name, d.department_name, e.position, e.status, e.emp_last_updated
+                ORDER BY e.employee_name ASC
+            """
+            cursor.execute(query)
+            return cursor.fetchall()
+        except Exception as err:
+            print(f"Error fetching employee logs: {err}")
+            return []
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+
+    @staticmethod
     def get_event_instances(conn, event_id):
         try:
             cursor = conn.cursor(dictionary=True)
