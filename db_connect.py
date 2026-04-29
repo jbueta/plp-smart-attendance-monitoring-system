@@ -1,8 +1,19 @@
-from database import connect_db
+from database import connect_db, release_db_connection
 from datetime import date, datetime, timedelta
 
 import mysql.connector as connector
 from werkzeug.security import check_password_hash
+
+from utils.employee_schema import (
+    EMPLOYEE_CREATE_LOCK_NAME,
+    build_employee_signature,
+    department_lookup_key,
+    normalize_department_name,
+    normalize_employee_name,
+    normalize_position,
+    validate_department_name,
+    validate_employee_fields,
+)
 
 
 VISITOR_PURPOSES = (
@@ -1154,8 +1165,10 @@ class Database:
                     ea.attendance_id,
                     e.employee_id,
                     COALESCE(NULLIF(TRIM(e.employee_name), ''), 'Unknown Employee') AS employee_name,
+                    e.department_id,
                     COALESCE(NULLIF(TRIM(d.department_name), ''), 'N/A') AS department_name,
-                    COALESCE(NULLIF(TRIM(e.position), ''), 'N/A') AS position,
+                    COALESCE(NULLIF(TRIM(e.position), ''), '') AS position_value,
+                    COALESCE(NULLIF(TRIM(e.position), ''), 'N/A') AS position_display,
                     COALESCE(NULLIF(TRIM(ev.event_name), ''), 'N/A') AS event_name,
                     ei.event_date,
                     ea.first_in,
@@ -1191,8 +1204,10 @@ class Database:
                         "id": row["employee_id"],
                         "initials": initials,
                         "name": name,
+                        "department_id": row["department_id"],
                         "dept": row["department_name"],
-                        "position": row["position"],
+                        "position": row["position_value"],
+                        "position_display": row["position_display"],
                         "event_name": row["event_name"],
                         "date": row["event_date"].isoformat() if row.get("event_date") else "",
                         "date_formatted": row["event_date"].strftime("%b %d, %Y") if row.get("event_date") else "",
@@ -1219,8 +1234,10 @@ class Database:
                 SELECT
                     e.employee_id,
                     COALESCE(NULLIF(TRIM(e.employee_name), ''), 'Unknown Employee') AS employee_name,
+                    e.department_id,
                     COALESCE(NULLIF(TRIM(d.department_name), ''), 'N/A') AS department_name,
-                    COALESCE(NULLIF(TRIM(e.position), ''), 'N/A') AS position,
+                    COALESCE(NULLIF(TRIM(e.position), ''), '') AS position_value,
+                    COALESCE(NULLIF(TRIM(e.position), ''), 'N/A') AS position_display,
                     COALESCE(u.active, 1) AS is_active
                 FROM employees e
                 JOIN users u ON e.user_id = u.user_id
@@ -1237,8 +1254,10 @@ class Database:
                     {
                         "id": row["employee_id"],
                         "name": row["employee_name"],
+                        "department_id": row["department_id"],
                         "dept": row["department_name"],
-                        "position": row["position"],
+                        "position": row["position_value"],
+                        "position_display": row["position_display"],
                         "status": "Active" if is_active else "Inactive",
                         "status_class": "success" if is_active else "secondary",
                     }
@@ -2020,21 +2039,20 @@ class Database:
 
 
 class EmployeeModel:
-    def add_employee(self, employee_name, department_id, position):
-        conn = connect_db()
-        if conn is None:
-            return {"success": False, "error": "Database connection failed"}
+    def _acquire_create_lock(self, cursor):
+        cursor.execute("SELECT GET_LOCK(%s, %s)", (EMPLOYEE_CREATE_LOCK_NAME, 10))
+        result = cursor.fetchone()
+        return bool(result and result[0] == 1)
 
-        cursor = None
+    def _release_create_lock(self, cursor):
         try:
-            employee_name = str(employee_name or "").strip()
-            department_id = str(department_id or "").strip()
-            position = str(position or "").strip()
+            cursor.execute("SELECT RELEASE_LOCK(%s)", (EMPLOYEE_CREATE_LOCK_NAME,))
+            cursor.fetchone()
+        except connector.Error:
+            pass
 
-            if not employee_name or not department_id or not position:
-                return {"success": False, "error": "All employee fields are required."}
-
-            cursor = conn.cursor()
+    def _resolve_department_id(self, cursor, department_id=None, department_name=None):
+        if department_id is not None and str(department_id).strip():
             cursor.execute(
                 """
                 SELECT department_id
@@ -2042,114 +2060,149 @@ class EmployeeModel:
                 WHERE department_id = %s
                 LIMIT 1
                 """,
-                (department_id,),
+                (str(department_id).strip(),),
             )
             department = cursor.fetchone()
             if not department:
-                return {"success": False, "error": "Selected department does not exist."}
+                return None, "Selected department does not exist."
+            return int(department[0]), None
 
-            cursor.execute(
-                """
-                SELECT employee_id
-                FROM employees
-                WHERE UPPER(TRIM(employee_name)) = UPPER(TRIM(%s))
-                  AND department_id = %s
-                  AND UPPER(TRIM(COALESCE(position, ''))) = UPPER(TRIM(%s))
-                LIMIT 1
-                """,
-                (employee_name, department_id, position),
-            )
-            existing_employee = cursor.fetchone()
-            if existing_employee:
-                return {
-                    "success": False,
-                    "error": f"Employee already exists with ID {existing_employee[0]}",
-                }
+        normalized_department_name = normalize_department_name(department_name)
+        if not normalized_department_name:
+            return None, "Department is required."
 
-            cursor.execute(
-                """
-                INSERT INTO users (role, active)
-                VALUES (%s, %s)
-                """,
-                ("employee", 1),
-            )
-            user_id = cursor.lastrowid
+        department_length_errors = validate_department_name(normalized_department_name)
+        if department_length_errors:
+            return None, department_length_errors[0]
 
-            cursor.execute(
-                """
-                INSERT INTO employees
-                    (user_id, employee_name, department_id, position, status)
-                VALUES (%s, %s, %s, %s, %s)
-                """,
-                (user_id, employee_name, department_id, position, "Outside"),
-            )
+        cursor.execute(
+            """
+            SELECT department_id
+            FROM departments
+            WHERE UPPER(TRIM(department_name)) = %s
+            ORDER BY department_id ASC
+            """,
+            (department_lookup_key(normalized_department_name),),
+        )
+        matches = cursor.fetchall()
+        if not matches:
+            return None, f"Department not found: {normalized_department_name}"
+        if len(matches) > 1:
+            return None, f"Department is ambiguous: {normalized_department_name}"
 
-            cursor.execute(
-                """
-                SELECT employee_id
-                FROM employees
-                WHERE user_id = %s
-                LIMIT 1
-                """,
-                (user_id,),
-            )
-            created_employee = cursor.fetchone()
-            conn.commit()
-            return {
-                "success": True,
-                "employee_id": created_employee[0] if created_employee else None,
-            }
-        except Exception as err:
-            conn.rollback()
-            return {"success": False, "error": str(err)}
-        finally:
-            if cursor:
-                cursor.close()
-            conn.close()
+        return int(matches[0][0]), None
 
-    def add_employee_excel(self, conn, employee_name, department_name, position):
+    def _find_employee_by_signature(self, cursor, employee_name, department_id, position):
+        employee_signature = build_employee_signature(employee_name, department_id, position)
+        cursor.execute(
+            """
+            SELECT e.employee_id, e.user_id, COALESCE(u.active, 1) AS is_active
+            FROM employees e
+            JOIN users u ON e.user_id = u.user_id
+            WHERE UPPER(TRIM(e.employee_name)) = %s
+              AND e.department_id = %s
+              AND UPPER(TRIM(COALESCE(e.position, ''))) = %s
+            LIMIT 1
+            """,
+            employee_signature,
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+
+        return {
+            "employee_id": row[0],
+            "user_id": row[1],
+            "is_active": bool(row[2]),
+        }
+
+    def _create_or_reactivate_employee(
+        self,
+        conn,
+        employee_name,
+        department_id=None,
+        department_name=None,
+        position="",
+    ):
         cursor = None
+        lock_acquired = False
         try:
+            employee_name = normalize_employee_name(employee_name)
+            position = normalize_position(position)
+
+            validation_errors = validate_employee_fields(
+                employee_name=employee_name,
+                position=position,
+                require_position=False,
+            )
+            if validation_errors:
+                return {"success": False, "error": validation_errors[0]}
+
+            if not conn.in_transaction:
+                conn.start_transaction()
+
             cursor = conn.cursor()
-
-            employee_name = str(employee_name or "").strip().title()
-            department_name = str(department_name or "").strip().upper().replace("\u2019", "'")
-            position = str(position or "").strip()
-
-            if not employee_name or not department_name:
-                return {"success": False, "error": "Missing required fields"}
-
-            cursor.execute(
-                """
-                SELECT department_id
-                FROM departments
-                WHERE UPPER(TRIM(department_name)) = TRIM(%s)
-                LIMIT 1
-                """,
-                (department_name,),
+            resolved_department_id, department_error = self._resolve_department_id(
+                cursor,
+                department_id=department_id,
+                department_name=department_name,
             )
-            department = cursor.fetchone()
-            if not department:
-                return {"success": False, "error": f"Department not found: {department_name}"}
+            if department_error:
+                conn.rollback()
+                return {"success": False, "error": department_error}
 
-            department_id = department[0]
-
-            cursor.execute(
-                """
-                SELECT employee_id
-                FROM employees
-                WHERE UPPER(TRIM(employee_name)) = UPPER(TRIM(%s))
-                  AND department_id = %s
-                  AND UPPER(TRIM(COALESCE(position, ''))) = UPPER(TRIM(%s))
-                LIMIT 1
-                """,
-                (employee_name, department_id, position),
-            )
-            existing_employee = cursor.fetchone()
-            if existing_employee:
+            if not self._acquire_create_lock(cursor):
+                conn.rollback()
                 return {
                     "success": False,
-                    "error": f"Employee already exists with ID {existing_employee[0]}",
+                    "error": "Could not secure the employee creation lock. Please try again.",
+                }
+            lock_acquired = True
+
+            existing_employee = self._find_employee_by_signature(
+                cursor,
+                employee_name=employee_name,
+                department_id=resolved_department_id,
+                position=position,
+            )
+            if existing_employee:
+                if existing_employee["is_active"]:
+                    conn.rollback()
+                    return {
+                        "success": False,
+                        "error": f"Employee already exists with ID {existing_employee['employee_id']}",
+                    }
+
+                cursor.execute(
+                    """
+                    UPDATE employees
+                    SET employee_name = %s,
+                        department_id = %s,
+                        position = %s,
+                        status = %s
+                    WHERE user_id = %s
+                    """,
+                    (
+                        employee_name,
+                        resolved_department_id,
+                        position or None,
+                        "Outside",
+                        existing_employee["user_id"],
+                    ),
+                )
+                cursor.execute(
+                    """
+                    UPDATE users
+                    SET active = 1
+                    WHERE user_id = %s
+                    """,
+                    (existing_employee["user_id"],),
+                )
+                conn.commit()
+                return {
+                    "success": True,
+                    "employee_id": existing_employee["employee_id"],
+                    "reactivated": True,
                 }
 
             cursor.execute(
@@ -2167,9 +2220,14 @@ class EmployeeModel:
                     (user_id, employee_name, department_id, position, status)
                 VALUES (%s, %s, %s, %s, %s)
                 """,
-                (user_id, employee_name, department_id, position or None, "Outside"),
+                (
+                    user_id,
+                    employee_name,
+                    resolved_department_id,
+                    position or None,
+                    "Outside",
+                ),
             )
-
             cursor.execute(
                 """
                 SELECT employee_id
@@ -2184,11 +2242,38 @@ class EmployeeModel:
             return {
                 "success": True,
                 "employee_id": created_employee[0] if created_employee else None,
+                "reactivated": False,
             }
         except Exception as err:
             if conn:
                 conn.rollback()
             return {"success": False, "error": str(err)}
         finally:
+            if cursor and lock_acquired:
+                self._release_create_lock(cursor)
             if cursor:
                 cursor.close()
+
+    def add_employee(self, employee_name, department_id, position):
+        conn = connect_db()
+        if conn is None:
+            return {"success": False, "error": "Database connection failed"}
+
+        try:
+            return self._create_or_reactivate_employee(
+                conn=conn,
+                employee_name=employee_name,
+                department_id=department_id,
+                position=position,
+            )
+        finally:
+            release_db_connection(conn)
+
+    def add_employee_excel(self, conn, employee_name, department_name=None, position="", department_id=None):
+        return self._create_or_reactivate_employee(
+            conn=conn,
+            employee_name=employee_name,
+            department_id=department_id,
+            department_name=department_name,
+            position=position,
+        )

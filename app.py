@@ -5,17 +5,26 @@ import io
 import json
 import os
 import re
-import unicodedata
+import zipfile
+import xml.etree.ElementTree as ET
 from urllib.parse import urlencode, urlsplit
 
 import requests
 from flask import Flask, Response, flash, jsonify, redirect, render_template, request, session, url_for
+from werkzeug.exceptions import HTTPException
 
 from app_tasks import fetch_report_data
 from config import get_config
-from database import close_db, connect_db, init_db_pool
+from database import close_db, connect_db, init_db_pool, release_db_connection
 from db_connect import Database, EmployeeModel, VISITOR_PURPOSES, normalize_visitor_purpose
 from extensions import cache
+from utils.employee_schema import (
+    build_employee_signature,
+    department_lookup_key,
+    normalize_text,
+    validate_department_name,
+    validate_employee_fields,
+)
 
 
 app = Flask(__name__)
@@ -129,19 +138,139 @@ def unique_values(values):
 
 
 def clean_upload_text(text):
-    if not isinstance(text, str):
-        text = str(text) if text is not None else ""
-    text = unicodedata.normalize("NFKC", text)
-    text = re.sub(r"[\u2018\u2019\u02bc\u0060\u00b4]", "'", text)
-    text = re.sub(r"[\u2013\u2014]", "-", text)
-    text = text.replace("\u00a0", " ").replace("\u200b", "")
-    text = re.sub(r"\s+", " ", text)
-    return text.strip()
+    return normalize_text(text)
+
+
+def _excel_column_index(cell_ref):
+    match = re.match(r"([A-Z]+)", (cell_ref or "").upper())
+    if not match:
+        return 0
+
+    index = 0
+    for char in match.group(1):
+        index = index * 26 + (ord(char) - ord("A") + 1)
+    return max(index - 1, 0)
+
+
+def _xlsx_cell_value(cell, shared_strings, namespace):
+    cell_type = cell.attrib.get("t")
+
+    if cell_type == "inlineStr":
+        return "".join(text.text or "" for text in cell.findall(".//a:t", namespace))
+
+    value_node = cell.find("a:v", namespace)
+    raw_value = value_node.text if value_node is not None and value_node.text is not None else ""
+    if cell_type == "s" and raw_value != "":
+        try:
+            return shared_strings[int(raw_value)]
+        except (ValueError, IndexError):
+            return raw_value
+
+    return raw_value
+
+
+def _read_xlsx_rows(file):
+    namespace = {"a": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    relationship_ns = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+
+    try:
+        workbook_bytes = file.read()
+        with zipfile.ZipFile(io.BytesIO(workbook_bytes)) as workbook:
+            shared_strings = []
+            if "xl/sharedStrings.xml" in workbook.namelist():
+                root = ET.fromstring(workbook.read("xl/sharedStrings.xml"))
+                for string_item in root.findall("a:si", namespace):
+                    shared_strings.append(
+                        "".join(text.text or "" for text in string_item.findall(".//a:t", namespace))
+                    )
+
+            workbook_root = ET.fromstring(workbook.read("xl/workbook.xml"))
+            rels_root = ET.fromstring(workbook.read("xl/_rels/workbook.xml.rels"))
+            rel_map = {
+                rel.attrib["Id"]: rel.attrib["Target"]
+                for rel in rels_root
+                if rel.attrib.get("Id") and rel.attrib.get("Target")
+            }
+
+            sheets = workbook_root.find("a:sheets", namespace)
+            if sheets is None or not list(sheets):
+                return {"success": False, "error": "The workbook does not contain any sheets."}
+
+            first_sheet = list(sheets)[0]
+            relationship_id = first_sheet.attrib.get(relationship_ns)
+            target = rel_map.get(relationship_id)
+            if not target:
+                return {"success": False, "error": "Could not resolve the first worksheet in the workbook."}
+
+            sheet_path = target if target.startswith("xl/") else f"xl/{target}"
+            sheet_root = ET.fromstring(workbook.read(sheet_path))
+
+            rows = []
+            for row in sheet_root.findall(".//a:sheetData/a:row", namespace):
+                source_row_number = int(row.attrib.get("r") or 0)
+                values_by_index = {}
+                max_index = -1
+
+                for cell in row.findall("a:c", namespace):
+                    column_index = _excel_column_index(cell.attrib.get("r"))
+                    values_by_index[column_index] = _xlsx_cell_value(cell, shared_strings, namespace)
+                    max_index = max(max_index, column_index)
+
+                row_values = [
+                    values_by_index.get(index, "")
+                    for index in range(max_index + 1)
+                ] if max_index >= 0 else []
+
+                rows.append({"source_row_number": source_row_number, "values": row_values})
+
+            return {"success": True, "rows": rows}
+    except zipfile.BadZipFile:
+        return {"success": False, "error": "The uploaded .xlsx file is not a valid Excel workbook."}
+    except ET.ParseError as err:
+        return {"success": False, "error": f"Could not read the Excel workbook structure: {err}"}
+    except Exception as err:
+        return {"success": False, "error": f"Could not read the Excel workbook: {err}"}
+    finally:
+        file.seek(0)
+
+
+def _read_csv_rows(file):
+    try:
+        content = file.read()
+        if isinstance(content, bytes):
+            text = content.decode("utf-8-sig")
+        else:
+            text = str(content)
+
+        reader = csv.reader(io.StringIO(text))
+        rows = []
+        for index, values in enumerate(reader, start=1):
+            rows.append({"source_row_number": index, "values": values})
+
+        return {"success": True, "rows": rows}
+    except UnicodeDecodeError as err:
+        return {"success": False, "error": f"Could not decode the CSV file: {err}"}
+    except Exception as err:
+        return {"success": False, "error": f"Could not read the CSV file: {err}"}
+    finally:
+        file.seek(0)
+
+
+def _extract_upload_rows(file, file_ext):
+    if file_ext == ".xlsx":
+        return _read_xlsx_rows(file)
+    if file_ext == ".csv":
+        return _read_csv_rows(file)
+    if file_ext == ".xls":
+        return {
+            "success": False,
+            "error": "Legacy .xls files are not supported by the current server runtime yet. Please save the file as .xlsx or .csv and try again.",
+        }
+
+    return {"success": False, "error": "Please upload a valid Excel or CSV file."}
 
 
 def parse_employee_upload_file(file):
-    import pandas as pd
-
     if not file or not file.filename:
         return {"success": False, "error": "No file uploaded"}
 
@@ -149,56 +278,62 @@ def parse_employee_upload_file(file):
     if file_ext not in {".xls", ".xlsx", ".csv"}:
         return {"success": False, "error": "Please upload a valid Excel or CSV file."}
 
-    reader = pd.read_csv if file_ext == ".csv" else pd.read_excel
-    raw = reader(file, dtype=str, header=None)
-    required_column_set = set(EMPLOYEE_UPLOAD_REQUIRED_COLUMNS)
+    extracted = _extract_upload_rows(file, file_ext)
+    if not extracted.get("success"):
+        return extracted
 
-    header_row = None
-    for idx, row in raw.iterrows():
-        row_values = {clean_upload_text(value).upper() for value in row.tolist() if pd.notna(value)}
+    required_column_set = set(EMPLOYEE_UPLOAD_REQUIRED_COLUMNS)
+    source_rows = extracted.get("rows", [])
+
+    header_index = None
+    header_source_row_number = None
+    normalized_headers = []
+
+    for index, row in enumerate(source_rows):
+        row_values = {
+            clean_upload_text(value).upper()
+            for value in row.get("values", [])
+            if clean_upload_text(value)
+        }
         if required_column_set.issubset(row_values):
-            header_row = idx
+            header_index = index
+            header_source_row_number = row.get("source_row_number") or (index + 1)
+            normalized_headers = [clean_upload_text(value).upper() for value in row.get("values", [])]
             break
 
-    if header_row is None:
+    if header_index is None:
         return {
             "success": False,
             "error": "Could not find the required headers: Employee Name and Department.",
         }
 
-    file.seek(0)
-    df = reader(file, dtype=str, header=header_row)
-    df.columns = [clean_upload_text(col).upper() for col in df.columns]
-    df.dropna(how="all", inplace=True)
-    df = df.applymap(lambda value: clean_upload_text(value) if isinstance(value, str) else value)
-
-    missing_columns = [column.title() for column in EMPLOYEE_UPLOAD_REQUIRED_COLUMNS if column not in df.columns]
+    missing_columns = [column.title() for column in EMPLOYEE_UPLOAD_REQUIRED_COLUMNS if column not in normalized_headers]
     if missing_columns:
         return {
             "success": False,
             "error": f"Missing required column(s): {', '.join(missing_columns)}",
         }
 
-    for column in EMPLOYEE_UPLOAD_REQUIRED_COLUMNS:
-        df[column] = df[column].fillna("").astype(str).str.strip()
-    for column in EMPLOYEE_UPLOAD_OPTIONAL_COLUMNS:
-        if column not in df.columns:
-            df[column] = ""
-        df[column] = df[column].fillna("").astype(str).str.strip()
-
-    df = df[
-        df[EMPLOYEE_UPLOAD_REQUIRED_COLUMNS + EMPLOYEE_UPLOAD_OPTIONAL_COLUMNS]
-        .apply(lambda row: any(str(value).strip() for value in row), axis=1)
-    ]
-
     parsed_rows = []
-    for index, row in df.iterrows():
+    for row in source_rows[header_index + 1:]:
+        row_values = list(row.get("values", []))
+        row_map = {}
+        for column_index, header in enumerate(normalized_headers):
+            if not header:
+                continue
+            row_map[header] = clean_upload_text(row_values[column_index]) if column_index < len(row_values) else ""
+
+        required_values = [row_map.get(column, "") for column in EMPLOYEE_UPLOAD_REQUIRED_COLUMNS]
+        optional_values = [row_map.get(column, "") for column in EMPLOYEE_UPLOAD_OPTIONAL_COLUMNS]
+        if not any(value.strip() for value in [*required_values, *optional_values]):
+            continue
+
         parsed_rows.append(
             {
-                "row_number": header_row + index + 2,
-                "employee_name": str(row.get("EMPLOYEE NAME") or "").strip(),
-                "department_name": str(row.get("DEPARTMENT") or "").strip(),
-                "position": str(row.get("POSITION") or "").strip(),
+                "row_number": row.get("source_row_number") or (header_source_row_number + 1),
+                "employee_name": row_map.get("EMPLOYEE NAME", ""),
+                "department_name": row_map.get("DEPARTMENT", ""),
+                "position": row_map.get("POSITION", ""),
             }
         )
 
@@ -221,20 +356,31 @@ def validate_employee_upload_rows(conn, parsed_rows):
         )
         department_lookup = {}
         for department_id, department_name in cursor.fetchall():
-            key = clean_upload_text(department_name).upper()
+            key = department_lookup_key(department_name)
             if key:
-                department_lookup[key] = department_id
+                department_lookup.setdefault(key, []).append(
+                    {
+                        "department_id": department_id,
+                        "department_name": clean_upload_text(department_name),
+                    }
+                )
 
         cursor.execute(
             """
             SELECT
                 UPPER(TRIM(employee_name)) AS employee_name_key,
                 department_id,
-                UPPER(TRIM(COALESCE(position, ''))) AS position_key
-            FROM employees
+                UPPER(TRIM(COALESCE(position, ''))) AS position_key,
+                COALESCE(u.active, 1) AS is_active
+            FROM employees e
+            JOIN users u ON e.user_id = u.user_id
             """
         )
-        existing_signatures = {(row[0], str(row[1]), row[2]) for row in cursor.fetchall()}
+        active_signatures = set()
+        inactive_signatures = set()
+        for row in cursor.fetchall():
+            target = active_signatures if bool(row[3]) else inactive_signatures
+            target.add((row[0], str(row[1]), row[2]))
 
         valid_rows = []
         errors = []
@@ -255,13 +401,31 @@ def validate_employee_upload_rows(conn, parsed_rows):
                 errors.append(f"Row {row_number}: Missing {', '.join(missing_fields)}")
                 continue
 
-            dept_key = department_name.upper()
-            department_id = department_lookup.get(dept_key)
-            if not department_id:
-                errors.append(f"Row {row_number}: Department not found: {department_name}")
+            employee_field_errors = validate_employee_fields(
+                employee_name=employee_name,
+                position=position,
+                require_position=False,
+            )
+            department_errors = validate_department_name(department_name)
+            if employee_field_errors or department_errors:
+                errors.append(
+                    f"Row {row_number}: {(employee_field_errors + department_errors)[0]}"
+                )
                 continue
 
-            signature = (employee_name.upper(), str(department_id), position.upper())
+            dept_key = department_lookup_key(department_name)
+            department_matches = department_lookup.get(dept_key, [])
+            if not department_matches:
+                errors.append(f"Row {row_number}: Department not found: {department_name}")
+                continue
+            if len(department_matches) > 1:
+                errors.append(f"Row {row_number}: Department is ambiguous: {department_name}")
+                continue
+            department_match = department_matches[0]
+            department_id = department_match["department_id"]
+            resolved_department_name = department_match["department_name"]
+
+            signature = build_employee_signature(employee_name, department_id, position)
             if signature in seen_signatures:
                 errors.append(
                     f"Row {row_number}: Duplicate of row {seen_signatures[signature]} in the uploaded file."
@@ -269,9 +433,9 @@ def validate_employee_upload_rows(conn, parsed_rows):
                 continue
             seen_signatures[signature] = row_number
 
-            if signature in existing_signatures:
+            if signature in active_signatures:
                 errors.append(
-                    f"Row {row_number}: Employee already exists ({employee_name} / {department_name} / {position or 'N/A'})."
+                    f"Row {row_number}: Employee already exists ({employee_name} / {resolved_department_name} / {position or 'N/A'})."
                 )
                 continue
 
@@ -279,9 +443,11 @@ def validate_employee_upload_rows(conn, parsed_rows):
                 {
                     "row_number": row_number,
                     "employee_name": employee_name,
-                    "department_name": department_name,
+                    "department_name": resolved_department_name,
                     "department_id": department_id,
                     "position": position,
+                    "action": "reactivate" if signature in inactive_signatures else "create",
+                    "source_department_name": department_name,
                 }
             )
 
@@ -365,6 +531,22 @@ def login_required(view_func):
         return view_func(*args, **kwargs)
 
     return wrapped_view
+
+
+@app.errorhandler(Exception)
+def handle_app_exception(err):
+    if request.path.startswith("/upload_employees"):
+        if isinstance(err, HTTPException):
+            return jsonify({"success": False, "error": err.description}), err.code
+
+        app.logger.exception("Unhandled upload route exception on %s", request.path)
+        return jsonify({"success": False, "error": f"Unhandled upload error: {err}"}), 500
+
+    if isinstance(err, HTTPException):
+        return err
+
+    app.logger.exception("Unhandled application exception.")
+    return "Internal Server Error", 500
 
 
 def resolve_visitor_source(source, fallback="kiosk_entrance"):
@@ -1263,16 +1445,35 @@ def download_employee_upload_template():
 @app.route("/upload_employees/preview", methods=["POST"])
 @login_required
 def preview_employees_upload():
-    file = request.files.get("file")
-    parsed = parse_employee_upload_file(file)
-    if not parsed.get("success"):
-        return jsonify(parsed), 400
+    try:
+        file = request.files.get("file")
+        app.logger.info(
+            "Employee upload preview requested. filename=%s",
+            getattr(file, "filename", None),
+        )
+        parsed = parse_employee_upload_file(file)
+        if not parsed.get("success"):
+            app.logger.warning(
+                "Employee upload parsing rejected. filename=%s error=%s",
+                getattr(file, "filename", None),
+                parsed.get("error"),
+            )
+            return jsonify(parsed), 400
+    except Exception as err:
+        app.logger.exception("Unexpected employee upload parsing failure.")
+        return jsonify({"success": False, "error": f"Upload parsing failed: {err}"}), 500
 
     conn = connect_db()
     if conn is None:
+        app.logger.error("Employee upload preview failed: database connection unavailable.")
         return jsonify({"success": False, "error": "Database connection failed"}), 500
     try:
         validation = validate_employee_upload_rows(conn, parsed.get("parsed_rows", []))
+        app.logger.info(
+            "Employee upload preview validated. valid_rows=%s errors=%s",
+            len(validation.get("valid_rows", [])),
+            len(validation.get("errors", [])),
+        )
         return jsonify(
             {
                 "success": True,
@@ -1283,9 +1484,10 @@ def preview_employees_upload():
             }
         )
     except Exception as err:
+        app.logger.exception("Employee upload validation failed unexpectedly.")
         return jsonify({"success": False, "error": str(err)}), 500
     finally:
-        conn.close()
+        release_db_connection(conn)
 
 
 def commit_employees_upload_payload(rows):
@@ -1294,11 +1496,13 @@ def commit_employees_upload_payload(rows):
         return jsonify({"success": False, "error": "Database connection failed"}), 500
 
     inserted = 0
+    reactivated = 0
     errors = []
     try:
         for row in rows:
             employee_name = clean_upload_text(row.get("employee_name"))
             department_name = clean_upload_text(row.get("department_name"))
+            department_id = str(row.get("department_id") or "").strip()
             position = clean_upload_text(row.get("position"))
             row_number = row.get("row_number") or "Unknown"
 
@@ -1309,20 +1513,31 @@ def commit_employees_upload_payload(rows):
             result = employee_model.add_employee_excel(
                 conn=conn,
                 employee_name=employee_name,
+                department_id=department_id,
                 department_name=department_name,
                 position=position,
             )
             if result.get("success"):
-                inserted += 1
+                if result.get("reactivated"):
+                    reactivated += 1
+                else:
+                    inserted += 1
             else:
                 errors.append(f"Row {row_number}: {result.get('error')}")
 
-        return jsonify({"success": True, "inserted": inserted, "errors": errors}), 200
+        return jsonify(
+            {
+                "success": True,
+                "inserted": inserted,
+                "reactivated": reactivated,
+                "errors": errors,
+            }
+        ), 200
     except Exception as err:
         conn.rollback()
         return jsonify({"success": False, "error": str(err)}), 500
     finally:
-        conn.close()
+        release_db_connection(conn)
 
 
 @app.route("/upload_employees/commit", methods=["POST"])
@@ -1342,11 +1557,18 @@ def update_employee():
     data = request.get_json(silent=True) or {}
     employee_id = (data.get("employee_id") or "").strip()
     employee_name = (data.get("employee_name") or "").strip()
-    department_name = (data.get("department_id") or "").strip()
+    department_id = (data.get("department_id") or "").strip()
     position = (data.get("position") or "").strip()
 
-    if not employee_id or not employee_name or not department_name or not position:
-        return jsonify({"success": False, "error": "All fields are required."}), 400
+    validation_errors = validate_employee_fields(
+        employee_name=employee_name,
+        position=position,
+        require_position=False,
+    )
+    if not employee_id or not department_id:
+        return jsonify({"success": False, "error": "Employee ID and Department are required."}), 400
+    if validation_errors:
+        return jsonify({"success": False, "error": validation_errors[0]}), 400
 
     conn = connect_db()
     if conn is None:
@@ -1354,20 +1576,63 @@ def update_employee():
 
     cursor = None
     try:
+        if not conn.in_transaction:
+            conn.start_transaction()
+
         cursor = conn.cursor()
+        normalized_employee_name = clean_upload_text(employee_name)
+        normalized_position = clean_upload_text(position)
+
+        cursor.execute(
+            """
+            SELECT user_id
+            FROM employees
+            WHERE employee_id = %s
+            LIMIT 1
+            """,
+            (employee_id,),
+        )
+        employee = cursor.fetchone()
+        if not employee:
+            conn.rollback()
+            return jsonify({"success": False, "error": "Employee not found."}), 404
+
         cursor.execute(
             """
             SELECT department_id
             FROM departments
-            WHERE LOWER(TRIM(department_name)) = LOWER(TRIM(%s))
+            WHERE department_id = %s
             LIMIT 1
             """,
-            (department_name,),
+            (department_id,),
         )
         department = cursor.fetchone()
 
         if not department:
-            return jsonify({"success": False, "error": f"Department not found: {department_name}"}), 400
+            conn.rollback()
+            return jsonify({"success": False, "error": "Selected department does not exist."}), 400
+
+        cursor.execute(
+            """
+            SELECT employee_id
+            FROM employees
+            WHERE UPPER(TRIM(employee_name)) = UPPER(TRIM(%s))
+              AND department_id = %s
+              AND UPPER(TRIM(COALESCE(position, ''))) = UPPER(TRIM(%s))
+              AND employee_id <> %s
+            LIMIT 1
+            """,
+            (normalized_employee_name, department[0], normalized_position, employee_id),
+        )
+        duplicate = cursor.fetchone()
+        if duplicate:
+            conn.rollback()
+            return jsonify(
+                {
+                    "success": False,
+                    "error": f"Another employee already uses this combination ({duplicate[0]}).",
+                }
+            ), 400
 
         cursor.execute(
             """
@@ -1377,13 +1642,10 @@ def update_employee():
                 position = %s
             WHERE employee_id = %s
             """,
-            (employee_name, department[0], position, employee_id),
+            (normalized_employee_name, department[0], normalized_position or None, employee_id),
         )
+
         conn.commit()
-
-        if cursor.rowcount == 0:
-            return jsonify({"success": False, "error": "Employee not found."}), 404
-
         return jsonify({"success": True})
     except Exception as err:
         conn.rollback()
@@ -1391,7 +1653,7 @@ def update_employee():
     finally:
         if cursor:
             cursor.close()
-        conn.close()
+        release_db_connection(conn)
 
 
 @app.route("/delete_employee", methods=["POST"])
@@ -1409,12 +1671,16 @@ def delete_employee():
 
     cursor = None
     try:
+        if not conn.in_transaction:
+            conn.start_transaction()
+
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT user_id
-            FROM employees
-            WHERE employee_id = %s
+            SELECT e.user_id, COALESCE(u.active, 1) AS is_active
+            FROM employees e
+            JOIN users u ON e.user_id = u.user_id
+            WHERE e.employee_id = %s
             LIMIT 1
             """,
             (employee_id,),
@@ -1422,10 +1688,15 @@ def delete_employee():
         employee = cursor.fetchone()
 
         if not employee:
+            conn.rollback()
             return jsonify({"success": False, "error": "Employee not found."}), 404
 
-        cursor.execute("DELETE FROM employees WHERE employee_id = %s", (employee_id,))
+        if not bool(employee[1]):
+            conn.rollback()
+            return jsonify({"success": True, "already_inactive": True})
+
         cursor.execute("UPDATE users SET active = 0 WHERE user_id = %s", (employee[0],))
+        cursor.execute("UPDATE employees SET status = %s WHERE user_id = %s", ("Outside", employee[0]))
         conn.commit()
         return jsonify({"success": True})
     except Exception as err:
@@ -1434,7 +1705,7 @@ def delete_employee():
     finally:
         if cursor:
             cursor.close()
-        conn.close()
+        release_db_connection(conn)
 
 
 if __name__ == "__main__":

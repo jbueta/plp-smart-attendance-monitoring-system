@@ -9,7 +9,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from config import get_config
-from database import close_db, connect_db, init_db_pool
+from database import close_db, connect_db, init_db_pool, release_db_connection
 from db_connect import Database
 
 
@@ -1141,7 +1141,7 @@ def manual_event_entry():
         return jsonify({"success": False, "message": str(e)}), 500
     finally:
         if conn:
-            close_db(conn)
+            release_db_connection(conn)
 
 # ==============================================================================
 # ENDPOINT: Get Today's Attendance for All Employees (For Admin Dashboard)
@@ -1224,7 +1224,7 @@ def get_employee_attendance():
         return jsonify({"success": False, "message": str(e)}), 500
     finally:
         if conn:
-            close_db(conn)
+            release_db_connection(conn)
 
 # ==============================================================================
 # ENDPOINT: Delete an Attendance Record (For Admin Corrections)
@@ -1272,7 +1272,7 @@ def delete_attendance_record(attendance_id):
         return jsonify({"success": False, "message": str(e)}), 500
     finally:
         if conn:
-            close_db(conn)
+            release_db_connection(conn)
 
 # ==============================================================================
 # ENDPOINT: Time in/Time out Log in Kiosk Event
@@ -1337,7 +1337,7 @@ def get_instance_logs(instance_id):
         return jsonify({"success": False, "message": str(e)}), 500
     finally:
         if conn:
-            close_db(conn)
+            release_db_connection(conn)
 
 start_instance_generation_scheduler()
 
