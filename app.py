@@ -1733,7 +1733,7 @@ def send_report_email():
 
     email_subject = f"PLP Report - {report_title}"
     email_body = (
-        "Attached is the requested PLP report.\n\n"
+        "Attached is a system generated PLP report send by an admin.\n\n"
         f"Report: {report_title}\n"
         f"Scope: {report_scope}\n"
         f"Date Range: {report_date_range}\n"
