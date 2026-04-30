@@ -448,6 +448,12 @@
                             <option>Delivery</option>
                             <option>Other</option>
                         </select>
+                        <select id="recordsSortFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
+                            <option value="recent">Recent to Oldest</option>
+                            <option value="name-asc">Name A-Z</option>
+                            <option value="name-desc">Name Z-A</option>
+                            <option value="group">Group by Purpose</option>
+                        </select>
                     </div>
                 </div>
                 <div class="table-responsive pb-3">
@@ -464,6 +470,7 @@
                             {% for visitor in visitors %}
                             <tr class="visitor-record-row"
                                 data-id="{{ visitor.id }}"
+                                data-added-order="{{ visitor.added_order or 0 }}"
                                 data-name="{{ visitor.name | lower }}"
                                 data-purpose="{{ visitor.purpose | lower }}"
                                 data-purpose-label="{{ visitor.purpose }}"
@@ -870,13 +877,15 @@
             // Records search
             const recordsSearch = document.getElementById('recordsSearchInput');
             const recordsPurpose = document.getElementById('recordsPurposeFilter');
-            const recordsRows = document.querySelectorAll('.visitor-record-row');
+            const recordsSortFilter = document.getElementById('recordsSortFilter');
+            const recordsTableBody = document.getElementById('recordsTableBody');
             const recordsPaginationContainer = document.getElementById('recordsPaginationContainer');
             const recordsPaginationList = document.getElementById('recordsPaginationList');
             const recordsTableCard = document.getElementById('recordsTableCard');
             const recordsTableResponsive = recordsTableCard ? recordsTableCard.querySelector('.table-responsive') : null;
             const recordsNoResults = document.getElementById('recordsNoResults');
             const recordsResultCount = document.getElementById('recordsResultCount');
+            const getRecordRows = () => document.querySelectorAll('.visitor-record-row');
             
             let recordsCurrentPage = 1;
 
@@ -953,10 +962,10 @@
             }
 
             function updateRecordsTableDisplay() {
-                const visibleRows = Array.from(recordsRows).filter(row => row.dataset.filterVisible !== 'false');
+                const visibleRows = Array.from(getRecordRows()).filter(row => row.dataset.filterVisible !== 'false');
                 const startIdx = (recordsCurrentPage - 1) * ITEMS_PER_PAGE;
                 const endIdx = startIdx + ITEMS_PER_PAGE;
-                recordsRows.forEach(row => {
+                getRecordRows().forEach(row => {
                     if (row.dataset.filterVisible === 'false') {
                         row.style.display = 'none';
                         return;
@@ -965,6 +974,36 @@
                     row.style.display = (idx >= startIdx && idx < endIdx) ? '' : 'none';
                 });
             }
+
+            function sortRecordsRows() {
+                if (!recordsTableBody) return;
+
+                const sortValue = recordsSortFilter ? recordsSortFilter.value : 'recent';
+                const rows = Array.from(getRecordRows());
+                const compareText = (left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' });
+
+                rows.sort((rowA, rowB) => {
+                    const nameA = rowA.dataset.name || '';
+                    const nameB = rowB.dataset.name || '';
+                    const purposeA = rowA.dataset.purpose || '';
+                    const purposeB = rowB.dataset.purpose || '';
+                    const orderA = Number(rowA.dataset.addedOrder || 0);
+                    const orderB = Number(rowB.dataset.addedOrder || 0);
+
+                    if (sortValue === 'name-asc') {
+                        return compareText(nameA, nameB) || (orderB - orderA);
+                    }
+                    if (sortValue === 'name-desc') {
+                        return compareText(nameB, nameA) || (orderB - orderA);
+                    }
+                    if (sortValue === 'group') {
+                        return compareText(purposeA, purposeB) || compareText(nameA, nameB) || (orderB - orderA);
+                    }
+                    return (orderB - orderA) || compareText(nameA, nameB);
+                });
+
+                rows.forEach(row => recordsTableBody.appendChild(row));
+            }
             
             function applyRecordsFilter() {
                 const val = recordsSearch ? recordsSearch.value.trim().toLowerCase() : '';
@@ -972,7 +1011,7 @@
                 
                 let visible = 0;
                 
-                recordsRows.forEach(row => {
+                getRecordRows().forEach(row => {
                     const name = row.dataset.name || '';
                     const purpose = row.dataset.purpose || '';
                     
@@ -987,10 +1026,11 @@
                     }
                 });
 
+                sortRecordsRows();
                 recordsCurrentPage = 1;
                 const hasFilters = val || purposeVal;
 
-                if (recordsRows.length > 0) {
+                if (getRecordRows().length > 0) {
                     if (visible === 0 && hasFilters) {
                         if (recordsTableResponsive) recordsTableResponsive.style.display = 'none';
                         recordsPaginationContainer.classList.remove('show');
@@ -1012,6 +1052,7 @@
 
             if (recordsSearch) recordsSearch.addEventListener('input', applyRecordsFilter);
             if (recordsPurpose) recordsPurpose.addEventListener('change', applyRecordsFilter);
+            if (recordsSortFilter) recordsSortFilter.addEventListener('change', applyRecordsFilter);
 
             // Edit Visitor Modal
             const editVisitorModal = document.getElementById('editVisitorModal');

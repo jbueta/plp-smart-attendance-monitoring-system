@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta
 from functools import wraps
 import csv
+import glob
 import io
 import json
 import os
@@ -12,18 +13,29 @@ from urllib.parse import urlencode, urlsplit
 import requests
 from flask import Flask, Response, flash, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.exceptions import HTTPException
+from werkzeug.routing import BuildError
+from werkzeug.utils import secure_filename
 
 from app_tasks import fetch_report_data
 from config import get_config
 from database import close_db, connect_db, init_db_pool, release_db_connection
-from db_connect import Database, EmployeeModel, VISITOR_PURPOSES, normalize_visitor_purpose
+from db_connect import Database, EmployeeModel, StudentModel, VISITOR_PURPOSES, normalize_visitor_purpose
 from extensions import cache
 from utils.employee_schema import (
+    build_person_name_match_keys,
     build_employee_signature,
     department_lookup_key,
     normalize_text,
     validate_department_name,
     validate_employee_fields,
+)
+from utils.sendEmail import send_email
+from utils.student_schema import (
+    normalize_course_name,
+    normalize_student_id,
+    normalize_student_name,
+    validate_course_name,
+    validate_student_fields,
 )
 
 
@@ -32,7 +44,11 @@ app.config.from_object(get_config())
 app.permanent_session_lifetime = timedelta(minutes=3)
 
 os.makedirs(os.path.dirname(app.config["LOG_FILE"]) or ".", exist_ok=True)
+REPORT_ARCHIVE_DIR = os.path.join(app.static_folder, "reports")
+LEGACY_REPORT_PATTERNS = ("attendance_report.pdf", "report_*.pdf")
+os.makedirs(REPORT_ARCHIVE_DIR, exist_ok=True)
 employee_model = EmployeeModel()
+student_model = StudentModel()
 cache.init_app(app)
 
 with app.app_context():
@@ -107,6 +123,156 @@ EVENT_FREQUENCIES = {"ONCE", "DAILY", "WEEKLY"}
 EVENT_DAYS = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
 EMPLOYEE_UPLOAD_REQUIRED_COLUMNS = ["EMPLOYEE NAME", "DEPARTMENT"]
 EMPLOYEE_UPLOAD_OPTIONAL_COLUMNS = ["POSITION"]
+STUDENT_UPLOAD_REQUIRED_COLUMNS = ["STUDENT ID", "STUDENT NAME"]
+STUDENT_UPLOAD_OPTIONAL_COLUMNS = ["COURSE", "COURSE ID", "STATUS"]
+
+
+def sanitize_report_archive_filename(filename, default_stem="report"):
+    candidate = secure_filename(os.path.basename(filename or "")).strip("._")
+    if not candidate:
+        candidate = f"{default_stem}.pdf"
+
+    stem, ext = os.path.splitext(candidate)
+    stem = re.sub(r"_+", "_", stem).strip("._") or default_stem
+    ext = ".pdf" if ext.lower() != ".pdf" else ext.lower()
+    return f"{stem[:120]}{ext}"
+
+
+def build_report_archive_filename(category, report_data):
+    pieces = [
+        category or "report",
+        report_data.get("event_name") or report_data.get("title") or "",
+        report_data.get("department") or "",
+        report_data.get("date_range") or "",
+    ]
+    normalized_parts = []
+    for piece in pieces:
+        cleaned = re.sub(r"[^A-Za-z0-9_-]+", "_", str(piece).strip())
+        cleaned = re.sub(r"_+", "_", cleaned).strip("_")
+        if cleaned and cleaned.lower() != "all":
+            normalized_parts.append(cleaned[:40])
+
+    archive_stem = "_".join(normalized_parts) or "report"
+    return sanitize_report_archive_filename(f"{archive_stem}.pdf")
+
+
+def get_unique_report_archive_path(filename):
+    archive_name = sanitize_report_archive_filename(filename)
+    archive_path = os.path.join(REPORT_ARCHIVE_DIR, archive_name)
+    if not os.path.exists(archive_path):
+        return archive_path, archive_name
+
+    stem, ext = os.path.splitext(archive_name)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    counter = 1
+    while True:
+        candidate_name = f"{stem}_{timestamp}_{counter}{ext}"
+        candidate_path = os.path.join(REPORT_ARCHIVE_DIR, candidate_name)
+        if not os.path.exists(candidate_path):
+            return candidate_path, candidate_name
+        counter += 1
+
+
+def relocate_legacy_report_files():
+    project_root = os.path.abspath(app.root_path)
+    moved_reports = []
+
+    for pattern in LEGACY_REPORT_PATTERNS:
+        for source_path in glob.glob(os.path.join(project_root, pattern)):
+            if not os.path.isfile(source_path):
+                continue
+
+            archive_path, archive_name = get_unique_report_archive_path(os.path.basename(source_path))
+            if os.path.abspath(source_path) == os.path.abspath(archive_path):
+                continue
+
+            os.replace(source_path, archive_path)
+            moved_reports.append((os.path.basename(source_path), archive_name))
+
+    if moved_reports:
+        app.logger.info("Relocated %s legacy report file(s) into %s.", len(moved_reports), REPORT_ARCHIVE_DIR)
+
+
+def _format_report_file_size(size_bytes):
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+
+    size_value = float(size_bytes)
+    for unit in ("KB", "MB", "GB"):
+        size_value /= 1024.0
+        if size_value < 1024 or unit == "GB":
+            return f"{size_value:.1f} {unit}"
+
+    return f"{size_bytes} B"
+
+
+def get_archived_reports():
+    reports = []
+    for entry in os.scandir(REPORT_ARCHIVE_DIR):
+        if not entry.is_file() or not entry.name.lower().endswith(".pdf"):
+            continue
+
+        stats = entry.stat()
+        modified_at = datetime.fromtimestamp(stats.st_mtime)
+        reports.append(
+            {
+                "icon": "file-earmark-pdf text-danger",
+                "name": entry.name,
+                "time": modified_at.strftime("Generated %b %d, %Y %I:%M %p"),
+                "size": _format_report_file_size(stats.st_size),
+                "url": url_for("static", filename=f"reports/{entry.name}"),
+                "sort_timestamp": stats.st_mtime,
+            }
+        )
+
+    return sorted(reports, key=lambda report: report["sort_timestamp"], reverse=True)
+
+
+relocate_legacy_report_files()
+
+
+def build_sample_report_payload():
+    return {
+        "title": "Report Preview",
+        "event_name": "",
+        "department": "ALL",
+        "date_range": datetime.now().strftime("%Y-%m-%d"),
+        "archive_filename": "report_preview.pdf",
+    }
+
+
+def resolve_archive_report_url():
+    try:
+        return url_for("archive_report")
+    except BuildError:
+        return url_for("sample_report")
+
+
+def resolve_report_context(category, report_type, filter_value, start_date, end_date):
+    report_results = fetch_report_data(category, report_type, filter_value, start_date, end_date)
+    if "error" in report_results:
+        return None, report_results["error"]
+
+    report_data = dict(report_results["report_data"])
+    report_data["archive_filename"] = build_report_archive_filename(category, report_data)
+    return report_data, None
+
+
+def load_archived_report_attachment(category, report_type, filter_value, start_date, end_date):
+    report_data, error = resolve_report_context(category, report_type, filter_value, start_date, end_date)
+    if error:
+        return None, None, error
+
+    archive_path = os.path.join(REPORT_ARCHIVE_DIR, report_data["archive_filename"])
+    if not os.path.exists(archive_path):
+        return (
+            None,
+            report_data,
+            "Archived PDF not found yet. Use 'Download and Archive PDF' first, then send it by email.",
+        )
+
+    with open(archive_path, "rb") as archived_pdf:
+        return archived_pdf.read(), report_data, None
 
 def normalize_event_frequency(value):
     frequency = (value or "").strip().upper().replace("_", "-")
@@ -139,6 +305,55 @@ def unique_values(values):
 
 def clean_upload_text(text):
     return normalize_text(text)
+
+
+def build_name_match_lookup(names):
+    lookup = {}
+    for name in names:
+        register_name_match_source(lookup, name, name)
+    return lookup
+
+
+def register_name_match_source(lookup, name, source):
+    for key in build_person_name_match_keys(name):
+        lookup.setdefault(key, set()).add(source)
+
+
+def find_name_match_sources(name, lookup):
+    matches = set()
+    for key in build_person_name_match_keys(name):
+        matches.update(lookup.get(key, set()))
+    return matches
+
+
+def has_name_match_conflict(name, lookup, exclude_sources=None):
+    matches = find_name_match_sources(name, lookup)
+    if exclude_sources:
+        matches.difference_update(
+            {
+                source
+                for source in exclude_sources
+                if source is not None and str(source).strip() != ""
+            }
+        )
+    return bool(matches)
+
+
+def same_role_name_conflict_error(role):
+    return (
+        f"A similar name already exists in {role} records. "
+        "Please review the existing records first."
+    )
+
+
+def cross_role_name_conflict_error(source_role, counterpart_role):
+    source_article = "an" if source_role == "employee" else "a"
+    counterpart_article = "an" if counterpart_role == "employee" else "a"
+    return (
+        f"A similar name already exists in {counterpart_role} records. "
+        f"A person cannot be both {source_article} {source_role} and {counterpart_article} {counterpart_role}. "
+        "Please review the existing records first."
+    )
 
 
 def _excel_column_index(cell_ref):
@@ -368,6 +583,7 @@ def validate_employee_upload_rows(conn, parsed_rows):
         cursor.execute(
             """
             SELECT
+                employee_name,
                 UPPER(TRIM(employee_name)) AS employee_name_key,
                 department_id,
                 UPPER(TRIM(COALESCE(position, ''))) AS position_key,
@@ -376,15 +592,28 @@ def validate_employee_upload_rows(conn, parsed_rows):
             JOIN users u ON e.user_id = u.user_id
             """
         )
+        employee_rows = cursor.fetchall()
         active_signatures = set()
         inactive_signatures = set()
-        for row in cursor.fetchall():
-            target = active_signatures if bool(row[3]) else inactive_signatures
-            target.add((row[0], str(row[1]), row[2]))
+        employee_name_lookup = {}
+        for row in employee_rows:
+            signature = (row[1], str(row[2]), row[3])
+            target = active_signatures if bool(row[4]) else inactive_signatures
+            target.add(signature)
+            register_name_match_source(employee_name_lookup, row[0], signature)
+
+        cursor.execute(
+            """
+            SELECT student_name
+            FROM students
+            """
+        )
+        student_name_lookup = build_name_match_lookup(row[0] for row in cursor.fetchall())
 
         valid_rows = []
         errors = []
         seen_signatures = {}
+        seen_name_rows = {}
 
         for row in parsed_rows:
             employee_name = clean_upload_text(row.get("employee_name"))
@@ -431,13 +660,38 @@ def validate_employee_upload_rows(conn, parsed_rows):
                     f"Row {row_number}: Duplicate of row {seen_signatures[signature]} in the uploaded file."
                 )
                 continue
-            seen_signatures[signature] = row_number
+
+            duplicate_name_rows = find_name_match_sources(employee_name, seen_name_rows)
+            if duplicate_name_rows:
+                errors.append(
+                    f"Row {row_number}: Similar name already appears in row {min(duplicate_name_rows)} of the uploaded file."
+                )
+                continue
 
             if signature in active_signatures:
                 errors.append(
                     f"Row {row_number}: Employee already exists ({employee_name} / {resolved_department_name} / {position or 'N/A'})."
                 )
                 continue
+
+            if has_name_match_conflict(
+                employee_name,
+                employee_name_lookup,
+                exclude_sources={signature} if signature in inactive_signatures else None,
+            ):
+                errors.append(
+                    f"Row {row_number}: {same_role_name_conflict_error('employee')}"
+                )
+                continue
+
+            if has_name_match_conflict(employee_name, student_name_lookup):
+                errors.append(
+                    f"Row {row_number}: {cross_role_name_conflict_error('employee', 'student')}"
+                )
+                continue
+
+            seen_signatures[signature] = row_number
+            register_name_match_source(seen_name_rows, employee_name, row_number)
 
             valid_rows.append(
                 {
@@ -1076,13 +1330,21 @@ def analytics_students():
 @app.route("/reports")
 @login_required
 def reports():
-    return render_template("reports.html", events=fetch_report_events(), reports=MOCK_REPORTS)
+    relocate_legacy_report_files()
+    return render_template("reports.html", events=fetch_report_events(), reports=get_archived_reports())
 
 
 @app.route("/reports/sample")
 @login_required
 def sample_report():
-    return render_template("sample_report.html", current_date=datetime.now().strftime("%B %d, %Y - %I:%M %p"))
+    return render_template(
+        "sample_report.html",
+        current_date=datetime.now().strftime("%B %d, %Y - %I:%M %p"),
+        report=build_sample_report_payload(),
+        metrics={},
+        logs=[],
+        archive_report_url=resolve_archive_report_url(),
+    )
 
 
 @app.route("/admin/events/add", methods=["POST"])
@@ -1385,13 +1647,678 @@ def generate_report():
     if "error" in report_results:
         return f"<h1>Report Error</h1><p>{report_results['error']}</p>", 500
 
+    report_data = dict(report_results["report_data"])
+    report_data["archive_filename"] = build_report_archive_filename(category, report_data)
+
     return render_template(
         "sample_report.html",
         current_date=datetime.now().strftime("%B %d, %Y - %I:%M %p"),
-        report=report_results["report_data"],
+        report=report_data,
         metrics=report_results["metrics_data"],
         logs=report_results["logs"],
+        archive_report_url=resolve_archive_report_url(),
     )
+
+
+@app.route("/reports/archive", methods=["POST"])
+@login_required
+def archive_report():
+    report_file = request.files.get("report_file")
+    requested_filename = (request.form.get("filename") or "").strip()
+
+    if not report_file or not report_file.filename:
+        return jsonify({"success": False, "message": "Missing report file."}), 400
+
+    incoming_name = requested_filename or report_file.filename
+    if not str(incoming_name).lower().endswith(".pdf"):
+        return jsonify({"success": False, "message": "Only PDF report files can be archived."}), 400
+
+    archive_path, archive_name = get_unique_report_archive_path(incoming_name)
+    report_file.save(archive_path)
+
+    return (
+        jsonify(
+            {
+                "success": True,
+                "filename": archive_name,
+                "url": url_for("static", filename=f"reports/{archive_name}"),
+            }
+        ),
+        201,
+    )
+
+
+@app.route("/send_report_email", methods=["POST"])
+@login_required
+def send_report_email():
+    recipient = (request.form.get("email") or "").strip()
+    category = (request.form.get("category") or "").strip()
+    report_type = (request.form.get("type") or "").strip()
+    filter_value = (request.form.get("filter") or "All").strip()
+    start_date = (request.form.get("start") or "").strip()
+    end_date = (request.form.get("end") or "").strip()
+    report_title = (request.form.get("report_title") or "PLP Report").strip()
+    report_scope = (request.form.get("report_scope") or "ALL").strip()
+    report_date_range = (request.form.get("report_date_range") or f"{start_date} to {end_date}").strip()
+    requested_filename = (request.form.get("filename") or "").strip()
+    uploaded_report = request.files.get("report_file")
+
+    if not recipient:
+        return jsonify({"success": False, "message": "Recipient email is required."}), 400
+
+    attachment_data = None
+    attachment_filename = sanitize_report_archive_filename(requested_filename or "report.pdf")
+
+    if uploaded_report and uploaded_report.filename:
+        attachment_data = uploaded_report.read()
+        attachment_filename = sanitize_report_archive_filename(requested_filename or uploaded_report.filename)
+    else:
+        attachment_data, resolved_report_data, error = load_archived_report_attachment(
+            category,
+            report_type,
+            filter_value,
+            start_date,
+            end_date,
+        )
+        if error:
+            return jsonify({"success": False, "message": error}), 400
+
+        attachment_filename = resolved_report_data["archive_filename"]
+        report_title = (resolved_report_data.get("event_name") or resolved_report_data.get("title") or report_title).strip()
+        report_scope = (resolved_report_data.get("department") or report_scope).strip()
+        report_date_range = (resolved_report_data.get("date_range") or report_date_range).strip()
+
+    if not attachment_data:
+        return jsonify({"success": False, "message": "No report PDF is available to attach."}), 400
+
+    email_subject = f"PLP Report - {report_title}"
+    email_body = (
+        "Attached is the requested PLP report.\n\n"
+        f"Report: {report_title}\n"
+        f"Scope: {report_scope}\n"
+        f"Date Range: {report_date_range}\n"
+        f"Generated By: {session.get('admin_username', 'PLP Admin')}\n"
+    )
+
+    try:
+        send_email(
+            subject=email_subject,
+            body=email_body,
+            recipient=recipient,
+            attachment_data=attachment_data,
+            filename=attachment_filename,
+        )
+    except ValueError as err:
+        return jsonify({"success": False, "message": str(err)}), 400
+    except Exception as err:
+        app.logger.exception("Failed to send report email to %s", recipient)
+        return jsonify({"success": False, "message": f"Failed to send the report email: {err}"}), 500
+
+    return jsonify({"success": True, "message": f"Report emailed successfully to {recipient}."}), 200
+
+
+@app.route("/get_courses")
+@login_required
+def get_courses():
+    conn = connect_db()
+    if not conn:
+        return jsonify([])
+
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """
+            SELECT course_id, course_name
+            FROM courses
+            ORDER BY course_name ASC
+            """
+        )
+        rows = cursor.fetchall()
+        return jsonify(
+            [
+                {
+                    "course_id": row["course_id"],
+                    "course_name": row["course_name"],
+                    "name": (row["course_name"] or "").upper(),
+                }
+                for row in rows
+            ]
+        )
+    finally:
+        cursor.close()
+
+
+def parse_student_upload_file(file):
+    if not file or not file.filename:
+        return {"success": False, "error": "No file uploaded"}
+
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in {".xls", ".xlsx", ".csv"}:
+        return {"success": False, "error": "Please upload a valid Excel or CSV file."}
+
+    extracted = _extract_upload_rows(file, file_ext)
+    if not extracted.get("success"):
+        return extracted
+
+    source_rows = extracted.get("rows", [])
+    header_index = None
+    header_source_row_number = None
+    normalized_headers = []
+
+    for index, row in enumerate(source_rows):
+        row_headers = [clean_upload_text(value).upper() for value in row.get("values", [])]
+        header_values = {header for header in row_headers if header}
+        has_required = set(STUDENT_UPLOAD_REQUIRED_COLUMNS).issubset(header_values)
+        has_course = "COURSE" in header_values or "COURSE ID" in header_values
+        if has_required and has_course:
+            header_index = index
+            header_source_row_number = row.get("source_row_number") or (index + 1)
+            normalized_headers = row_headers
+            break
+
+    if header_index is None:
+        return {
+            "success": False,
+            "error": "Could not find the required headers: Student ID, Student Name, and Course or Course ID.",
+        }
+
+    missing_columns = [
+        column.title() for column in STUDENT_UPLOAD_REQUIRED_COLUMNS if column not in normalized_headers
+    ]
+    if "COURSE" not in normalized_headers and "COURSE ID" not in normalized_headers:
+        missing_columns.append("Course or Course ID")
+    if missing_columns:
+        return {
+            "success": False,
+            "error": f"Missing required column(s): {', '.join(missing_columns)}",
+        }
+
+    parsed_rows = []
+    for row in source_rows[header_index + 1:]:
+        row_values = list(row.get("values", []))
+        row_map = {}
+        for column_index, header in enumerate(normalized_headers):
+            if not header:
+                continue
+            row_map[header] = clean_upload_text(row_values[column_index]) if column_index < len(row_values) else ""
+
+        relevant_values = [
+            row_map.get(column, "")
+            for column in STUDENT_UPLOAD_REQUIRED_COLUMNS + STUDENT_UPLOAD_OPTIONAL_COLUMNS
+        ]
+        if not any(value.strip() for value in relevant_values):
+            continue
+
+        course_id = str(row_map.get("COURSE ID", "") or "").strip()
+        if course_id.endswith(".0"):
+            course_id = course_id[:-2]
+
+        parsed_rows.append(
+            {
+                "row_number": row.get("source_row_number") or (header_source_row_number + 1),
+                "student_id": row_map.get("STUDENT ID", ""),
+                "student_name": row_map.get("STUDENT NAME", ""),
+                "course_name": row_map.get("COURSE", ""),
+                "course_id": course_id,
+                "status": row_map.get("STATUS", ""),
+            }
+        )
+
+    return {
+        "success": True,
+        "required_columns": STUDENT_UPLOAD_REQUIRED_COLUMNS,
+        "optional_columns": STUDENT_UPLOAD_OPTIONAL_COLUMNS,
+        "parsed_rows": parsed_rows,
+    }
+
+
+def validate_student_upload_rows(conn, parsed_rows):
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT course_id, course_name
+            FROM courses
+            """
+        )
+        course_lookup_by_id = {}
+        course_lookup_by_name = {}
+        for course_id, course_name in cursor.fetchall():
+            normalized_course = normalize_course_name(course_name)
+            course_data = {
+                "course_id": course_id,
+                "course_name": normalized_course,
+            }
+            course_lookup_by_id[str(course_id)] = course_data
+            if normalized_course:
+                course_lookup_by_name.setdefault(normalized_course.upper(), []).append(course_data)
+
+        cursor.execute(
+            """
+            SELECT s.student_id, s.student_name, COALESCE(u.active, 1) AS is_active
+            FROM students s
+            JOIN users u ON s.user_id = u.user_id
+            """
+        )
+        active_ids = set()
+        inactive_ids = set()
+        student_name_lookup = {}
+        for student_id, student_name, is_active in cursor.fetchall():
+            normalized_id = normalize_student_id(student_id)
+            register_name_match_source(student_name_lookup, student_name, normalized_id)
+            if bool(is_active):
+                active_ids.add(normalized_id)
+            else:
+                inactive_ids.add(normalized_id)
+
+        cursor.execute(
+            """
+            SELECT employee_name
+            FROM employees
+            """
+        )
+        employee_name_lookup = build_name_match_lookup(row[0] for row in cursor.fetchall())
+
+        valid_rows = []
+        errors = []
+        seen_ids = {}
+        seen_name_rows = {}
+
+        for row in parsed_rows:
+            student_id = normalize_student_id(row.get("student_id"))
+            student_name = normalize_student_name(row.get("student_name"))
+            course_name = normalize_course_name(row.get("course_name"))
+            course_id = str(row.get("course_id") or "").strip()
+            if course_id.endswith(".0"):
+                course_id = course_id[:-2]
+            status = clean_upload_text(row.get("status"))
+            row_number = row.get("row_number")
+
+            missing_fields = []
+            if not student_id:
+                missing_fields.append("Student ID")
+            if not student_name:
+                missing_fields.append("Student Name")
+            if not course_id and not course_name:
+                missing_fields.append("Course or Course ID")
+            if missing_fields:
+                errors.append(f"Row {row_number}: Missing {', '.join(missing_fields)}")
+                continue
+
+            field_errors = validate_student_fields(student_id=student_id, student_name=student_name)
+            course_errors = validate_course_name(course_name) if course_name else []
+            if field_errors or course_errors:
+                errors.append(f"Row {row_number}: {(field_errors + course_errors)[0]}")
+                continue
+
+            if course_id:
+                course_match = course_lookup_by_id.get(course_id)
+                if not course_match:
+                    errors.append(f"Row {row_number}: Course ID not found: {course_id}")
+                    continue
+                resolved_course = course_match
+            else:
+                course_matches = course_lookup_by_name.get(course_name.upper(), [])
+                if not course_matches:
+                    errors.append(f"Row {row_number}: Course not found: {course_name}")
+                    continue
+                if len(course_matches) > 1:
+                    errors.append(f"Row {row_number}: Course is ambiguous: {course_name}")
+                    continue
+                resolved_course = course_matches[0]
+
+            if student_id in seen_ids:
+                errors.append(
+                    f"Row {row_number}: Duplicate of row {seen_ids[student_id]} in the uploaded file."
+                )
+                continue
+
+            duplicate_name_rows = find_name_match_sources(student_name, seen_name_rows)
+            if duplicate_name_rows:
+                errors.append(
+                    f"Row {row_number}: Similar name already appears in row {min(duplicate_name_rows)} of the uploaded file."
+                )
+                continue
+
+            if student_id in active_ids:
+                errors.append(f"Row {row_number}: Student already exists with ID {student_id}.")
+                continue
+
+            if has_name_match_conflict(
+                student_name,
+                student_name_lookup,
+                exclude_sources={student_id} if student_id in inactive_ids else None,
+            ):
+                errors.append(
+                    f"Row {row_number}: {same_role_name_conflict_error('student')}"
+                )
+                continue
+
+            if has_name_match_conflict(student_name, employee_name_lookup):
+                errors.append(
+                    f"Row {row_number}: {cross_role_name_conflict_error('student', 'employee')}"
+                )
+                continue
+
+            seen_ids[student_id] = row_number
+            register_name_match_source(seen_name_rows, student_name, row_number)
+
+            valid_rows.append(
+                {
+                    "row_number": row_number,
+                    "student_id": student_id,
+                    "student_name": student_name,
+                    "course_id": resolved_course["course_id"],
+                    "course_name": resolved_course["course_name"],
+                    "status": status or "Outside",
+                    "action": "reactivate" if student_id in inactive_ids else "create",
+                }
+            )
+
+        return {"success": True, "valid_rows": valid_rows, "errors": errors}
+    finally:
+        cursor.close()
+
+
+@app.route("/add_student_manual", methods=["POST"])
+@login_required
+def add_student_manual():
+    data = request.get_json(silent=True) or {}
+    student_id = (data.get("student_id") or "").strip()
+    student_name = (data.get("student_name") or "").strip()
+    course_id = (data.get("course_id") or "").strip()
+    status = (data.get("status") or "Outside").strip()
+
+    validation_errors = validate_student_fields(student_id=student_id, student_name=student_name)
+    if not course_id:
+        return jsonify({"success": False, "error": "Course is required."}), 400
+    if validation_errors:
+        return jsonify({"success": False, "error": validation_errors[0]}), 400
+
+    result = student_model.add_student(
+        student_id=student_id,
+        student_name=student_name,
+        course_id=course_id,
+        status=status,
+    )
+    return jsonify(result), (200 if result.get("success") else 400)
+
+
+@app.route("/upload_students", methods=["POST"])
+@login_required
+def upload_students():
+    preview_response, preview_status = preview_students_upload()
+    if preview_status != 200:
+        return preview_response, preview_status
+
+    preview_data = preview_response.get_json(silent=True) or {}
+    valid_rows = preview_data.get("preview_rows", [])
+    if not valid_rows:
+        return jsonify({"success": False, "error": "No valid student rows to upload."}), 400
+
+    return commit_students_upload_payload(valid_rows)
+
+
+@app.route("/upload_students/template.csv", methods=["GET"])
+@login_required
+def download_student_upload_template():
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["STUDENT ID", "STUDENT NAME", "COURSE"])
+    writer.writerow(["23-00312", "Juan Dela Cruz", "BS Information Technology"])
+    writer.writerow(["24-00101", "Maria Santos", "BS Nursing"])
+    csv_content = output.getvalue()
+    output.close()
+
+    return Response(
+        csv_content,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=student_upload_template.csv"},
+    )
+
+
+@app.route("/upload_students/preview", methods=["POST"])
+@login_required
+def preview_students_upload():
+    try:
+        file = request.files.get("file")
+        app.logger.info(
+            "Student upload preview requested. filename=%s",
+            getattr(file, "filename", None),
+        )
+        parsed = parse_student_upload_file(file)
+        if not parsed.get("success"):
+            app.logger.warning(
+                "Student upload parsing rejected. filename=%s error=%s",
+                getattr(file, "filename", None),
+                parsed.get("error"),
+            )
+            return jsonify(parsed), 400
+    except Exception as err:
+        app.logger.exception("Unexpected student upload parsing failure.")
+        return jsonify({"success": False, "error": f"Upload parsing failed: {err}"}), 500
+
+    conn = connect_db()
+    if conn is None:
+        app.logger.error("Student upload preview failed: database connection unavailable.")
+        return jsonify({"success": False, "error": "Database connection failed"}), 500
+    try:
+        validation = validate_student_upload_rows(conn, parsed.get("parsed_rows", []))
+        app.logger.info(
+            "Student upload preview validated. valid_rows=%s errors=%s",
+            len(validation.get("valid_rows", [])),
+            len(validation.get("errors", [])),
+        )
+        return jsonify(
+            {
+                "success": True,
+                "required_columns": parsed.get("required_columns", []),
+                "optional_columns": parsed.get("optional_columns", []),
+                "preview_rows": validation.get("valid_rows", []),
+                "errors": validation.get("errors", []),
+            }
+        )
+    except Exception as err:
+        app.logger.exception("Student upload validation failed unexpectedly.")
+        return jsonify({"success": False, "error": str(err)}), 500
+    finally:
+        release_db_connection(conn)
+
+
+def commit_students_upload_payload(rows):
+    conn = connect_db()
+    if conn is None:
+        return jsonify({"success": False, "error": "Database connection failed"}), 500
+
+    inserted = 0
+    reactivated = 0
+    errors = []
+    try:
+        for row in rows:
+            student_id = normalize_student_id(row.get("student_id"))
+            student_name = normalize_student_name(row.get("student_name"))
+            course_id = str(row.get("course_id") or "").strip()
+            course_name = normalize_course_name(row.get("course_name"))
+            status = clean_upload_text(row.get("status")) or "Outside"
+            row_number = row.get("row_number") or "Unknown"
+
+            if not student_id or not student_name or not course_id:
+                errors.append(f"Row {row_number}: Missing Student ID, Student Name, or Course.")
+                continue
+
+            result = student_model.add_student_excel(
+                conn=conn,
+                student_id=student_id,
+                student_name=student_name,
+                course_id=course_id,
+                course_name=course_name,
+                status=status,
+            )
+            if result.get("success"):
+                if result.get("reactivated"):
+                    reactivated += 1
+                else:
+                    inserted += 1
+            else:
+                errors.append(f"Row {row_number}: {result.get('error')}")
+
+        return jsonify(
+            {
+                "success": True,
+                "inserted": inserted,
+                "reactivated": reactivated,
+                "errors": errors,
+            }
+        ), 200
+    except Exception as err:
+        conn.rollback()
+        return jsonify({"success": False, "error": str(err)}), 500
+    finally:
+        release_db_connection(conn)
+
+
+@app.route("/upload_students/commit", methods=["POST"])
+@login_required
+def commit_students_upload():
+    data = request.get_json(silent=True) or {}
+    rows = data.get("rows", [])
+    if not isinstance(rows, list) or not rows:
+        return jsonify({"success": False, "error": "No student rows provided for upload."}), 400
+
+    return commit_students_upload_payload(rows)
+
+
+@app.route("/update_student", methods=["POST"])
+@login_required
+def update_student():
+    data = request.get_json(silent=True) or {}
+    student_id = (data.get("student_id") or "").strip()
+    student_name = (data.get("student_name") or "").strip()
+    course_id = (data.get("course_id") or "").strip()
+
+    validation_errors = validate_student_fields(student_id=student_id, student_name=student_name)
+    if not course_id:
+        return jsonify({"success": False, "error": "Course is required."}), 400
+    if validation_errors:
+        return jsonify({"success": False, "error": validation_errors[0]}), 400
+
+    conn = connect_db()
+    if conn is None:
+        return jsonify({"success": False, "error": "Database connection failed"}), 500
+
+    cursor = None
+    try:
+        if not conn.in_transaction:
+            conn.start_transaction()
+
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT user_id
+            FROM students
+            WHERE student_id = %s
+            LIMIT 1
+            """,
+            (normalize_student_id(student_id),),
+        )
+        student = cursor.fetchone()
+        if not student:
+            conn.rollback()
+            return jsonify({"success": False, "error": "Student not found."}), 404
+
+        cursor.execute(
+            """
+            SELECT course_id, course_name
+            FROM courses
+            WHERE course_id = %s
+            LIMIT 1
+            """,
+            (course_id,),
+        )
+        course = cursor.fetchone()
+        if not course:
+            conn.rollback()
+            return jsonify({"success": False, "error": "Selected course does not exist."}), 400
+
+        cursor.execute(
+            """
+            UPDATE students
+            SET student_name = %s,
+                course_id = %s
+            WHERE student_id = %s
+            """,
+            (
+                normalize_student_name(student_name),
+                course[0],
+                normalize_student_id(student_id),
+            ),
+        )
+        conn.commit()
+        return jsonify(
+            {
+                "success": True,
+                "course_id": course[0],
+                "course_name": normalize_course_name(course[1]),
+            }
+        )
+    except Exception as err:
+        conn.rollback()
+        return jsonify({"success": False, "error": str(err)}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        release_db_connection(conn)
+
+
+@app.route("/delete_student", methods=["POST"])
+@login_required
+def delete_student():
+    data = request.get_json(silent=True) or {}
+    student_id = (data.get("student_id") or "").strip()
+
+    if not student_id:
+        return jsonify({"success": False, "error": "Missing student_id."}), 400
+
+    conn = connect_db()
+    if conn is None:
+        return jsonify({"success": False, "error": "Database connection failed"}), 500
+
+    cursor = None
+    try:
+        if not conn.in_transaction:
+            conn.start_transaction()
+
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT s.user_id, COALESCE(u.active, 1) AS is_active
+            FROM students s
+            JOIN users u ON s.user_id = u.user_id
+            WHERE s.student_id = %s
+            LIMIT 1
+            """,
+            (normalize_student_id(student_id),),
+        )
+        student = cursor.fetchone()
+        if not student:
+            conn.rollback()
+            return jsonify({"success": False, "error": "Student not found."}), 404
+
+        if not bool(student[1]):
+            conn.rollback()
+            return jsonify({"success": True, "already_inactive": True})
+
+        cursor.execute("UPDATE users SET active = 0 WHERE user_id = %s", (student[0],))
+        cursor.execute("UPDATE students SET status = %s WHERE user_id = %s", ("Outside", student[0]))
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as err:
+        conn.rollback()
+        return jsonify({"success": False, "error": str(err)}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        release_db_connection(conn)
 
 
 @app.route("/add_employee", methods=["POST"])

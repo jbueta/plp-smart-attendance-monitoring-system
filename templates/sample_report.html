@@ -59,6 +59,34 @@
 </head>
 <body>
 
+    <div class="container d-print-none mb-4" style="max-width: 950px;">
+        <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center">
+            <button onclick="window.print()" class="btn btn-primary">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-printer me-2" viewBox="0 0 16 16">
+            <path d="M2.5 8a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z" />
+            <path d="M5 1a2 2 0 0 0-2 2v2H2a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1v1a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1V3a2 2 0 0 0-2-2H5zM4 3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2H4V3zm1 5a2 2 0 0 0-2 2v1H2a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v-1a2 2 0 0 0-2-2H5zm7 2v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1z" />
+        </svg>
+        Print / Save as PDF
+    </button>
+            <form id="sendReportEmailForm" action="/send_report_email" method="POST" class="d-flex flex-wrap gap-2 align-items-center">
+                <input type="email" name="email" class="form-control" style="max-width: 280px;" placeholder="Enter email" required>
+                <input type="hidden" name="category" value="{{ request.args.get('category') }}">
+                <input type="hidden" name="type" value="{{ request.args.get('type') }}">
+                <input type="hidden" name="filter" value="{{ request.args.get('filter') }}">
+                <input type="hidden" name="start" value="{{ request.args.get('start') }}">
+                <input type="hidden" name="end" value="{{ request.args.get('end') }}">
+                <input type="hidden" name="filename" value="{{ report.archive_filename }}">
+                <input type="hidden" name="report_title" value="{{ report.event_name if report.event_name else report.title }}">
+                <input type="hidden" name="report_scope" value="{{ report.department if report.department else 'ALL' }}">
+                <input type="hidden" name="report_date_range" value="{{ report.date_range }}">
+                <button type="submit" class="btn btn-success">
+                    Send Report as PDF
+                </button>
+            </form>
+            <div id="sendReportEmailStatus" class="small text-white-50"></div>
+        </div>
+    </div>
+
 <div class="document-container" id="report-content">
 
     <div class="header-container">
@@ -226,7 +254,7 @@
             <ul class="dropdown-menu dropdown-menu-end shadow">
                 <li><a class="dropdown-item py-2 fw-bold" href="#" onclick="window.print()"><i class="bi bi-printer me-2 text-primary"></i> Print Document</a></li>
                 <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item py-2 fw-bold" href="#" onclick="downloadPDF()"><i class="bi bi-file-pdf me-2 text-danger"></i> Download as PDF</a></li>
+                <li><a class="dropdown-item py-2 fw-bold" href="#" onclick="downloadPDF()"><i class="bi bi-file-pdf me-2 text-danger"></i> Download and Archive PDF</a></li>
                 <li><a class="dropdown-item py-2 fw-bold" href="#" onclick="exportTableToCSV('Report_{{ report.date_range | replace(' ', '_') }}.csv')"><i class="bi bi-filetype-csv me-2 text-success"></i> Download as CSV</a></li>
             </ul>
         </div>
@@ -237,21 +265,135 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <script>
-        function downloadPDF() {
-            // Hide the button container during PDF generation
-            const printBtn = document.querySelector('.d-print-none');
-            printBtn.style.display = 'none';
+        const archiveReportUrl = {{ archive_report_url | tojson }};
+        const sampleReportUrl = {{ url_for('sample_report') | tojson }};
+        const archiveFilename = {{ report.archive_filename | tojson }};
+        const sendReportEmailForm = document.getElementById('sendReportEmailForm');
+        const sendReportEmailStatus = document.getElementById('sendReportEmailStatus');
 
-            var opt = {
-                margin:       0.5,
-                filename:     'Report_{{ report.date_range | replace(" ", "_") }}.pdf',
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2 },
-                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+        async function archivePDF(blob, filename) {
+            if (!archiveReportUrl || archiveReportUrl === sampleReportUrl) {
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('filename', filename);
+            formData.append('report_file', new File([blob], filename, { type: 'application/pdf' }));
+
+            const response = await fetch(archiveReportUrl, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error(`Archive request failed with status ${response.status}`);
+            }
+        }
+
+        function triggerPDFDownload(blob, filename) {
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const downloadLink = document.createElement('a');
+            downloadLink.download = filename;
+            downloadLink.href = downloadUrl;
+            downloadLink.style.display = 'none';
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            window.URL.revokeObjectURL(downloadUrl);
+        }
+
+        async function createReportPdfBlob(filename) {
+            const printBlocks = Array.from(document.querySelectorAll('.d-print-none'));
+            printBlocks.forEach((element) => {
+                element.dataset.previousDisplay = element.style.display || '';
+                element.style.display = 'none';
+            });
+
+            const opt = {
+                margin: 0.5,
+                filename: archiveFilename,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
             };
 
-            html2pdf().set(opt).from(document.getElementById('report-content')).save().then(() => {
-                printBtn.style.display = 'flex';
+            try {
+                const worker = html2pdf().set(opt).from(document.getElementById('report-content')).toPdf();
+                const pdf = await worker.get('pdf');
+                return {
+                    blob: pdf.output('blob'),
+                    filename: opt.filename
+                };
+            } catch (error) {
+                console.error('Failed to export PDF:', error);
+                throw error;
+            } finally {
+                printBlocks.forEach((element) => {
+                    element.style.display = element.dataset.previousDisplay || '';
+                    delete element.dataset.previousDisplay;
+                });
+            }
+        }
+
+        async function downloadPDF() {
+            try {
+                const pdfResult = await createReportPdfBlob(archiveFilename);
+                triggerPDFDownload(pdfResult.blob, pdfResult.filename);
+                await archivePDF(pdfResult.blob, pdfResult.filename);
+            } catch (error) {
+                alert('The PDF was not fully archived. Please try again.');
+            }
+        }
+
+        if (sendReportEmailForm) {
+            sendReportEmailForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+
+                const submitButton = sendReportEmailForm.querySelector('button[type="submit"]');
+                const originalLabel = submitButton ? submitButton.textContent : '';
+
+                if (sendReportEmailStatus) {
+                    sendReportEmailStatus.textContent = 'Generating report PDF for email...';
+                    sendReportEmailStatus.className = 'small text-white-50';
+                }
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.textContent = 'Sending...';
+                }
+
+                try {
+                    const pdfResult = await createReportPdfBlob(archiveFilename);
+                    const formData = new FormData(sendReportEmailForm);
+                    formData.append('report_file', new File([pdfResult.blob], pdfResult.filename, { type: 'application/pdf' }));
+
+                    const response = await fetch(sendReportEmailForm.action, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.message || `Request failed with status ${response.status}`);
+                    }
+
+                    if (sendReportEmailStatus) {
+                        sendReportEmailStatus.textContent = result.message || 'Report emailed successfully.';
+                        sendReportEmailStatus.className = 'small text-success';
+                    }
+                } catch (error) {
+                    console.error('Failed to email report:', error);
+                    if (sendReportEmailStatus) {
+                        sendReportEmailStatus.textContent = error.message || 'Could not send the report email.';
+                        sendReportEmailStatus.className = 'small text-danger';
+                    } else {
+                        alert('Could not send the report email. Please try again.');
+                    }
+                } finally {
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.textContent = originalLabel;
+                    }
+                }
             });
         }
 

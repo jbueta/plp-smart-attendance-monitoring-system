@@ -6,6 +6,7 @@ from werkzeug.security import check_password_hash
 
 from utils.employee_schema import (
     EMPLOYEE_CREATE_LOCK_NAME,
+    build_person_name_match_keys,
     build_employee_signature,
     department_lookup_key,
     normalize_department_name,
@@ -13,6 +14,15 @@ from utils.employee_schema import (
     normalize_position,
     validate_department_name,
     validate_employee_fields,
+)
+from utils.student_schema import (
+    STUDENT_CREATE_LOCK_NAME,
+    normalize_course_name,
+    normalize_student_id,
+    normalize_student_name,
+    normalize_student_status,
+    validate_course_name,
+    validate_student_fields,
 )
 
 
@@ -50,6 +60,42 @@ def _format_department_label(department_name):
         if token.lower() not in {"college", "of", "and"}
     ]
     return "".join(initials) or str(department_name)[:6]
+
+
+def _has_cross_role_name_match(cursor, query, name_value):
+    candidate_keys = build_person_name_match_keys(name_value)
+    if not candidate_keys:
+        return False
+
+    cursor.execute(query)
+    for row in cursor.fetchall():
+        raw_name = row[0] if isinstance(row, (tuple, list)) else next(iter(row.values()), "")
+        if candidate_keys.intersection(build_person_name_match_keys(raw_name)):
+            return True
+    return False
+
+
+def _has_same_role_name_match(cursor, query, name_value, source_builder, exclude_sources=None):
+    candidate_keys = build_person_name_match_keys(name_value)
+    if not candidate_keys:
+        return False
+
+    excluded = {
+        source
+        for source in (exclude_sources or set())
+        if source is not None and str(source).strip() != ""
+    }
+
+    cursor.execute(query)
+    for row in cursor.fetchall():
+        source = source_builder(row)
+        if source in excluded:
+            continue
+
+        raw_name = row[0] if isinstance(row, (tuple, list)) else next(iter(row.values()), "")
+        if candidate_keys.intersection(build_person_name_match_keys(raw_name)):
+            return True
+    return False
 
 
 class Database:
@@ -368,6 +414,7 @@ class Database:
 
             query = f"""
                 SELECT
+                    v.seq AS added_order,
                     v.visitor_id AS id,
                     v.visitor_name AS name,
                     COALESCE(NULLIF(TRIM(v.purpose), ''), 'N/A') AS purpose,
@@ -1123,8 +1170,10 @@ class Database:
             cursor.execute(
                 """
                 SELECT
+                    s.user_id AS added_order,
                     s.student_id,
                     COALESCE(NULLIF(TRIM(s.student_name), ''), 'Unknown Student') AS student_name,
+                    s.course_id,
                     COALESCE(NULLIF(TRIM(c.course_name), ''), 'N/A') AS course_name,
                     COALESCE(u.active, 1) AS is_active
                 FROM students s
@@ -1141,7 +1190,9 @@ class Database:
                 records.append(
                     {
                         "id": row["student_id"],
+                        "added_order": row["added_order"],
                         "name": row["student_name"],
+                        "course_id": row["course_id"],
                         "course": row["course_name"],
                         "status": "Active" if is_active else "Inactive",
                         "status_class": "success" if is_active else "secondary",
@@ -1232,6 +1283,7 @@ class Database:
             cursor.execute(
                 """
                 SELECT
+                    e.seq AS added_order,
                     e.employee_id,
                     COALESCE(NULLIF(TRIM(e.employee_name), ''), 'Unknown Employee') AS employee_name,
                     e.department_id,
@@ -1253,6 +1305,7 @@ class Database:
                 records.append(
                     {
                         "id": row["employee_id"],
+                        "added_order": row["added_order"],
                         "name": row["employee_name"],
                         "department_id": row["department_id"],
                         "dept": row["department_name"],
@@ -1278,6 +1331,7 @@ class Database:
                 """
                 SELECT
                     instance_id,
+                    DATE_FORMAT(event_date, '%Y-%m-%d') AS event_date_value,
                     DATE_FORMAT(event_date, '%b %e, %Y') AS event_date,
                     status
                 FROM event_instances
@@ -2092,6 +2146,28 @@ class EmployeeModel:
 
         return int(matches[0][0]), None
 
+    def _has_student_name_conflict(self, cursor, employee_name):
+        return _has_cross_role_name_match(
+            cursor,
+            """
+            SELECT student_name
+            FROM students
+            """,
+            employee_name,
+        )
+
+    def _has_existing_employee_name_conflict(self, cursor, employee_name, exclude_signature=None):
+        return _has_same_role_name_match(
+            cursor,
+            """
+            SELECT employee_name, department_id, COALESCE(position, '')
+            FROM employees
+            """,
+            employee_name,
+            lambda row: build_employee_signature(row[0], row[1], row[2]),
+            exclude_sources={exclude_signature} if exclude_signature else None,
+        )
+
     def _find_employee_by_signature(self, cursor, employee_name, department_id, position):
         employee_signature = build_employee_signature(employee_name, department_id, position)
         cursor.execute(
@@ -2159,6 +2235,11 @@ class EmployeeModel:
                 }
             lock_acquired = True
 
+            employee_signature = build_employee_signature(
+                employee_name,
+                resolved_department_id,
+                position,
+            )
             existing_employee = self._find_employee_by_signature(
                 cursor,
                 employee_name=employee_name,
@@ -2173,6 +2254,32 @@ class EmployeeModel:
                         "error": f"Employee already exists with ID {existing_employee['employee_id']}",
                     }
 
+            if self._has_existing_employee_name_conflict(
+                cursor,
+                employee_name,
+                exclude_signature=employee_signature if existing_employee else None,
+            ):
+                conn.rollback()
+                return {
+                    "success": False,
+                    "error": (
+                        "A similar name already exists in employee records. "
+                        "Please review the existing records first."
+                    ),
+                }
+
+            if self._has_student_name_conflict(cursor, employee_name):
+                conn.rollback()
+                return {
+                    "success": False,
+                    "error": (
+                        "A similar name already exists in student records. "
+                        "A person cannot be both an employee and a student. "
+                        "Please review the existing records first."
+                    ),
+                }
+
+            if existing_employee:
                 cursor.execute(
                     """
                     UPDATE employees
@@ -2276,4 +2383,289 @@ class EmployeeModel:
             department_id=department_id,
             department_name=department_name,
             position=position,
+        )
+
+
+class StudentModel:
+    def _acquire_create_lock(self, cursor):
+        cursor.execute("SELECT GET_LOCK(%s, %s)", (STUDENT_CREATE_LOCK_NAME, 10))
+        result = cursor.fetchone()
+        return bool(result and result[0] == 1)
+
+    def _release_create_lock(self, cursor):
+        try:
+            cursor.execute("SELECT RELEASE_LOCK(%s)", (STUDENT_CREATE_LOCK_NAME,))
+            cursor.fetchone()
+        except connector.Error:
+            pass
+
+    def _resolve_course_id(self, cursor, course_id=None, course_name=None):
+        if course_id is not None and str(course_id).strip():
+            cursor.execute(
+                """
+                SELECT course_id, course_name
+                FROM courses
+                WHERE course_id = %s
+                LIMIT 1
+                """,
+                (str(course_id).strip(),),
+            )
+            course = cursor.fetchone()
+            if not course:
+                return None, None, "Selected course does not exist."
+            return int(course[0]), normalize_course_name(course[1]), None
+
+        normalized_course_name = normalize_course_name(course_name)
+        if not normalized_course_name:
+            return None, None, "Course is required."
+
+        course_length_errors = validate_course_name(normalized_course_name)
+        if course_length_errors:
+            return None, None, course_length_errors[0]
+
+        cursor.execute(
+            """
+            SELECT course_id, course_name
+            FROM courses
+            WHERE UPPER(TRIM(course_name)) = %s
+            ORDER BY course_id ASC
+            """,
+            (normalized_course_name.upper(),),
+        )
+        matches = cursor.fetchall()
+        if not matches:
+            return None, None, f"Course not found: {normalized_course_name}"
+        if len(matches) > 1:
+            return None, None, f"Course is ambiguous: {normalized_course_name}"
+
+        return int(matches[0][0]), normalize_course_name(matches[0][1]), None
+
+    def _has_employee_name_conflict(self, cursor, student_name):
+        return _has_cross_role_name_match(
+            cursor,
+            """
+            SELECT employee_name
+            FROM employees
+            """,
+            student_name,
+        )
+
+    def _has_existing_student_name_conflict(self, cursor, student_name, exclude_student_id=None):
+        normalized_exclude_id = normalize_student_id(exclude_student_id)
+        return _has_same_role_name_match(
+            cursor,
+            """
+            SELECT student_name, student_id
+            FROM students
+            """,
+            student_name,
+            lambda row: normalize_student_id(row[1]),
+            exclude_sources={normalized_exclude_id} if normalized_exclude_id else None,
+        )
+
+    def _find_student_by_id(self, cursor, student_id):
+        cursor.execute(
+            """
+            SELECT s.student_id, s.user_id, COALESCE(u.active, 1) AS is_active
+            FROM students s
+            JOIN users u ON s.user_id = u.user_id
+            WHERE s.student_id = %s
+            LIMIT 1
+            """,
+            (student_id,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+
+        return {
+            "student_id": row[0],
+            "user_id": row[1],
+            "is_active": bool(row[2]),
+        }
+
+    def _create_or_reactivate_student(
+        self,
+        conn,
+        student_id,
+        student_name,
+        course_id=None,
+        course_name=None,
+        status="Outside",
+    ):
+        cursor = None
+        lock_acquired = False
+        try:
+            student_id = normalize_student_id(student_id)
+            student_name = normalize_student_name(student_name)
+            status = normalize_student_status(status, default="Outside")
+
+            validation_errors = validate_student_fields(
+                student_id=student_id,
+                student_name=student_name,
+            )
+            if validation_errors:
+                return {"success": False, "error": validation_errors[0]}
+
+            if not conn.in_transaction:
+                conn.start_transaction()
+
+            cursor = conn.cursor()
+            resolved_course_id, resolved_course_name, course_error = self._resolve_course_id(
+                cursor,
+                course_id=course_id,
+                course_name=course_name,
+            )
+            if course_error:
+                conn.rollback()
+                return {"success": False, "error": course_error}
+
+            if not self._acquire_create_lock(cursor):
+                conn.rollback()
+                return {
+                    "success": False,
+                    "error": "Could not secure the student creation lock. Please try again.",
+                }
+            lock_acquired = True
+
+            existing_student = self._find_student_by_id(cursor, student_id)
+            if existing_student:
+                if existing_student["is_active"]:
+                    conn.rollback()
+                    return {
+                        "success": False,
+                        "error": f"Student already exists with ID {student_id}",
+                    }
+
+            if self._has_existing_student_name_conflict(
+                cursor,
+                student_name,
+                exclude_student_id=student_id if existing_student else None,
+            ):
+                conn.rollback()
+                return {
+                    "success": False,
+                    "error": (
+                        "A similar name already exists in student records. "
+                        "Please review the existing records first."
+                    ),
+                }
+
+            if self._has_employee_name_conflict(cursor, student_name):
+                conn.rollback()
+                return {
+                    "success": False,
+                    "error": (
+                        "A similar name already exists in employee records. "
+                        "A person cannot be both a student and an employee. "
+                        "Please review the existing records first."
+                    ),
+                }
+
+            if existing_student:
+                cursor.execute(
+                    """
+                    UPDATE students
+                    SET student_name = %s,
+                        course_id = %s,
+                        status = %s
+                    WHERE user_id = %s
+                    """,
+                    (
+                        student_name,
+                        resolved_course_id,
+                        status,
+                        existing_student["user_id"],
+                    ),
+                )
+                cursor.execute(
+                    """
+                    UPDATE users
+                    SET active = 1
+                    WHERE user_id = %s
+                    """,
+                    (existing_student["user_id"],),
+                )
+                conn.commit()
+                return {
+                    "success": True,
+                    "student_id": student_id,
+                    "course_id": resolved_course_id,
+                    "course_name": resolved_course_name,
+                    "reactivated": True,
+                }
+
+            cursor.execute(
+                """
+                INSERT INTO users (role, active)
+                VALUES (%s, %s)
+                """,
+                ("student", 1),
+            )
+            user_id = cursor.lastrowid
+
+            cursor.execute(
+                """
+                INSERT INTO students
+                    (user_id, student_id, student_name, course_id, status)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (
+                    user_id,
+                    student_id,
+                    student_name,
+                    resolved_course_id,
+                    status,
+                ),
+            )
+            conn.commit()
+            return {
+                "success": True,
+                "student_id": student_id,
+                "course_id": resolved_course_id,
+                "course_name": resolved_course_name,
+                "reactivated": False,
+            }
+        except Exception as err:
+            if conn:
+                conn.rollback()
+            return {"success": False, "error": str(err)}
+        finally:
+            if cursor and lock_acquired:
+                self._release_create_lock(cursor)
+            if cursor:
+                cursor.close()
+
+    def add_student(self, student_id, student_name, course_id, status="Outside"):
+        conn = connect_db()
+        if conn is None:
+            return {"success": False, "error": "Database connection failed"}
+
+        try:
+            return self._create_or_reactivate_student(
+                conn=conn,
+                student_id=student_id,
+                student_name=student_name,
+                course_id=course_id,
+                status=status,
+            )
+        finally:
+            release_db_connection(conn)
+
+    def add_student_excel(
+        self,
+        conn,
+        student_id,
+        student_name,
+        course_name=None,
+        course_id=None,
+        status="Outside",
+    ):
+        return self._create_or_reactivate_student(
+            conn=conn,
+            student_id=student_id,
+            student_name=student_name,
+            course_id=course_id,
+            course_name=course_name,
+            status=status,
         )

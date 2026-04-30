@@ -46,6 +46,18 @@ def normalize_department_name(value):
     return normalize_text(value)
 
 
+def build_person_name_match_keys(value):
+    normalized_name = normalize_text(value).upper()
+    if not normalized_name:
+        return set()
+
+    compact_name = re.sub(r"[^A-Z0-9]", "", normalized_name)
+    keys = {normalized_name}
+    if compact_name:
+        keys.add(compact_name)
+    return keys
+
+
 def resolve_department_alias(value):
     normalized_department = normalize_department_name(value)
     alias_key = normalized_department.upper()

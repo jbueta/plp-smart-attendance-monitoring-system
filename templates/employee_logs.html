@@ -177,6 +177,12 @@
                             <option value="{{ dept.department_name | lower }}">{{ dept.department_name }}</option>
                             {% endfor %}
                         </select>
+                        <select id="recordsSortFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
+                            <option value="recent">Recent to Oldest</option>
+                            <option value="name-asc">Name A-Z</option>
+                            <option value="name-desc">Name Z-A</option>
+                            <option value="group">Group by Department</option>
+                        </select>
                     </div>
                 </div>
                 <div class="table-responsive pb-3">
@@ -196,6 +202,7 @@
                             <tr class="employee-record-row"
                                 data-id="{{ emp.id | lower }}"
                                 data-id-original="{{ emp.id }}"
+                                data-added-order="{{ emp.added_order or 0 }}"
                                 data-name="{{ emp.name | lower }}"
                                 data-name-original="{{ emp.name }}"
                                 data-dept-id-original="{{ emp.department_id or '' }}"
@@ -1191,13 +1198,45 @@ document.addEventListener('DOMContentLoaded', function () {
     // ─── RECORDS FILTER + PAGINATION ─────────────────────────────────────────
     const recordsSearch           = document.getElementById('recordsSearchInput');
     const recordsDeptFilter       = document.getElementById('recordsDepartmentFilter');
+    const recordsSortFilter       = document.getElementById('recordsSortFilter');
     const recordsTableCard        = document.getElementById('recordsTableCard');
+    const recordsTableBody        = document.getElementById('recordsTableBody');
     const recordsNoResults        = document.getElementById('recordsNoResults');
     const recordsResultCount      = document.getElementById('recordsResultCount');
     const recordsPaginationContainer = document.getElementById('recordsPaginationContainer');
     const recordsPaginationList   = document.getElementById('recordsPaginationList');
     const getRecordRows           = () => document.querySelectorAll('.employee-record-row');
     let recordsCurrentPage = 1;
+
+    function sortRecordsRows() {
+        if (!recordsTableBody) return;
+
+        const sortValue = recordsSortFilter ? recordsSortFilter.value : 'recent';
+        const rows = Array.from(getRecordRows());
+        const compareText = (left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' });
+
+        rows.sort((rowA, rowB) => {
+            const nameA = rowA.dataset.name || '';
+            const nameB = rowB.dataset.name || '';
+            const deptA = rowA.dataset.dept || '';
+            const deptB = rowB.dataset.dept || '';
+            const orderA = Number(rowA.dataset.addedOrder || 0);
+            const orderB = Number(rowB.dataset.addedOrder || 0);
+
+            if (sortValue === 'name-asc') {
+                return compareText(nameA, nameB) || (orderB - orderA);
+            }
+            if (sortValue === 'name-desc') {
+                return compareText(nameB, nameA) || (orderB - orderA);
+            }
+            if (sortValue === 'group') {
+                return compareText(deptA, deptB) || compareText(nameA, nameB) || (orderB - orderA);
+            }
+            return (orderB - orderA) || compareText(nameA, nameB);
+        });
+
+        rows.forEach(row => recordsTableBody.appendChild(row));
+    }
 
     function getRecordsVisibleCount() {
         return Array.from(getRecordRows()).filter(r => r.dataset.filterVisible !== 'false').length;
@@ -1243,6 +1282,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
+        sortRecordsRows();
         recordsCurrentPage = 1;
         const hasFilters = search || deptVal;
 
@@ -1277,6 +1317,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (recordsSearch)     recordsSearch.addEventListener('input',  applyRecordsFilter);
     if (recordsDeptFilter) recordsDeptFilter.addEventListener('change', applyRecordsFilter);
+    if (recordsSortFilter) recordsSortFilter.addEventListener('change', applyRecordsFilter);
 
 
     // ─── EDIT OVERLAY ─────────────────────────────────────────────────────────

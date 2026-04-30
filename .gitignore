@@ -15,3 +15,9 @@ venv.bak/
 .history/
 
 logs/
+
+# Generated reports
+/attendance_report.pdf
+/report_*.pdf
+/static/reports/*
+!/static/reports/.gitkeep

@@ -4,11 +4,20 @@ from email.message import EmailMessage
 
 from dotenv import load_dotenv
 
+
 load_dotenv()
 
 
-def send_email(subject, body, recipient, sender_email=None, sender_password=None):
-    """Send a plain-text email using SMTP credentials from the environment."""
+def send_email(
+    subject,
+    body,
+    recipient,
+    sender_email=None,
+    sender_password=None,
+    attachment_data=None,
+    filename="Report.pdf",
+):
+    """Send an email with optional PDF attachment using SMTP credentials from the environment."""
 
     sender_email = sender_email or os.getenv("SENDER_EMAIL", "")
     sender_password = sender_password or os.getenv("SENDER_PASSWORD", "")
@@ -23,6 +32,14 @@ def send_email(subject, body, recipient, sender_email=None, sender_password=None
     message["From"] = sender_email
     message["To"] = recipient
     message.set_content(body)
+
+    if attachment_data:
+        message.add_attachment(
+            attachment_data,
+            maintype="application",
+            subtype="pdf",
+            filename=filename,
+        )
 
     with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
         server.login(sender_email, sender_password)
