@@ -505,7 +505,7 @@ INSERT INTO `users` (`user_id`, `role`, `active`) VALUES
 (26, 'employee', 1),
 (27, 'employee', 1);
 
--- --------------------------------------------------------
+-- ---------------F-----------------------------------------
 
 --
 -- Table structure for table `violations`
