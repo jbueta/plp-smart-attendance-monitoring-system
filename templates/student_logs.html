@@ -97,7 +97,7 @@
                                         <button class="btn btn-sm btn-outline-light p-0 border-0 d-flex align-items-center justify-content-center fs-4" type="button" data-bs-toggle="dropdown" aria-expanded="false">&hellip;</button>
                                         <ul class="dropdown-menu dropdown-menu-end shadow-sm student-action-menu">
                                             <li><button type="button" class="dropdown-item view-student text-white" data-id="{{ log.id }}">View Details</button></li>
-                                            <li><button type="button" class="dropdown-item text-danger delete-student" data-id="{{ log.id }}">Deactivate</button></li>
+                                            <li><button type="button" class="dropdown-item text-danger delete-student" data-id="{{ log.id }}">Delete</button></li>
                                         </ul>
                                     </div>
                                 </td>
@@ -191,7 +191,11 @@
                                         <button class="btn btn-sm btn-outline-light p-0 border-0 d-flex align-items-center justify-content-center fs-4" type="button" data-bs-toggle="dropdown" aria-expanded="false">&hellip;</button>
                                         <ul class="dropdown-menu dropdown-menu-end shadow-sm student-action-menu">
                                             <li><button type="button" class="dropdown-item edit-student-record text-white" data-id="{{ record.id }}">Edit</button></li>
-                                            <li><button type="button" class="dropdown-item text-danger delete-student-record" data-id="{{ record.id }}">Deactivate</button></li>
+                                            {% if record.status == 'Active' %}
+                                            <li><button type="button" class="dropdown-item text-danger delete-student-record" data-id="{{ record.id }}">Delete</button></li>
+                                            {% else %}
+                                            <li><button type="button" class="dropdown-item text-white-50" disabled>Already Inactive</button></li>
+                                            {% endif %}
                                         </ul>
                                     </div>
                                 </td>
@@ -1588,8 +1592,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const studentId = row.dataset.idOriginal || row.dataset.id || '';
 
         const confirmed = await showConfirm(
-            `Deactivate "${name}"?`,
-            'This will keep the student in the database but mark the account inactive.'
+            `Delete "${name}"?`,
+            'This is a soft delete, so the student will stay in the database as inactive.'
         );
         if (!confirmed) return;
 
@@ -1603,13 +1607,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (res.ok && result && result.success) {
                 if (currentEditRow === row) hideEditCard();
                 showToast(
-                    result.already_inactive ? 'Student is already inactive.' : 'Student deactivated successfully.',
+                    result.already_inactive ? 'Student is already inactive.' : 'Student deleted successfully.',
                     'success',
                     result.already_inactive ? `${name} is already inactive.` : `${name} has been marked inactive.`
                 );
                 setTimeout(() => location.reload(), 1500);
             } else {
-                showToast('Deactivate failed.', 'danger', (result && result.error) || 'Could not deactivate student.');
+                showToast('Delete failed.', 'danger', (result && result.error) || 'Could not delete student.');
             }
         } catch (err) {
             console.error(err);

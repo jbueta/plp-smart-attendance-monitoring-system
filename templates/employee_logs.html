@@ -119,7 +119,7 @@
                                         </button>
                                         <ul class="dropdown-menu dropdown-menu-end shadow-sm employee-action-menu">
                                             <li><button type="button" class="dropdown-item view-employee text-white" data-id="{{ log.id }}">View Details</button></li>
-                                            <li><button type="button" class="dropdown-item text-danger delete-employee-record" data-id="{{ log.id }}">Deactivate</button></li>
+                                            <li><button type="button" class="dropdown-item text-danger delete-employee-record" data-id="{{ log.id }}">Delete</button></li>
                                         </ul>
                                     </div>
                                 </td>
@@ -227,7 +227,7 @@
                                         <ul class="dropdown-menu dropdown-menu-end shadow-sm employee-action-menu">
                                             <li><button type="button" class="dropdown-item edit-employee-record" data-id="{{ emp.id }}">Edit</button></li>
                                             {% if emp.status == 'Active' %}
-                                            <li><button type="button" class="dropdown-item text-danger delete-employee-record" data-id="{{ emp.id }}">Deactivate</button></li>
+                                            <li><button type="button" class="dropdown-item text-danger delete-employee-record" data-id="{{ emp.id }}">Delete</button></li>
                                             {% else %}
                                             <li><button type="button" class="dropdown-item text-white-50" disabled>Already Inactive</button></li>
                                             {% endif %}
@@ -515,13 +515,13 @@
         <div class="d-flex align-items-center gap-3">
             <i class="bi bi-trash3-fill text-danger" style="font-size: 2rem;"></i>
             <div>
-                <div class="fw-bold fs-5">Deactivate Employee</div>
-                <div class="text-white-50 small" id="confirmDeleteMsg">Are you sure you want to deactivate this employee?</div>
+                <div class="fw-bold fs-5">Delete Employee</div>
+                <div class="text-white-50 small" id="confirmDeleteMsg">Are you sure you want to delete this employee? This will mark the account inactive.</div>
             </div>
         </div>
         <div class="d-flex justify-content-end gap-2 mt-1">
             <button id="cancelDeleteBtn" class="btn btn-outline-light btn-sm px-4">Cancel</button>
-            <button id="confirmDeleteBtn" class="btn btn-danger btn-sm px-4">Deactivate</button>
+            <button id="confirmDeleteBtn" class="btn btn-danger btn-sm px-4">Delete</button>
         </div>
     </div>
 </div>
@@ -1445,7 +1445,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!btn) return;
         pendingDeleteId = btn.dataset.id;
         document.getElementById('confirmDeleteMsg').textContent =
-            `Are you sure you want to deactivate employee ${pendingDeleteId}? The record will stay in the system as inactive.`;
+            `Are you sure you want to delete employee ${pendingDeleteId}? This is a soft delete, so the record will stay in the system as inactive.`;
         document.getElementById('confirmDeleteToast').style.display = 'block';
     });
 
@@ -1454,21 +1454,25 @@ document.addEventListener('DOMContentLoaded', function () {
         pendingDeleteId = null;
     });
 
-    document.getElementById('confirmDeleteBtn').addEventListener('click', function () {
+    document.getElementById('confirmDeleteBtn').addEventListener('click', async function () {
         if (!pendingDeleteId) return;
         document.getElementById('confirmDeleteToast').style.display = 'none';
-        fetch('/delete_employee', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ employee_id: pendingDeleteId })
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                showToast(data.already_inactive ? 'Employee is already inactive.' : 'Employee deactivated successfully.');
+        try {
+            const res = await fetch('/delete_employee', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ employee_id: pendingDeleteId })
+            });
+            const data = await parseApiResponseSafe(res);
+            if (res.ok && data && data.success) {
+                showToast(data.already_inactive ? 'Employee is already inactive.' : 'Employee deleted successfully.');
                 setTimeout(() => location.reload(), 1800);
-            } else { alert('Delete failed: ' + data.error); }
-        });
+            } else {
+                alert('Delete failed: ' + ((data && data.error) || 'Could not delete employee.'));
+            }
+        } catch (_) {
+            alert('Delete failed: Could not delete employee.');
+        }
         pendingDeleteId = null;
     });
 
