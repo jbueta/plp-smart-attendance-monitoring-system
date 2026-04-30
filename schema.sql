@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 28, 2026 at 07:02 AM
+-- Generation Time: Apr 30, 2026 at 05:37 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -93,12 +93,7 @@ INSERT INTO `departments` (`department_id`, `department_name`, `created_at`) VAL
 (4, 'College of Information Technology', '2026-04-15 00:00:00'),
 (5, 'College of Business and Accountancy', '2026-04-15 00:00:00'),
 (6, 'College of International Hospitality Management', '2026-04-15 00:00:00'),
-(7, 'College of Education', '2026-04-15 00:00:00'),
-(8, 'Registrar''s Office', '2026-04-15 00:00:00'),
-(9, 'Accounting Office', '2026-04-15 00:00:00'),
-(10, 'Human Resources Office', '2026-04-15 00:00:00'),
-(11, 'MIS Office', '2026-04-15 00:00:00'),
-(12, 'Library', '2026-04-15 00:00:00');
+(7, 'College of Education', '2026-04-15 00:00:00');
 
 -- --------------------------------------------------------
 
@@ -129,6 +124,13 @@ INSERT INTO `employees` (`seq`, `user_id`, `employee_id`, `employee_name`, `depa
 (4, 26, 'EMP-0004', 'Gabriela Silang', 6, 'Department Chair', 'Outside', '2026-04-15 08:56:17'),
 (5, 27, 'EMP-0005', 'Josefa Llanes Escoda', 7, 'Registrar', 'Outside', '2026-04-15 08:56:17'),
 (8, 29, 'EMP-0008', 'Jason Jay M. Recto', 3, 'Professor I', 'Outside', '2026-04-27 15:51:55'),
+(9, 30, 'EMP-0009', 'GONATO, VINCE RUSSEL H.', 4, 'PROFESSOR I', 'Outside', '2026-04-29 11:14:41'),
+(10, 31, 'EMP-0010', 'GONATO, RHEA VIANCA H.', 3, 'PROFESSOR II', 'Outside', '2026-04-29 11:15:19'),
+(11, 32, 'EMP-0011', 'HENSON, HONEYPEARL CHARISSE B.', 5, 'INSTRUCTOR I', 'Outside', '2026-04-29 11:25:52'),
+(12, 33, 'EMP-0012', 'CABUGUANG, JUAN MIGUEL', 3, 'PROFESSOR I', 'Outside', '2026-04-29 11:25:52'),
+(13, 34, 'EMP-0013', 'GUNGON, KARL', 1, 'PROFESSOR II', 'Outside', '2026-04-29 11:25:52'),
+(14, 35, 'EMP-0014', 'Moncada, Ashanti Martir M.', 5, 'Dean', 'Outside', '2026-04-30 09:01:32'),
+(15, 38, 'EMP-0015', 'Maryjoy Bernabe', 2, 'Professor I', 'Outside', '2026-04-30 14:46:35'),
 (6, 5, 'EMP-1098', 'Apolinario Mabini', 2, 'Dean', 'Outside', '2026-04-15 13:36:17'),
 (7, 4, 'EMP-2015', 'Juan Dela Cruz', 1, 'Faculty', 'Inside', '2026-03-12 14:22:44');
 
@@ -463,7 +465,13 @@ INSERT INTO `general_log` (`log_id`, `user_id`, `timestamp`, `log_type`, `gate`)
 (72, 1, '2026-04-26 22:57:07', 'Entry', 'Gate 1'),
 (73, 1, '2026-04-26 22:57:23', 'Exit', 'Gate 2'),
 (74, 1, '2026-04-27 22:43:09', 'Entry', 'Gate 1'),
-(75, 1, '2026-04-27 22:43:20', 'Exit', 'Gate 2');
+(75, 1, '2026-04-27 22:43:20', 'Exit', 'Gate 2'),
+(76, 1, '2026-04-28 13:13:02', 'Entry', 'Gate 1'),
+(77, 1, '2026-04-28 13:13:18', 'Exit', 'Gate 2'),
+(78, 1, '2026-04-30 19:31:42', 'Entry', 'Gate 1'),
+(79, 36, '2026-04-30 19:31:57', 'Entry', 'Gate 1'),
+(80, 37, '2026-04-30 19:32:07', 'Entry', 'Gate 1'),
+(81, 1, '2026-04-30 19:32:17', 'Exit', 'Gate 2');
 
 -- --------------------------------------------------------
 
@@ -502,8 +510,13 @@ CREATE TABLE `students` (
 INSERT INTO `students` (`user_id`, `student_id`, `student_name`, `course_id`, `status`, `stud_last_updated`) VALUES
 (2, '22-01582', 'Jose Rizal', 1, 'Outside', '2026-03-12 14:32:43'),
 (19, '23-00312', 'JERICHO PAUL D. SALVADOR', 4, 'Outside', '2026-03-17 16:11:32'),
-(1, '23-00314', 'Maria Clara', 5, 'Outside', '2026-04-27 14:43:20'),
-(3, '24-00101', 'Andres Bonifacio', 3, 'Inside', '2026-03-12 14:32:52');
+(1, '23-00314', 'Maria Clara', 5, 'Outside', '2026-04-30 11:32:17'),
+(3, '24-00101', 'Andres Bonifacio', 3, 'Inside', '2026-03-12 14:32:52'),
+(39, '24-00102', 'Maria Santos', 5, 'Outside', '2026-04-30 14:49:08'),
+(42, '24-00254', 'Sasuke Uchiha', 5, 'Outside', '2026-04-30 14:50:59'),
+(43, '24-00256', 'Madara Uchiha', 7, 'Outside', '2026-04-30 15:01:40'),
+(40, '26-00251', 'Kulangot', 3, 'Outside', '2026-04-30 14:49:08'),
+(41, '26-00252', 'Naruto', 5, 'Outside', '2026-04-30 14:49:08');
 
 -- --------------------------------------------------------
 
@@ -550,7 +563,21 @@ INSERT INTO `users` (`user_id`, `role`, `active`) VALUES
 (26, 'employee', 1),
 (27, 'employee', 1),
 (28, 'visitor', 1),
-(29, 'employee', 1);
+(29, 'employee', 1),
+(30, 'employee', 1),
+(31, 'employee', 1),
+(32, 'employee', 1),
+(33, 'employee', 1),
+(34, 'employee', 1),
+(35, 'employee', 1),
+(36, 'visitor', 1),
+(37, 'visitor', 1),
+(38, 'employee', 1),
+(39, 'student', 1),
+(40, 'student', 1),
+(41, 'student', 1),
+(42, 'student', 1),
+(43, 'student', 1);
 
 -- --------------------------------------------------------
 
@@ -589,7 +616,9 @@ CREATE TABLE `visitors` (
 --
 
 INSERT INTO `visitors` (`seq`, `user_id`, `visitor_id`, `visitor_name`, `purpose`, `details`, `status`, `visitor_last_updated`) VALUES
-(1, 28, 'VT-00001', 'Vico Sotto', 'Other', 'Monitor Campus facilities and staff', 'Inside', '2026-04-26 15:44:03');
+(1, 28, 'VT-00001', 'Vico Sotto', 'Other', 'Monitor Campus facilities and staff', 'Inside', '2026-04-26 15:44:03'),
+(2, 36, 'VT-00002', 'Ron Alexander Inocencio', 'Official Business', NULL, 'Inside', '2026-04-30 11:31:57'),
+(3, 37, 'VT-00003', 'Ron Alexander Inocencio', 'Official Business', NULL, 'Inside', '2026-04-30 11:32:07');
 
 --
 -- Triggers `visitors`
@@ -731,13 +760,13 @@ ALTER TABLE `visitors`
 -- AUTO_INCREMENT for table `departments`
 --
 ALTER TABLE `departments`
-  MODIFY `department_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `department_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `employees`
 --
 ALTER TABLE `employees`
-  MODIFY `seq` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `seq` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- AUTO_INCREMENT for table `events`
@@ -767,19 +796,19 @@ ALTER TABLE `event_log`
 -- AUTO_INCREMENT for table `general_log`
 --
 ALTER TABLE `general_log`
-  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=76;
+  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=82;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=30;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=44;
 
 --
 -- AUTO_INCREMENT for table `visitors`
 --
 ALTER TABLE `visitors`
-  MODIFY `seq` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `seq` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- Constraints for dumped tables
