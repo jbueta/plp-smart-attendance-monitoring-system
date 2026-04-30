@@ -1,11 +1,23 @@
+import importlib
 import os
 import smtplib
 from email.message import EmailMessage
 
-from dotenv import load_dotenv
+
+def _load_dotenv_if_available():
+    try:
+        dotenv = importlib.import_module("dotenv")
+    except ImportError:
+        return False
+
+    load_dotenv = getattr(dotenv, "load_dotenv", None)
+    if not callable(load_dotenv):
+        return False
+
+    return bool(load_dotenv())
 
 
-load_dotenv()
+_load_dotenv_if_available()
 
 
 def send_email(
