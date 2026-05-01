@@ -93,7 +93,12 @@ INSERT INTO `departments` (`department_id`, `department_name`, `created_at`) VAL
 (4, 'College of Information Technology', '2026-04-15 00:00:00'),
 (5, 'College of Business and Accountancy', '2026-04-15 00:00:00'),
 (6, 'College of International Hospitality Management', '2026-04-15 00:00:00'),
-(7, 'College of Education', '2026-04-15 00:00:00');
+(7, 'College of Education', '2026-04-15 00:00:00'),
+(8, 'Registrar''s Office', '2026-04-15 00:00:00'),
+(9, 'Human Resources Office', '2026-04-15 00:00:00'),
+(10, 'Accounting Office', '2026-04-15 00:00:00'),
+(11, 'Management Information Systems Office', '2026-04-15 00:00:00'),
+(12, 'Library', '2026-04-15 00:00:00');
 
 -- --------------------------------------------------------
 
@@ -103,9 +108,8 @@ INSERT INTO `departments` (`department_id`, `department_name`, `created_at`) VAL
 
 DROP TABLE IF EXISTS `employees`;
 CREATE TABLE `employees` (
-  `seq` int(11) NOT NULL,
   `user_id` int(11) NOT NULL,
-  `employee_id` varchar(12) NOT NULL,
+  `employee_id` int(5) unsigned zerofill NOT NULL AUTO_INCREMENT,
   `employee_name` varchar(80) DEFAULT NULL,
   `department_id` int(11) NOT NULL,
   `position` varchar(100) DEFAULT NULL,
@@ -117,43 +121,22 @@ CREATE TABLE `employees` (
 -- Dumping data for table `employees`
 --
 
-INSERT INTO `employees` (`seq`, `user_id`, `employee_id`, `employee_name`, `department_id`, `position`, `status`, `emp_last_updated`) VALUES
-(1, 23, 'EMP-0001', 'Gregoria De Jesus', 3, 'Professor', 'Outside', '2026-04-15 08:56:17'),
-(2, 24, 'EMP-0002', 'Melchora Aquino', 4, 'Dean', 'Outside', '2026-04-15 08:56:17'),
-(3, 25, 'EMP-0003', 'Antonio Luna', 5, 'Faculty', 'Outside', '2026-04-15 08:56:17'),
-(4, 26, 'EMP-0004', 'Gabriela Silang', 6, 'Department Chair', 'Outside', '2026-04-15 08:56:17'),
-(5, 27, 'EMP-0005', 'Josefa Llanes Escoda', 7, 'Registrar', 'Outside', '2026-04-15 08:56:17'),
-(8, 29, 'EMP-0008', 'Jason Jay M. Recto', 3, 'Professor I', 'Outside', '2026-04-27 15:51:55'),
-(9, 30, 'EMP-0009', 'GONATO, VINCE RUSSEL H.', 4, 'PROFESSOR I', 'Outside', '2026-04-29 11:14:41'),
-(10, 31, 'EMP-0010', 'GONATO, RHEA VIANCA H.', 3, 'PROFESSOR II', 'Outside', '2026-04-29 11:15:19'),
-(11, 32, 'EMP-0011', 'HENSON, HONEYPEARL CHARISSE B.', 5, 'INSTRUCTOR I', 'Outside', '2026-04-29 11:25:52'),
-(12, 33, 'EMP-0012', 'CABUGUANG, JUAN MIGUEL', 3, 'PROFESSOR I', 'Outside', '2026-04-29 11:25:52'),
-(13, 34, 'EMP-0013', 'GUNGON, KARL', 1, 'PROFESSOR II', 'Outside', '2026-04-29 11:25:52'),
-(14, 35, 'EMP-0014', 'Moncada, Ashanti Martir M.', 5, 'Dean', 'Outside', '2026-04-30 09:01:32'),
-(15, 38, 'EMP-0015', 'Maryjoy Bernabe', 2, 'Professor I', 'Outside', '2026-04-30 14:46:35'),
-(6, 5, 'EMP-1098', 'Apolinario Mabini', 2, 'Dean', 'Outside', '2026-04-15 13:36:17'),
-(7, 4, 'EMP-2015', 'Juan Dela Cruz', 1, 'Faculty', 'Inside', '2026-03-12 14:22:44');
-
---
--- Triggers `employees`
---
-DROP TRIGGER IF EXISTS `employee_id_format`;
-DELIMITER $$
-CREATE TRIGGER `employee_id_format` BEFORE INSERT ON `employees` FOR EACH ROW BEGIN
-    DECLARE next_seq INT;
-
-    SELECT AUTO_INCREMENT INTO next_seq
-    FROM information_schema.TABLES
-    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employees';
-
-    IF next_seq IS NULL THEN
-        SET next_seq = 1;
-    END IF;
-
-    SET NEW.employee_id = CONCAT('EMP-', LPAD(next_seq, 4, '0'));
-END
-$$
-DELIMITER ;
+INSERT INTO `employees` (`user_id`, `employee_id`, `employee_name`, `department_id`, `position`, `status`, `emp_last_updated`) VALUES
+(23, 1, 'Gregoria De Jesus', 3, 'Professor', 'Outside', '2026-04-15 08:56:17'),
+(24, 2, 'Melchora Aquino', 4, 'Dean', 'Outside', '2026-04-15 08:56:17'),
+(25, 3, 'Antonio Luna', 5, 'Faculty', 'Outside', '2026-04-15 08:56:17'),
+(26, 4, 'Gabriela Silang', 6, 'Department Chair', 'Outside', '2026-04-15 08:56:17'),
+(27, 5, 'Josefa Llanes Escoda', 8, 'Registrar', 'Outside', '2026-04-15 08:56:17'),
+(29, 8, 'Jason Jay M. Recto', 3, 'Professor I', 'Outside', '2026-04-27 15:51:55'),
+(30, 9, 'GONATO, VINCE RUSSEL H.', 4, 'PROFESSOR I', 'Outside', '2026-04-29 11:14:41'),
+(31, 10, 'GONATO, RHEA VIANCA H.', 3, 'PROFESSOR II', 'Outside', '2026-04-29 11:15:19'),
+(32, 11, 'HENSON, HONEYPEARL CHARISSE B.', 5, 'INSTRUCTOR I', 'Outside', '2026-04-29 11:25:52'),
+(33, 12, 'CABUGUANG, JUAN MIGUEL', 3, 'PROFESSOR I', 'Outside', '2026-04-29 11:25:52'),
+(34, 13, 'GUNGON, KARL', 1, 'PROFESSOR II', 'Outside', '2026-04-29 11:25:52'),
+(35, 14, 'Moncada, Ashanti Martir M.', 5, 'Dean', 'Outside', '2026-04-30 09:01:32'),
+(38, 15, 'Maryjoy Bernabe', 2, 'Professor I', 'Outside', '2026-04-30 14:46:35'),
+(5, 1098, 'Apolinario Mabini', 2, 'Dean', 'Outside', '2026-04-15 13:36:17'),
+(4, 2015, 'Juan Dela Cruz', 1, 'Faculty', 'Inside', '2026-03-12 14:22:44');
 
 -- --------------------------------------------------------
 
@@ -669,7 +652,6 @@ ALTER TABLE `departments`
 --
 ALTER TABLE `employees`
   ADD PRIMARY KEY (`employee_id`),
-  ADD UNIQUE KEY `employees_seq_unique` (`seq`),
   ADD KEY `employees_fk_departments` (`department_id`),
   ADD KEY `employees_ibfk_1` (`user_id`);
 
@@ -760,13 +742,13 @@ ALTER TABLE `visitors`
 -- AUTO_INCREMENT for table `departments`
 --
 ALTER TABLE `departments`
-  MODIFY `department_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `department_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT for table `employees`
 --
 ALTER TABLE `employees`
-  MODIFY `seq` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `employee_id` int(5) unsigned zerofill NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2016;
 
 --
 -- AUTO_INCREMENT for table `events`

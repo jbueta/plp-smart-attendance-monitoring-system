@@ -57,7 +57,7 @@
                 <div class="d-flex flex-wrap gap-2 p-3 justify-content-end">
                     <div class="input-group input-group-sm" style="width: 200px;">
                         <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
-                        <input type="text" id="searchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search Employee...">
+                        <input type="text" id="searchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search ID or Name...">
                     </div>
                     <select id="departmentFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
                         <option value="">All Departments</option>
@@ -169,13 +169,17 @@
                     <div class="d-flex gap-2">
                         <div class="input-group input-group-sm" style="width: 220px;">
                             <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
-                            <input type="text" id="recordsSearchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search Name or Dept...">
+                            <input type="text" id="recordsSearchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search ID, Name, or Dept...">
                         </div>
                         <select id="recordsDepartmentFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
                             <option value="">All Departments</option>
                             {% for dept in departments %}
                             <option value="{{ dept.department_name | lower }}">{{ dept.department_name }}</option>
                             {% endfor %}
+                        </select>
+                        <select id="recordsStatusFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
+                            <option value="active" selected>Active</option>
+                            <option value="all">Active / Inactive</option>
                         </select>
                         <select id="recordsSortFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
                             <option value="recent">Recent to Oldest</option>
@@ -209,7 +213,8 @@
                                 data-dept="{{ emp.dept | lower }}"
                                 data-dept-original="{{ emp.dept }}"
                                 data-position-original="{{ emp.position or '' }}"
-                                data-position-display="{{ emp.position_display or 'N/A' }}">
+                                data-position-display="{{ emp.position_display or 'N/A' }}"
+                                data-status="{{ emp.status | lower }}">
                                 <td class="font-monospace text-white-50 ps-4">{{ emp.id }}</td>
                                 <td class="fw-bold text-white">{{ emp.name }}</td>
                                 <td class="text-white-50">{{ emp.dept }}</td>
@@ -340,20 +345,14 @@
                         </div>
                     </div>
                     <div class="row g-3 mb-0">
-                        <div class="col-md-5">
-                            <div class="card-glass border-secondary p-3 h-100 d-flex flex-column align-items-center justify-content-center text-center shadow-sm" style="background: linear-gradient(135deg, #0f3d2e 0%, #0b2f23 100%); border-radius: 16px;">
-                                <div class="bg-transparent border border-secondary rounded-4 mb-3 d-flex align-items-center justify-content-center p-3" style="width: 180px; height: 180px; border-style: dashed !important; border-width: 2px !important;">
-                                    <span class="text-white-50 small fw-bold tracking-wider">QR PLACEHOLDER ONLY</span>
-                                </div>
-                                <button type="button" class="btn btn-light rounded-pill px-4 py-2 btn-sm fw-bold text-dark shadow-sm" disabled title="QR generation is planned but not yet enabled.">
-                                    QR GENERATION COMING SOON
-                                </button>
-                            </div>
-                        </div>
-                        <div class="col-md-7">
+                        <div class="col-12">
                             <form id="manualAddEmployeeForm" class="d-flex flex-column h-100 justify-content-between card-glass border-secondary p-3 shadow-sm" style="background: linear-gradient(135deg, #0f3d2e 0%, #0b2f23 100%); border-radius: 16px;">
                                 <h6 class="text-white fw-bold mb-3 tracking-wider">INFORMATION DETAILS</h6>
                                 <div class="vstack gap-2 text-start flex-grow-1">
+                                    <div class="row align-items-center">
+                                        <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0" for="manualAddId">EMPLOYEE ID:</label></div>
+                                        <div class="col-sm-8"><input type="text" id="manualAddId" class="form-control form-control-sm bg-transparent text-white border-secondary rounded-3 shadow-none" placeholder="e.g. 00001" inputmode="numeric" pattern="^[0-9]{5}$" maxlength="5" required></div>
+                                    </div>
                                     <div class="row align-items-center">
                                         <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0" for="manualAddName">FULL NAME:</label></div>
                                         <div class="col-sm-8"><input type="text" id="manualAddName" class="form-control form-control-sm bg-transparent text-white border-secondary rounded-3 shadow-none" placeholder="e.g. Juan Dela Cruz" required></div>
@@ -427,7 +426,7 @@
                                     </div>
                                 </div>
                                 <div class="mt-3 pt-2 border-top border-secondary">
-                                    <span class="text-white-50" style="font-size: 0.70rem;">Employee ID will be generated automatically after the record is saved. Position is optional.</span>
+                                    <span class="text-white-50" style="font-size: 0.70rem;">Employee ID must be a 5-digit number such as 00001. Position is optional.</span>
                                 </div>
                             </form>
                         </div>
@@ -486,42 +485,49 @@
 </div>
 
 
-<!-- ========== SUCCESS TOAST ========== -->
-<div id="successToast" style="
-    display: none; position: fixed; top: 50%; left: 50%;
-    transform: translate(-50%, -50%); z-index: 9999;
-    background: rgba(25, 135, 84, 0.15); border: 1px solid rgba(25, 135, 84, 0.4);
-    backdrop-filter: blur(10px); border-radius: 16px; padding: 2rem 2.5rem;
-    color: #fff; min-width: 380px; box-shadow: 0 8px 32px rgba(0,0,0,0.3);">
-    <div class="d-flex align-items-center gap-3">
-        <i class="bi bi-check-circle-fill text-success" style="font-size: 2.5rem;"></i>
-        <div>
-            <div class="fw-bold fs-5">Success</div>
-            <div class="text-white-50" id="successToastMsg">Employee updated successfully.</div>
-        </div>
-        <button onclick="hideToast()" class="btn-close btn-close-white ms-auto" style="opacity:0.6"></button>
-    </div>
-</div>
+<!-- Toast notification -->
+<div id="toastContainer" class="position-fixed" style="z-index: 9999; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; pointer-events: none;"></div>
 
 
-<!-- ========== CONFIRM DELETE TOAST ========== -->
-<div id="confirmDeleteToast" style="
-    display: none; position: fixed; top: 50%; left: 50%;
-    transform: translate(-50%, -50%); z-index: 9999;
-    background: rgba(20, 20, 30, 0.95); border: 1px solid rgba(220, 53, 69, 0.4);
-    backdrop-filter: blur(10px); border-radius: 16px; padding: 2rem 2.5rem;
-    color: #fff; min-width: 380px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
-    <div class="d-flex flex-column gap-3">
-        <div class="d-flex align-items-center gap-3">
-            <i class="bi bi-trash3-fill text-danger" style="font-size: 2rem;"></i>
-            <div>
-                <div class="fw-bold fs-5">Delete Employee</div>
-                <div class="text-white-50 small" id="confirmDeleteMsg">Are you sure you want to delete this employee? This will mark the account inactive.</div>
-            </div>
+<!-- ===================== CONFIRM DIALOG ===================== -->
+<div id="confirmOverlay" class="d-none position-fixed top-0 start-0 w-100 h-100"
+    style="background: rgba(0,0,0,0.55); backdrop-filter: blur(6px); z-index: 9998; display: flex; align-items: center; justify-content: center;">
+    <div style="
+        background: rgba(10,40,25,0.98);
+        border: 1px solid rgba(239,68,68,0.3);
+        border-radius: 20px;
+        padding: 32px 28px;
+        min-width: 320px;
+        max-width: 400px;
+        box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+        text-align: center;
+        animation: toastSlideIn 0.25s cubic-bezier(0.34,1.56,0.64,1) forwards;
+    ">
+        <div style="
+            width:52px; height:52px; border-radius:50%;
+            background:#ef4444; margin: 0 auto 16px;
+            display:flex; align-items:center; justify-content:center;
+            box-shadow: 0 0 0 8px rgba(239,68,68,0.15);
+        ">
+            <i class="bi bi-exclamation-triangle-fill" style="font-size:1.4rem; color:#fff;"></i>
         </div>
-        <div class="d-flex justify-content-end gap-2 mt-1">
-            <button id="cancelDeleteBtn" class="btn btn-outline-light btn-sm px-4">Cancel</button>
-            <button id="confirmDeleteBtn" class="btn btn-danger btn-sm px-4">Delete</button>
+        <h6 id="confirmTitle" style="color:#fff; font-weight:700; font-size:1rem; margin-bottom:8px;"></h6>
+        <p id="confirmSubtitle" style="color:rgba(255,255,255,0.55); font-size:0.83rem; margin-bottom:24px;"></p>
+        <div class="d-flex gap-3 justify-content-center">
+            <button id="confirmCancelBtn" style="
+                flex:1; padding:10px; border-radius:12px;
+                background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15);
+                color:#fff; font-weight:600; cursor:pointer; font-size:0.9rem;
+                transition: background 0.2s;
+            " onmouseover="this.style.background='rgba(255,255,255,0.15)'"
+               onmouseout="this.style.background='rgba(255,255,255,0.08)'">Cancel</button>
+            <button id="confirmOkBtn" style="
+                flex:1; padding:10px; border-radius:12px;
+                background:#ef4444; border:none;
+                color:#fff; font-weight:700; cursor:pointer; font-size:0.9rem;
+                transition: background 0.2s;
+            " onmouseover="this.style.background='#dc2626'"
+               onmouseout="this.style.background='#ef4444'">Delete</button>
         </div>
     </div>
 </div>
@@ -619,6 +625,8 @@
 .upload-zone:hover { background: rgba(255,255,255,0.05) !important; border-color: #d4af37 !important; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
 .upload-zone:hover i, .upload-zone:hover span { color: #d4af37 !important; transition: color 0.3s ease; }
 @keyframes fadeInModal { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes toastSlideIn { from { opacity: 0; transform: scale(0.88); } to { opacity: 1; transform: scale(1); } }
+@keyframes toastSlideOut { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.88); } }
 </style>
 
 
@@ -634,19 +642,107 @@ document.addEventListener('DOMContentLoaded', function () {
     const ITEMS_PER_PAGE = 6;
 
     // ─── TOAST HELPERS ────────────────────────────────────────────────────────
-    function showToast(msg) {
-        const toast = document.getElementById('successToast');
-        document.getElementById('successToastMsg').textContent = msg;
-        toast.style.display = 'block';
-        clearTimeout(window._toastTimer);
-        window._toastTimer = setTimeout(() => hideToast(), 3000);
+    const TOAST_DURATION = 5000;
+
+    function escapeToastHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
-    window.hideToast = function () {
-        const toast = document.getElementById('successToast');
-        toast.style.opacity = '0';
-        toast.style.transition = 'opacity 0.3s ease';
-        setTimeout(() => { toast.style.display = 'none'; toast.style.opacity = '1'; }, 300);
-    };
+
+    function showToast(message, type = 'success', subtitle = '') {
+        const container = document.getElementById('toastContainer');
+        if (!container) return;
+
+        const id = 'toast-' + Date.now();
+        const barId = id + '-bar';
+
+        const cfg = {
+            success: { icon: 'check-circle-fill', iconBg: '#22c55e', border: 'rgba(34,197,94,0.35)', barColor: '#22c55e', title: 'Success' },
+            danger: { icon: 'x-circle-fill', iconBg: '#ef4444', border: 'rgba(239,68,68,0.35)', barColor: '#ef4444', title: 'Error' },
+            warning: { icon: 'exclamation-circle-fill', iconBg: '#f59e0b', border: 'rgba(245,158,11,0.35)', barColor: '#f59e0b', title: 'Warning' },
+            info: { icon: 'info-circle-fill', iconBg: '#3b82f6', border: 'rgba(59,130,246,0.35)', barColor: '#3b82f6', title: 'Info' }
+        };
+
+        const c = cfg[type] || cfg.success;
+        const titleText = escapeToastHtml(message || c.title);
+        const bodyText = escapeToastHtml(subtitle || message || '');
+        const html = `
+            <div id="${id}" style="
+                position: relative; overflow: hidden;
+                display: flex; align-items: flex-start; gap: 14px;
+                width: min(520px, calc(100vw - 32px));
+                padding: 18px 18px 24px;
+                border-radius: 18px;
+                background: rgba(8, 32, 20, 0.98);
+                border: 1px solid ${c.border};
+                box-shadow: 0 24px 60px rgba(0,0,0,0.65);
+                backdrop-filter: blur(20px);
+                animation: toastSlideIn 0.32s cubic-bezier(0.34,1.56,0.64,1) forwards;
+                pointer-events: auto;
+            ">
+                <div style="
+                    width:46px; height:46px; border-radius:50%; flex-shrink:0;
+                    background:${c.iconBg};
+                    display:flex; align-items:center; justify-content:center;
+                    box-shadow: 0 0 0 7px ${c.iconBg}28;
+                ">
+                    <i class="bi bi-${c.icon}" style="font-size:1.25rem; color:#fff;"></i>
+                </div>
+                <div style="flex:1; min-width:0;">
+                    <div style="font-weight:700; font-size:0.95rem; color:#fff; margin-bottom:4px; letter-spacing:0.01em;">${titleText}</div>
+                    <div style="
+                        font-size:0.84rem;
+                        color:rgba(255,255,255,0.74);
+                        line-height:1.45;
+                        white-space:pre-wrap;
+                        overflow-wrap:anywhere;
+                        word-break:break-word;
+                    ">${bodyText}</div>
+                </div>
+                <button type="button" data-toast-close="${id}" style="
+                    background:none; border:none; cursor:pointer; padding:0; line-height:1; flex-shrink:0;
+                    color:rgba(255,255,255,0.35); font-size:0.9rem; transition:color 0.15s;
+                ">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+                <div id="${barId}" style="
+                    position:absolute; bottom:0; left:0; height:3px;
+                    width:100%; border-radius:0 0 18px 18px;
+                    background:${c.barColor};
+                    transition: width ${TOAST_DURATION}ms linear;
+                "></div>
+            </div>`;
+
+        container.insertAdjacentHTML('beforeend', html);
+
+        const closeBtn = container.querySelector(`[data-toast-close="${id}"]`);
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => dismissToast(id));
+            closeBtn.addEventListener('mouseover', () => { closeBtn.style.color = '#fff'; });
+            closeBtn.addEventListener('mouseout', () => { closeBtn.style.color = 'rgba(255,255,255,0.35)'; });
+        }
+
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                const bar = document.getElementById(barId);
+                if (bar) bar.style.width = '0%';
+            });
+        });
+
+        setTimeout(() => dismissToast(id), TOAST_DURATION);
+    }
+
+    function dismissToast(id) {
+        const toast = document.getElementById(id);
+        if (!toast || toast.dataset.closing === 'true') return;
+        toast.dataset.closing = 'true';
+        toast.style.animation = 'toastSlideOut 0.22s ease forwards';
+        setTimeout(() => toast.remove(), 230);
+    }
 
     // ─── ADD USER MODAL ───────────────────────────────────────────────────────
     const addUserModalEl       = document.getElementById('addUserModal');
@@ -712,6 +808,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Manual Add — dynamic fields & validation
+    const manualIdInput               = document.getElementById('manualAddId');
     const manualNameInput             = document.getElementById('manualAddName');
     const typeTeachingRadio           = document.getElementById('typeTeaching');
     const typeNonTeachingRadio        = document.getElementById('typeNonTeaching');
@@ -722,6 +819,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const manualAddOffice             = document.getElementById('manualAddOffice');
     const manualAddNonTeachingPos     = document.getElementById('manualAddNonTeachingPosition');
     const submitManualBtn             = document.getElementById('submitManualAddBtn');
+    const EMPLOYEE_ID_REGEX           = /^\d{5}$/;
 
     function togglePersonnelFields() {
         if (typeTeachingRadio.checked) {
@@ -739,24 +837,26 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function validateManualForm() {
+        const idOk   = manualIdInput && EMPLOYEE_ID_REGEX.test(manualIdInput.value.trim());
         const nameOk = manualNameInput && manualNameInput.value.trim().length > 0;
         let typeOk   = false;
         if (typeTeachingRadio && typeTeachingRadio.checked)
             typeOk = manualAddCollege.value !== '';
         else if (typeNonTeachingRadio && typeNonTeachingRadio.checked)
             typeOk = manualAddOffice.value !== '';
-        if (submitManualBtn) submitManualBtn.disabled = !(nameOk && typeOk);
+        if (submitManualBtn) submitManualBtn.disabled = !(idOk && nameOk && typeOk);
     }
 
     if (typeTeachingRadio)    typeTeachingRadio.addEventListener('change', togglePersonnelFields);
     if (typeNonTeachingRadio) typeNonTeachingRadio.addEventListener('change', togglePersonnelFields);
-    [manualNameInput, manualAddCollege, manualAddTeachingPosition, manualAddOffice, manualAddNonTeachingPos]
+    [manualIdInput, manualNameInput, manualAddCollege, manualAddTeachingPosition, manualAddOffice, manualAddNonTeachingPos]
         .forEach(el => el && el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', validateManualForm));
 
     if (submitManualBtn) {
         submitManualBtn.addEventListener('click', async function () {
             const isTeaching = typeTeachingRadio && typeTeachingRadio.checked;
             const payload = {
+                employee_id:   manualIdInput.value.trim(),
                 employee_name: manualNameInput.value.trim(),
                 department_id: isTeaching ? manualAddCollege.value : manualAddOffice.value,
                 position:      isTeaching ? manualAddTeachingPosition.value : manualAddNonTeachingPos.value
@@ -767,10 +867,20 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (result.success) {
                     const modal = bootstrap.Modal.getInstance(addUserModalEl);
                     if (modal) modal.hide();
-                    showToast(result.reactivated ? 'Employee reactivated successfully.' : 'Employee added successfully.');
+                    showToast(
+                        result.reactivated ? 'Employee reactivated successfully.' : 'Employee added successfully.',
+                        'success',
+                        result.reactivated
+                            ? `${payload.employee_name.toUpperCase()} was reactivated.`
+                            : `${payload.employee_name.toUpperCase()} has been added to records.`
+                    );
                     setTimeout(() => location.reload(), 1800);
-                } else { alert('Error: ' + result.error); }
-            } catch (err) { alert('Request failed: ' + err.message); }
+                } else {
+                    showToast('Add employee failed.', 'danger', (result && result.error) || 'Could not add employee.');
+                }
+            } catch (err) {
+                showToast('Request failed.', 'danger', err.message || 'Could not reach the server.');
+            }
         });
     }
 
@@ -785,6 +895,34 @@ document.addEventListener('DOMContentLoaded', function () {
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    }
+
+    function showConfirm(title, subtitle = '') {
+        return new Promise(resolve => {
+            const overlay = document.getElementById('confirmOverlay');
+            const titleEl = document.getElementById('confirmTitle');
+            const subEl = document.getElementById('confirmSubtitle');
+            const okBtn = document.getElementById('confirmOkBtn');
+            const cancelBtn = document.getElementById('confirmCancelBtn');
+
+            titleEl.textContent = title;
+            subEl.textContent = subtitle;
+
+            overlay.classList.remove('d-none');
+            overlay.style.display = 'flex';
+
+            function cleanup(result) {
+                overlay.style.display = 'none';
+                overlay.classList.add('d-none');
+                okBtn.replaceWith(okBtn.cloneNode(true));
+                cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+                resolve(result);
+            }
+
+            document.getElementById('confirmOkBtn').addEventListener('click', () => cleanup(true));
+            document.getElementById('confirmCancelBtn').addEventListener('click', () => cleanup(false));
+            overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(false); }, { once: true });
+        });
     }
 
     async function parseApiResponseSafe(response) {
@@ -842,6 +980,7 @@ document.addEventListener('DOMContentLoaded', function () {
             ? uploadPreviewRows.map((row, index) => `
                 <tr>
                     <td class="text-white-50">${escapeHtml(row.row_number)}</td>
+                    <td class="text-white">${escapeHtml(row.employee_id)}</td>
                     <td class="text-white">${escapeHtml(row.employee_name)}</td>
                     <td class="text-white-50">
                         ${escapeHtml(row.department_name)}
@@ -856,7 +995,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     </td>
                 </tr>
             `).join('')
-            : `<tr><td colspan="6" class="text-center text-white-50 py-4">No rows left to upload.</td></tr>`;
+            : `<tr><td colspan="7" class="text-center text-white-50 py-4">No rows left to upload.</td></tr>`;
 
         const validationErrors = (result.errors || []).length
             ? `
@@ -888,6 +1027,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     <thead>
                         <tr>
                             <th>Row</th>
+                            <th>Employee ID</th>
                             <th>Employee Name</th>
                             <th>Department</th>
                             <th>Position</th>
@@ -913,10 +1053,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     async function commitPreviewRows() {
         if (!uploadPreviewRows.length) {
-            alert('No rows left to upload.');
+            showToast('No rows left to upload.', 'warning');
             return;
         }
         const confirmBtn = document.getElementById('confirmUploadPreviewBtn');
+        const resultModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('uploadResultModal'));
         if (confirmBtn) {
             confirmBtn.disabled = true;
             confirmBtn.textContent = 'Uploading...';
@@ -965,7 +1106,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 `;
             }
         } catch (err) {
-            alert('Upload failed. Please try again. If the issue persists, refresh the page and retry.');
+            resultModal?.hide();
+            showToast('Upload failed.', 'danger', 'Please try again. If the issue persists, refresh the page and retry.');
         } finally {
             if (confirmBtn) {
                 confirmBtn.disabled = false;
@@ -981,7 +1123,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!Number.isNaN(index)) {
                 uploadPreviewRows.splice(index, 1);
                 renderUploadPreviewModal({
-                    required_columns: ['EMPLOYEE NAME', 'DEPARTMENT'],
+                    required_columns: ['EMPLOYEE ID', 'EMPLOYEE NAME', 'DEPARTMENT'],
                     optional_columns: ['POSITION'],
                     errors: []
                 });
@@ -1004,7 +1146,10 @@ document.addEventListener('DOMContentLoaded', function () {
     if (uploadSubmitBtn) {
         uploadSubmitBtn.addEventListener('click', async function () {
             const file = fileInput && fileInput.files[0];
-            if (!file) { alert('Please select an Excel file first.'); return; }
+            if (!file) {
+                showToast('No file selected.', 'warning', 'Please choose an Excel or CSV file first.');
+                return;
+            }
             const formData = new FormData();
             formData.append('file', file);
             uploadSubmitBtn.disabled = true;
@@ -1018,9 +1163,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 } else {
                     const message = (result && (result.error || (result.errors && result.errors.join('\n'))))
                         || 'Validation failed. Please check the file format and required columns, then try again.';
-                    alert(message);
+                    showToast('Validation failed.', 'danger', message);
                 }
-            } catch (err) { alert('Something went wrong while validating the file. Please try again.'); }
+            } catch (err) {
+                showToast('Validation failed.', 'danger', 'Something went wrong while validating the file. Please try again.');
+            }
             finally { uploadSubmitBtn.disabled = false; uploadSubmitBtn.textContent = 'Validate File'; }
         });
     }
@@ -1169,7 +1316,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        if (visible === 0 && hasFilters) {
+        if (visible === 0) {
             // Rows exist but none match the current filter
             tableCard.style.display  = '';
             if (activityTableResponsive) activityTableResponsive.style.display = 'none';
@@ -1198,8 +1345,10 @@ document.addEventListener('DOMContentLoaded', function () {
     // ─── RECORDS FILTER + PAGINATION ─────────────────────────────────────────
     const recordsSearch           = document.getElementById('recordsSearchInput');
     const recordsDeptFilter       = document.getElementById('recordsDepartmentFilter');
+    const recordsStatusFilter     = document.getElementById('recordsStatusFilter');
     const recordsSortFilter       = document.getElementById('recordsSortFilter');
     const recordsTableCard        = document.getElementById('recordsTableCard');
+    const recordsTableResponsive  = recordsTableCard ? recordsTableCard.querySelector('.table-responsive') : null;
     const recordsTableBody        = document.getElementById('recordsTableBody');
     const recordsNoResults        = document.getElementById('recordsNoResults');
     const recordsResultCount      = document.getElementById('recordsResultCount');
@@ -1264,17 +1413,20 @@ document.addEventListener('DOMContentLoaded', function () {
     function applyRecordsFilter() {
         const search  = recordsSearch  ? recordsSearch.value.trim().toLowerCase()  : '';
         const deptVal = recordsDeptFilter ? recordsDeptFilter.value.toLowerCase()   : '';
+        const statusVal = recordsStatusFilter ? recordsStatusFilter.value.toLowerCase() : 'active';
         let visible   = 0;
 
         getRecordRows().forEach(row => {
             const name = row.dataset.name || '';
             const dept = row.dataset.dept || '';
             const id   = row.dataset.id   || '';
+            const status = (row.dataset.status || '').toLowerCase();
 
             const matchSearch = !search   || name.includes(search) || id.includes(search) || dept.includes(search);
             const matchDept   = !deptVal  || dept === deptVal;
+            const matchStatus = statusVal === 'all' || status === 'active';
 
-            if (matchSearch && matchDept) {
+            if (matchSearch && matchDept && matchStatus) {
                 row.dataset.filterVisible = 'true';
                 visible++;
             } else {
@@ -1284,7 +1436,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         sortRecordsRows();
         recordsCurrentPage = 1;
-        const hasFilters = search || deptVal;
+        const hasFilters = search || deptVal || statusVal !== 'active';
 
         if (getRecordRows().length === 0) {
             // No rows at all — keep table + filters visible, hide extra UI
@@ -1296,15 +1448,15 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        if (visible === 0 && hasFilters) {
+        if (visible === 0) {
                 // Rows exist but nothing matches — hide only the table, keep controls visible
-            recordsTableCard.querySelector('.table-responsive').style.display = 'none';
+            if (recordsTableResponsive) recordsTableResponsive.style.display = 'none';
             recordsNoResults.style.display  = 'block';
             recordsResultCount.textContent  = '';
             recordsPaginationContainer.classList.remove('show');
             recordsPaginationContainer.style.display = 'none';
         } else {
-            recordsTableCard.querySelector('.table-responsive').style.display = '';
+            if (recordsTableResponsive) recordsTableResponsive.style.display = '';
             recordsNoResults.style.display  = 'none';
             // Only show count when a filter is active
             recordsResultCount.textContent  = hasFilters
@@ -1317,6 +1469,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (recordsSearch)     recordsSearch.addEventListener('input',  applyRecordsFilter);
     if (recordsDeptFilter) recordsDeptFilter.addEventListener('change', applyRecordsFilter);
+    if (recordsStatusFilter) recordsStatusFilter.addEventListener('change', applyRecordsFilter);
     if (recordsSortFilter) recordsSortFilter.addEventListener('change', applyRecordsFilter);
 
 
@@ -1417,7 +1570,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 position:      editPosition.value.trim()
             };
             if (!payload.employee_id || !payload.employee_name || !payload.department_id) {
-                alert('Please fill in Employee ID, Employee Name, and Department before updating.');
+                showToast('Missing fields.', 'warning', 'Please fill in Employee ID, Employee Name, and Department before updating.');
                 return;
             }
             fetch('/update_employee', {
@@ -1429,51 +1582,64 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(data => {
                 if (data.success) {
                     hideEditCard();
-                    showToast('Employee record updated successfully.');
+                    showToast('Employee record updated successfully.', 'success', `${payload.employee_name.toUpperCase()} has been updated.`);
                     setTimeout(() => location.reload(), 1800);
-                } else { alert('Update failed: ' + data.error); }
+                } else {
+                    showToast('Update failed.', 'danger', (data && data.error) || 'Could not update employee.');
+                }
+            })
+            .catch(() => {
+                showToast('Server error.', 'danger', 'Could not reach the server. Please try again.');
             });
         });
     }
 
 
     // ─── DELETE RECORD ────────────────────────────────────────────────────────
-    let pendingDeleteId = null;
+    async function handleDeleteEmployee(row) {
+        const isActivityRow = row.classList.contains('employee-row');
+        const employeeId = isActivityRow
+            ? (row.getAttribute('data-employee-id-original') || row.getAttribute('data-employee-id') || '')
+            : (row.getAttribute('data-id-original') || row.getAttribute('data-id') || '');
+        const name = isActivityRow
+            ? (row.getAttribute('data-employee-name-original') || row.querySelector('td:nth-child(1) span')?.textContent.trim() || 'this employee')
+            : (row.getAttribute('data-name-original') || row.querySelector('td:nth-child(2)')?.textContent.trim() || 'this employee');
 
-    document.addEventListener('click', function (e) {
-        const btn = e.target.closest('.delete-employee-record');
-        if (!btn) return;
-        pendingDeleteId = btn.dataset.id;
-        document.getElementById('confirmDeleteMsg').textContent =
-            `Are you sure you want to delete employee ${pendingDeleteId}? This is a soft delete, so the record will stay in the system as inactive.`;
-        document.getElementById('confirmDeleteToast').style.display = 'block';
-    });
+        const confirmed = await showConfirm(
+            `Delete "${name}"?`,
+            'This is a soft delete, so the employee will stay in the database as inactive.'
+        );
+        if (!confirmed) return;
 
-    document.getElementById('cancelDeleteBtn').addEventListener('click', function () {
-        document.getElementById('confirmDeleteToast').style.display = 'none';
-        pendingDeleteId = null;
-    });
-
-    document.getElementById('confirmDeleteBtn').addEventListener('click', async function () {
-        if (!pendingDeleteId) return;
-        document.getElementById('confirmDeleteToast').style.display = 'none';
         try {
             const res = await fetch('/delete_employee', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ employee_id: pendingDeleteId })
+                body: JSON.stringify({ employee_id: employeeId })
             });
             const data = await parseApiResponseSafe(res);
             if (res.ok && data && data.success) {
-                showToast(data.already_inactive ? 'Employee is already inactive.' : 'Employee deleted successfully.');
+                showToast(
+                    data.already_inactive ? 'Employee is already inactive.' : 'Employee deleted successfully.',
+                    data.already_inactive ? 'info' : 'success',
+                    data.already_inactive
+                        ? `${name} is already inactive.`
+                        : `${name} has been marked inactive.`
+                );
                 setTimeout(() => location.reload(), 1800);
             } else {
-                alert('Delete failed: ' + ((data && data.error) || 'Could not delete employee.'));
+                showToast('Delete failed.', 'danger', (data && data.error) || 'Could not delete employee.');
             }
         } catch (_) {
-            alert('Delete failed: Could not delete employee.');
+            showToast('Delete failed.', 'danger', 'Could not delete employee.');
         }
-        pendingDeleteId = null;
+    }
+
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('.delete-employee, .delete-employee-record');
+        if (!btn) return;
+        const row = btn.closest('tr');
+        if (row) handleDeleteEmployee(row);
     });
 
 

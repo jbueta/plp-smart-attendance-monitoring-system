@@ -7,10 +7,12 @@ from werkzeug.security import check_password_hash
 from utils.employee_schema import (
     EMPLOYEE_CREATE_LOCK_NAME,
     build_person_name_match_keys,
-    build_employee_signature,
     department_lookup_key,
+    format_employee_id,
     normalize_department_name,
+    normalize_employee_id,
     normalize_employee_name,
+    parse_employee_id,
     normalize_position,
     validate_department_name,
     validate_employee_fields,
@@ -969,7 +971,14 @@ class Database:
                 GROUP BY
                     e.event_id, e.event_name, e.event_type, e.frequency,
                     e.event_date, e.time_start, e.time_end, e.location
-                ORDER BY e.event_date DESC, e.event_id DESC
+                ORDER BY
+                    CASE
+                        WHEN e.event_name = 'Flag Ceremony' THEN 0
+                        WHEN e.event_name = 'Flag Retreat' THEN 1
+                        ELSE 2
+                    END ASC,
+                    e.event_date DESC,
+                    e.event_id DESC
                 """
             )
             result = cursor.fetchall()
@@ -1252,7 +1261,7 @@ class Database:
                 logs.append(
                     {
                         "attendance_id": row["attendance_id"],
-                        "id": row["employee_id"],
+                        "id": format_employee_id(row["employee_id"]),
                         "initials": initials,
                         "name": name,
                         "department_id": row["department_id"],
@@ -1283,7 +1292,7 @@ class Database:
             cursor.execute(
                 """
                 SELECT
-                    e.seq AS added_order,
+                    e.user_id AS added_order,
                     e.employee_id,
                     COALESCE(NULLIF(TRIM(e.employee_name), ''), 'Unknown Employee') AS employee_name,
                     e.department_id,
@@ -1294,7 +1303,7 @@ class Database:
                 FROM employees e
                 JOIN users u ON e.user_id = u.user_id
                 LEFT JOIN departments d ON e.department_id = d.department_id
-                ORDER BY is_active DESC, employee_name ASC
+                ORDER BY is_active DESC, e.user_id DESC, employee_name ASC
                 """
             )
             rows = cursor.fetchall()
@@ -1304,7 +1313,7 @@ class Database:
                 is_active = bool(row.get("is_active"))
                 records.append(
                     {
-                        "id": row["employee_id"],
+                        "id": format_employee_id(row["employee_id"]),
                         "added_order": row["added_order"],
                         "name": row["employee_name"],
                         "department_id": row["department_id"],
@@ -2156,38 +2165,36 @@ class EmployeeModel:
             employee_name,
         )
 
-    def _has_existing_employee_name_conflict(self, cursor, employee_name, exclude_signature=None):
+    def _has_existing_employee_name_conflict(self, cursor, employee_name, exclude_employee_id=None):
+        normalized_exclude_id = normalize_employee_id(exclude_employee_id)
         return _has_same_role_name_match(
             cursor,
             """
-            SELECT employee_name, department_id, COALESCE(position, '')
+            SELECT employee_name, employee_id
             FROM employees
             """,
             employee_name,
-            lambda row: build_employee_signature(row[0], row[1], row[2]),
-            exclude_sources={exclude_signature} if exclude_signature else None,
+            lambda row: format_employee_id(row[1]),
+            exclude_sources={normalized_exclude_id} if normalized_exclude_id else None,
         )
 
-    def _find_employee_by_signature(self, cursor, employee_name, department_id, position):
-        employee_signature = build_employee_signature(employee_name, department_id, position)
+    def _find_employee_by_id(self, cursor, employee_id):
         cursor.execute(
             """
             SELECT e.employee_id, e.user_id, COALESCE(u.active, 1) AS is_active
             FROM employees e
             JOIN users u ON e.user_id = u.user_id
-            WHERE UPPER(TRIM(e.employee_name)) = %s
-              AND e.department_id = %s
-              AND UPPER(TRIM(COALESCE(e.position, ''))) = %s
+            WHERE e.employee_id = %s
             LIMIT 1
             """,
-            employee_signature,
+            (parse_employee_id(employee_id),),
         )
         row = cursor.fetchone()
         if not row:
             return None
 
         return {
-            "employee_id": row[0],
+            "employee_id": format_employee_id(row[0]),
             "user_id": row[1],
             "is_active": bool(row[2]),
         }
@@ -2195,6 +2202,7 @@ class EmployeeModel:
     def _create_or_reactivate_employee(
         self,
         conn,
+        employee_id,
         employee_name,
         department_id=None,
         department_name=None,
@@ -2203,12 +2211,15 @@ class EmployeeModel:
         cursor = None
         lock_acquired = False
         try:
+            employee_id = normalize_employee_id(employee_id)
             employee_name = normalize_employee_name(employee_name)
             position = normalize_position(position)
 
             validation_errors = validate_employee_fields(
+                employee_id=employee_id,
                 employee_name=employee_name,
                 position=position,
+                require_employee_id=True,
                 require_position=False,
             )
             if validation_errors:
@@ -2235,29 +2246,22 @@ class EmployeeModel:
                 }
             lock_acquired = True
 
-            employee_signature = build_employee_signature(
-                employee_name,
-                resolved_department_id,
-                position,
-            )
-            existing_employee = self._find_employee_by_signature(
+            existing_employee = self._find_employee_by_id(
                 cursor,
-                employee_name=employee_name,
-                department_id=resolved_department_id,
-                position=position,
+                employee_id=employee_id,
             )
             if existing_employee:
                 if existing_employee["is_active"]:
                     conn.rollback()
                     return {
                         "success": False,
-                        "error": f"Employee already exists with ID {existing_employee['employee_id']}",
+                        "error": f"Employee already exists with ID {existing_employee['employee_id']}.",
                     }
 
             if self._has_existing_employee_name_conflict(
                 cursor,
                 employee_name,
-                exclude_signature=employee_signature if existing_employee else None,
+                exclude_employee_id=employee_id if existing_employee else None,
             ):
                 conn.rollback()
                 return {
@@ -2324,31 +2328,22 @@ class EmployeeModel:
             cursor.execute(
                 """
                 INSERT INTO employees
-                    (user_id, employee_name, department_id, position, status)
-                VALUES (%s, %s, %s, %s, %s)
+                    (user_id, employee_id, employee_name, department_id, position, status)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 (
                     user_id,
+                    parse_employee_id(employee_id),
                     employee_name,
                     resolved_department_id,
                     position or None,
                     "Outside",
                 ),
             )
-            cursor.execute(
-                """
-                SELECT employee_id
-                FROM employees
-                WHERE user_id = %s
-                LIMIT 1
-                """,
-                (user_id,),
-            )
-            created_employee = cursor.fetchone()
             conn.commit()
             return {
                 "success": True,
-                "employee_id": created_employee[0] if created_employee else None,
+                "employee_id": employee_id,
                 "reactivated": False,
             }
         except Exception as err:
@@ -2361,7 +2356,7 @@ class EmployeeModel:
             if cursor:
                 cursor.close()
 
-    def add_employee(self, employee_name, department_id, position):
+    def add_employee(self, employee_id, employee_name, department_id, position):
         conn = connect_db()
         if conn is None:
             return {"success": False, "error": "Database connection failed"}
@@ -2369,6 +2364,7 @@ class EmployeeModel:
         try:
             return self._create_or_reactivate_employee(
                 conn=conn,
+                employee_id=employee_id,
                 employee_name=employee_name,
                 department_id=department_id,
                 position=position,
@@ -2376,9 +2372,18 @@ class EmployeeModel:
         finally:
             release_db_connection(conn)
 
-    def add_employee_excel(self, conn, employee_name, department_name=None, position="", department_id=None):
+    def add_employee_excel(
+        self,
+        conn,
+        employee_id,
+        employee_name,
+        department_name=None,
+        position="",
+        department_id=None,
+    ):
         return self._create_or_reactivate_employee(
             conn=conn,
+            employee_id=employee_id,
             employee_name=employee_name,
             department_id=department_id,
             department_name=department_name,

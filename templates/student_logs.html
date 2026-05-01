@@ -139,13 +139,17 @@
                     <div class="d-flex gap-2">
                         <div class="input-group input-group-sm" style="width: 220px;">
                             <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
-                            <input type="text" id="recordsSearchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search Name or Course...">
+                            <input type="text" id="recordsSearchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search ID, Name, or Course...">
                         </div>
                         <select id="recordsCourseFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
                             <option value="">All Courses</option>
                             {% for course in course_options %}
                             <option value="{{ course }}">{{ course }}</option>
                             {% endfor %}
+                        </select>
+                        <select id="recordsStatusFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
+                            <option value="active" selected>Active</option>
+                            <option value="all">Active / Inactive</option>
                         </select>
                         <select id="recordsSortFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
                             <option value="recent">Recent to Oldest</option>
@@ -305,35 +309,17 @@
                     <div id="manualAddAlert" class="d-none rounded-3 px-3 py-2 mb-3 small fw-semibold"></div>
 
                     <div class="row g-3">
-                        <!-- LEFT: QR Preview -->
-                        <div class="col-md-5">
-                            <div class="card-glass p-4 text-center h-100 d-flex flex-column justify-content-center">
-                                <div id="qrPreview" class="border border-secondary rounded-4 mb-3 d-flex align-items-center justify-content-center" style="height:180px;">
-                                    <span class="text-white-50 small fw-bold">QR PLACEHOLDER ONLY</span>
-                                </div>
-                                <button
-                                    type="button"
-                                    id="generateQRBtn"
-                                    class="btn btn-light btn-sm fw-bold text-dark"
-                                    disabled
-                                    title="QR generation is planned but not yet enabled."
-                                >
-                                    QR GENERATION COMING SOON
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- RIGHT: Form -->
-                        <div class="col-md-7">
+                        <div class="col-12">
                             <div class="card-glass p-4 h-100">
                                 <!-- Student ID -->
                                 <div class="mb-3">
                                     <label class="form-label text-white-50 small fw-semibold">Student ID</label>
                                     <input type="text" id="manualAddId"
                                         class="form-control bg-dark text-white border-secondary"
-                                        placeholder="e.g. 23-00312" autocomplete="off">
+                                        placeholder="e.g. 23-00312" autocomplete="off"
+                                        inputmode="numeric" maxlength="8">
                                     <div id="idFeedback" class="form-text text-danger d-none small mt-1">
-                                        Student ID must be 8 characters or fewer, like 23-00312.
+                                        Student ID must follow the format 00-00000, like 23-00312.
                                     </div>
                                 </div>
                                 <!-- Full Name -->
@@ -381,7 +367,6 @@
         text-align: center;
         animation: toastSlideIn 0.25s cubic-bezier(0.34,1.56,0.64,1) forwards;
     ">
-        <!-- Icon -->
         <div style="
             width:52px; height:52px; border-radius:50%;
             background:#ef4444; margin: 0 auto 16px;
@@ -391,7 +376,7 @@
             <i class="bi bi-exclamation-triangle-fill" style="font-size:1.4rem; color:#fff;"></i>
         </div>
         <h6 id="confirmTitle" style="color:#fff; font-weight:700; font-size:1rem; margin-bottom:8px;"></h6>
-        <p  id="confirmSubtitle" style="color:rgba(255,255,255,0.55); font-size:0.83rem; margin-bottom:24px;"></p>
+        <p id="confirmSubtitle" style="color:rgba(255,255,255,0.55); font-size:0.83rem; margin-bottom:24px;"></p>
         <div class="d-flex gap-3 justify-content-center">
             <button id="confirmCancelBtn" style="
                 flex:1; padding:10px; border-radius:12px;
@@ -565,6 +550,15 @@ document.addEventListener('DOMContentLoaded', function () {
     // ── Toast helper ───────────────────────────────────────────
     const TOAST_DURATION = 4000;
 
+    function escapeToastHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     function showToast(message, type = 'success', subtitle = '') {
         const container = document.getElementById('toastContainer');
         if (!container) return;
@@ -580,13 +574,13 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         const c   = cfg[type] || cfg.success;
-        const sub = subtitle || message;
+        const sub = escapeToastHtml(subtitle || message);
 
         const html = `
             <div id="${id}" style="
                 position: relative; overflow: hidden;
-                display: flex; align-items: center; gap: 14px;
-                min-width: 330px; max-width: 420px;
+                display: flex; align-items: flex-start; gap: 14px;
+                width: min(520px, calc(100vw - 32px));
                 padding: 18px 18px 24px;
                 border-radius: 18px;
                 background: rgba(8, 32, 20, 0.98);
@@ -609,7 +603,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 <!-- Text -->
                 <div style="flex:1; min-width:0;">
                     <div style="font-weight:700; font-size:0.95rem; color:#fff; margin-bottom:3px; letter-spacing:0.01em;">${c.title}</div>
-                    <div style="font-size:0.81rem; color:rgba(255,255,255,0.6); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${sub}</div>
+                    <div style="
+                        font-size:0.84rem;
+                        color:rgba(255,255,255,0.74);
+                        line-height:1.45;
+                        white-space:pre-wrap;
+                        overflow-wrap:anywhere;
+                        word-break:break-word;
+                    ">${sub}</div>
                 </div>
 
                 <!-- Close btn -->
@@ -656,14 +657,14 @@ document.addEventListener('DOMContentLoaded', function () {
     // ── Confirm dialog helper ──────────────────────────────────
     function showConfirm(title, subtitle = '') {
         return new Promise(resolve => {
-            const overlay  = document.getElementById('confirmOverlay');
-            const titleEl  = document.getElementById('confirmTitle');
-            const subEl    = document.getElementById('confirmSubtitle');
-            const okBtn    = document.getElementById('confirmOkBtn');
+            const overlay = document.getElementById('confirmOverlay');
+            const titleEl = document.getElementById('confirmTitle');
+            const subEl = document.getElementById('confirmSubtitle');
+            const okBtn = document.getElementById('confirmOkBtn');
             const cancelBtn = document.getElementById('confirmCancelBtn');
 
             titleEl.textContent = title;
-            subEl.textContent   = subtitle;
+            subEl.textContent = subtitle;
 
             overlay.classList.remove('d-none');
             overlay.style.display = 'flex';
@@ -671,14 +672,13 @@ document.addEventListener('DOMContentLoaded', function () {
             function cleanup(result) {
                 overlay.style.display = 'none';
                 overlay.classList.add('d-none');
-                okBtn.replaceWith(okBtn.cloneNode(true));       // remove old listeners
+                okBtn.replaceWith(okBtn.cloneNode(true));
                 cancelBtn.replaceWith(cancelBtn.cloneNode(true));
                 resolve(result);
             }
 
-            // Re-query after cloneNode
-            document.getElementById('confirmOkBtn').addEventListener('click',     () => cleanup(true));
-            document.getElementById('confirmCancelBtn').addEventListener('click',  () => cleanup(false));
+            document.getElementById('confirmOkBtn').addEventListener('click', () => cleanup(true));
+            document.getElementById('confirmCancelBtn').addEventListener('click', () => cleanup(false));
             overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(false); }, { once: true });
         });
     }
@@ -749,6 +749,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Records filter elements
     const recordsSearch              = document.getElementById('recordsSearchInput');
     const recordsCourse              = document.getElementById('recordsCourseFilter');
+    const recordsStatusFilter        = document.getElementById('recordsStatusFilter');
     const recordsSortFilter          = document.getElementById('recordsSortFilter');
     const recordsTableCard           = document.getElementById('recordsTableCard');
     const recordsTableResponsive     = recordsTableCard ? recordsTableCard.querySelector('.table-responsive') : null;
@@ -856,13 +857,41 @@ document.addEventListener('DOMContentLoaded', function () {
         saveBtnSpinner?.classList.toggle('d-none', !loading);
     }
 
+    function formatStudentIdValue(value) {
+        const digits = String(value || '').replace(/\D/g, '').slice(0, 7);
+        if (digits.length <= 2) return digits;
+        return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+    }
+
+    function applyStudentIdMask() {
+        if (!manualIdInput) return;
+
+        const rawValue = manualIdInput.value || '';
+        const selectionStart = manualIdInput.selectionStart ?? rawValue.length;
+        const digitsBeforeCursor = rawValue
+            .slice(0, selectionStart)
+            .replace(/\D/g, '')
+            .slice(0, 7).length;
+        const formatted = formatStudentIdValue(rawValue);
+
+        manualIdInput.value = formatted;
+
+        const nextCursor = digitsBeforeCursor <= 2
+            ? digitsBeforeCursor
+            : Math.min(formatted.length, digitsBeforeCursor + 1);
+
+        requestAnimationFrame(() => {
+            manualIdInput.setSelectionRange(nextCursor, nextCursor);
+        });
+    }
+
     // ── Manual-add validation ──────────────────────────────────
     function validateManualForm() {
         const idVal    = (manualIdInput?.value   || '').trim();
         const nameVal  = (manualNameInput?.value || '').trim();
         const courseVal = manualCourse?.value    || '';
 
-        const idOk     = idVal.length > 0 && idVal.length <= 8;
+        const idOk     = /^\d{2}-\d{5}$/.test(idVal);
         const nameOk   = nameVal.length > 0;
         const courseOk = courseVal !== '';
 
@@ -876,7 +905,12 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    if (manualIdInput)   manualIdInput.addEventListener('input',  validateManualForm);
+    if (manualIdInput) {
+        manualIdInput.addEventListener('input', () => {
+            applyStudentIdMask();
+            validateManualForm();
+        });
+    }
     if (manualNameInput) manualNameInput.addEventListener('input', validateManualForm);
     if (manualCourse)    manualCourse.addEventListener('change',   validateManualForm);
 
@@ -963,6 +997,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         tr.dataset.id       = student_id.toLowerCase();
                         tr.dataset.name     = student_name.toLowerCase();
                         tr.dataset.course   = resolvedCourseName.toLowerCase();
+                        tr.dataset.status   = 'active';
                         tr.innerHTML = `
                             <td class="font-monospace text-white-50 ps-4">${student_id}</td>
                             <td class="fw-bold text-white">${student_name.toUpperCase()}</td>
@@ -1458,18 +1493,22 @@ document.addEventListener('DOMContentLoaded', function () {
     function applyRecordsFilter() {
         const val = (recordsSearch?.value || '').trim().toLowerCase();
         const courseVal = (recordsCourse?.value || '').toLowerCase();
+        const statusVal = (recordsStatusFilter?.value || 'active').toLowerCase();
         let visible = 0;
 
         getRecordRows().forEach(row => {
+            const rowStatus = (row.dataset.status || '').toLowerCase();
+            const matchStatus = statusVal === 'all' || rowStatus === 'active';
             const ok = (row.dataset.id.includes(val) || row.dataset.name.includes(val) || row.dataset.course.includes(val))
-                && (!courseVal || row.dataset.course === courseVal);
+                && (!courseVal || row.dataset.course === courseVal)
+                && matchStatus;
             row.dataset.filterVisible = ok ? 'true' : 'false';
             if (ok) visible += 1;
         });
 
         sortRecordsRows();
         recordsCurrentPage = 1;
-        const hasFilters = val || courseVal;
+        const hasFilters = val || courseVal || statusVal !== 'active';
 
         if (getRecordRows().length === 0) {
             if (recordsTableResponsive) recordsTableResponsive.style.display = '';
@@ -1480,7 +1519,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        if (visible === 0 && hasFilters) {
+        if (visible === 0) {
             if (recordsTableResponsive) recordsTableResponsive.style.display = 'none';
             recordsNoResults.style.display = 'block';
             recordsResultCount.textContent = '';
@@ -1500,6 +1539,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     recordsSearch?.addEventListener('input', applyRecordsFilter);
     recordsCourse?.addEventListener('change', applyRecordsFilter);
+    recordsStatusFilter?.addEventListener('change', applyRecordsFilter);
     recordsSortFilter?.addEventListener('change', applyRecordsFilter);
 
     function showEditCard(row, mode = 'edit') {
@@ -1608,7 +1648,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (currentEditRow === row) hideEditCard();
                 showToast(
                     result.already_inactive ? 'Student is already inactive.' : 'Student deleted successfully.',
-                    'success',
+                    result.already_inactive ? 'info' : 'success',
                     result.already_inactive ? `${name} is already inactive.` : `${name} has been marked inactive.`
                 );
                 setTimeout(() => location.reload(), 1500);

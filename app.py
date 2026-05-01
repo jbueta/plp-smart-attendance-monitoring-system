@@ -23,8 +23,9 @@ from db_connect import Database, EmployeeModel, StudentModel, VISITOR_PURPOSES, 
 from extensions import cache
 from utils.employee_schema import (
     build_person_name_match_keys,
-    build_employee_signature,
     department_lookup_key,
+    format_employee_id,
+    normalize_employee_id,
     normalize_text,
     validate_department_name,
     validate_employee_fields,
@@ -121,7 +122,7 @@ MOCK_KIOSK_DATA = {
 EVENT_TYPES = {"Meeting", "Training", "Seminar", "Workshop", "Drill", "Activity", "Flag Ceremony", "Other"}
 EVENT_FREQUENCIES = {"ONCE", "DAILY", "WEEKLY"}
 EVENT_DAYS = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
-EMPLOYEE_UPLOAD_REQUIRED_COLUMNS = ["EMPLOYEE NAME", "DEPARTMENT"]
+EMPLOYEE_UPLOAD_REQUIRED_COLUMNS = ["EMPLOYEE ID", "EMPLOYEE NAME", "DEPARTMENT"]
 EMPLOYEE_UPLOAD_OPTIONAL_COLUMNS = ["POSITION"]
 STUDENT_UPLOAD_REQUIRED_COLUMNS = ["STUDENT ID", "STUDENT NAME"]
 STUDENT_UPLOAD_OPTIONAL_COLUMNS = ["COURSE", "COURSE ID", "STATUS"]
@@ -519,7 +520,7 @@ def parse_employee_upload_file(file):
     if header_index is None:
         return {
             "success": False,
-            "error": "Could not find the required headers: Employee Name and Department.",
+            "error": "Could not find the required headers: Employee ID, Employee Name, and Department.",
         }
 
     missing_columns = [column.title() for column in EMPLOYEE_UPLOAD_REQUIRED_COLUMNS if column not in normalized_headers]
@@ -546,6 +547,7 @@ def parse_employee_upload_file(file):
         parsed_rows.append(
             {
                 "row_number": row.get("source_row_number") or (header_source_row_number + 1),
+                "employee_id": row_map.get("EMPLOYEE ID", ""),
                 "employee_name": row_map.get("EMPLOYEE NAME", ""),
                 "department_name": row_map.get("DEPARTMENT", ""),
                 "position": row_map.get("POSITION", ""),
@@ -583,24 +585,22 @@ def validate_employee_upload_rows(conn, parsed_rows):
         cursor.execute(
             """
             SELECT
+                e.employee_id,
                 employee_name,
-                UPPER(TRIM(employee_name)) AS employee_name_key,
-                department_id,
-                UPPER(TRIM(COALESCE(position, ''))) AS position_key,
                 COALESCE(u.active, 1) AS is_active
             FROM employees e
             JOIN users u ON e.user_id = u.user_id
             """
         )
         employee_rows = cursor.fetchall()
-        active_signatures = set()
-        inactive_signatures = set()
+        active_employee_ids = set()
+        inactive_employee_ids = set()
         employee_name_lookup = {}
         for row in employee_rows:
-            signature = (row[1], str(row[2]), row[3])
-            target = active_signatures if bool(row[4]) else inactive_signatures
-            target.add(signature)
-            register_name_match_source(employee_name_lookup, row[0], signature)
+            employee_id = format_employee_id(row[0])
+            target = active_employee_ids if bool(row[2]) else inactive_employee_ids
+            target.add(employee_id)
+            register_name_match_source(employee_name_lookup, row[1], employee_id)
 
         cursor.execute(
             """
@@ -612,16 +612,19 @@ def validate_employee_upload_rows(conn, parsed_rows):
 
         valid_rows = []
         errors = []
-        seen_signatures = {}
+        seen_employee_ids = {}
         seen_name_rows = {}
 
         for row in parsed_rows:
+            employee_id = normalize_employee_id(row.get("employee_id"))
             employee_name = clean_upload_text(row.get("employee_name"))
             department_name = clean_upload_text(row.get("department_name"))
             position = clean_upload_text(row.get("position"))
             row_number = row.get("row_number")
 
             missing_fields = []
+            if not employee_id:
+                missing_fields.append("Employee ID")
             if not employee_name:
                 missing_fields.append("Employee Name")
             if not department_name:
@@ -631,8 +634,10 @@ def validate_employee_upload_rows(conn, parsed_rows):
                 continue
 
             employee_field_errors = validate_employee_fields(
+                employee_id=row.get("employee_id"),
                 employee_name=employee_name,
                 position=position,
+                require_employee_id=True,
                 require_position=False,
             )
             department_errors = validate_department_name(department_name)
@@ -654,10 +659,9 @@ def validate_employee_upload_rows(conn, parsed_rows):
             department_id = department_match["department_id"]
             resolved_department_name = department_match["department_name"]
 
-            signature = build_employee_signature(employee_name, department_id, position)
-            if signature in seen_signatures:
+            if employee_id in seen_employee_ids:
                 errors.append(
-                    f"Row {row_number}: Duplicate of row {seen_signatures[signature]} in the uploaded file."
+                    f"Row {row_number}: Duplicate Employee ID already appears in row {seen_employee_ids[employee_id]} of the uploaded file."
                 )
                 continue
 
@@ -668,16 +672,16 @@ def validate_employee_upload_rows(conn, parsed_rows):
                 )
                 continue
 
-            if signature in active_signatures:
+            if employee_id in active_employee_ids:
                 errors.append(
-                    f"Row {row_number}: Employee already exists ({employee_name} / {resolved_department_name} / {position or 'N/A'})."
+                    f"Row {row_number}: Employee already exists with ID {employee_id}."
                 )
                 continue
 
             if has_name_match_conflict(
                 employee_name,
                 employee_name_lookup,
-                exclude_sources={signature} if signature in inactive_signatures else None,
+                exclude_sources={employee_id} if employee_id in inactive_employee_ids else None,
             ):
                 errors.append(
                     f"Row {row_number}: {same_role_name_conflict_error('employee')}"
@@ -690,17 +694,18 @@ def validate_employee_upload_rows(conn, parsed_rows):
                 )
                 continue
 
-            seen_signatures[signature] = row_number
+            seen_employee_ids[employee_id] = row_number
             register_name_match_source(seen_name_rows, employee_name, row_number)
 
             valid_rows.append(
                 {
                     "row_number": row_number,
+                    "employee_id": employee_id,
                     "employee_name": employee_name,
                     "department_name": resolved_department_name,
                     "department_id": department_id,
                     "position": position,
-                    "action": "reactivate" if signature in inactive_signatures else "create",
+                    "action": "reactivate" if employee_id in inactive_employee_ids else "create",
                     "source_department_name": department_name,
                 }
             )
@@ -906,16 +911,31 @@ def fetch_departments():
         if response.ok:
             payload = response.json()
             if payload.get("success"):
-                return [
+                departments = [
                     {
                         "department_id": dept.get("dept_id"),
                         "department_name": dept.get("dept_name"),
                     }
                     for dept in payload.get("departments", [])
                 ]
+                if departments:
+                    return departments
     except requests.RequestException as err:
         app.logger.warning("Could not fetch departments: %s", err)
-    return []
+
+    conn = connect_db()
+    if not conn:
+        return []
+    try:
+        return [
+            {
+                "department_id": dept.get("dept_id"),
+                "department_name": dept.get("dept_name"),
+            }
+            for dept in Database.get_admin_departments(conn)
+        ]
+    finally:
+        release_db_connection(conn)
 
 
 def fetch_employee_attendance():
@@ -1253,7 +1273,7 @@ def admin_employees():
             {"department_id": "", "department_name": department}
             for department in department_options
         ]
-        teaching_departments, office_departments = departments, []
+        teaching_departments, office_departments = split_employee_departments(departments)
 
     return render_template(
         "employee_logs.html",
@@ -2327,6 +2347,7 @@ def add_employee():
     data = request.get_json(silent=True) or {}
 
     result = employee_model.add_employee(
+        employee_id=(data.get("employee_id") or "").strip(),
         employee_name=(data.get("employee_name") or "").strip(),
         department_id=(data.get("department_id") or "").strip(),
         position=(data.get("position") or "").strip(),
@@ -2356,8 +2377,8 @@ def download_employee_upload_template():
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(EMPLOYEE_UPLOAD_REQUIRED_COLUMNS + EMPLOYEE_UPLOAD_OPTIONAL_COLUMNS)
-    writer.writerow(["Juan Dela Cruz", "College of Information Technology", "Instructor I"])
-    writer.writerow(["Maria Santos", "Registrar's Office", "Admin Officer"])
+    writer.writerow(["00001", "Juan Dela Cruz", "College of Information Technology", "Instructor I"])
+    writer.writerow(["00002", "Maria Santos", "Registrar's Office", "Admin Officer"])
 
     csv_content = output.getvalue()
     output.close()
@@ -2427,18 +2448,20 @@ def commit_employees_upload_payload(rows):
     errors = []
     try:
         for row in rows:
+            employee_id = normalize_employee_id(row.get("employee_id"))
             employee_name = clean_upload_text(row.get("employee_name"))
             department_name = clean_upload_text(row.get("department_name"))
             department_id = str(row.get("department_id") or "").strip()
             position = clean_upload_text(row.get("position"))
             row_number = row.get("row_number") or "Unknown"
 
-            if not employee_name or not department_name:
-                errors.append(f"Row {row_number}: Missing Employee Name or Department.")
+            if not employee_id or not employee_name or not department_name:
+                errors.append(f"Row {row_number}: Missing Employee ID, Employee Name, or Department.")
                 continue
 
             result = employee_model.add_employee_excel(
                 conn=conn,
+                employee_id=employee_id,
                 employee_name=employee_name,
                 department_id=department_id,
                 department_name=department_name,
@@ -2482,14 +2505,16 @@ def commit_employees_upload():
 @login_required
 def update_employee():
     data = request.get_json(silent=True) or {}
-    employee_id = (data.get("employee_id") or "").strip()
+    employee_id = normalize_employee_id(data.get("employee_id"))
     employee_name = (data.get("employee_name") or "").strip()
     department_id = (data.get("department_id") or "").strip()
     position = (data.get("position") or "").strip()
 
     validation_errors = validate_employee_fields(
+        employee_id=data.get("employee_id"),
         employee_name=employee_name,
         position=position,
+        require_employee_id=True,
         require_position=False,
     )
     if not employee_id or not department_id:
@@ -2557,7 +2582,7 @@ def update_employee():
             return jsonify(
                 {
                     "success": False,
-                    "error": f"Another employee already uses this combination ({duplicate[0]}).",
+                    "error": f"Another employee already uses this combination ({format_employee_id(duplicate[0])}).",
                 }
             ), 400
 
@@ -2587,10 +2612,12 @@ def update_employee():
 @login_required
 def delete_employee():
     data = request.get_json(silent=True) or {}
-    employee_id = (data.get("employee_id") or "").strip()
+    employee_id = normalize_employee_id(data.get("employee_id"))
 
     if not employee_id:
         return jsonify({"success": False, "error": "Missing employee_id."}), 400
+    if not employee_id.isdigit() or len(employee_id) != 5:
+        return jsonify({"success": False, "error": "Invalid employee ID format."}), 400
 
     conn = connect_db()
     if conn is None:

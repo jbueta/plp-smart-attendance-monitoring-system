@@ -509,7 +509,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const row = document.createElement('div');
             row.className = 'd-flex align-items-center mt-2';
             row.innerHTML = `
-                <input type="text" name="custom_dept" class="form-control bg-dark text-white border-secondary form-control-sm" placeholder="e.g. EMP-0001, ST-0001">
+                <input type="text" name="custom_dept" class="form-control bg-dark text-white border-secondary form-control-sm" placeholder="e.g. 00001, 23-00312">
                 <button type="button" class="btn btn-sm btn-outline-danger ms-2 remove-custom-btn" title="Remove">
                     <i class="bi bi-x"></i>
                 </button>

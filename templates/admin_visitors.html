@@ -117,9 +117,24 @@
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
-        .visitor-action-menu .dropdown-item:hover {
+        .visitor-action-menu .dropdown-item {
+            color: #fff;
+        }
+        .visitor-action-menu .dropdown-item:hover,
+        .visitor-action-menu .dropdown-item:focus {
             background-color: #d4af37;
-            color: #000;
+            color: #051a10;
+        }
+        .dropdown .btn {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+        }
+        .dropdown .btn:hover {
+            background: transparent !important;
+            border: 1px solid #fff !important;
+            border-radius: 50% !important;
+            color: #fff !important;
         }
         .edit-modal-overlay {
             position: fixed;
@@ -230,6 +245,10 @@
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
     }
+    @keyframes toastSlideIn {
+        from { opacity: 0; transform: scale(0.88); }
+        to { opacity: 1; transform: scale(1); }
+    }
     </style>
 
     <style>
@@ -339,7 +358,7 @@
         <div class="d-flex flex-wrap gap-2 p-3 justify-content-end">
             <div class="input-group input-group-sm" style="width: 200px;">
                 <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
-                <input type="text" id="searchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search Visitor...">
+                <input type="text" id="searchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search ID or Name...">
             </div>
             <input type="date" id="dateFilter" class="form-control form-control-sm bg-dark text-white border-secondary w-auto">
         </div>
@@ -437,7 +456,7 @@
                     <div class="d-flex gap-2">
                         <div class="input-group input-group-sm" style="width: 220px;">
                             <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
-                            <input type="text" id="recordsSearchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search Name or Purpose...">
+                            <input type="text" id="recordsSearchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search ID, Name, or Purpose...">
                         </div>
                         <select id="recordsPurposeFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
                             <option value="">All Purposes</option>
@@ -470,6 +489,7 @@
                             {% for visitor in visitors %}
                             <tr class="visitor-record-row"
                                 data-id="{{ visitor.id }}"
+                                data-id-search="{{ visitor.id | lower }}"
                                 data-added-order="{{ visitor.added_order or 0 }}"
                                 data-name="{{ visitor.name | lower }}"
                                 data-purpose="{{ visitor.purpose | lower }}"
@@ -586,6 +606,49 @@
         <div class="edit-modal-footer">
             <button type="button" class="btn btn-secondary" id="cancelEditVisitor">Cancel</button>
             <button type="button" class="btn btn-primary-gold" id="saveEditVisitor">Save Changes</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== CONFIRM DIALOG ===================== -->
+<div id="confirmOverlay" class="d-none position-fixed top-0 start-0 w-100 h-100"
+    style="background: rgba(0,0,0,0.55); backdrop-filter: blur(6px); z-index: 9998; display: flex; align-items: center; justify-content: center;">
+    <div style="
+        background: rgba(10,40,25,0.98);
+        border: 1px solid rgba(239,68,68,0.3);
+        border-radius: 20px;
+        padding: 32px 28px;
+        min-width: 320px;
+        max-width: 400px;
+        box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+        text-align: center;
+        animation: toastSlideIn 0.25s cubic-bezier(0.34,1.56,0.64,1) forwards;
+    ">
+        <div style="
+            width:52px; height:52px; border-radius:50%;
+            background:#ef4444; margin: 0 auto 16px;
+            display:flex; align-items:center; justify-content:center;
+            box-shadow: 0 0 0 8px rgba(239,68,68,0.15);
+        ">
+            <i class="bi bi-exclamation-triangle-fill" style="font-size:1.4rem; color:#fff;"></i>
+        </div>
+        <h6 id="confirmTitle" style="color:#fff; font-weight:700; font-size:1rem; margin-bottom:8px;"></h6>
+        <p id="confirmSubtitle" style="color:rgba(255,255,255,0.55); font-size:0.83rem; margin-bottom:24px;"></p>
+        <div class="d-flex gap-3 justify-content-center">
+            <button id="confirmCancelBtn" style="
+                flex:1; padding:10px; border-radius:12px;
+                background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15);
+                color:#fff; font-weight:600; cursor:pointer; font-size:0.9rem;
+                transition: background 0.2s;
+            " onmouseover="this.style.background='rgba(255,255,255,0.15)'"
+               onmouseout="this.style.background='rgba(255,255,255,0.08)'">Cancel</button>
+            <button id="confirmOkBtn" style="
+                flex:1; padding:10px; border-radius:12px;
+                background:#ef4444; border:none;
+                color:#fff; font-weight:700; cursor:pointer; font-size:0.9rem;
+                transition: background 0.2s;
+            " onmouseover="this.style.background='#dc2626'"
+               onmouseout="this.style.background='#ef4444'">Delete</button>
         </div>
     </div>
 </div>
@@ -1012,10 +1075,11 @@
                 let visible = 0;
                 
                 getRecordRows().forEach(row => {
+                    const id = row.dataset.idSearch || (row.dataset.id || '').toLowerCase();
                     const name = row.dataset.name || '';
                     const purpose = row.dataset.purpose || '';
                     
-                    const matchSearch = name.includes(val) || purpose.includes(val);
+                    const matchSearch = !val || id.includes(val) || name.includes(val) || purpose.includes(val);
                     const matchPurpose = !purposeVal || purpose === purposeVal || (purposeVal === 'all purposes');
                     
                     if (matchSearch && matchPurpose) {
@@ -1073,6 +1137,34 @@
             const viewVisitorTimeOut = document.getElementById('viewVisitorTimeOut');
 
             let currentVisitorRow = null;
+
+            function showConfirm(title, subtitle = '') {
+                return new Promise(resolve => {
+                    const overlay = document.getElementById('confirmOverlay');
+                    const titleEl = document.getElementById('confirmTitle');
+                    const subEl = document.getElementById('confirmSubtitle');
+                    const okBtn = document.getElementById('confirmOkBtn');
+                    const cancelBtn = document.getElementById('confirmCancelBtn');
+
+                    titleEl.textContent = title;
+                    subEl.textContent = subtitle;
+
+                    overlay.classList.remove('d-none');
+                    overlay.style.display = 'flex';
+
+                    function cleanup(result) {
+                        overlay.style.display = 'none';
+                        overlay.classList.add('d-none');
+                        okBtn.replaceWith(okBtn.cloneNode(true));
+                        cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+                        resolve(result);
+                    }
+
+                    document.getElementById('confirmOkBtn').addEventListener('click', () => cleanup(true));
+                    document.getElementById('confirmCancelBtn').addEventListener('click', () => cleanup(false));
+                    overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(false); }, { once: true });
+                });
+            }
 
             function syncVisitorDetailsField(isReadOnly = false) {
                 const showDetails = (editVisitorPurpose.value || '').trim().toLowerCase() === 'other';
@@ -1147,8 +1239,19 @@
                 
                 const deleteBtn = e.target.closest('.delete-visitor') || e.target.closest('.delete-visitor-record');
                 if (deleteBtn) {
-                    if (confirm('Are you sure you want to delete this visitor record?')) {
-                        const visitorId = deleteBtn.dataset.id;
+                    const row = deleteBtn.closest('tr');
+                    const visitorId = deleteBtn.dataset.id;
+                    const visitorName = row?.querySelector('td:nth-child(1) span')?.textContent?.trim()
+                        || row?.querySelector('td:nth-child(1)')?.textContent?.trim()
+                        || row?.getAttribute('data-visitor-name')
+                        || 'this visitor';
+
+                    showConfirm(
+                        `Delete "${visitorName}"?`,
+                        'This is a soft delete, so the visitor record will stay in the database as inactive.'
+                    ).then(confirmed => {
+                        if (!confirmed) return;
+
                         fetch(`/admin/visitors/${encodeURIComponent(visitorId)}`, {
                             method: 'DELETE'
                         })
@@ -1162,7 +1265,7 @@
                         .catch(error => {
                             alert(error.message || 'Failed to delete visitor.');
                         });
-                    }
+                    });
                 }
             });
 

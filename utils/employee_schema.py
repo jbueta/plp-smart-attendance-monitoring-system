@@ -2,8 +2,8 @@ import re
 import unicodedata
 
 
-EMPLOYEE_ID_PREFIX = "EMP-"
-EMPLOYEE_ID_PAD_WIDTH = 4
+EMPLOYEE_ID_PAD_WIDTH = 5
+EMPLOYEE_ID_MAX_VALUE = 99999
 EMPLOYEE_NAME_MAX_LENGTH = 80
 POSITION_MAX_LENGTH = 100
 DEPARTMENT_NAME_MAX_LENGTH = 255
@@ -36,6 +36,32 @@ def normalize_text(value):
 
 def normalize_employee_name(value):
     return normalize_text(value)
+
+
+def normalize_employee_id(value):
+    normalized_value = normalize_text(value)
+    if not normalized_value:
+        return ""
+
+    normalized_value = re.sub(r"\.0$", "", normalized_value)
+    if not normalized_value.isdigit():
+        return normalized_value
+
+    employee_id_number = int(normalized_value)
+    if employee_id_number <= 0 or employee_id_number > EMPLOYEE_ID_MAX_VALUE:
+        return normalized_value
+
+    return str(employee_id_number).zfill(EMPLOYEE_ID_PAD_WIDTH)
+
+
+def parse_employee_id(value):
+    normalized_employee_id = normalize_employee_id(value)
+    if not normalized_employee_id.isdigit():
+        return None
+    employee_id_number = int(normalized_employee_id)
+    if employee_id_number <= 0 or employee_id_number > EMPLOYEE_ID_MAX_VALUE:
+        return None
+    return employee_id_number
 
 
 def normalize_position(value):
@@ -76,15 +102,38 @@ def build_employee_signature(employee_name, department_id, position):
     )
 
 
-def format_employee_id(seq):
-    sequence = max(int(seq or 0), 0)
-    return f"{EMPLOYEE_ID_PREFIX}{str(sequence).zfill(EMPLOYEE_ID_PAD_WIDTH)}"
+def format_employee_id(employee_id):
+    parsed_employee_id = parse_employee_id(employee_id)
+    if parsed_employee_id is None:
+        return normalize_text(employee_id)
+    return f"{parsed_employee_id:0{EMPLOYEE_ID_PAD_WIDTH}d}"
 
 
-def validate_employee_fields(employee_name, position="", require_position=False):
+def validate_employee_fields(
+    employee_name,
+    position="",
+    require_position=False,
+    employee_id="",
+    require_employee_id=False,
+):
     errors = []
+    raw_employee_id = normalize_text(employee_id)
     normalized_name = normalize_employee_name(employee_name)
     normalized_position = normalize_position(position)
+
+    if require_employee_id and not raw_employee_id:
+        errors.append("Employee ID is required.")
+    elif raw_employee_id:
+        if not raw_employee_id.isdigit():
+            errors.append("Employee ID must contain digits only.")
+        elif len(raw_employee_id) > EMPLOYEE_ID_PAD_WIDTH:
+            errors.append(
+                f"Employee ID must be {EMPLOYEE_ID_PAD_WIDTH} digits or fewer."
+            )
+        elif parse_employee_id(employee_id) is None:
+            errors.append(
+                f"Employee ID must be between 00001 and {EMPLOYEE_ID_MAX_VALUE:05d}."
+            )
 
     if not normalized_name:
         errors.append("Employee Name is required.")
