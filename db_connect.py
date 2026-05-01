@@ -1670,9 +1670,11 @@ class Database:
 
             cursor.execute(
                 """
-                SELECT COUNT(*) AS total, SUM(status IN ('Present', 'Late')) AS attended
-                FROM event_attendance
-                WHERE event_date = %s
+                SELECT COUNT(*) AS total, SUM(ea.status IN ('Present', 'Late')) AS attended
+                FROM event_attendance ea
+                JOIN users u ON ea.user_id = u.user_id
+                WHERE ea.event_date = %s
+                  AND u.active = 1
                 """,
                 (today,),
             )
@@ -1755,6 +1757,7 @@ class Database:
                 FROM general_log gl
                 JOIN users u ON gl.user_id = u.user_id
                 WHERE u.role = 'student'
+                  AND u.active = 1
                   AND DATE(gl.timestamp) = %s
                   AND gl.log_type = 'Entry'
                 """,
@@ -1762,7 +1765,16 @@ class Database:
             )
             total_entries = cursor.fetchone()["total"] or 0
 
-            cursor.execute("SELECT COUNT(*) AS inside FROM students WHERE status = 'Inside'")
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS inside
+                FROM students s
+                JOIN users u ON s.user_id = u.user_id
+                WHERE s.status = 'Inside'
+                  AND u.role = 'student'
+                  AND u.active = 1
+                """
+            )
             currently_inside = cursor.fetchone()["inside"] or 0
 
             cursor.execute(
@@ -1776,7 +1788,9 @@ class Database:
                  AND x.log_type = 'Exit'
                  AND x.timestamp > e.timestamp
                 JOIN users u ON e.user_id = u.user_id
-                WHERE u.role = 'student' AND DATE(e.timestamp) = %s
+                WHERE u.role = 'student'
+                  AND u.active = 1
+                  AND DATE(e.timestamp) = %s
                 """,
                 (today,),
             )
@@ -1789,6 +1803,7 @@ class Database:
                 FROM general_log gl
                 JOIN users u ON gl.user_id = u.user_id
                 WHERE u.role = 'student'
+                  AND u.active = 1
                   AND DATE(gl.timestamp) = %s
                   AND gl.log_type = 'Entry'
                 GROUP BY HOUR(gl.timestamp)
@@ -1800,9 +1815,17 @@ class Database:
             peak_row = cursor.fetchone()
             peak_hour = _format_hour_label(peak_row["hr"]) if peak_row else "N/A"
 
-            cursor.execute("SELECT COUNT(*) AS total FROM students")
-            total_students = cursor.fetchone()["total"] or 1
-            peak_load = f"{round((currently_inside / total_students) * 100)}%"
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM students s
+                JOIN users u ON s.user_id = u.user_id
+                WHERE u.role = 'student'
+                  AND u.active = 1
+                """
+            )
+            total_students = cursor.fetchone()["total"] or 0
+            peak_load = f"{round((currently_inside / total_students) * 100)}%" if total_students else "0%"
 
             cursor.execute(
                 """
@@ -1810,6 +1833,7 @@ class Database:
                 FROM general_log gl
                 JOIN users u ON gl.user_id = u.user_id
                 WHERE u.role = 'student'
+                  AND u.active = 1
                   AND DATE(gl.timestamp) = %s
                   AND gl.log_type = 'Entry'
                 GROUP BY HOUR(gl.timestamp)
@@ -1825,6 +1849,7 @@ class Database:
                 FROM general_log gl
                 JOIN users u ON gl.user_id = u.user_id
                 WHERE u.role = 'student'
+                  AND u.active = 1
                   AND DATE(gl.timestamp) = %s
                   AND gl.log_type = 'Entry'
                 """,

@@ -158,7 +158,7 @@
     // Tardiness Heatmap (Horizontal Bar) — labels are dynamic from DB
     const ctxTardiness = document.getElementById('tardinessChart').getContext('2d');
     const tardinessRaw = {{ stats.tardiness_data | tojson | safe }};
-    const tardinessDepts = {{ stats.dept_participation | map(attribute='name') | list | tojson | safe }};
+    const tardinessDepts = {{ stats.tardiness_labels | tojson | safe }};
     const allColors = ['#808080', '#800080', '#0000FF', '#FFA500', '#FFC0CB', '#800000', '#FFFF00'];
     const dataTardiness = {
         labels: tardinessDepts.length ? tardinessDepts : tardinessRaw.map((_, i) => `Dept ${i + 1}`),

@@ -377,8 +377,9 @@ def user_authenticate():
         if requested_log_type == "Entry" and current_status_normalized == "inside":
             return jsonify({
                 "success": False,
-                "message": "Cannot allow entrance. User current status is already Inside.",
+                "message": "Cannot allow entry. User is currently inside.",
                 "status": "blocked",
+                "error_code": "already_inside",
                 "current_status": "Inside",
                 "requested_log_type": requested_log_type,
                 "name": full_name,
@@ -388,8 +389,9 @@ def user_authenticate():
         if requested_log_type == "Exit" and current_status_normalized != "inside":
             return jsonify({
                 "success": False,
-                "message": "Cannot allow exit. User current status is already Outside.",
+                "message": "Cannot allow exit. User is currently outside.",
                 "status": "blocked",
+                "error_code": "already_outside",
                 "current_status": "Outside",
                 "requested_log_type": requested_log_type,
                 "name": full_name,

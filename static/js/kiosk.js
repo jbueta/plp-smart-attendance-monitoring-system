@@ -41,6 +41,19 @@ function escapeHtml(str) {
 }
 
 /**
+ * Parse a fetch response without losing backend validation messages on non-2xx replies.
+ */
+async function parseJsonResponse(response, fallbackMessage = 'Server error') {
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok && !data.message && !data.error && !data.Invalid) {
+        throw new Error(fallbackMessage);
+    }
+
+    return data;
+}
+
+/**
  * Create a new log row element
  * @param {Object} log - contains name, dept, time, type, initials
  * @param {string} logType - 'Entry' or 'Exit'
@@ -195,17 +208,7 @@ function submitManualEntry(type, manualId = null) {
                 event_id: window.currentEventId
             })
         })
-        .then(async r => {
-            if (!r.ok) {
-                let errorMsg = `HTTP ${r.status}`;
-                try {
-                    const errorData = await r.json();
-                    errorMsg = errorData.message || errorMsg;
-                } catch (e) {}
-                throw new Error(errorMsg);
-            }
-            return r.json();
-        })
+        .then(r => parseJsonResponse(r, 'Failed to contact the event attendance service.'))
         .then(data => {
             console.log('Manual entry response:', data);
             if (data.success) {
@@ -245,10 +248,7 @@ function submitManualEntry(type, manualId = null) {
                 requested_log_type: requestedLogType
             })
         })
-        .then(r => {
-            if (!r.ok && r.status !== 404) throw new Error('Server error');
-            return r.json();
-        })
+        .then(r => parseJsonResponse(r, 'Server error'))
         .then(data => {
             if (data.success) {
                 const logType = data.attendance_status.toLowerCase();
@@ -281,7 +281,7 @@ function submitManualEntry(type, manualId = null) {
         })
         .catch(err => {
             console.error('General auth error:', err);
-            alert("Connection error: " + err.message + ". Please try again.");
+            alert(err.message ? err.message : "Connection error. Please try again.");
             if (typeof showScanBanner === 'function') showScanBanner('error', { id: id });
         });
     }
