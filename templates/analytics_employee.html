@@ -159,6 +159,9 @@
 
     // Tardiness Heatmap (Horizontal Bar)
     const ctxTardiness = document.getElementById('tardinessChart').getContext('2d');
+    const tardinessRaw = {{ stats.tardiness_data | tojson | safe }};
+    const tardinessDepts = {{ stats.tardiness_labels | tojson | safe }};
+    const allColors = ['#808080', '#800080', '#0000FF', '#FFA500', '#FFC0CB', '#800000', '#FFFF00'];
     const dataTardiness = {
         labels: ['Computer Studies', 'Arts & Sciences', 'Education', 'Engineering', 'Nursing', 'Intl Hospitality Mgmt', 'Business & Accountancy'],
         datasets: [{

@@ -1675,9 +1675,11 @@ class Database:
 
             cursor.execute(
                 """
-                SELECT COUNT(*) AS total, SUM(status IN ('Present', 'Late')) AS attended
-                FROM event_attendance
-                WHERE event_date = %s
+                SELECT COUNT(*) AS total, SUM(ea.status IN ('Present', 'Late')) AS attended
+                FROM event_attendance ea
+                JOIN users u ON ea.user_id = u.user_id
+                WHERE ea.event_date = %s
+                  AND u.active = 1
                 """,
                 (today,),
             )
@@ -1730,57 +1732,6 @@ class Database:
             while len(dept_distribution) < 5:
                 dept_distribution.append(0)
 
-            alerts = []
-
-            cursor.execute(
-                """
-                SELECT COUNT(*) AS cnt
-                FROM students s
-                JOIN users u ON s.user_id = u.user_id
-                WHERE s.status = 'Inside' AND u.active = 1
-                """
-            )
-            students_inside = cursor.fetchone()["cnt"] or 0
-            if students_inside > 0:
-                alerts.append(
-                    {
-                        "type": "danger",
-                        "icon": "shield-exclamation",
-                        "title": f"Curfew Watch: {students_inside} student(s) still inside",
-                        "time": datetime.now().strftime("%I:%M %p"),
-                    }
-                )
-
-            if peak_row:
-                alerts.append(
-                    {
-                        "type": "info",
-                        "icon": "graph-up-arrow",
-                        "title": f"Peak Hour Detected at {peak_hour}",
-                        "time": "Today",
-                    }
-                )
-
-            if total_invited > 0 and total_attended / total_invited < 0.5:
-                alerts.append(
-                    {
-                        "type": "warning",
-                        "icon": "calendar-x-fill",
-                        "title": f"Low Event Attendance: {attendance_rate} turnout today",
-                        "time": datetime.now().strftime("%I:%M %p"),
-                    }
-                )
-
-            if not alerts:
-                alerts.append(
-                    {
-                        "type": "success",
-                        "icon": "check-circle-fill",
-                        "title": "All systems normal. No issues detected.",
-                        "time": datetime.now().strftime("%I:%M %p"),
-                    }
-                )
-
             return {
                 "total_entries": f"{total_entries:,}",
                 "entries_trend": trend,
@@ -1792,7 +1743,7 @@ class Database:
                 "event_attendance_rate": attendance_rate,
                 "event_attendance_raw": attendance_raw,
                 "dept_distribution": dept_distribution,
-                "alerts": alerts,
+                "alerts": [],
             }
         except connector.Error as err:
             print(f"Error fetching overall dashboard stats: {err}")
@@ -1812,6 +1763,7 @@ class Database:
                 FROM general_log gl
                 JOIN users u ON gl.user_id = u.user_id
                 WHERE u.role = 'student'
+                  AND u.active = 1
                   AND DATE(gl.timestamp) = %s
                   AND gl.log_type = 'Entry'
                 """,
@@ -1819,7 +1771,16 @@ class Database:
             )
             total_entries = cursor.fetchone()["total"] or 0
 
-            cursor.execute("SELECT COUNT(*) AS inside FROM students WHERE status = 'Inside'")
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS inside
+                FROM students s
+                JOIN users u ON s.user_id = u.user_id
+                WHERE s.status = 'Inside'
+                  AND u.role = 'student'
+                  AND u.active = 1
+                """
+            )
             currently_inside = cursor.fetchone()["inside"] or 0
 
             cursor.execute(
@@ -1833,7 +1794,9 @@ class Database:
                  AND x.log_type = 'Exit'
                  AND x.timestamp > e.timestamp
                 JOIN users u ON e.user_id = u.user_id
-                WHERE u.role = 'student' AND DATE(e.timestamp) = %s
+                WHERE u.role = 'student'
+                  AND u.active = 1
+                  AND DATE(e.timestamp) = %s
                 """,
                 (today,),
             )
@@ -1846,6 +1809,7 @@ class Database:
                 FROM general_log gl
                 JOIN users u ON gl.user_id = u.user_id
                 WHERE u.role = 'student'
+                  AND u.active = 1
                   AND DATE(gl.timestamp) = %s
                   AND gl.log_type = 'Entry'
                 GROUP BY HOUR(gl.timestamp)
@@ -1857,9 +1821,17 @@ class Database:
             peak_row = cursor.fetchone()
             peak_hour = _format_hour_label(peak_row["hr"]) if peak_row else "N/A"
 
-            cursor.execute("SELECT COUNT(*) AS total FROM students")
-            total_students = cursor.fetchone()["total"] or 1
-            peak_load = f"{round((currently_inside / total_students) * 100)}%"
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM students s
+                JOIN users u ON s.user_id = u.user_id
+                WHERE u.role = 'student'
+                  AND u.active = 1
+                """
+            )
+            total_students = cursor.fetchone()["total"] or 0
+            peak_load = f"{round((currently_inside / total_students) * 100)}%" if total_students else "0%"
 
             cursor.execute(
                 """
@@ -1867,6 +1839,7 @@ class Database:
                 FROM general_log gl
                 JOIN users u ON gl.user_id = u.user_id
                 WHERE u.role = 'student'
+                  AND u.active = 1
                   AND DATE(gl.timestamp) = %s
                   AND gl.log_type = 'Entry'
                 GROUP BY HOUR(gl.timestamp)
@@ -1882,6 +1855,7 @@ class Database:
                 FROM general_log gl
                 JOIN users u ON gl.user_id = u.user_id
                 WHERE u.role = 'student'
+                  AND u.active = 1
                   AND DATE(gl.timestamp) = %s
                   AND gl.log_type = 'Entry'
                 """,
@@ -1893,32 +1867,6 @@ class Database:
             else:
                 trend = "N/A"
 
-            cursor.execute(
-                """
-                SELECT
-                    s.student_name AS name,
-                    COALESCE(c.course_name, 'N/A') AS course,
-                    DATE_FORMAT(
-                        (
-                            SELECT MAX(gl2.timestamp)
-                            FROM general_log gl2
-                            WHERE gl2.user_id = u.user_id
-                              AND gl2.log_type = 'Entry'
-                              AND DATE(gl2.timestamp) = %s
-                        ),
-                        '%%h:%%i %%p'
-                    ) AS last_entry
-                FROM students s
-                JOIN users u ON s.user_id = u.user_id
-                LEFT JOIN courses c ON s.course_id = c.course_id
-                WHERE s.status = 'Inside'
-                  AND u.active = 1
-                ORDER BY s.student_name ASC
-                """,
-                (today,),
-            )
-            watchlist = cursor.fetchall()
-
             return {
                 "total_entries": f"{total_entries:,}",
                 "entries_trend": trend,
@@ -1927,7 +1875,7 @@ class Database:
                 "currently_inside": f"{currently_inside:,}",
                 "avg_stay": avg_stay,
                 "hourly_traffic": hourly_traffic,
-                "watchlist": watchlist,
+                "watchlist": [],
                 "curfew_trigger": "09:40:00 PM",
             }
         except connector.Error as err:
