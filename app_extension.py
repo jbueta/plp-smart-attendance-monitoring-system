@@ -66,6 +66,20 @@ def normalize_requested_log_type(value):
     return None
 
 
+def get_kiosk_actor_label(role):
+    actor = clean_text(role).lower()
+    if actor in {"student", "employee", "visitor"}:
+        return actor
+    return "user"
+
+
+def build_kiosk_block_message(requested_log_type, current_status, role):
+    action = "Entry" if requested_log_type == "Entry" else "Exit"
+    status = "inside" if clean_text(current_status).lower() == "inside" else "outside"
+    actor = get_kiosk_actor_label(role)
+    return f"{action} denied: {actor} is already {status}."
+
+
 def validation_error(errors):
     message = " ".join(errors)
     return jsonify({"success": False, "message": message, "error": message, "errors": errors}), 400
@@ -377,7 +391,7 @@ def user_authenticate():
         if requested_log_type == "Entry" and current_status_normalized == "inside":
             return jsonify({
                 "success": False,
-                "message": "Cannot allow entrance. User current status is already Inside.",
+                "message": build_kiosk_block_message("Entry", "Inside", role),
                 "status": "blocked",
                 "current_status": "Inside",
                 "requested_log_type": requested_log_type,
@@ -388,7 +402,7 @@ def user_authenticate():
         if requested_log_type == "Exit" and current_status_normalized != "inside":
             return jsonify({
                 "success": False,
-                "message": "Cannot allow exit. User current status is already Outside.",
+                "message": build_kiosk_block_message("Exit", "Outside", role),
                 "status": "blocked",
                 "current_status": "Outside",
                 "requested_log_type": requested_log_type,

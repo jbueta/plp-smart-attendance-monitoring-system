@@ -40,6 +40,11 @@ function escapeHtml(str) {
     });
 }
 
+function getKioskAuthErrorMessage(data, fallback = 'ID not found!') {
+    if (!data || typeof data !== 'object') return fallback;
+    return data.message || data.Invalid || fallback;
+}
+
 /**
  * Create a new log row element
  * @param {Object} log - contains name, dept, time, type, initials
@@ -245,11 +250,11 @@ function submitManualEntry(type, manualId = null) {
                 requested_log_type: requestedLogType
             })
         })
-        .then(r => {
-            if (!r.ok && r.status !== 404) throw new Error('Server error');
-            return r.json();
+        .then(async r => {
+            const data = await r.json().catch(() => ({}));
+            return { ok: r.ok, status: r.status, data };
         })
-        .then(data => {
+        .then(({ status, data }) => {
             if (data.success) {
                 const logType = data.attendance_status.toLowerCase();
                 const bannerType = logType === 'entry' ? 'in' : 'out';
@@ -275,7 +280,8 @@ function submitManualEntry(type, manualId = null) {
 
                 appendToLiveFeed(data.name, data.affiliation, logType);
             } else {
-                alert(data.message || data.Invalid || "ID not found!");
+                const fallbackMessage = status === 404 ? 'ID not found!' : 'Unable to process kiosk request.';
+                alert(getKioskAuthErrorMessage(data, fallbackMessage));
                 if (typeof showScanBanner === 'function') showScanBanner('error', { id: id });
             }
         })

@@ -18,7 +18,7 @@
         <h3 id="scan-name" class="h2 text-white mb-0">Juan Dela Cruz</h3>
         <p id="scan-id" class="text-white-50 font-monospace mb-3">ID: 2026-01234</p>
         <div class="badge bg-white bg-opacity-10 text-white px-3 py-2 rounded-pill">
-            <i class="bi bi-check-circle-fill me-2 text-success"></i><span id="scan-status">ENTRY RECORDED</span>
+            <i class="bi bi-check-circle-fill me-2 text-success"></i><span id="scan-status">EXIT RECORDED</span>
         </div>
     </div>
 </div>
@@ -394,7 +394,7 @@
                             appendToLiveFeed(data.name, data.affiliation, logType);
                         } else {
                             frame.style.borderColor = '#ef4444'; 
-                            feedText.innerText = data.message || data.Invalid || "SCAN FAILED";
+                            feedText.innerText = getKioskAuthErrorMessage(data, "SCAN FAILED");
                         }
 
                         setTimeout(() => {

@@ -166,3 +166,6 @@ Event instance background scheduler started.
 Creating database connection pool...
 CRITICAL ERROR: Could not connect to MySQL database. Details: 2003: Can't connect to MySQL server on 'localhost:3306' (Errno 10061: No connection could be made because the target machine actively refused it)
 Event instance background scheduler started.
+Creating database connection pool...
+Database connection pool created.
+Event instance background scheduler started.

@@ -483,7 +483,7 @@
                                 appendToLiveFeed(data.name, data.affiliation, logType);
                             } else {
                                 frame.style.borderColor = '#ef4444';
-                                feedText.innerText = data.message || data.Invalid || "SCAN FAILED";
+                                feedText.innerText = getKioskAuthErrorMessage(data, "SCAN FAILED");
 
                                 if (typeof showScanBanner === 'function') {
                                     showScanBanner('error', { id: extractedId });
