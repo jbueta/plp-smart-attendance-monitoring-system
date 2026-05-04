@@ -98,7 +98,7 @@
                                 </div>
                                 <!-- Row 2 -->
                                 <div class="col-md-6">
-                                    <label class="form-label text-white-50 small fw-bold mb-2">Target / Filter
+                                    <label class="form-label text-white-50 small fw-bold mb-2" id="report-filter-label">Target / Filter
                                         By</label>
                                     <select class="form-select bg-dark text-white border-secondary shadow-sm"
                                         id="report-filter">
@@ -127,6 +127,18 @@
                                             <!-- <span class="d-block text-white-50 small fw-bold text-uppercase">Fixed Event Date</span> -->
                                             <span id="displayEventDate" class="text-white fw-bold fs-6">--</span>
                                         </div>
+                                    </div>
+
+                                    <div id="eventInstanceGroup" class="d-none mt-1">
+                                        <select
+                                            class="form-select bg-dark text-white border-secondary shadow-sm"
+                                            id="event-instance-select"
+                                        >
+                                            <option value="">Select an event instance date</option>
+                                        </select>
+                                        <small id="eventInstanceHelp" class="text-white-50 d-block mt-2">
+                                            Choose which generated date instance of the recurring event you want to report on.
+                                        </small>
                                     </div>
                                 </div>
                             </div>
@@ -311,18 +323,32 @@
         <!-- Recent Reports -->
         <div class="col-md-12">
             <div class="card-glass p-4">
-                <h5 class="mb-3">Recently Generated</h5>
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <div>
+                        <h5 class="mb-1">Recently Generated</h5>
+                        <p class="text-white-50 small mb-0">Archived report PDFs are stored in <code>static/reports</code>.</p>
+                    </div>
+                </div>
                 <div class="list-group list-group-flush border-secondary rounded">
+                    {% if reports %}
                     {% for report in reports %}
-                    <a href="#"
-                        class="list-group-item list-group-item-action bg-transparent text-white border-secondary d-flex justify-content-between align-items-center">
+                    <a href="{{ report.url }}" target="_blank" rel="noopener"
+                        class="list-group-item list-group-item-action bg-transparent text-white border-secondary d-flex justify-content-between align-items-center gap-3">
                         <div>
                             <i class="bi bi-{{ report.icon }} me-3 fs-5"></i>
                             <strong>{{ report.name }}</strong>
                         </div>
-                        <span class="text-white-50 small">{{ report.time }}</span>
+                        <div class="text-end">
+                            <div class="text-white-50 small">{{ report.time }}</div>
+                            <div class="text-white-50 small">{{ report.size }}</div>
+                        </div>
                     </a>
                     {% endfor %}
+                    {% else %}
+                    <div class="list-group-item bg-transparent text-white-50 border-secondary">
+                        No archived reports yet. Download a report as PDF to save it here.
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>

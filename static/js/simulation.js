@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Simulate a scan every 4 seconds
                 simInterval = setInterval(() => {
-                    const mockIds = ['2023-001', '2023-002', '2023-003', 'EMP-001'];
+                    const mockIds = ['2023-001', '2023-002', '2023-003', '00001'];
                     const randomId = mockIds[Math.floor(Math.random() * mockIds.length)];
 
                     const inputField = document.getElementById('scanner-input');

@@ -444,3 +444,43 @@ h6 {
 .shrink-font-date {
     font-size: 0.7em !important;  /* 30% reduction */
 }
+
+/* Background job notification */
+.instance-generator-toast {
+    position: fixed;
+    left: 1rem;
+    bottom: 1rem;
+    z-index: 2050;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    width: min(360px, calc(100vw - 2rem));
+    min-height: 72px;
+    padding: 0.9rem 1rem;
+    color: #fff;
+    background: rgba(15, 23, 42, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 8px;
+    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.38);
+    backdrop-filter: blur(16px);
+}
+
+.instance-generator-toast__icon {
+    width: 34px;
+    min-width: 34px;
+    display: grid;
+    place-items: center;
+}
+
+.instance-generator-toast__title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.instance-generator-toast__message {
+    margin-top: 0.2rem;
+    color: rgba(255, 255, 255, 0.68);
+    font-size: 0.78rem;
+    line-height: 1.35;
+}

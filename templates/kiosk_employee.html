@@ -16,7 +16,7 @@
             </div>
             <h2 id="scan-title" class="display-6 fw-bold text-success mb-2">ATTENDANCE LOGGED</h2>
             <h3 id="scan-name" class="h2 text-white mb-0">Faculty Member</h3>
-            <p id="scan-id" class="text-white-50 font-monospace mb-3">ID: 2026-FAC-001</p>
+            <p id="scan-id" class="text-white-50 font-monospace mb-3">ID: 00001</p>
             <div class="badge bg-white bg-opacity-10 text-white px-3 py-2 rounded-pill">
                 <i class="bi bi-check-circle-fill me-2 text-success"></i><span id="scan-status">FLAG CEREMONY:
                     PRESENT</span>
@@ -110,7 +110,7 @@
                     <div class="mb-3">
                         <label for="manual-employee-id" class="form-label text-white-50">Employee ID Number</label>
                         <input type="text" class="form-control bg-transparent text-white border-secondary"
-                            id="manual-employee-id" placeholder="e.g. 2026-FAC-001">
+                            id="manual-employee-id" placeholder="e.g. 00001" inputmode="numeric" pattern="[0-9]{5}" maxlength="5">
                     </div>
                     <div class="d-grid gap-2">
                         <button type="button" class="btn btn-primary-gold" onclick="submitManualEntry('employee')">Log

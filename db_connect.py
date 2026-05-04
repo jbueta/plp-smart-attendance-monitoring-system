@@ -1,8 +1,49 @@
-from database import connect_db
+from database import connect_db, release_db_connection
 from datetime import date, datetime, timedelta
 
 import mysql.connector as connector
 from werkzeug.security import check_password_hash
+
+from utils.employee_schema import (
+    EMPLOYEE_CREATE_LOCK_NAME,
+    build_person_name_match_keys,
+    department_lookup_key,
+    format_employee_id,
+    normalize_department_name,
+    normalize_employee_id,
+    normalize_employee_name,
+    parse_employee_id,
+    normalize_position,
+    validate_department_name,
+    validate_employee_fields,
+)
+from utils.student_schema import (
+    STUDENT_CREATE_LOCK_NAME,
+    normalize_course_name,
+    normalize_student_id,
+    normalize_student_name,
+    normalize_student_status,
+    validate_course_name,
+    validate_student_fields,
+)
+
+
+VISITOR_PURPOSES = (
+    "Official Business",
+    "Document Submission",
+    "Inquiry",
+    "Meeting",
+    "Delivery",
+    "Other",
+)
+
+
+def normalize_visitor_purpose(value):
+    raw_value = (value or "").strip()
+    for purpose in VISITOR_PURPOSES:
+        if raw_value.lower() == purpose.lower():
+            return purpose
+    return None
 
 
 def _format_hour_label(hour_value):
@@ -21,6 +62,42 @@ def _format_department_label(department_name):
         if token.lower() not in {"college", "of", "and"}
     ]
     return "".join(initials) or str(department_name)[:6]
+
+
+def _has_cross_role_name_match(cursor, query, name_value):
+    candidate_keys = build_person_name_match_keys(name_value)
+    if not candidate_keys:
+        return False
+
+    cursor.execute(query)
+    for row in cursor.fetchall():
+        raw_name = row[0] if isinstance(row, (tuple, list)) else next(iter(row.values()), "")
+        if candidate_keys.intersection(build_person_name_match_keys(raw_name)):
+            return True
+    return False
+
+
+def _has_same_role_name_match(cursor, query, name_value, source_builder, exclude_sources=None):
+    candidate_keys = build_person_name_match_keys(name_value)
+    if not candidate_keys:
+        return False
+
+    excluded = {
+        source
+        for source in (exclude_sources or set())
+        if source is not None and str(source).strip() != ""
+    }
+
+    cursor.execute(query)
+    for row in cursor.fetchall():
+        source = source_builder(row)
+        if source in excluded:
+            continue
+
+        raw_name = row[0] if isinstance(row, (tuple, list)) else next(iter(row.values()), "")
+        if candidate_keys.intersection(build_person_name_match_keys(raw_name)):
+            return True
+    return False
 
 
 class Database:
@@ -124,7 +201,8 @@ class Database:
 
     def change_status(self):
         try:
-            user_id, current_status, role = self.parameter
+            user_id, current_status, role = self.parameter[:3]
+            requested_log_type = self.parameter[3] if len(self.parameter) > 3 else None
             current_status = (current_status or "Outside").lower()
 
             self.cursor.execute(
@@ -143,7 +221,11 @@ class Database:
             today_date = now.date()
             forgot_to_timeout = False
 
-            if current_status == "inside":
+            if requested_log_type == "Entry":
+                new_status = "Inside"
+            elif requested_log_type == "Exit":
+                new_status = "Outside"
+            elif current_status == "inside":
                 if last_log and last_log["timestamp"].date() == today_date:
                     new_status = "Outside"
                 else:
@@ -197,16 +279,18 @@ class Database:
     def add_visitor_log(self):
         try:
             visitor_name = (self.parameter[0] or "").strip()
-            purpose = (self.parameter[1] or "").strip()
+            purpose = normalize_visitor_purpose(self.parameter[1])
             details = (self.parameter[2] or "").strip() if len(self.parameter) > 2 else ""
             gate = self.parameter[3] if len(self.parameter) > 3 else "Gate 1"
 
-            if not visitor_name or not purpose:
-                return {"success": False, "message": "Visitor name and purpose are required."}
-            if purpose.lower() == "other" and not details:
-                return {"success": False, "message": "Please specify the visitor purpose details."}
+            if not visitor_name:
+                return {"success": False, "message": "Visitor name is required."}
+            if not purpose:
+                return {"success": False, "message": "Select a valid visitor purpose."}
+            if purpose == "Other" and not details:
+                return {"success": False, "message": "Visit description is required when purpose is Other."}
 
-            normalized_details = details if purpose.lower() == "other" else None
+            normalized_details = details if purpose == "Other" else None
 
             self.cursor.execute(
                 "INSERT INTO users (role, active) VALUES (%s, %s)",
@@ -332,6 +416,7 @@ class Database:
 
             query = f"""
                 SELECT
+                    v.seq AS added_order,
                     v.visitor_id AS id,
                     v.visitor_name AS name,
                     COALESCE(NULLIF(TRIM(v.purpose), ''), 'N/A') AS purpose,
@@ -370,18 +455,19 @@ class Database:
         try:
             visitor_id = self.parameter[0]
             visitor_name = self.parameter[1]
-            purpose = self.parameter[2]
+            purpose = normalize_visitor_purpose(self.parameter[2])
             details = self.parameter[3] if len(self.parameter) > 3 else ""
             visitor_name = (visitor_name or "").strip()
-            purpose = (purpose or "").strip()
             details = (details or "").strip()
 
-            if not visitor_name or not purpose:
-                return {"success": False, "message": "Visitor name and purpose are required."}
-            if purpose.lower() == "other" and not details:
-                return {"success": False, "message": "Please specify the visitor purpose details."}
+            if not visitor_name:
+                return {"success": False, "message": "Visitor name is required."}
+            if not purpose:
+                return {"success": False, "message": "Select a valid visitor purpose."}
+            if purpose == "Other" and not details:
+                return {"success": False, "message": "Visit description is required when purpose is Other."}
 
-            normalized_details = details if purpose.lower() == "other" else None
+            normalized_details = details if purpose == "Other" else None
 
             self.cursor.execute(
                 """
@@ -561,8 +647,78 @@ class Database:
                 participants_type,
             ) = self.parameter
 
+            def is_blank(value):
+                return value is None or str(value).strip() == ""
+
+            required_values = {
+                "event name": event_name,
+                "event type": event_type,
+                "frequency": frequency,
+                "start time": time_start,
+                "end time": time_end,
+                "location": location,
+                "participants type": participants_type,
+            }
+            missing_values = [label for label, value in required_values.items() if is_blank(value)]
+            if missing_values:
+                return {"success": False, "message": f"Missing required fields: {', '.join(missing_values)}."}
+
+            event_name = str(event_name).strip()
+            event_type = str(event_type).strip()
+            frequency = str(frequency).strip().upper()
+            day = str(day).strip() if day is not None else None
+            location = str(location).strip()
+            participants_type = str(participants_type).strip().lower()
+            if frequency not in {"ONCE", "DAILY", "WEEKLY"}:
+                return {"success": False, "message": "Invalid event frequency."}
+
             if frequency == "DAILY" and not event_date:
                 event_date = date.today().isoformat()
+
+            if frequency != "DAILY" and is_blank(event_date):
+                return {"success": False, "message": "Event date is required."}
+
+            if frequency == "WEEKLY" and str(day or "").strip() not in {
+                "Sunday",
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday",
+                "Saturday",
+            }:
+                return {"success": False, "message": "Event day is required for weekly events."}
+
+            try:
+                parsed_event_date = (
+                    event_date
+                    if isinstance(event_date, date)
+                    else datetime.strptime(str(event_date), "%Y-%m-%d").date()
+                )
+            except ValueError:
+                return {"success": False, "message": "Event date must use YYYY-MM-DD format."}
+
+            if parsed_event_date < date.today():
+                return {"success": False, "message": "Event date cannot be in the past."}
+
+            try:
+                parsed_start = datetime.strptime(str(time_start), "%H:%M:%S").time()
+            except ValueError:
+                try:
+                    parsed_start = datetime.strptime(str(time_start), "%H:%M").time()
+                except ValueError:
+                    return {"success": False, "message": "Start time must use HH:MM format."}
+
+            try:
+                parsed_end = datetime.strptime(str(time_end), "%H:%M:%S").time()
+            except ValueError:
+                try:
+                    parsed_end = datetime.strptime(str(time_end), "%H:%M").time()
+                except ValueError:
+                    return {"success": False, "message": "End time must use HH:MM format."}
+
+            if parsed_end <= parsed_start:
+                return {"success": False, "message": "End time must be later than start time."}
 
             if frequency == "WEEKLY":
                 query = """
@@ -815,7 +971,14 @@ class Database:
                 GROUP BY
                     e.event_id, e.event_name, e.event_type, e.frequency,
                     e.event_date, e.time_start, e.time_end, e.location
-                ORDER BY e.event_date DESC, e.event_id DESC
+                ORDER BY
+                    CASE
+                        WHEN e.event_name = 'Flag Ceremony' THEN 0
+                        WHEN e.event_name = 'Flag Retreat' THEN 1
+                        ELSE 2
+                    END ASC,
+                    e.event_date DESC,
+                    e.event_id DESC
                 """
             )
             result = cursor.fetchall()
@@ -1016,8 +1179,10 @@ class Database:
             cursor.execute(
                 """
                 SELECT
+                    s.user_id AS added_order,
                     s.student_id,
                     COALESCE(NULLIF(TRIM(s.student_name), ''), 'Unknown Student') AS student_name,
+                    s.course_id,
                     COALESCE(NULLIF(TRIM(c.course_name), ''), 'N/A') AS course_name,
                     COALESCE(u.active, 1) AS is_active
                 FROM students s
@@ -1034,7 +1199,9 @@ class Database:
                 records.append(
                     {
                         "id": row["student_id"],
+                        "added_order": row["added_order"],
                         "name": row["student_name"],
+                        "course_id": row["course_id"],
                         "course": row["course_name"],
                         "status": "Active" if is_active else "Inactive",
                         "status_class": "success" if is_active else "secondary",
@@ -1058,8 +1225,10 @@ class Database:
                     ea.attendance_id,
                     e.employee_id,
                     COALESCE(NULLIF(TRIM(e.employee_name), ''), 'Unknown Employee') AS employee_name,
+                    e.department_id,
                     COALESCE(NULLIF(TRIM(d.department_name), ''), 'N/A') AS department_name,
-                    COALESCE(NULLIF(TRIM(e.position), ''), 'N/A') AS position,
+                    COALESCE(NULLIF(TRIM(e.position), ''), '') AS position_value,
+                    COALESCE(NULLIF(TRIM(e.position), ''), 'N/A') AS position_display,
                     COALESCE(NULLIF(TRIM(ev.event_name), ''), 'N/A') AS event_name,
                     ei.event_date,
                     ea.first_in,
@@ -1092,11 +1261,13 @@ class Database:
                 logs.append(
                     {
                         "attendance_id": row["attendance_id"],
-                        "id": row["employee_id"],
+                        "id": format_employee_id(row["employee_id"]),
                         "initials": initials,
                         "name": name,
+                        "department_id": row["department_id"],
                         "dept": row["department_name"],
-                        "position": row["position"],
+                        "position": row["position_value"],
+                        "position_display": row["position_display"],
                         "event_name": row["event_name"],
                         "date": row["event_date"].isoformat() if row.get("event_date") else "",
                         "date_formatted": row["event_date"].strftime("%b %d, %Y") if row.get("event_date") else "",
@@ -1121,15 +1292,18 @@ class Database:
             cursor.execute(
                 """
                 SELECT
+                    e.user_id AS added_order,
                     e.employee_id,
                     COALESCE(NULLIF(TRIM(e.employee_name), ''), 'Unknown Employee') AS employee_name,
+                    e.department_id,
                     COALESCE(NULLIF(TRIM(d.department_name), ''), 'N/A') AS department_name,
-                    COALESCE(NULLIF(TRIM(e.position), ''), 'N/A') AS position,
+                    COALESCE(NULLIF(TRIM(e.position), ''), '') AS position_value,
+                    COALESCE(NULLIF(TRIM(e.position), ''), 'N/A') AS position_display,
                     COALESCE(u.active, 1) AS is_active
                 FROM employees e
                 JOIN users u ON e.user_id = u.user_id
                 LEFT JOIN departments d ON e.department_id = d.department_id
-                ORDER BY is_active DESC, employee_name ASC
+                ORDER BY is_active DESC, e.user_id DESC, employee_name ASC
                 """
             )
             rows = cursor.fetchall()
@@ -1139,10 +1313,13 @@ class Database:
                 is_active = bool(row.get("is_active"))
                 records.append(
                     {
-                        "id": row["employee_id"],
+                        "id": format_employee_id(row["employee_id"]),
+                        "added_order": row["added_order"],
                         "name": row["employee_name"],
+                        "department_id": row["department_id"],
                         "dept": row["department_name"],
-                        "position": row["position"],
+                        "position": row["position_value"],
+                        "position_display": row["position_display"],
                         "status": "Active" if is_active else "Inactive",
                         "status_class": "success" if is_active else "secondary",
                     }
@@ -1163,6 +1340,7 @@ class Database:
                 """
                 SELECT
                     instance_id,
+                    DATE_FORMAT(event_date, '%Y-%m-%d') AS event_date_value,
                     DATE_FORMAT(event_date, '%b %e, %Y') AS event_date,
                     status
                 FROM event_instances
@@ -1228,18 +1406,28 @@ class Database:
         raw_logs = []
         total_expected = 0
         total_present = 0
+        filter_display = "All"
 
         try:
-            dept_condition = ""
-            dept_params = []
-            if department_filter and str(department_filter).lower() != "all":
-                dept_condition = "AND d.department_id = %s"
-                dept_params = [department_filter]
+            filter_value = str(department_filter or "All").strip()
 
             if normalized_category == "Event Attendance":
                 report_title = "Event Attendance Report"
                 event_name_display = "Scheduled Event"
                 col_headers = ["Participant Name", "Role / Affiliation", "Time In", "Time Out", "Status", "Remarks"]
+                dept_condition = ""
+                dept_params = []
+                if filter_value.lower() != "all":
+                    dept_condition = "AND d.department_id = %s"
+                    dept_params = [filter_value]
+                    cursor.execute(
+                        "SELECT department_name FROM departments WHERE department_id = %s",
+                        (filter_value,),
+                    )
+                    dept_row = cursor.fetchone()
+                    filter_display = dept_row["department_name"] if dept_row else filter_value
+                else:
+                    filter_display = "All Departments"
 
                 cursor.execute("SELECT event_name FROM events WHERE event_id = %s", (report_type,))
                 event_info = cursor.fetchone()
@@ -1248,20 +1436,10 @@ class Database:
 
                 query = f"""
                     SELECT
-                        COALESCE(e.employee_name, s.student_name, v.visitor_name, a.username, 'Unknown User') AS name,
+                        COALESCE(e.employee_name, 'Unknown Employee') AS name,
                         CONCAT(
-                            UPPER(u.role),
-                            ' - ',
-                            COALESCE(
-                                d.department_name,
-                                c.course_name,
-                                CASE
-                                    WHEN LOWER(COALESCE(v.purpose, '')) = 'other'
-                                    THEN NULLIF(TRIM(v.details), '')
-                                    ELSE NULLIF(TRIM(v.purpose), '')
-                                END,
-                                'N/A'
-                            )
+                            'EMPLOYEE - ',
+                            COALESCE(d.department_name, 'N/A')
                         ) AS detail,
                         LOWER(TRIM(DATE_FORMAT(ea.first_in, '%l:%i %p'))) AS time_in,
                         LOWER(TRIM(DATE_FORMAT(ea.last_out, '%l:%i %p'))) AS time_out,
@@ -1270,24 +1448,28 @@ class Database:
                     FROM event_attendance ea
                     JOIN event_instances ei ON ea.instance_id = ei.instance_id
                     JOIN users u ON ea.user_id = u.user_id
-                    LEFT JOIN employees e ON u.user_id = e.user_id
+                    JOIN employees e ON u.user_id = e.user_id
                     LEFT JOIN departments d ON e.department_id = d.department_id
-                    LEFT JOIN students s ON u.user_id = s.user_id
-                    LEFT JOIN courses c ON s.course_id = c.course_id
-                    LEFT JOIN visitors v ON u.user_id = v.user_id
-                    LEFT JOIN admin a ON u.user_id = a.user_id
                     WHERE ei.event_id = %s
                       AND ei.event_date BETWEEN %s AND %s
+                      AND u.role = 'employee'
                       {dept_condition}
                     ORDER BY ea.first_in ASC, name ASC
                 """
                 cursor.execute(query, [report_type, start_date, end_date] + dept_params)
                 raw_logs = cursor.fetchall()
 
-                cursor.execute(
-                    "SELECT COUNT(*) AS count FROM event_participants WHERE event_id = %s",
-                    (report_type,),
-                )
+                expected_query = f"""
+                    SELECT COUNT(*) AS count
+                    FROM event_participants ep
+                    JOIN users u ON ep.user_id = u.user_id
+                    JOIN employees e ON ep.user_id = e.user_id
+                    LEFT JOIN departments d ON e.department_id = d.department_id
+                    WHERE ep.event_id = %s
+                      AND u.role = 'employee'
+                      {dept_condition}
+                """
+                cursor.execute(expected_query, [report_type] + dept_params)
                 expected_result = cursor.fetchone()
                 total_expected = expected_result["count"] if expected_result else 0
                 total_present = sum(1 for log in raw_logs if log["status"] in {"Present", "Late"})
@@ -1295,29 +1477,34 @@ class Database:
             elif normalized_category == "Visitor Logs":
                 report_title = "Visitor Logs Report"
                 event_name_display = "Visitor Activity"
-                col_headers = ["Visitor Name", "Purpose", "Time In", "Time Out", "Status", "Visitor ID"]
+                col_headers = ["Visitor Name", "Purpose", "Time In", "Time Out", "Visitor ID"]
+                purpose_condition = ""
+                purpose_params = []
+                if filter_value.lower() != "all":
+                    purpose_condition = "AND COALESCE(NULLIF(TRIM(v.purpose), ''), 'N/A') = %s"
+                    purpose_params = [filter_value]
+                    filter_display = filter_value
+                else:
+                    filter_display = "All Purposes"
 
-                query = """
+                query = f"""
                     SELECT
                         v.visitor_name AS name,
                         COALESCE(NULLIF(TRIM(v.purpose), ''), 'N/A') AS detail,
                         LOWER(TRIM(DATE_FORMAT(MIN(CASE WHEN gl.log_type = 'Entry' THEN gl.timestamp END), '%l:%i %p'))) AS time_in,
                         LOWER(TRIM(DATE_FORMAT(MAX(CASE WHEN gl.log_type = 'Exit' THEN gl.timestamp END), '%l:%i %p'))) AS time_out,
-                        CASE WHEN v.status = 'Inside' THEN 'Checked In' ELSE 'Checked Out' END AS status,
-                        CASE
-                            WHEN LOWER(COALESCE(v.purpose, '')) = 'other'
-                            THEN COALESCE(NULLIF(TRIM(v.details), ''), v.visitor_id)
-                            ELSE v.visitor_id
-                        END AS remarks
+                        v.visitor_id AS remarks
                     FROM visitors v
                     JOIN users u ON v.user_id = u.user_id
                     LEFT JOIN general_log gl ON gl.user_id = v.user_id
                     WHERE COALESCE(u.active, 1) = 1
-                    GROUP BY v.seq, v.visitor_id, v.visitor_name, v.purpose, v.status
+                      AND u.role = 'visitor'
+                      {purpose_condition}
+                    GROUP BY v.seq, v.visitor_id, v.visitor_name, v.purpose
                     HAVING DATE(MIN(CASE WHEN gl.log_type = 'Entry' THEN gl.timestamp END)) BETWEEN %s AND %s
                     ORDER BY MIN(CASE WHEN gl.log_type = 'Entry' THEN gl.timestamp END) DESC
                 """
-                cursor.execute(query, (start_date, end_date))
+                cursor.execute(query, purpose_params + [start_date, end_date])
                 raw_logs = cursor.fetchall()
                 total_expected = len(raw_logs)
                 total_present = len(raw_logs)
@@ -1326,6 +1513,14 @@ class Database:
                 report_title = "Violations Report"
                 event_name_display = "Security Violations"
                 col_headers = ["User Name", "Description", "Time", "Status", "Remarks"]
+                role_condition = ""
+                role_params = []
+                if filter_value.lower() in {"student", "visitor", "employee"}:
+                    role_condition = "AND u.role = %s"
+                    role_params = [filter_value.lower()]
+                    filter_display = f"{filter_value.capitalize()}s"
+                else:
+                    filter_display = "All Subjects"
 
                 query = f"""
                     SELECT
@@ -1341,52 +1536,49 @@ class Database:
                     LEFT JOIN students s ON u.user_id = s.user_id
                     LEFT JOIN visitors v ON u.user_id = v.user_id
                     WHERE DATE(violation.created_at) BETWEEN %s AND %s
-                      {dept_condition}
+                      {role_condition}
                     ORDER BY violation.created_at DESC
                 """
-                cursor.execute(query, [start_date, end_date] + dept_params)
+                cursor.execute(query, [start_date, end_date] + role_params)
                 raw_logs = cursor.fetchall()
                 total_expected = len(raw_logs)
                 total_present = len(raw_logs)
 
             else:
-                report_title = "General Campus Access Logs"
-                event_name_display = "Campus Gates Entry / Exit"
-                col_headers = ["User Name", "Role / Affiliation", "Time", "Action", "Gate"]
+                report_title = "Student Campus Access Logs"
+                event_name_display = "Student Gates Entry / Exit"
+                col_headers = ["Student Name", "Program", "Time In", "Time Out", "Gate"]
+                course_condition = ""
+                course_params = []
+                if filter_value.lower() != "all":
+                    course_condition = "AND c.course_id = %s"
+                    course_params = [filter_value]
+                    cursor.execute(
+                        "SELECT course_name FROM courses WHERE course_id = %s",
+                        (filter_value,),
+                    )
+                    course_row = cursor.fetchone()
+                    filter_display = course_row["course_name"] if course_row else filter_value
+                else:
+                    filter_display = "All Programs"
 
                 query = f"""
                     SELECT
-                        COALESCE(e.employee_name, s.student_name, v.visitor_name, a.username, 'Unknown User') AS name,
-                        CONCAT(
-                            UPPER(u.role),
-                            ' - ',
-                            COALESCE(
-                                d.department_name,
-                                c.course_name,
-                                CASE
-                                    WHEN LOWER(COALESCE(v.purpose, '')) = 'other'
-                                    THEN NULLIF(TRIM(v.details), '')
-                                    ELSE NULLIF(TRIM(v.purpose), '')
-                                END,
-                                'N/A'
-                            )
-                        ) AS detail,
+                        COALESCE(s.student_name, 'Unknown Student') AS name,
+                        COALESCE(c.course_name, 'N/A') AS detail,
                         TIME_FORMAT(gl.timestamp, '%h:%i %p') AS time,
                         gl.log_type AS status,
                         COALESCE(gl.gate, 'Main Gate') AS remarks
                     FROM general_log gl
                     JOIN users u ON gl.user_id = u.user_id
-                    LEFT JOIN employees e ON u.user_id = e.user_id
-                    LEFT JOIN departments d ON e.department_id = d.department_id
-                    LEFT JOIN students s ON u.user_id = s.user_id
+                    JOIN students s ON u.user_id = s.user_id
                     LEFT JOIN courses c ON s.course_id = c.course_id
-                    LEFT JOIN visitors v ON u.user_id = v.user_id
-                    LEFT JOIN admin a ON u.user_id = a.user_id
                     WHERE DATE(gl.timestamp) BETWEEN %s AND %s
-                      {dept_condition}
+                      AND u.role = 'student'
+                      {course_condition}
                     ORDER BY gl.timestamp DESC
                 """
-                cursor.execute(query, [start_date, end_date] + dept_params)
+                cursor.execute(query, [start_date, end_date] + course_params)
                 raw_logs = cursor.fetchall()
                 total_expected = len(raw_logs)
                 total_present = len(raw_logs)
@@ -1398,6 +1590,7 @@ class Database:
                 "raw_logs": raw_logs,
                 "total_expected": total_expected,
                 "total_present": total_present,
+                "filter_display": filter_display,
             }
         except connector.Error as err:
             print(f"Error fetching report data: {err}")
@@ -1462,6 +1655,11 @@ class Database:
             )
             peak_row = cursor.fetchone()
             peak_hour = _format_hour_label(peak_row["hr"]) if peak_row else "N/A"
+            peak_window = (
+                f"{_format_hour_label(peak_row['hr'])} - {_format_hour_label((peak_row['hr'] + 1) % 24)}"
+                if peak_row
+                else "N/A"
+            )
 
             cursor.execute(
                 """
@@ -1532,17 +1730,69 @@ class Database:
             while len(dept_distribution) < 5:
                 dept_distribution.append(0)
 
+            alerts = []
+
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM students s
+                JOIN users u ON s.user_id = u.user_id
+                WHERE s.status = 'Inside' AND u.active = 1
+                """
+            )
+            students_inside = cursor.fetchone()["cnt"] or 0
+            if students_inside > 0:
+                alerts.append(
+                    {
+                        "type": "danger",
+                        "icon": "shield-exclamation",
+                        "title": f"Curfew Watch: {students_inside} student(s) still inside",
+                        "time": datetime.now().strftime("%I:%M %p"),
+                    }
+                )
+
+            if peak_row:
+                alerts.append(
+                    {
+                        "type": "info",
+                        "icon": "graph-up-arrow",
+                        "title": f"Peak Hour Detected at {peak_hour}",
+                        "time": "Today",
+                    }
+                )
+
+            if total_invited > 0 and total_attended / total_invited < 0.5:
+                alerts.append(
+                    {
+                        "type": "warning",
+                        "icon": "calendar-x-fill",
+                        "title": f"Low Event Attendance: {attendance_rate} turnout today",
+                        "time": datetime.now().strftime("%I:%M %p"),
+                    }
+                )
+
+            if not alerts:
+                alerts.append(
+                    {
+                        "type": "success",
+                        "icon": "check-circle-fill",
+                        "title": "All systems normal. No issues detected.",
+                        "time": datetime.now().strftime("%I:%M %p"),
+                    }
+                )
+
             return {
                 "total_entries": f"{total_entries:,}",
                 "entries_trend": trend,
                 "currently_inside": f"{currently_inside:,}",
                 "avg_dwell_time": avg_dwell,
                 "peak_hour": peak_hour,
+                "peak_window": peak_window,
                 "traffic_chart": traffic_chart,
                 "event_attendance_rate": attendance_rate,
                 "event_attendance_raw": attendance_raw,
                 "dept_distribution": dept_distribution,
-                "alerts": [],
+                "alerts": alerts,
             }
         except connector.Error as err:
             print(f"Error fetching overall dashboard stats: {err}")
@@ -1643,6 +1893,32 @@ class Database:
             else:
                 trend = "N/A"
 
+            cursor.execute(
+                """
+                SELECT
+                    s.student_name AS name,
+                    COALESCE(c.course_name, 'N/A') AS course,
+                    DATE_FORMAT(
+                        (
+                            SELECT MAX(gl2.timestamp)
+                            FROM general_log gl2
+                            WHERE gl2.user_id = u.user_id
+                              AND gl2.log_type = 'Entry'
+                              AND DATE(gl2.timestamp) = %s
+                        ),
+                        '%%h:%%i %%p'
+                    ) AS last_entry
+                FROM students s
+                JOIN users u ON s.user_id = u.user_id
+                LEFT JOIN courses c ON s.course_id = c.course_id
+                WHERE s.status = 'Inside'
+                  AND u.active = 1
+                ORDER BY s.student_name ASC
+                """,
+                (today,),
+            )
+            watchlist = cursor.fetchall()
+
             return {
                 "total_entries": f"{total_entries:,}",
                 "entries_trend": trend,
@@ -1651,7 +1927,7 @@ class Database:
                 "currently_inside": f"{currently_inside:,}",
                 "avg_stay": avg_stay,
                 "hourly_traffic": hourly_traffic,
-                "watchlist": [],
+                "watchlist": watchlist,
                 "curfew_trigger": "09:40:00 PM",
             }
         except connector.Error as err:
@@ -1909,22 +2185,20 @@ class Database:
 
 
 class EmployeeModel:
-    def add_employee(self, employee_id, employee_name, department_id, position):
-        conn = connect_db()
-        if conn is None:
-            return {"success": False, "error": "Database connection failed"}
+    def _acquire_create_lock(self, cursor):
+        cursor.execute("SELECT GET_LOCK(%s, %s)", (EMPLOYEE_CREATE_LOCK_NAME, 10))
+        result = cursor.fetchone()
+        return bool(result and result[0] == 1)
 
-        cursor = None
+    def _release_create_lock(self, cursor):
         try:
-            employee_id = str(employee_id or "").strip()
-            employee_name = str(employee_name or "").strip()
-            department_id = str(department_id or "").strip()
-            position = str(position or "").strip()
+            cursor.execute("SELECT RELEASE_LOCK(%s)", (EMPLOYEE_CREATE_LOCK_NAME,))
+            cursor.fetchone()
+        except connector.Error:
+            pass
 
-            if not employee_id or not employee_name or not department_id or not position:
-                return {"success": False, "error": "All employee fields are required."}
-
-            cursor = conn.cursor()
+    def _resolve_department_id(self, cursor, department_id=None, department_name=None):
+        if department_id is not None and str(department_id).strip():
             cursor.execute(
                 """
                 SELECT department_id
@@ -1932,90 +2206,198 @@ class EmployeeModel:
                 WHERE department_id = %s
                 LIMIT 1
                 """,
-                (department_id,),
+                (str(department_id).strip(),),
             )
             department = cursor.fetchone()
             if not department:
-                return {"success": False, "error": "Selected department does not exist."}
+                return None, "Selected department does not exist."
+            return int(department[0]), None
 
-            cursor.execute(
-                """
-                SELECT employee_id
-                FROM employees
-                WHERE employee_id = %s
-                LIMIT 1
-                """,
-                (employee_id,),
-            )
-            if cursor.fetchone():
-                return {"success": False, "error": f"Employee already exists: {employee_id}"}
+        normalized_department_name = normalize_department_name(department_name)
+        if not normalized_department_name:
+            return None, "Department is required."
 
-            cursor.execute(
-                """
-                INSERT INTO users (role, active)
-                VALUES (%s, %s)
-                """,
-                ("employee", 1),
-            )
-            user_id = cursor.lastrowid
+        department_length_errors = validate_department_name(normalized_department_name)
+        if department_length_errors:
+            return None, department_length_errors[0]
 
-            cursor.execute(
-                """
-                INSERT INTO employees
-                    (user_id, employee_id, employee_name, department_id, position, status)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                """,
-                (user_id, employee_id, employee_name, department_id, position, "Outside"),
-            )
-            conn.commit()
-            return {"success": True}
-        except Exception as err:
-            conn.rollback()
-            return {"success": False, "error": str(err)}
-        finally:
-            if cursor:
-                cursor.close()
-            conn.close()
+        cursor.execute(
+            """
+            SELECT department_id
+            FROM departments
+            WHERE UPPER(TRIM(department_name)) = %s
+            ORDER BY department_id ASC
+            """,
+            (department_lookup_key(normalized_department_name),),
+        )
+        matches = cursor.fetchall()
+        if not matches:
+            return None, f"Department not found: {normalized_department_name}"
+        if len(matches) > 1:
+            return None, f"Department is ambiguous: {normalized_department_name}"
 
-    def add_employee_excel(self, conn, employee_id, employee_name, department_name, position):
+        return int(matches[0][0]), None
+
+    def _has_student_name_conflict(self, cursor, employee_name):
+        return _has_cross_role_name_match(
+            cursor,
+            """
+            SELECT student_name
+            FROM students
+            """,
+            employee_name,
+        )
+
+    def _has_existing_employee_name_conflict(self, cursor, employee_name, exclude_employee_id=None):
+        normalized_exclude_id = normalize_employee_id(exclude_employee_id)
+        return _has_same_role_name_match(
+            cursor,
+            """
+            SELECT employee_name, employee_id
+            FROM employees
+            """,
+            employee_name,
+            lambda row: format_employee_id(row[1]),
+            exclude_sources={normalized_exclude_id} if normalized_exclude_id else None,
+        )
+
+    def _find_employee_by_id(self, cursor, employee_id):
+        cursor.execute(
+            """
+            SELECT e.employee_id, e.user_id, COALESCE(u.active, 1) AS is_active
+            FROM employees e
+            JOIN users u ON e.user_id = u.user_id
+            WHERE e.employee_id = %s
+            LIMIT 1
+            """,
+            (parse_employee_id(employee_id),),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+
+        return {
+            "employee_id": format_employee_id(row[0]),
+            "user_id": row[1],
+            "is_active": bool(row[2]),
+        }
+
+    def _create_or_reactivate_employee(
+        self,
+        conn,
+        employee_id,
+        employee_name,
+        department_id=None,
+        department_name=None,
+        position="",
+    ):
         cursor = None
+        lock_acquired = False
         try:
+            employee_id = normalize_employee_id(employee_id)
+            employee_name = normalize_employee_name(employee_name)
+            position = normalize_position(position)
+
+            validation_errors = validate_employee_fields(
+                employee_id=employee_id,
+                employee_name=employee_name,
+                position=position,
+                require_employee_id=True,
+                require_position=False,
+            )
+            if validation_errors:
+                return {"success": False, "error": validation_errors[0]}
+
+            if not conn.in_transaction:
+                conn.start_transaction()
+
             cursor = conn.cursor()
-
-            employee_id = str(employee_id or "").strip()
-            employee_name = str(employee_name or "").strip().title()
-            department_name = str(department_name or "").strip().upper().replace("\u2019", "'")
-            position = str(position or "").strip()
-
-            if not employee_id or not employee_name or not department_name:
-                return {"success": False, "error": "Missing required fields"}
-
-            cursor.execute(
-                """
-                SELECT department_id
-                FROM departments
-                WHERE UPPER(TRIM(department_name)) = TRIM(%s)
-                LIMIT 1
-                """,
-                (department_name,),
+            resolved_department_id, department_error = self._resolve_department_id(
+                cursor,
+                department_id=department_id,
+                department_name=department_name,
             )
-            department = cursor.fetchone()
-            if not department:
-                return {"success": False, "error": f"Department not found: {department_name}"}
+            if department_error:
+                conn.rollback()
+                return {"success": False, "error": department_error}
 
-            department_id = department[0]
+            if not self._acquire_create_lock(cursor):
+                conn.rollback()
+                return {
+                    "success": False,
+                    "error": "Could not secure the employee creation lock. Please try again.",
+                }
+            lock_acquired = True
 
-            cursor.execute(
-                """
-                SELECT employee_id
-                FROM employees
-                WHERE employee_id = %s
-                LIMIT 1
-                """,
-                (employee_id,),
+            existing_employee = self._find_employee_by_id(
+                cursor,
+                employee_id=employee_id,
             )
-            if cursor.fetchone():
-                return {"success": False, "error": f"Employee already exists: {employee_id}"}
+            if existing_employee:
+                if existing_employee["is_active"]:
+                    conn.rollback()
+                    return {
+                        "success": False,
+                        "error": f"Employee already exists with ID {existing_employee['employee_id']}.",
+                    }
+
+            if self._has_existing_employee_name_conflict(
+                cursor,
+                employee_name,
+                exclude_employee_id=employee_id if existing_employee else None,
+            ):
+                conn.rollback()
+                return {
+                    "success": False,
+                    "error": (
+                        "A similar name already exists in employee records. "
+                        "Please review the existing records first."
+                    ),
+                }
+
+            if self._has_student_name_conflict(cursor, employee_name):
+                conn.rollback()
+                return {
+                    "success": False,
+                    "error": (
+                        "A similar name already exists in student records. "
+                        "A person cannot be both an employee and a student. "
+                        "Please review the existing records first."
+                    ),
+                }
+
+            if existing_employee:
+                cursor.execute(
+                    """
+                    UPDATE employees
+                    SET employee_name = %s,
+                        department_id = %s,
+                        position = %s,
+                        status = %s
+                    WHERE user_id = %s
+                    """,
+                    (
+                        employee_name,
+                        resolved_department_id,
+                        position or None,
+                        "Outside",
+                        existing_employee["user_id"],
+                    ),
+                )
+                cursor.execute(
+                    """
+                    UPDATE users
+                    SET active = 1
+                    WHERE user_id = %s
+                    """,
+                    (existing_employee["user_id"],),
+                )
+                conn.commit()
+                return {
+                    "success": True,
+                    "employee_id": existing_employee["employee_id"],
+                    "reactivated": True,
+                }
 
             cursor.execute(
                 """
@@ -2032,14 +2414,346 @@ class EmployeeModel:
                     (user_id, employee_id, employee_name, department_id, position, status)
                 VALUES (%s, %s, %s, %s, %s, %s)
                 """,
-                (user_id, employee_id, employee_name, department_id, position or None, "Outside"),
+                (
+                    user_id,
+                    parse_employee_id(employee_id),
+                    employee_name,
+                    resolved_department_id,
+                    position or None,
+                    "Outside",
+                ),
             )
             conn.commit()
-            return {"success": True}
+            return {
+                "success": True,
+                "employee_id": employee_id,
+                "reactivated": False,
+            }
         except Exception as err:
             if conn:
                 conn.rollback()
             return {"success": False, "error": str(err)}
         finally:
+            if cursor and lock_acquired:
+                self._release_create_lock(cursor)
             if cursor:
                 cursor.close()
+
+    def add_employee(self, employee_id, employee_name, department_id, position):
+        conn = connect_db()
+        if conn is None:
+            return {"success": False, "error": "Database connection failed"}
+
+        try:
+            return self._create_or_reactivate_employee(
+                conn=conn,
+                employee_id=employee_id,
+                employee_name=employee_name,
+                department_id=department_id,
+                position=position,
+            )
+        finally:
+            release_db_connection(conn)
+
+    def add_employee_excel(
+        self,
+        conn,
+        employee_id,
+        employee_name,
+        department_name=None,
+        position="",
+        department_id=None,
+    ):
+        return self._create_or_reactivate_employee(
+            conn=conn,
+            employee_id=employee_id,
+            employee_name=employee_name,
+            department_id=department_id,
+            department_name=department_name,
+            position=position,
+        )
+
+
+class StudentModel:
+    def _acquire_create_lock(self, cursor):
+        cursor.execute("SELECT GET_LOCK(%s, %s)", (STUDENT_CREATE_LOCK_NAME, 10))
+        result = cursor.fetchone()
+        return bool(result and result[0] == 1)
+
+    def _release_create_lock(self, cursor):
+        try:
+            cursor.execute("SELECT RELEASE_LOCK(%s)", (STUDENT_CREATE_LOCK_NAME,))
+            cursor.fetchone()
+        except connector.Error:
+            pass
+
+    def _resolve_course_id(self, cursor, course_id=None, course_name=None):
+        if course_id is not None and str(course_id).strip():
+            cursor.execute(
+                """
+                SELECT course_id, course_name
+                FROM courses
+                WHERE course_id = %s
+                LIMIT 1
+                """,
+                (str(course_id).strip(),),
+            )
+            course = cursor.fetchone()
+            if not course:
+                return None, None, "Selected course does not exist."
+            return int(course[0]), normalize_course_name(course[1]), None
+
+        normalized_course_name = normalize_course_name(course_name)
+        if not normalized_course_name:
+            return None, None, "Course is required."
+
+        course_length_errors = validate_course_name(normalized_course_name)
+        if course_length_errors:
+            return None, None, course_length_errors[0]
+
+        cursor.execute(
+            """
+            SELECT course_id, course_name
+            FROM courses
+            WHERE UPPER(TRIM(course_name)) = %s
+            ORDER BY course_id ASC
+            """,
+            (normalized_course_name.upper(),),
+        )
+        matches = cursor.fetchall()
+        if not matches:
+            return None, None, f"Course not found: {normalized_course_name}"
+        if len(matches) > 1:
+            return None, None, f"Course is ambiguous: {normalized_course_name}"
+
+        return int(matches[0][0]), normalize_course_name(matches[0][1]), None
+
+    def _has_employee_name_conflict(self, cursor, student_name):
+        return _has_cross_role_name_match(
+            cursor,
+            """
+            SELECT employee_name
+            FROM employees
+            """,
+            student_name,
+        )
+
+    def _has_existing_student_name_conflict(self, cursor, student_name, exclude_student_id=None):
+        normalized_exclude_id = normalize_student_id(exclude_student_id)
+        return _has_same_role_name_match(
+            cursor,
+            """
+            SELECT student_name, student_id
+            FROM students
+            """,
+            student_name,
+            lambda row: normalize_student_id(row[1]),
+            exclude_sources={normalized_exclude_id} if normalized_exclude_id else None,
+        )
+
+    def _find_student_by_id(self, cursor, student_id):
+        cursor.execute(
+            """
+            SELECT s.student_id, s.user_id, COALESCE(u.active, 1) AS is_active
+            FROM students s
+            JOIN users u ON s.user_id = u.user_id
+            WHERE s.student_id = %s
+            LIMIT 1
+            """,
+            (student_id,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+
+        return {
+            "student_id": row[0],
+            "user_id": row[1],
+            "is_active": bool(row[2]),
+        }
+
+    def _create_or_reactivate_student(
+        self,
+        conn,
+        student_id,
+        student_name,
+        course_id=None,
+        course_name=None,
+        status="Outside",
+    ):
+        cursor = None
+        lock_acquired = False
+        try:
+            student_id = normalize_student_id(student_id)
+            student_name = normalize_student_name(student_name)
+            status = normalize_student_status(status, default="Outside")
+
+            validation_errors = validate_student_fields(
+                student_id=student_id,
+                student_name=student_name,
+            )
+            if validation_errors:
+                return {"success": False, "error": validation_errors[0]}
+
+            if not conn.in_transaction:
+                conn.start_transaction()
+
+            cursor = conn.cursor()
+            resolved_course_id, resolved_course_name, course_error = self._resolve_course_id(
+                cursor,
+                course_id=course_id,
+                course_name=course_name,
+            )
+            if course_error:
+                conn.rollback()
+                return {"success": False, "error": course_error}
+
+            if not self._acquire_create_lock(cursor):
+                conn.rollback()
+                return {
+                    "success": False,
+                    "error": "Could not secure the student creation lock. Please try again.",
+                }
+            lock_acquired = True
+
+            existing_student = self._find_student_by_id(cursor, student_id)
+            if existing_student:
+                if existing_student["is_active"]:
+                    conn.rollback()
+                    return {
+                        "success": False,
+                        "error": f"Student already exists with ID {student_id}",
+                    }
+
+            if self._has_existing_student_name_conflict(
+                cursor,
+                student_name,
+                exclude_student_id=student_id if existing_student else None,
+            ):
+                conn.rollback()
+                return {
+                    "success": False,
+                    "error": (
+                        "A similar name already exists in student records. "
+                        "Please review the existing records first."
+                    ),
+                }
+
+            if self._has_employee_name_conflict(cursor, student_name):
+                conn.rollback()
+                return {
+                    "success": False,
+                    "error": (
+                        "A similar name already exists in employee records. "
+                        "A person cannot be both a student and an employee. "
+                        "Please review the existing records first."
+                    ),
+                }
+
+            if existing_student:
+                cursor.execute(
+                    """
+                    UPDATE students
+                    SET student_name = %s,
+                        course_id = %s,
+                        status = %s
+                    WHERE user_id = %s
+                    """,
+                    (
+                        student_name,
+                        resolved_course_id,
+                        status,
+                        existing_student["user_id"],
+                    ),
+                )
+                cursor.execute(
+                    """
+                    UPDATE users
+                    SET active = 1
+                    WHERE user_id = %s
+                    """,
+                    (existing_student["user_id"],),
+                )
+                conn.commit()
+                return {
+                    "success": True,
+                    "student_id": student_id,
+                    "course_id": resolved_course_id,
+                    "course_name": resolved_course_name,
+                    "reactivated": True,
+                }
+
+            cursor.execute(
+                """
+                INSERT INTO users (role, active)
+                VALUES (%s, %s)
+                """,
+                ("student", 1),
+            )
+            user_id = cursor.lastrowid
+
+            cursor.execute(
+                """
+                INSERT INTO students
+                    (user_id, student_id, student_name, course_id, status)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (
+                    user_id,
+                    student_id,
+                    student_name,
+                    resolved_course_id,
+                    status,
+                ),
+            )
+            conn.commit()
+            return {
+                "success": True,
+                "student_id": student_id,
+                "course_id": resolved_course_id,
+                "course_name": resolved_course_name,
+                "reactivated": False,
+            }
+        except Exception as err:
+            if conn:
+                conn.rollback()
+            return {"success": False, "error": str(err)}
+        finally:
+            if cursor and lock_acquired:
+                self._release_create_lock(cursor)
+            if cursor:
+                cursor.close()
+
+    def add_student(self, student_id, student_name, course_id, status="Outside"):
+        conn = connect_db()
+        if conn is None:
+            return {"success": False, "error": "Database connection failed"}
+
+        try:
+            return self._create_or_reactivate_student(
+                conn=conn,
+                student_id=student_id,
+                student_name=student_name,
+                course_id=course_id,
+                status=status,
+            )
+        finally:
+            release_db_connection(conn)
+
+    def add_student_excel(
+        self,
+        conn,
+        student_id,
+        student_name,
+        course_name=None,
+        course_id=None,
+        status="Outside",
+    ):
+        return self._create_or_reactivate_student(
+            conn=conn,
+            student_id=student_id,
+            student_name=student_name,
+            course_id=course_id,
+            course_name=course_name,
+            status=status,
+        )

@@ -1,6 +1,7 @@
 /* Kiosk functionality - Student and Employee */
 
-const backendBaseUrl = window.APP_CONFIG?.backendApiUrl || 'http://127.0.0.1:5001';
+const frontendBaseUrl = window.location.origin;
+const backendProxyBaseUrl = `${frontendBaseUrl}/api/backend`;
 
 /**
  * Format a datetime string to 12-hour time (e.g., "7:45 AM")
@@ -138,7 +139,7 @@ function appendToLiveFeed(name, affiliation, logType) {
  */
 function loadEventAttendance(instanceId) {
     console.log(`Loading event logs for instance ${instanceId}`);
-    fetch(`${backendBaseUrl}/admin/instances/${instanceId}/get-logs`)
+    fetch(`${backendProxyBaseUrl}/admin/instances/${instanceId}/logs`)
         .then(response => {
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             return response.json();
@@ -164,10 +165,16 @@ function loadEventAttendance(instanceId) {
  */
 function submitManualEntry(type, manualId = null) {
     const idField = type === 'employee' ? 'manual-employee-id' : 'manual-student-id';
-    const id = manualId !== null ? manualId : document.getElementById(idField).value.trim();
+    const inputElement = manualId === null ? document.getElementById(idField) : null;
+    const id = manualId !== null ? manualId : inputElement.value.trim();
     
     if (!id) {
         alert("Please enter an ID");
+        return;
+    }
+
+    if (inputElement && !inputElement.checkValidity()) {
+        inputElement.reportValidity();
         return;
     }
     
@@ -180,7 +187,7 @@ function submitManualEntry(type, manualId = null) {
     
     if (isEventKiosk) {
         console.log('Sending manual entry request:', { employee_id: id, event_id: window.currentEventId });
-        fetch(`${backendBaseUrl}/api/events/manual_entry`, {
+        fetch(`${backendProxyBaseUrl}/events/manual-entry`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -229,10 +236,14 @@ function submitManualEntry(type, manualId = null) {
         });
     } else {
         // Fallback to general authentication (students, visitor, etc.)
-        fetch(`${backendBaseUrl}/admin/user/authentication`, {
+        const requestedLogType = window.GENERAL_KIOSK_ACTION || null;
+        fetch(`${backendProxyBaseUrl}/admin/user/authentication`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: id })
+            body: JSON.stringify({
+                id: id,
+                requested_log_type: requestedLogType
+            })
         })
         .then(r => {
             if (!r.ok && r.status !== 404) throw new Error('Server error');
@@ -264,7 +275,7 @@ function submitManualEntry(type, manualId = null) {
 
                 appendToLiveFeed(data.name, data.affiliation, logType);
             } else {
-                alert(data.Invalid || "ID not found!");
+                alert(data.message || data.Invalid || "ID not found!");
                 if (typeof showScanBanner === 'function') showScanBanner('error', { id: id });
             }
         })

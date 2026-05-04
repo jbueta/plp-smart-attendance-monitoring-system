@@ -1,12 +1,25 @@
 """Centralized configuration management for the Smart Attendance System."""
 
+import importlib
 import os
 import secrets
 from datetime import timedelta
 
-from dotenv import load_dotenv
 
-load_dotenv()
+def _load_dotenv_if_available() -> bool:
+    try:
+        dotenv = importlib.import_module("dotenv")
+    except ImportError:
+        return False
+
+    load_dotenv = getattr(dotenv, "load_dotenv", None)
+    if not callable(load_dotenv):
+        return False
+
+    return bool(load_dotenv())
+
+
+_load_dotenv_if_available()
 
 
 def _get_bool(name: str, default: str = "False") -> bool:

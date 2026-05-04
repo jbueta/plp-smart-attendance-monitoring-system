@@ -153,7 +153,7 @@ def fetch_report_data(category, report_type, filter_val, start_date, end_date):
             attendance_rate = "0.0"
             if data['total_expected'] > 0:
                 attendance_rate = str(round((data['total_present'] / data['total_expected']) * 100, 1))
-            elif category in ['General Logs', 'Visitor Logs']:
+            elif (category or '').lower() in ['general', 'visitor']:
                 attendance_rate = "100.0"
             general_metrics = None 
 
@@ -166,7 +166,7 @@ def fetch_report_data(category, report_type, filter_val, start_date, end_date):
             "title": data['report_title'],
             "reference_id": f"PLP-{category[:3].upper()}-{uuid.uuid4().hex[:6].upper()}",
             "event_name": data['event_name_display'],
-            "department": filter_val,
+            "department": data.get('filter_display', filter_val),
             "date_range": f"{start_date} to {end_date}",
             "headers": data['col_headers']
         },

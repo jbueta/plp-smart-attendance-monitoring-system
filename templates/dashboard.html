@@ -129,7 +129,7 @@
                                     <span class="badge bg-gold bg-opacity-10 text-gold border border-gold border-opacity-25">{{ overall_stats.event_attendance_rate }}</span>
                                 </div>
                                 <h6 class="text-white-50 small text-uppercase tracking-wider mb-1">Event Participation</h6>
-                                <h2 class="display-6 fw-bold text-white mb-0">{{ overall_stats.event_attendance_raw.split('/')[0] }}</h2>
+                                <h2 class="display-6 fw-bold text-white mb-0">{{ overall_stats.event_attendance_raw.split('/')[0] | trim }}</h2>
                             </div>
                         </div>
                     </div>
@@ -143,7 +143,7 @@
                         <div class="d-flex justify-content-between align-items-center mb-4">
                             <h5 class="card-title text-white mb-0">Hourly Traffic Volume</h5>
                             <div class="badge bg-primary-gold text-dark">
-                                <i class="bi bi-graph-up-arrow me-1"></i> Peak: 07:00 AM - 08:00 AM
+                                <i class="bi bi-graph-up-arrow me-1"></i> Peak: {{ overall_stats.peak_window if overall_stats.peak_window != 'N/A' else overall_stats.peak_hour }}
                             </div>
                         </div>
 
@@ -169,9 +169,18 @@
                             </div>
                         </div>
                         {% endfor %}
+                        {% if not overall_stats.alerts %}
+                        <div class="text-center py-5">
+                            <div class="rounded-circle bg-success bg-opacity-10 p-4 d-inline-block mb-3">
+                                <i class="bi bi-check-circle-fill text-success fs-1"></i>
+                            </div>
+                            <h6 class="text-white mb-1">No active alerts</h6>
+                            <p class="text-white-50 small mb-0">System analytics are stable right now.</p>
+                        </div>
+                        {% endif %}
                     </div>
 
-                    <div class="card-glass p-4 mt-4 h-auto">
+                    <!-- <div class="card-glass p-4 mt-4 h-auto">
                         <h5 class="card-title text-white mb-3">Dept. Entry Distribution</h5>
                         <div class="mb-3">
                             <div class="d-flex justify-content-between small text-white-50 mb-1">
@@ -210,7 +219,7 @@
                                             style="width: {{ overall_stats.dept_distribution[3] + overall_stats.dept_distribution[4] }}%"></div>
                                     </div>
                         </div>
-                </div>
+                </div> -->
                 </div>
             </div> <!-- Close Row (Hourly Traffic & Alerts) -->
         </div> <!-- Close executive view wrapper -->
