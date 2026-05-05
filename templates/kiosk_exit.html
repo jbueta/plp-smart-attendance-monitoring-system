@@ -56,8 +56,6 @@
                 <h3 class="h5 mb-2">Scan Digital ID</h3>
                 <p class="text-white-50 small mb-4">Scanner is active and ready</p>
 
-                <!-- Hidden Input to catch exact scanner focus (optional, but global key listener added later) -->
-
                 <div class="mt-4 d-grid gap-2 d-md-flex justify-content-center">
                     <button class="btn btn-outline-light rounded-pill px-4 hover-text-dark small" data-bs-toggle="modal"
                         data-bs-target="#manualEntryModal">
@@ -69,7 +67,6 @@
 
         <!-- Right: Info Panel & Bulletin -->
         <div class="col-lg-6">
-            <!-- Student Search tracking removed as requested -->
             <!-- Recent Activity -->
             <div class="card-glass p-4 mb-4">
                 <h4 class="h6 text-uppercase text-white-50 mb-3 border-bottom border-secondary pb-2">
@@ -104,7 +101,7 @@
                 </div>
             </div>
 
-            <!-- NEW: Campus Bulletin -->
+            <!-- Campus Bulletin -->
             <div class="card-glass p-4 bg-gradient"
                 style="background: linear-gradient(135deg, rgba(11, 125, 63, 0.4), rgba(5, 26, 16, 0.8));">
                 <div class="d-flex align-items-center mb-2">
@@ -130,13 +127,14 @@
             <div class="modal-body">
                 <div class="mb-3">
                     <label for="manual-student-id" class="form-label text-white-50">Student ID Number</label>
-                    <input type="text" class="form-control text-black border-secondary"
-                        id="manual-student-id" 
-                        placeholder="e.g. 23-00312" pattern="[0-9]{2}-[0-9]{5}" title="Format: 00-00000">
+                    <!-- FIXED: Added onkeypress Enter functionality & unified text-color UI style -->
+                    <input type="text" class="form-control text-white border-secondary"
+                        id="manual-student-id" placeholder="e.g. 23-00312" pattern="[0-9]{2}-[0-9]{5}" 
+                        title="Format: 00-00000" style="background: rgba(0,0,0,0.5);"
+                        onkeypress="if(event.key === 'Enter') submitManualEntry('student')">
                 </div>
                 <div class="d-grid gap-2">
-                    <button type="button" class="btn btn-secondary" onclick="submitManualEntry('student')">Time
-                        Out</button>
+                    <button type="button" class="btn btn-secondary" onclick="submitManualEntry('student')">Time Out</button>
                 </div>
             </div>
         </div>
@@ -153,36 +151,27 @@
                     aria-label="Close"></button>
             </div>
             <div class="modal-body p-0">
-                <!-- Tabs (Single tab now, for visuals) -->
-                <ul class="nav nav-pills nav-fill bg-dark bg-opacity-50 border-bottom border-secondary" id="visitorTabs"
-                    role="tablist">
+                <ul class="nav nav-pills nav-fill bg-dark bg-opacity-50 border-bottom border-secondary" id="visitorTabs" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active rounded-0 py-3 fw-bold text-uppercase" id="v-checkin-tab"
-                            data-bs-toggle="tab" data-bs-target="#v-checkin" type="button" role="tab"
-                            style="cursor: default;">
+                            data-bs-toggle="tab" data-bs-target="#v-checkin" type="button" role="tab" style="cursor: default;">
                             <i class="bi bi-box-arrow-in-right me-2"></i>Visitor Check In
                         </button>
                     </li>
                 </ul>
 
                 <div class="tab-content p-4">
-                    <!-- Check In Form -->
                     <div class="tab-pane fade show active" id="v-checkin" role="tabpanel">
                         <form action="{{ url_for('visitor_checkin') }}" method="POST">
                             <input type="hidden" name="source" value="kiosk_student">
                             <div class="row g-3">
                                 <div class="col-md-6">
-                                    <label class="form-label text-white-50">Full Name <span
-                                            class="text-danger">*</span></label>
-                                    <input type="text" name="name"
-                                        class="form-control bg-dark text-white border-secondary" required
-                                        placeholder="Last Name, First Name">
+                                    <label class="form-label text-white-50">Full Name <span class="text-danger">*</span></label>
+                                    <input type="text" name="name" class="form-control bg-dark text-white border-secondary" required placeholder="Last Name, First Name">
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label text-white-50">Purpose <span
-                                            class="text-danger">*</span></label>
-                                    <select name="purpose" class="form-select bg-dark text-white border-secondary"
-                                        required>
+                                    <label class="form-label text-white-50">Purpose <span class="text-danger">*</span></label>
+                                    <select name="purpose" class="form-select bg-dark text-white border-secondary" required>
                                         <option value="" selected disabled>Select Purpose</option>
                                         <option>Official Business</option>
                                         <option>Document Submission</option>
@@ -194,23 +183,16 @@
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label text-white-50">Person/Office to Visit</label>
-                                    <input type="text" name="details"
-                                        class="form-control bg-dark text-white border-secondary"
-                                        placeholder="e.g. Registrar's Office">
+                                    <input type="text" name="details" class="form-control bg-dark text-white border-secondary" placeholder="e.g. Registrar's Office">
                                 </div>
                                 <div class="col-12 mt-4">
                                     <div class="d-grid">
-                                        <button type="submit"
-                                            class="btn btn-info p-3 fw-bold text-uppercase text-white">
-                                            Confirm Check In
-                                        </button>
+                                        <button type="submit" class="btn btn-info p-3 fw-bold text-uppercase text-white">Confirm Check In</button>
                                     </div>
                                 </div>
                             </div>
                         </form>
                     </div>
-
-                    <!-- Check Out List Removed as requested -->
                 </div>
             </div>
         </div>
@@ -275,7 +257,8 @@
             {% if messages %}
                 {% for message in messages %}
                 setTimeout(() => {
-                    const msg = "{{ message }}";
+                    // FIXED: Removed quotes around the tojson filter output
+                    const msg = {{ message | tojson }};
                     if (msg.includes("Check-in successful")) {
                         let name = "Visitor";
                         const nameMatch = msg.match(/Welcome, (.*?)\./);
@@ -292,7 +275,7 @@
         // --- 3. GLOBAL SCANNER LOGIC ---
         let barcodeBuffer = "";
         let scanTimeout = null;
-        let scanCooldown = false; // Prevents accidental double-scans
+        let scanCooldown = false; 
 
         document.addEventListener('keydown', function (e) {
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
@@ -311,15 +294,13 @@
                         return; 
                     }
 
-                    const extractedName = match[1].trim();   // e.g., "SALVADOR, JERICHO PAUL D."
-                    const extractedId = match[2].trim();     // e.g., "23-00312"
-                    const extractedCourse = match[3].trim(); // e.g., "BSCS"
+                    const extractedName = match[1].trim(); 
+                    const extractedId = match[2].trim();    
+                    const extractedCourse = match[3].trim(); 
 
-                    // Start Cooldown
                     scanCooldown = true;
                     setTimeout(() => { scanCooldown = false; }, 3000);
 
-                    // Update UI feedback
                     const feedText = document.getElementById('scanner-text');
                     const frame = document.querySelector('.scanner-frame');
                     
@@ -328,7 +309,6 @@
                     feedText.innerText = "READING ID...";
                     feedText.className = "position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-warning font-monospace fw-bold scanning-text";
 
-                    // Hit the Backend API
                     fetch('http://127.0.0.1:5001/admin/user/authentication', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -349,14 +329,15 @@
                                 showScanBanner(bannerType, {
                                     id: extractedId,
                                     name: data.name,
-                                    course: data.affiliation
+                                    course: data.course_name || data.course || 'N/A'
                                 });
                             }
 
                             showSuccessOverlay(logType, { 
                                 id: extractedId, 
                                 name: data.name, 
-                                affiliation: data.affiliation 
+                                affiliation: data.affiliation,
+                                course: data.course_name || data.course || 'N/A' 
                             });
                             
                             appendToLiveFeed(data.name, data.affiliation, logType);
@@ -374,10 +355,9 @@
                     })
                     .catch(error => {
                         console.error('Server Error:', error);
-                            feedText.innerText = "BACKEND OFFLINE";
-                            frame.style.borderColor = '#ef4444';
-
-                            console.warn("Please ensure 'python app_extension.py' is running on port 5001.");
+                        feedText.innerText = "BACKEND OFFLINE";
+                        frame.style.borderColor = '#ef4444';
+                        console.warn("Please ensure 'python app_extension.py' is running on port 5001.");
                     });
                 }
                 
@@ -385,14 +365,15 @@
                 if (scanTimeout) clearTimeout(scanTimeout);
 
             } else if (e.key.length === 1) { 
-                // Append character to buffer
                 barcodeBuffer += e.key;
                 
-                // Clear buffer if typing is too slow (not a scanner)
                 if (scanTimeout) clearTimeout(scanTimeout);
                 scanTimeout = setTimeout(() => { barcodeBuffer = ""; }, 100); 
             }
         });
+
+        // FIXED: Added missing global reference so kiosk.js can call this function
+        window.appendToLiveFeed = appendToLiveFeed;
     });
 </script>
 {% endblock %}
