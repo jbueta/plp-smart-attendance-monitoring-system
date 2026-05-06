@@ -7,7 +7,7 @@ import re
 import unicodedata
 
 import requests
-from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
+from flask import Flask, Response, flash, jsonify, redirect, render_template, request, session, url_for
 
 from app_tasks import fetch_report_data
 from config import get_config
@@ -502,6 +502,19 @@ def admin_students():
         course_options=course_options,
     )
 
+@app.route("/download_student_upload_template")
+@login_required
+def download_student_upload_template():
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow(["STUDENT ID", "STUDENT NAME", "COURSE", "STATUS"])
+    writer.writerow(["23-00312", "JUAN DELA CRUZ", "BS Computer Science", "Outside"])
+    writer.writerow(["23-00313", "MARIA SANTOS", "BS Nursing", "Outside"])
+
+    response = Response(output.getvalue(), mimetype="text/csv")
+    response.headers["Content-Disposition"] = "attachment; filename=student_upload_template.csv"
+    return response
 
 @app.route("/admin/employees")
 @login_required
