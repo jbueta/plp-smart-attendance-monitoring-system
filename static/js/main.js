@@ -273,3 +273,93 @@ function populateRandomStudentRecords() {
         tableBody.appendChild(row);
     }
 }
+
+// --- Global Status Card (Success/Fail) ---
+let gscTimeout = null;
+
+window.showStatusCard = function(type, title, message) {
+    const card = document.getElementById('global-status-card');
+    const icon = document.getElementById('gsc-icon');
+    const titleEl = document.getElementById('gsc-title');
+    const msgEl = document.getElementById('gsc-message');
+
+    if (!card) return;
+
+    // Reset classes
+    card.className = 'position-fixed top-0 start-50 translate-middle-x mt-4 p-3 rounded-4 shadow-lg d-flex align-items-center';
+
+    // Apply success (green) or fail (red) colors + appropriate icons
+    if (type === 'success') {
+        card.classList.add('bg-success');
+        icon.innerHTML = '<i class="bi bi-check-circle-fill text-white"></i>';
+    } else {
+        card.classList.add('bg-danger');
+        icon.innerHTML = '<i class="bi bi-x-circle-fill text-white"></i>';
+    }
+
+    titleEl.innerText = title;
+    msgEl.innerText = message;
+
+    // Show card
+    card.style.opacity = '1';
+    card.style.pointerEvents = 'auto';
+    card.style.transform = 'translateY(0)';
+
+    // Clear existing timeout
+    if (gscTimeout) clearTimeout(gscTimeout);
+
+    // Hide automatically after 2 seconds
+    gscTimeout = setTimeout(hideStatusCard, 2000);
+};
+
+window.hideStatusCard = function() {
+    const card = document.getElementById('global-status-card');
+    if (card) {
+        card.style.opacity = '0';
+        card.style.pointerEvents = 'none';
+        card.style.transform = 'translateY(-20px)';
+    }
+};
+
+// Hide on any key press or click anywhere
+document.addEventListener('keydown', hideStatusCard);
+document.addEventListener('click', (e) => {
+    const card = document.getElementById('global-status-card');
+    if (card && card.style.opacity === '1') {
+        hideStatusCard();
+    }
+});
+
+// --- Global Confirm Modal ---
+let confirmCallback = null;
+
+window.showConfirmModal = function(title, message, onConfirm) {
+    const modal = document.getElementById('global-confirm-modal');
+    const titleEl = document.getElementById('gcm-title');
+    const msgEl = document.getElementById('gcm-message');
+    const confirmBtn = document.getElementById('gcm-confirm-btn');
+
+    if (!modal) return;
+
+    titleEl.innerText = title || "Confirm Action";
+    msgEl.innerText = message || "Are you sure you want to proceed?";
+    confirmCallback = onConfirm;
+
+    modal.classList.remove('d-none');
+    modal.classList.add('d-flex');
+    
+    // Overwrite the onclick handler dynamically
+    confirmBtn.onclick = function() {
+        if (confirmCallback) confirmCallback();
+        hideConfirmModal();
+    };
+};
+
+window.hideConfirmModal = function() {
+    const modal = document.getElementById('global-confirm-modal');
+    if (modal) {
+        modal.classList.remove('d-flex');
+        modal.classList.add('d-none');
+    }
+    confirmCallback = null;
+};

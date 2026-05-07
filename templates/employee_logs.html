@@ -6,10 +6,10 @@
 
 <!-- Page content -->
 {% block content %}
-<!-- Sidebar (unchanged) -->
+<!-- Sidebar -->
 <div class="sidebar d-flex flex-column flex-shrink-0 p-3">
     <a href="#" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
-        <img src="{{ url_for('static', filename='images/plp_logo.png') }}" alt="PLP Logo" class="me-2" style="width: 32px; height: 32px; object-fit: contain;">
+        <i class="bi bi-bank2 fs-4 text-gold me-2"></i>
         <span class="fs-5 fw-bold">PLP Admin</span>
     </a>
     <hr>
@@ -50,115 +50,106 @@
     <!-- MAIN CONTAINER -->
     <div id="employee-content-area" class="position-relative overflow-hidden" style="min-height: 500px;">
 
-        <!-- ========== ACTIVITY LOGS VIEW ========== -->
+        <!-- ACTIVITY LOGS VIEW -->
         <div id="activity-view" class="employee-view active-view">
 
+            <!-- Employee Logs Table -->
             <div class="card-glass p-0 mb-4 overflow-hidden" id="tableCard">
                 <div class="d-flex flex-wrap gap-2 p-3 justify-content-end">
                     <div class="input-group input-group-sm" style="width: 200px;">
                         <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
-                        <input type="text" id="searchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search ID or Name...">
+                        <input type="text" id="searchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search Employee...">
                     </div>
                     <select id="departmentFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
                         <option value="">All Departments</option>
-                        {% for department in department_options %}
-                        <option>{{ department }}</option>
-                        {% endfor %}
+                        <option>Engineering</option>
+                        <option>Nursing</option>
+                        <option>Arts & Sciences</option>
+                        <option>Business Admin</option>
+                        <option>Education</option>
                     </select>
                     <input type="date" id="dateFilter" class="form-control form-control-sm bg-dark text-white border-secondary w-auto">
                 </div>
                 <div class="table-responsive pb-3">
-                    <table class="table table-dark-glass table-hover align-middle mb-0" id="employeeTable">
-                        <thead>
-                            <tr>
-                                <th class="ps-4">Employee Name</th>
-                                <th>Event Name</th>
-                                <th>Department</th>
-                                <th>Date</th>
-                                <th>Time In</th>
-                                <th>Time Out</th>
-                                <th class="text-end" style="padding-right: 3rem;">Status</th>
-                                <th class="text-end pe-4">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for log in logs %}
-                            <tr class="employee-row"
-                                data-employee-id="{{ log.id | lower }}"
-                                data-employee-id-original="{{ log.id }}"
-                                data-employee-name="{{ log.name | lower }}"
-                                data-employee-name-original="{{ log.name }}"
-                                data-department-id-original="{{ log.department_id or '' }}"
-                                data-department="{{ log.dept }}"
-                                data-department-original="{{ log.dept }}"
-                                data-position="{{ log.position or '' }}"
-                                data-position-original="{{ log.position or '' }}"
-                                data-position-display="{{ log.position_display or 'N/A' }}"
-                                data-date="{{ log.date or '' }}">
-                                <td class="fw-bold text-white ps-4">
-                                    <div class="d-flex align-items-center">
-                                        <div class="rounded-circle bg-white bg-opacity-10 p-1 me-2"
-                                            style="width: 32px; height: 32px; display:grid; place-items:center;">{{ log.initials }}</div>
-                                        <span>{{ log.name }}</span>
-                                    </div>
-                                </td>
-                                <td class="text-white">{{ log.event_name }}</td>
-                                <td class="text-white-50">{{ log.dept }}</td>
-                                <td class="text-white-50 font-monospace small">{{ log.date_formatted or log.date }}</td>
-                                <td class="text-success font-monospace small">{{ log.in or '--:--' }}</td>
-                                <td class="text-danger font-monospace small">{{ log.out or '--:--' }}</td>
-                                <td class="text-end" style="padding-right: 3rem;">
-                                    <span class="badge bg-{{ log.status_class }} bg-opacity-25 text-{{ log.status_class }} border border-{{ log.status_class }} border-opacity-25 rounded-pill px-3">
-                                        {{ log.status }}
-                                    </span>
-                                </td>
-                                <td class="text-center align-middle" style="width: 80px;">
-                                    <div class="dropdown h-100 d-flex align-items-center justify-content-center">
-                                        <button class="btn btn-sm btn-outline-light p-0 border-0 d-flex align-items-center justify-content-center fs-4" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                            &hellip;
-                                        </button>
-                                        <ul class="dropdown-menu dropdown-menu-end shadow-sm employee-action-menu">
-                                            <li><button type="button" class="dropdown-item view-employee text-white" data-id="{{ log.id }}">View Details</button></li>
-                                            <li><button type="button" class="dropdown-item text-danger delete-employee-record" data-id="{{ log.id }}">Delete</button></li>
-                                        </ul>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr id="emptyRow">
-                                <td colspan="8" class="text-center text-white-50 py-5">
-                                    <i class="bi bi-person-x display-4 d-block mb-3"></i>
-                                    No attendance records available for this period.
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+            <table class="table table-dark-glass table-hover align-middle mb-0" id="employeeTable">
+                <thead>
+                    <tr>
+                        <th class="ps-4">Employee Name</th>
+                        <th>Department</th>
+                        <th>Time In</th>
+                        <th>Time Out</th>
+                        <th class="text-end" style="padding-right: 3rem;">Status</th>
+                        <th class="text-end pe-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr class="employee-row"
+                        data-employee-id="{{ log.id }}"
+                        data-employee-name="{{ log.name }}"
+                        data-department="{{ log.dept }}"
+                        data-position="{{ log.position or '' }}"
+                        data-date="{{ log.date or '' }}">
+                        <td class="fw-bold text-white ps-4">
+                            <div class="d-flex align-items-center">
+                                <div class="rounded-circle bg-white bg-opacity-10 p-1 me-2"
+                                    style="width: 32px; height: 32px; display:grid; place-items:center;">{{
+                                    log.initials }}</div>
+                                <span>{{ log.name }}</span>
+                            </div>
+                        </td>
+                        <td class="text-white-50">{{ log.dept }}</td>
+                        <td class="text-success font-monospace small">{{ log.in or '--:--' }}</td>
+                        <td class="text-danger font-monospace small">{{ log.out or '--:--' }}</td>
+                        <td class="text-end" style="padding-right: 3rem;">
+                            <span class="badge bg-{{ log.status_class }} bg-opacity-25 text-{{ log.status_class }} border border-{{ log.status_class }} border-opacity-25 rounded-pill px-3">
+                                {{ log.status }}
+                            </span>
+                        </td>
+                        <td class="text-center align-middle" style="width: 80px;">
+                            <div class="dropdown h-100 d-flex align-items-center justify-content-center">
+                                <button class="btn btn-sm btn-outline-light p-0 border-0 d-flex align-items-center justify-content-center fs-4" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="bi bi-three-dots fs-5"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end shadow-sm employee-action-menu">
+                                    <li><button type="button" class="dropdown-item view-employee text-white" data-id="{{ log.id }}">View Details</button></li>
+                                    <li><button type="button" class="dropdown-item text-danger delete-employee" data-id="{{ log.id }}">Delete</button></li>
+                                </ul>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr id="emptyRow">
+                        <td colspan="6" class="text-center text-white-50 py-5">
+                            <i class="bi bi-person-x display-4 d-block mb-3"></i>
+                            No attendance records available for this period.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 
-                <!-- Pagination (activity) -->
-                <div id="paginationContainer" class="pagination-footer" style="display: none;">
-                    <nav aria-label="Page navigation">
-                        <ul id="paginationList" class="pagination pagination-custom mb-0 gap-1"></ul>
-                    </nav>
-                </div>
-            </div>
+    <!-- No results (shown only when filters return nothing) -->
+    <div id="noResults" style="display: none;" class="card-glass text-center text-white-50 py-5 mb-4">
+        <i class="bi bi-search display-4 d-block mb-3"></i>
+        <p class="mb-0">No records found matching your search criteria.</p>
+    </div>
 
-            <!-- No results (activity) -->
-            <div id="noResults" style="display: none;" class="card-glass text-center text-white-50 py-5 mb-4">
-                <i class="bi bi-search display-4 d-block mb-3"></i>
-                <p class="mb-0">No records found matching your search criteria.</p>
-            </div>
+    <!-- Result count -->
+    <p id="resultCount" class="text-white-50 small ms-1"></p>
 
-            <!-- Result count (activity only) -->
-            <p id="resultCount" class="text-white-50 small ms-1"></p>
+    <!-- Pagination Footer -->
+    <div id="paginationContainer" class="pagination-footer" style="display: none;">
+        <nav aria-label="Page navigation">
+            <ul id="paginationList" class="pagination pagination-custom mb-0 gap-1"></ul>
+        </nav>
+    </div>
+        </div>
 
-        </div><!-- end activity-view -->
-
-
-        <!-- ========== RECORDS VIEW ========== -->
+        <!-- RECORDS VIEW -->
         <div id="records-view" class="employee-view">
-
             <div class="card-glass p-0 mb-4 overflow-hidden" id="recordsTableCard">
                 <div class="d-flex flex-wrap gap-3 p-3 justify-content-between align-items-center">
                     <div class="me-3">
@@ -169,23 +160,15 @@
                     <div class="d-flex gap-2">
                         <div class="input-group input-group-sm" style="width: 220px;">
                             <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
-                            <input type="text" id="recordsSearchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search ID, Name, or Dept...">
+                            <input type="text" id="recordsSearchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search Name or Dept...">
                         </div>
                         <select id="recordsDepartmentFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
                             <option value="">All Departments</option>
-                            {% for dept in departments %}
-                            <option value="{{ dept.department_name | lower }}">{{ dept.department_name }}</option>
-                            {% endfor %}
-                        </select>
-                        <select id="recordsStatusFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
-                            <option value="active" selected>Active</option>
-                            <option value="all">Active / Inactive</option>
-                        </select>
-                        <select id="recordsSortFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
-                            <option value="recent">Recent to Oldest</option>
-                            <option value="name-asc">Name A-Z</option>
-                            <option value="name-desc">Name Z-A</option>
-                            <option value="group">Group by Department</option>
+                            <option>Engineering</option>
+                            <option>Nursing</option>
+                            <option>Arts & Sciences</option>
+                            <option>Business Admin</option>
+                            <option>Education</option>
                         </select>
                     </div>
                 </div>
@@ -202,47 +185,36 @@
                             </tr>
                         </thead>
                         <tbody id="recordsTableBody">
-                            {% for emp in employees %}
+                            {% for log in logs %}
                             <tr class="employee-record-row"
-                                data-id="{{ emp.id | lower }}"
-                                data-id-original="{{ emp.id }}"
-                                data-added-order="{{ emp.added_order or 0 }}"
-                                data-name="{{ emp.name | lower }}"
-                                data-name-original="{{ emp.name }}"
-                                data-dept-id-original="{{ emp.department_id or '' }}"
-                                data-dept="{{ emp.dept | lower }}"
-                                data-dept-original="{{ emp.dept }}"
-                                data-position-original="{{ emp.position or '' }}"
-                                data-position-display="{{ emp.position_display or 'N/A' }}"
-                                data-status="{{ emp.status | lower }}">
-                                <td class="font-monospace text-white-50 ps-4">{{ emp.id }}</td>
-                                <td class="fw-bold text-white">{{ emp.name }}</td>
-                                <td class="text-white-50">{{ emp.dept }}</td>
-                                <td class="text-white-50">{{ emp.position_display }}</td>
+                                data-id="{{ log.id }}"
+                                data-name="{{ log.name }}"
+                                data-dept="{{ log.dept }}"
+                                data-position="{{ log.position or '' }}">
+                                <td class="font-monospace text-white-50 ps-4">{{ log.id }}</td>
+                                <td class="fw-bold text-white">{{ log.name }}</td>
+                                <td class="text-white-50">{{ log.dept }}</td>
+                                <td class="text-white-50">{{ log.position }}</td>
                                 <td class="text-center">
-                                    <span class="badge bg-{{ emp.status_class or 'success' }} bg-opacity-25 border border-{{ emp.status_class or 'success' }} text-{{ emp.status_class or 'success' }} rounded-pill px-3">
-                                        {{ emp.status }}
+                                    <span class="badge bg-success bg-opacity-25 border border-success text-success rounded-pill px-3">
+                                        Active
                                     </span>
                                 </td>
-                                <td class="text-end pe-4">
-                                    <div class="dropdown">
-                                        <button class="btn btn-sm btn-outline-light border-0" type="button" data-bs-toggle="dropdown">
-                                            <i class="bi bi-three-dots"></i>
+                                <td class="text-center align-middle" style="width: 80px;">
+                                    <div class="dropdown h-100 d-flex align-items-center justify-content-center">
+                                        <button class="btn btn-sm btn-outline-light p-0 border-0 d-flex align-items-center justify-content-center fs-4" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="bi bi-three-dots fs-5"></i>
                                         </button>
                                         <ul class="dropdown-menu dropdown-menu-end shadow-sm employee-action-menu">
-                                            <li><button type="button" class="dropdown-item edit-employee-record" data-id="{{ emp.id }}">Edit</button></li>
-                                            {% if emp.status == 'Active' %}
-                                            <li><button type="button" class="dropdown-item text-danger delete-employee-record" data-id="{{ emp.id }}">Delete</button></li>
-                                            {% else %}
-                                            <li><button type="button" class="dropdown-item text-white-50" disabled>Already Inactive</button></li>
-                                            {% endif %}
+                                            <li><button type="button" class="dropdown-item edit-employee-record text-white" data-id="{{ log.id }}">Edit</button></li>
+                                            <li><button type="button" class="dropdown-item text-danger delete-employee-record" data-id="{{ log.id }}">Delete</button></li>
                                         </ul>
                                     </div>
                                 </td>
                             </tr>
                             {% else %}
                             <tr id="recordsEmptyRow">
-                                <td colspan="6" class="text-center text-white-50 py-5">
+                                <td colspan="5" class="text-center text-white-50 py-5">
                                     <i class="bi bi-people display-4 d-block mb-3"></i>
                                     No employee records found.
                                 </td>
@@ -251,51 +223,52 @@
                         </tbody>
                     </table>
                 </div>
-
-                <!-- Pagination (records) -->
-                <div id="recordsPaginationContainer" class="pagination-footer" style="display: none;">
-                    <nav aria-label="Page navigation">
-                        <ul id="recordsPaginationList" class="pagination pagination-custom mb-0 gap-1"></ul>
-                    </nav>
-                </div>
             </div>
 
-            <!-- No results (records) -->
+            <!-- No results for records -->
             <div id="recordsNoResults" style="display: none;" class="card-glass text-center text-white-50 py-5 mb-4">
                 <i class="bi bi-search display-4 d-block mb-3"></i>
                 <p class="mb-0">No records found matching your search criteria.</p>
             </div>
 
-            <!-- Result count (records only) -->
+            <!-- Result count for records -->
             <p id="recordsResultCount" class="text-white-50 small ms-1"></p>
 
-        </div><!-- end records-view -->
+            <!-- Pagination Footer for records -->
+            <div id="recordsPaginationContainer" class="pagination-footer" style="display: none;">
+                <nav aria-label="Page navigation">
+                    <ul id="recordsPaginationList" class="pagination pagination-custom mb-0 gap-1"></ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
 
-    </div><!-- end employee-content-area -->
-</div><!-- end main-content -->
-
-
-<!-- ========== ADD USER MODAL ========== -->
+<!-- Add User Selection Modal -->
 <div class="modal fade" id="addUserModal" tabindex="-1" aria-hidden="true" style="backdrop-filter: blur(5px);">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg" style="background-color: #07271d; border-radius: 20px;">
             <div class="modal-body p-4 position-relative">
                 <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-4" data-bs-dismiss="modal" aria-label="Close" style="z-index: 10;"></button>
-
+                
                 <!-- View 1: Selection -->
                 <div id="addSelectionView">
                     <div class="text-center mb-5 mt-2">
                         <h4 class="text-white fw-bold">Select Addition Method</h4>
                         <p class="text-white-50">Choose how you want to add new employee records.</p>
                     </div>
+
                     <div class="row g-4 justify-content-center">
+                        <!-- Left Card: XLS -->
                         <div class="col-md-6">
                             <div class="add-option-card xls-card h-100 p-5 rounded-4 border text-center d-flex flex-column justify-content-center align-items-center">
                                 <i class="bi bi-file-earmark-spreadsheet display-3 text-light mb-4"></i>
-                                <h5 class="fw-bold text-white mb-2 tracking-wider">UPLOAD EXCEL OR CSV</h5>
-                                <p class="text-white-50 small mb-0">Add many employees from a spreadsheet file.</p>
+                                <h5 class="fw-bold text-white mb-2 tracking-wider">EXPORT XLS FILE</h5>
+                                <p class="text-white-50 small mb-0">Add all the records from the excel</p>
                             </div>
                         </div>
+
+                        <!-- Right Card: Manual -->
                         <div class="col-md-6">
                             <div class="add-option-card manual-card h-100 p-5 rounded-4 border text-center d-flex flex-column justify-content-center align-items-center">
                                 <i class="bi bi-person-plus display-3 mb-4" style="color: #d4af37;"></i>
@@ -310,22 +283,18 @@
                 <div id="xlsUploadView" class="d-none w-100">
                     <div class="d-flex justify-content-between align-items-start mb-4 pe-5">
                         <div>
-                            <h4 class="fw-bold text-white mb-1 tracking-wider">UPLOAD EXCEL OR CSV</h4>
-                            <p class="text-white-50 small mb-0">Accepted formats: `.xlsx` and `.csv`.</p>
-                            <a
-                                href="{{ url_for('download_employee_upload_template') }}"
-                                class="btn btn-link btn-sm text-info text-decoration-none px-0 mt-2"
-                            >
-                                <i class="bi bi-download me-1"></i>Download Upload Template
-                            </a>
+                            <h4 class="fw-bold text-white mb-1 tracking-wider">EXPORT XLS FILE</h4>
+                            <p class="text-white-50 small mb-0">Add all the records from the excel</p>
                         </div>
-                        <button type="button" class="btn btn-sm btn-primary-gold rounded-3 px-3 fw-bold shadow-sm mt-1" id="uploadXlsBtn">VALIDATE FILE</button>
+                        <button type="button" class="btn btn-sm btn-primary-gold rounded-3 px-3 fw-bold shadow-sm mt-1">EXPORT</button>
                     </div>
+                    
                     <div class="upload-zone border border-secondary rounded-4 d-flex flex-column align-items-center justify-content-center p-5" style="border-style: dashed !important; border-width: 2px !important; cursor: pointer; background: rgba(255,255,255,0.02); min-height: 250px;">
-                        <input type="file" id="xlsFileInput" accept=".xlsx,.csv" class="d-none">
+                        <input type="file" id="xlsFileInput" accept=".xls,.xlsx,.csv" class="d-none">
                         <i class="bi bi-file-earmark-spreadsheet display-4 text-white-50 mb-3"></i>
-                        <span class="text-white-50">Click to upload an Excel or CSV file</span>
+                        <span class="text-white-50">Click to export xls file</span>
                     </div>
+                    
                     <div class="mt-4">
                         <button type="button" class="btn btn-link text-white-50 text-decoration-none p-0 btn-back-selection">
                             <i class="bi bi-arrow-left me-2"></i>Back to selection
@@ -340,25 +309,54 @@
                             <h4 class="fw-bold mb-1 tracking-wider" style="color: #d4af37;">ADD MANUALLY</h4>
                             <p class="text-white-50 small mb-0">Add a new employee record manually</p>
                         </div>
-                        <div>
-                            <button type="button" id="submitManualAddBtn" class="btn btn-sm btn-warning rounded-3 px-3 fw-bold text-dark shadow-sm mt-1" disabled>+ ADD EMPLOYEE</button>
-                        </div>
                     </div>
+                    
                     <div class="row g-3 mb-0">
-                        <div class="col-12">
-                            <form id="manualAddEmployeeForm" class="d-flex flex-column h-100 justify-content-between card-glass border-secondary p-3 shadow-sm" style="background: linear-gradient(135deg, #0f3d2e 0%, #0b2f23 100%); border-radius: 16px;">
+                        <!-- Left Side: QR Code Area -->
+                        <div class="col-md-5">
+                            <div class="card-glass border-secondary p-3 h-100 d-flex flex-column align-items-center justify-content-center text-center shadow-sm" style="background: linear-gradient(135deg, #0f3d2e 0%, #0b2f23 100%); border-radius: 16px;">
+                                <div class="bg-transparent border border-secondary rounded-4 mb-3 d-flex align-items-center justify-content-center p-2 overflow-hidden" id="manualQrCodeContainer" style="width: 130px; height: 130px; border-style: dashed !important; border-width: 2px !important;">
+                                    <img id="manualQrCodeImage" src="" alt="QR Code" style="max-width: 100%; max-height: 100%; display: none;">
+                                    <span class="text-white-50 small fw-bold tracking-wider text-center" id="manualQrCodePlaceholder" style="font-size: 0.7rem;">QR CODE</span>
+                                </div>
+                                <button type="button" class="btn btn-light rounded-pill px-4 py-2 btn-sm fw-bold text-dark shadow-sm mb-2" id="manualGenerateQrBtn" disabled>
+                                    GENERATE QR
+                                </button>
+                                <button type="button" class="btn btn-outline-light rounded-pill px-3 py-1 btn-sm fw-bold shadow-sm" id="manualResendEmailBtn" style="display: none; font-size: 0.75rem;">
+                                    <i class="bi bi-envelope-check me-2"></i>SEND TO EMAIL
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Right Side: Form Inputs -->
+                        <div class="col-md-7">
+                            <form id="manualAddEmployeeForm" class="d-flex flex-column h-100 card-glass border-secondary p-3 shadow-sm" style="background: linear-gradient(135deg, #0f3d2e 0%, #0b2f23 100%); border-radius: 16px;">
                                 <h6 class="text-white fw-bold mb-3 tracking-wider">INFORMATION DETAILS</h6>
+                                
                                 <div class="vstack gap-2 text-start flex-grow-1">
                                     <div class="row align-items-center">
-                                        <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0" for="manualAddId">EMPLOYEE ID:</label></div>
-                                        <div class="col-sm-8"><input type="text" id="manualAddId" class="form-control form-control-sm bg-transparent text-white border-secondary rounded-3 shadow-none" placeholder="e.g. 00001" inputmode="numeric" pattern="^[0-9]{5}$" maxlength="5" required></div>
+                                        <div class="col-sm-4">
+                                            <label class="form-label text-white-50 small fw-bold mb-0" for="manualAddId">EMPLOYEE ID:</label>
+                                        </div>
+                                        <div class="col-sm-8">
+                                            <input type="text" id="manualAddId" class="form-control form-control-sm bg-transparent text-white border-secondary rounded-3 shadow-none" placeholder="Auto-generated" pattern="^[A-Z0-9-]{5,15}$" readonly style="opacity: 0.6; cursor: not-allowed;" required>
+                                        </div>
                                     </div>
+                                    
                                     <div class="row align-items-center">
-                                        <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0" for="manualAddName">FULL NAME:</label></div>
-                                        <div class="col-sm-8"><input type="text" id="manualAddName" class="form-control form-control-sm bg-transparent text-white border-secondary rounded-3 shadow-none" placeholder="e.g. Juan Dela Cruz" required></div>
+                                        <div class="col-sm-4">
+                                            <label class="form-label text-white-50 small fw-bold mb-0" for="manualAddName">FULL NAME:</label>
+                                        </div>
+                                        <div class="col-sm-8">
+                                            <input type="text" id="manualAddName" class="form-control form-control-sm bg-transparent text-white border-secondary rounded-3 shadow-none" placeholder="e.g. Juan Dela Cruz" required>
+                                        </div>
                                     </div>
+                                    
+                                    <!-- Radio Buttons -->
                                     <div class="row align-items-center my-1">
-                                        <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0">TYPE:</label></div>
+                                        <div class="col-sm-4">
+                                            <label class="form-label text-white-50 small fw-bold mb-0">TYPE:</label>
+                                        </div>
                                         <div class="col-sm-8 d-flex gap-3">
                                             <div class="form-check mb-0">
                                                 <input class="form-check-input bg-transparent border-secondary" type="radio" name="personnelType" id="typeTeaching" value="teaching">
@@ -370,71 +368,94 @@
                                             </div>
                                         </div>
                                     </div>
+
+                                    <!-- Wrapper to maintain fixed card height -->
                                     <div style="min-height: 80px;">
-                                        <div id="teachingFields" class="d-none vstack gap-2">
-                                            <div class="row align-items-center">
-                                                <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0" for="manualAddCollege">COLLEGE:</label></div>
-                                                <div class="col-sm-8">
-                                                    <select id="manualAddCollege" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
-                                                        <option value="" disabled selected class="text-dark">Select College</option>
-                                                        {% for dept in teaching_departments %}
-                                                        <option value="{{ dept.department_id }}" class="text-dark">{{ dept.department_name }}</option>
-                                                        {% endfor %}
-                                                    </select>
-                                                </div>
+                                    <!-- Conditional Fields: Teaching -->
+                                    <div id="teachingFields" class="d-none vstack gap-2">
+                                        <div class="row align-items-center">
+                                            <div class="col-sm-4">
+                                                <label class="form-label text-white-50 small fw-bold mb-0" for="manualAddCollege">COLLEGE:</label>
                                             </div>
-                                            <div class="row align-items-center">
-                                                <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0" for="manualAddTeachingPosition">POSITION:</label></div>
-                                                <div class="col-sm-8">
-                                                    <select id="manualAddTeachingPosition" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
-                                                        <option value="" selected disabled class="text-dark">Select Position</option>
-                                                        <option class="text-dark">Professor I</option>
-                                                        <option class="text-dark">Professor II</option>
-                                                        <option class="text-dark">Instructor I</option>
-                                                        <option class="text-dark">Instructor II</option>
-                                                        <option class="text-dark">Dean</option>
-                                                    </select>
-                                                </div>
+                                            <div class="col-sm-8">
+                                                <select id="manualAddCollege" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
+                                                    <option value="" selected disabled class="text-dark">Select College</option>
+                                                    <option class="text-dark">College of Engineering</option>
+                                                    <option class="text-dark">College of Nursing</option>
+                                                    <option class="text-dark">College of Computer Studies</option>
+                                                    <option class="text-dark">College of Business and Accountancy</option>
+                                                    <option class="text-dark">College of Education</option>
+                                                    <option class="text-dark">College of Arts and Sciences</option>
+                                                    <option class="text-dark">College of International Hospitality Management</option>
+                                                </select>
                                             </div>
                                         </div>
-                                        <div id="nonTeachingFields" class="d-none vstack gap-2">
-                                            <div class="row align-items-center">
-                                                <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0" for="manualAddOffice">OFFICE:</label></div>
-                                                <div class="col-sm-8">
-                                                    <select id="manualAddOffice" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
-                                                        <option value="" selected disabled class="text-dark">Select Office</option>
-                                                        {% for dept in office_departments %}
-                                                        <option value="{{ dept.department_id }}" class="text-dark">{{ dept.department_name }}</option>
-                                                        {% endfor %}
-                                                    </select>
-                                                </div>
+                                        <div class="row align-items-center">
+                                            <div class="col-sm-4">
+                                                <label class="form-label text-white-50 small fw-bold mb-0" for="manualAddTeachingPosition">POSITION:</label>
                                             </div>
-                                            <div class="row align-items-center">
-                                                <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0" for="manualAddNonTeachingPosition">POSITION:</label></div>
-                                                <div class="col-sm-8">
-                                                    <select id="manualAddNonTeachingPosition" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
-                                                        <option value="" selected disabled class="text-dark">Select Position</option>
-                                                        <option class="text-dark">Admin Aide</option>
-                                                        <option class="text-dark">Admin Officer</option>
-                                                        <option class="text-dark">Clerk</option>
-                                                        <option class="text-dark">IT Staff</option>
-                                                        <option class="text-dark">Director</option>
-                                                    </select>
-                                                </div>
+                                            <div class="col-sm-8">
+                                                <select id="manualAddTeachingPosition" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
+                                                    <option value="" selected disabled class="text-dark">Select Position</option>
+                                                    <option class="text-dark">Professor I</option>
+                                                    <option class="text-dark">Professor II</option>
+                                                    <option class="text-dark">Instructor I</option>
+                                                    <option class="text-dark">Instructor II</option>
+                                                    <option class="text-dark">Dean</option>
+                                                </select>
                                             </div>
                                         </div>
                                     </div>
+
+                                    <!-- Conditional Fields: Non-Teaching -->
+                                    <div id="nonTeachingFields" class="d-none vstack gap-2">
+                                        <div class="row align-items-center">
+                                            <div class="col-sm-4">
+                                                <label class="form-label text-white-50 small fw-bold mb-0" for="manualAddOffice">OFFICE:</label>
+                                            </div>
+                                            <div class="col-sm-8">
+                                                <select id="manualAddOffice" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
+                                                    <option value="" selected disabled class="text-dark">Select Office</option>
+                                                    <option class="text-dark">Registrar's Office</option>
+                                                    <option class="text-dark">Accounting Office</option>
+                                                    <option class="text-dark">Human Resources</option>
+                                                    <option class="text-dark">MIS Office</option>
+                                                    <option class="text-dark">Library</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="row align-items-center">
+                                            <div class="col-sm-4">
+                                                <label class="form-label text-white-50 small fw-bold mb-0" for="manualAddNonTeachingPosition">POSITION:</label>
+                                            </div>
+                                            <div class="col-sm-8">
+                                                <select id="manualAddNonTeachingPosition" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
+                                                    <option value="" selected disabled class="text-dark">Select Position</option>
+                                                    <option class="text-dark">Admin Aide</option>
+                                                    <option class="text-dark">Admin Officer</option>
+                                                    <option class="text-dark">Clerk</option>
+                                                    <option class="text-dark">IT Staff</option>
+                                                    <option class="text-dark">Director</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    </div>
                                 </div>
-                                <div class="mt-3 pt-2 border-top border-secondary">
-                                    <span class="text-white-50" style="font-size: 0.70rem;">Employee ID must be a 5-digit number such as 00001. Position is optional.</span>
+                                <div class="d-flex justify-content-end mt-2">
+                                    <button type="button" class="btn btn-outline-warning btn-sm rounded-pill px-3" id="generateEmployeeIdBtn">
+                                        <i class="bi bi-magic me-1"></i> Generate ID
+                                    </button>
                                 </div>
                             </form>
                         </div>
                     </div>
-                    <div class="mt-4">
+                    
+                    <div class="d-flex justify-content-between align-items-center mt-4">
                         <button type="button" class="btn btn-link text-white-50 text-decoration-none p-0 btn-back-selection">
                             <i class="bi bi-arrow-left me-2"></i>Back to selection
                         </button>
+                        <button type="button" id="submitManualAddBtn" class="btn btn-sm btn-warning rounded-3 px-4 fw-bold text-dark shadow-sm" disabled>+ ADD EMPLOYEE</button>
                     </div>
                 </div>
 
@@ -443,121 +464,154 @@
     </div>
 </div>
 
-
-<!-- ========== EDIT OVERLAY ========== -->
 <div id="editOverlay" class="d-none position-fixed top-0 start-0 w-100 h-100" style="background: rgba(10, 12, 20, 0.56); backdrop-filter: blur(8px); z-index: 1080;">
-    <div id="employeeEditCard" class="card-glass p-4 position-absolute top-50 start-50 translate-middle" style="width: min(760px, 94%); border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 28px 80px rgba(0,0,0,0.35);">
+    <div id="employeeEditCard" class="card-glass p-4 position-absolute top-50 start-50 translate-middle shadow-sm" style="width: min(850px, 94%); background: #0b2f23; border-radius: 16px; border: 1px solid rgba(255,255,255,0.08);">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div>
-                <h5 class="mb-1">Edit Employee Record</h5>
-                <p class="text-white-50 small mb-0">Update the employee details and save the changes.</p>
+                <h5 class="fw-bold mb-1 tracking-wider" style="color: #d4af37;">EDIT RECORD</h5>
+                <p class="text-white-50 small mb-0">Update the current employee details and save the changes.</p>
+            </div>
+            <div class="d-flex gap-2">
+                <button id="cancelEditEmployee" type="button" class="btn btn-outline-light btn-sm px-3">Cancel</button>
+                <button id="saveEmployeeEdit" type="button" class="btn btn-primary-gold btn-sm px-3">Update</button>
             </div>
         </div>
         <hr class="border-secondary opacity-25 my-3">
-        <div class="row g-3">
-            <div class="col-md-3">
-                <label class="form-label text-white-50" for="editEmployeeId">Employee ID</label>
-                <input id="editEmployeeId" class="form-control bg-dark text-white border-secondary" type="text" readonly style="opacity: 0.6; cursor: not-allowed;" />
-            </div>
-            <div class="col-md-3">
-                <label class="form-label text-white-50" for="editEmployeeName">Employee Name</label>
-                <input id="editEmployeeName" class="form-control bg-dark text-white border-secondary" type="text" />
-            </div>
-            <div class="col-md-3">
-                <label class="form-label text-white-50" for="editDepartmentId">Department</label>
-                <select id="editDepartmentId" class="form-select bg-dark text-white border-secondary">
-                    <option value="" disabled>Select Department</option>
-                    {% for dept in departments %}
-                    <option value="{{ dept.department_id }}">{{ dept.department_name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label text-white-50" for="editPosition">Position</label>
-                <input id="editPosition" class="form-control bg-dark text-white border-secondary" type="text" />
-            </div>
-        </div>
-        <div class="d-flex justify-content-end gap-2 mt-4">
-            <button id="cancelEditEmployee" type="button" class="btn btn-outline-light">Cancel</button>
-            <button id="saveEmployeeEdit" type="button" class="btn btn-primary-gold">Update</button>
-        </div>
-    </div>
-</div>
-
-
-<!-- Toast notification -->
-<div id="toastContainer" class="position-fixed" style="z-index: 9999; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; pointer-events: none;"></div>
-
-
-<!-- ===================== CONFIRM DIALOG ===================== -->
-<div id="confirmOverlay" class="d-none position-fixed top-0 start-0 w-100 h-100"
-    style="background: rgba(0,0,0,0.55); backdrop-filter: blur(6px); z-index: 9998; display: flex; align-items: center; justify-content: center;">
-    <div style="
-        background: rgba(10,40,25,0.98);
-        border: 1px solid rgba(239,68,68,0.3);
-        border-radius: 20px;
-        padding: 32px 28px;
-        min-width: 320px;
-        max-width: 400px;
-        box-shadow: 0 24px 60px rgba(0,0,0,0.6);
-        text-align: center;
-        animation: toastSlideIn 0.25s cubic-bezier(0.34,1.56,0.64,1) forwards;
-    ">
-        <div style="
-            width:52px; height:52px; border-radius:50%;
-            background:#ef4444; margin: 0 auto 16px;
-            display:flex; align-items:center; justify-content:center;
-            box-shadow: 0 0 0 8px rgba(239,68,68,0.15);
-        ">
-            <i class="bi bi-exclamation-triangle-fill" style="font-size:1.4rem; color:#fff;"></i>
-        </div>
-        <h6 id="confirmTitle" style="color:#fff; font-weight:700; font-size:1rem; margin-bottom:8px;"></h6>
-        <p id="confirmSubtitle" style="color:rgba(255,255,255,0.55); font-size:0.83rem; margin-bottom:24px;"></p>
-        <div class="d-flex gap-3 justify-content-center">
-            <button id="confirmCancelBtn" style="
-                flex:1; padding:10px; border-radius:12px;
-                background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15);
-                color:#fff; font-weight:600; cursor:pointer; font-size:0.9rem;
-                transition: background 0.2s;
-            " onmouseover="this.style.background='rgba(255,255,255,0.15)'"
-               onmouseout="this.style.background='rgba(255,255,255,0.08)'">Cancel</button>
-            <button id="confirmOkBtn" style="
-                flex:1; padding:10px; border-radius:12px;
-                background:#ef4444; border:none;
-                color:#fff; font-weight:700; cursor:pointer; font-size:0.9rem;
-                transition: background 0.2s;
-            " onmouseover="this.style.background='#dc2626'"
-               onmouseout="this.style.background='#ef4444'">Delete</button>
-        </div>
-    </div>
-</div>
-
-
-<!-- ========== UPLOAD RESULT MODAL ========== -->
-<div class="modal fade" id="uploadResultModal" tabindex="-1" aria-hidden="true" style="z-index: 1090;">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content card-glass" style="background: rgba(11, 45, 33, 0.85); backdrop-filter: blur(16px); border: 1px solid rgba(212,175,55,0.25); box-shadow: 0 28px 80px rgba(0,0,0,0.5);">
-            <div class="modal-header border-secondary border-opacity-25 pb-3 pt-4 px-4">
-                <div class="d-flex align-items-center gap-4">
-                    <div id="uploadResultIconContainer" class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 64px; height: 64px; background: rgba(25,135,84,0.15);">
-                        <i id="uploadResultIcon" class="bi bi-check-circle-fill text-success" style="font-size: 2.2rem;"></i>
+        <div class="row g-4 mb-0 align-items-stretch">
+            <!-- Left Side: QR Code / Logs History -->
+            <div class="col-md-5">
+                <!-- QR Code Section (Edit Mode) -->
+                <div id="editQrCodeSection" class="card-glass border-secondary p-4 h-100 d-flex flex-column align-items-center justify-content-center text-center shadow-sm" style="background: rgba(0,0,0,0.15); border-radius: 16px;">
+                    <div class="bg-white border border-secondary rounded-4 mb-3 d-flex align-items-center justify-content-center p-3 overflow-hidden" style="width: 180px; height: 180px; border-style: solid !important; border-width: 2px !important;" id="editQrCodeContainer">
+                        <img id="editQrCodeImage" src="" alt="QR Code" style="max-width: 100%; max-height: 100%; display: none;">
+                        <span class="text-secondary small fw-bold tracking-wider" id="editQrCodePlaceholder">GENERATING...</span>
                     </div>
-                    <div>
-                        <h4 class="modal-title text-white mb-1 fw-bold" id="uploadResultTitle">Upload Successful</h4>
-                        <p class="text-white-50 mb-0" id="uploadResultSubtitle" style="font-size: 0.95rem;">X employees inserted</p>
+                    <button type="button" class="btn btn-outline-light rounded-pill px-3 py-1 btn-sm fw-bold shadow-sm" id="btnResendEmail" style="display: none; font-size: 0.75rem;">
+                        <i class="bi bi-envelope-check me-2"></i>RESEND TO EMAIL
+                    </button>
+                </div>
+                
+                <!-- Logs History Section (View Mode) -->
+                <div id="viewLogsHistorySection" class="card-glass border-secondary pt-4 pb-0 px-0 h-100 d-none d-flex flex-column justify-content-start align-items-center shadow-sm" style="background: rgba(0,0,0,0.15); border-radius: 16px;">
+                    <h6 class="fw-bold mb-3 tracking-wider text-center px-4 w-100" style="color: #ffffff;">LOGS HISTORY</h6>
+                    <div class="table-responsive border-top border-bottom border-secondary transparent-scrollbar w-100" style="max-height: 220px; overflow-y: auto;">
+                        <table class="table table-dark-glass table-sm table-hover align-middle mb-0 text-center w-100" style="font-size: 0.8rem; background: transparent;">
+                            <thead class="text-white-50" style="position: sticky; top: 0; z-index: 1; background: #0b2f23;">
+                                <tr>
+                                    <th class="fw-normal pb-2 border-bottom border-secondary text-center">Date</th>
+                                    <th class="fw-normal pb-2 border-bottom border-secondary text-center">Time In</th>
+                                    <th class="fw-normal pb-2 border-bottom border-secondary text-center">Time Out</th>
+                                </tr>
+                            </thead>
+                            <tbody id="editLogsHistoryBody">
+                                <!-- Populated dynamically by JS -->
+                                <tr>
+                                    <td colspan="3" class="text-center text-white-50 py-3">No logs available</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-                <button type="button" class="btn-close btn-close-white opacity-50" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body py-4 px-4">
-                <div id="uploadResultTipContainer"></div>
-                <div id="uploadResultContent" class="text-white-50 small" style="max-height: 400px; overflow-y: auto;">
-                    <!-- Content populated via JS -->
+            <!-- Right Side: Form Inputs -->
+            <div class="col-md-7">
+                <div class="d-flex flex-column h-100 card-glass border-secondary p-4 shadow-sm" style="background: rgba(0,0,0,0.15); border-radius: 16px;">
+                    <div class="m-auto w-100">
+                        <h6 class="fw-bold mb-4 tracking-wider text-center" style="color: #ffffff;">INFORMATION DETAILS</h6>
+                        <div class="vstack gap-3 text-start w-100">
+                            <div class="row align-items-center">
+                                <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0 text-md-end d-block pe-2" for="editEmployeeId">EMPLOYEE ID:</label></div>
+                                <div class="col-sm-8"><input id="editEmployeeId" class="form-control form-control-sm bg-transparent text-white border-secondary rounded-3 shadow-none" type="text" readonly style="opacity: 0.6; cursor: not-allowed;" /></div>
+                            </div>
+                            <div class="row align-items-center">
+                                <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0 text-md-end d-block pe-2" for="editEmployeeName">FULL NAME:</label></div>
+                                <div class="col-sm-8"><input id="editEmployeeName" class="form-control form-control-sm bg-transparent text-white border-secondary rounded-3 shadow-none" type="text" /></div>
+                            </div>
+                            
+                            <!-- Radio Buttons -->
+                            <div class="row align-items-center my-1">
+                                <div class="col-sm-4">
+                                    <label class="form-label text-white-50 small fw-bold mb-0 text-md-end d-block pe-2">TYPE:</label>
+                                </div>
+                                <div class="col-sm-8 d-flex gap-3">
+                                    <div class="form-check mb-0">
+                                        <input class="form-check-input bg-transparent border-secondary" type="radio" name="editPersonnelType" id="editTypeTeaching" value="teaching">
+                                        <label class="form-check-label text-white small" for="editTypeTeaching">Teaching</label>
+                                    </div>
+                                    <div class="form-check mb-0">
+                                        <input class="form-check-input bg-transparent border-secondary" type="radio" name="editPersonnelType" id="editTypeNonTeaching" value="non-teaching">
+                                        <label class="form-check-label text-white small" for="editTypeNonTeaching">Non-Teaching</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Wrapper to maintain fixed card height -->
+                            <div style="min-height: 80px;">
+                                <!-- Conditional Fields: Teaching -->
+                                <div id="editTeachingFields" class="d-none vstack gap-3">
+                                    <div class="row align-items-center">
+                                        <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0 text-md-end d-block pe-2" for="editCollege">COLLEGE:</label></div>
+                                        <div class="col-sm-8">
+                                            <select id="editCollege" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
+                                                <option value="" selected disabled class="text-dark">Select College</option>
+                                                <option class="text-dark">College of Engineering</option>
+                                                <option class="text-dark">College of Nursing</option>
+                                                <option class="text-dark">College of Computer Studies</option>
+                                                <option class="text-dark">College of Business and Accountancy</option>
+                                                <option class="text-dark">College of Education</option>
+                                                <option class="text-dark">College of Arts and Sciences</option>
+                                                <option class="text-dark">College of International Hospitality Management</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="row align-items-center">
+                                        <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0 text-md-end d-block pe-2" for="editTeachingPosition">POSITION:</label></div>
+                                        <div class="col-sm-8">
+                                            <select id="editTeachingPosition" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
+                                                <option value="" selected disabled class="text-dark">Select Position</option>
+                                                <option class="text-dark">Professor I</option>
+                                                <option class="text-dark">Professor II</option>
+                                                <option class="text-dark">Instructor I</option>
+                                                <option class="text-dark">Instructor II</option>
+                                                <option class="text-dark">Dean</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Conditional Fields: Non-Teaching -->
+                                <div id="editNonTeachingFields" class="d-none vstack gap-3">
+                                    <div class="row align-items-center">
+                                        <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0 text-md-end d-block pe-2" for="editOffice">OFFICE:</label></div>
+                                        <div class="col-sm-8">
+                                            <select id="editOffice" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
+                                                <option value="" selected disabled class="text-dark">Select Office</option>
+                                                <option class="text-dark">Registrar's Office</option>
+                                                <option class="text-dark">Accounting Office</option>
+                                                <option class="text-dark">Human Resources</option>
+                                                <option class="text-dark">MIS Office</option>
+                                                <option class="text-dark">Library</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="row align-items-center">
+                                        <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0 text-md-end d-block pe-2" for="editNonTeachingPosition">POSITION:</label></div>
+                                        <div class="col-sm-8">
+                                            <select id="editNonTeachingPosition" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
+                                                <option value="" selected disabled class="text-dark">Select Position</option>
+                                                <option class="text-dark">Admin Aide</option>
+                                                <option class="text-dark">Admin Officer</option>
+                                                <option class="text-dark">Clerk</option>
+                                                <option class="text-dark">IT Staff</option>
+                                                <option class="text-dark">Director</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div id="uploadResultPagination" class="d-flex justify-content-center mt-3 gap-2"></div>
-            </div>
-            <div class="modal-footer border-0 pt-0 pb-4 justify-content-center gap-3" id="uploadResultFooter">
-                <button type="button" class="btn btn-outline-light px-4 rounded-pill" data-bs-dismiss="modal">Exit</button>
             </div>
         </div>
     </div>
@@ -569,864 +623,767 @@
     backdrop-filter: blur(12px);
     border: 1px solid rgba(255,255,255,0.15);
 }
-.employee-action-menu .dropdown-item { color: #fff; }
+.employee-action-menu .dropdown-item {
+    color: #fff;
+}
 .employee-action-menu .dropdown-item:hover,
-.employee-action-menu .dropdown-item:focus { background: #d4af37; color: #051a10; }
-.dropdown .btn { width: 2rem; height: 2rem; border-radius: 50%; }
+.employee-action-menu .dropdown-item:focus {
+    background: #d4af37;
+    color: #051a10;
+}
+.dropdown .btn {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+}
 .dropdown .btn:hover {
     background: transparent !important;
     border: 1px solid #fff !important;
     border-radius: 50% !important;
     color: #fff !important;
 }
+/* Fixed table card height for 6 records */
+#tableCard .table-responsive {
+    overflow: visible;
+}
+/* Pagination Footer */
 .pagination-footer {
     display: none;
+    position: fixed;
+    bottom: 1rem;
+    left: 60%;
+    transform: translateX(-50%);
     justify-content: center;
-    width: 100%;
-    margin-top: 0.75rem;
-    padding: 0 1rem 1rem;
+    pointer-events: none;
+    z-index: 1100;
+    width: auto;
+    max-width: 90vw;
+    padding: 0 0.5rem;
 }
-.pagination-footer.show { display: flex !important; }
-.pagination-footer nav { width: 100%; display: flex; justify-content: center; }
-.pagination-footer .pagination { background: transparent; flex-wrap: wrap; justify-content: center; }
-.main-content { padding-bottom: 0; }
-.pagination-custom { list-style: none; display: flex; align-items: center; gap: 0.5rem; margin: 0; padding: 0; }
-.pagination-custom .page-item { margin: 0; }
+
+.pagination-footer.show {
+    display: flex !important;
+}
+
+.pagination-footer .pagination {
+    pointer-events: auto;
+    background: transparent;
+}
+
+/* Add bottom padding to main content when pagination is visible */
+.main-content {
+    padding-bottom: 4rem;
+}
+
+/* Pagination Styling */
+.pagination-custom {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+}
+.pagination-custom .page-item {
+    margin: 0;
+}
 .pagination-custom .page-link {
-    display: inline-flex; align-items: center; justify-content: center;
-    min-width: 2.75rem; height: 2.75rem; padding: 0 0.85rem;
-    color: #fff; background-color: transparent; border: none;
-    border-radius: 999px; cursor: pointer;
-    transition: all 0.25s ease; font-size: 0.95rem; font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.75rem;
+    height: 2.75rem;
+    padding: 0 0.85rem;
+    color: #fff;
+    background-color: transparent;
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    font-size: 0.95rem;
+    font-weight: 500;
 }
 .pagination-custom .page-link:hover:not(:disabled) {
-    background-color: rgba(212, 175, 55, 0.18); color: #fff; transform: translateY(-1px);
+    background-color: rgba(212, 175, 55, 0.18);
+    color: #fff;
+    transform: translateY(-1px);
 }
 .pagination-custom .page-link.active {
-    background-color: rgba(212, 175, 55, 0.25); color: #ffffff; font-weight: 700;
+    background-color: rgba(212, 175, 55, 0.25);
+    color: #ffffff;
+    font-weight: 700;
 }
-.pagination-custom .page-link:disabled { opacity: 0.35; cursor: not-allowed; background-color: transparent; }
+.pagination-custom .page-link:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    background-color: transparent;
+}
 .pagination-custom .page-link.page-number-separator {
-    cursor: default; pointer-events: none; background-color: transparent; border-color: transparent; color: #b6b6b6;
+    cursor: default;
+    pointer-events: none;
+    background-color: transparent;
+    border-color: transparent;
+    color: #b6b6b6;
 }
+.pagination-custom .page-link.page-prev,
+.pagination-custom .page-link.page-next {
+    min-width: auto;
+    padding: 0.4rem 0.9rem;
+    font-size: 0.9rem;
+}
+.pagination-custom .page-link.page-prev i,
+.pagination-custom .page-link.page-next i {
+    font-size: 1rem;
+}
+
 /* View System */
 .employee-view { display: none; }
 .employee-view.active-view { display: block; }
-.view-toggle:checked + label { background-color: #d4af37 !important; color: #ffffff !important; }
-#addEmployeeBtn { transition: all 0.25s ease; font-weight: 600; border: none; box-shadow: 0 2px 8px rgba(212, 175, 55, 0.3); }
-#addEmployeeBtn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4); }
-.add-option-card { background-color: #0b3d2e; transition: all 0.3s ease; cursor: pointer; }
-.add-option-card:hover { transform: translateY(-5px); }
-.add-option-card.xls-card { border-color: rgba(255,255,255,0.3) !important; }
-.add-option-card.xls-card:hover { border-color: rgba(255,255,255,0.8) !important; box-shadow: 0 10px 25px rgba(255,255,255,0.1); }
-.add-option-card.manual-card { border-color: #d4af37 !important; }
-.add-option-card.manual-card:hover { border-color: #f5dd00 !important; box-shadow: 0 10px 25px rgba(212,175,55,0.2); }
-.upload-zone { transition: all 0.3s ease; }
-.upload-zone:hover { background: rgba(255,255,255,0.05) !important; border-color: #d4af37 !important; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
-.upload-zone:hover i, .upload-zone:hover span { color: #d4af37 !important; transition: color 0.3s ease; }
-@keyframes fadeInModal { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes toastSlideIn { from { opacity: 0; transform: scale(0.88); } to { opacity: 1; transform: scale(1); } }
-@keyframes toastSlideOut { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.88); } }
+
+/* Active Toggle Styling */
+.view-toggle:checked + label {
+    background-color: #d4af37 !important;
+    color: #ffffff !important;
+}
+
+/* Add Button Enhancement */
+#addEmployeeBtn {
+    transition: all 0.25s ease; font-weight: 600; border: none; box-shadow: 0 2px 8px rgba(212, 175, 55, 0.3);
+}
+#addEmployeeBtn:hover {
+    transform: translateY(-1px); box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
+}
+
+/* Add User Modal Styles */
+.add-option-card {
+    background-color: #0b3d2e;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+.add-option-card:hover {
+    transform: translateY(-5px);
+}
+.add-option-card.xls-card {
+    border-color: rgba(255, 255, 255, 0.3) !important;
+}
+.add-option-card.xls-card:hover {
+    border-color: rgba(255, 255, 255, 0.8) !important;
+    box-shadow: 0 10px 25px rgba(255, 255, 255, 0.1);
+}
+.add-option-card.manual-card {
+    border-color: #d4af37 !important;
+}
+.add-option-card.manual-card:hover {
+    border-color: #f5dd00 !important;
+    box-shadow: 0 10px 25px rgba(212, 175, 55, 0.2);
+}
+.upload-zone {
+    transition: all 0.3s ease;
+}
+.upload-zone:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-color: #d4af37 !important;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+}
+.upload-zone:hover i, .upload-zone:hover span {
+    color: #d4af37 !important;
+    transition: color 0.3s ease;
+}
+@keyframes fadeInModal {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Transparent Scrollbar */
+.transparent-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+.transparent-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+.transparent-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+}
+.transparent-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
 </style>
 
-
 <script>
-window.reopenUploadModal = function() {
-    sessionStorage.setItem('reopenUploadModal', 'true');
-    location.reload();
-};
-
 document.addEventListener('DOMContentLoaded', function () {
-
-    // ─── SHARED CONSTANTS ─────────────────────────────────────────────────────
-    const ITEMS_PER_PAGE = 6;
-
-    // ─── TOAST HELPERS ────────────────────────────────────────────────────────
-    const TOAST_DURATION = 5000;
-
-    function escapeToastHtml(value) {
-        return String(value ?? '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-
-    function showToast(message, type = 'success', subtitle = '') {
-        const container = document.getElementById('toastContainer');
-        if (!container) return;
-
-        const id = 'toast-' + Date.now();
-        const barId = id + '-bar';
-
-        const cfg = {
-            success: { icon: 'check-circle-fill', iconBg: '#22c55e', border: 'rgba(34,197,94,0.35)', barColor: '#22c55e', title: 'Success' },
-            danger: { icon: 'x-circle-fill', iconBg: '#ef4444', border: 'rgba(239,68,68,0.35)', barColor: '#ef4444', title: 'Error' },
-            warning: { icon: 'exclamation-circle-fill', iconBg: '#f59e0b', border: 'rgba(245,158,11,0.35)', barColor: '#f59e0b', title: 'Warning' },
-            info: { icon: 'info-circle-fill', iconBg: '#3b82f6', border: 'rgba(59,130,246,0.35)', barColor: '#3b82f6', title: 'Info' }
-        };
-
-        const c = cfg[type] || cfg.success;
-        const titleText = escapeToastHtml(message || c.title);
-        const bodyText = escapeToastHtml(subtitle || message || '');
-        const html = `
-            <div id="${id}" style="
-                position: relative; overflow: hidden;
-                display: flex; align-items: flex-start; gap: 14px;
-                width: min(520px, calc(100vw - 32px));
-                padding: 18px 18px 24px;
-                border-radius: 18px;
-                background: rgba(8, 32, 20, 0.98);
-                border: 1px solid ${c.border};
-                box-shadow: 0 24px 60px rgba(0,0,0,0.65);
-                backdrop-filter: blur(20px);
-                animation: toastSlideIn 0.32s cubic-bezier(0.34,1.56,0.64,1) forwards;
-                pointer-events: auto;
-            ">
-                <div style="
-                    width:46px; height:46px; border-radius:50%; flex-shrink:0;
-                    background:${c.iconBg};
-                    display:flex; align-items:center; justify-content:center;
-                    box-shadow: 0 0 0 7px ${c.iconBg}28;
-                ">
-                    <i class="bi bi-${c.icon}" style="font-size:1.25rem; color:#fff;"></i>
-                </div>
-                <div style="flex:1; min-width:0;">
-                    <div style="font-weight:700; font-size:0.95rem; color:#fff; margin-bottom:4px; letter-spacing:0.01em;">${titleText}</div>
-                    <div style="
-                        font-size:0.84rem;
-                        color:rgba(255,255,255,0.74);
-                        line-height:1.45;
-                        white-space:pre-wrap;
-                        overflow-wrap:anywhere;
-                        word-break:break-word;
-                    ">${bodyText}</div>
-                </div>
-                <button type="button" data-toast-close="${id}" style="
-                    background:none; border:none; cursor:pointer; padding:0; line-height:1; flex-shrink:0;
-                    color:rgba(255,255,255,0.35); font-size:0.9rem; transition:color 0.15s;
-                ">
-                    <i class="bi bi-x-lg"></i>
-                </button>
-                <div id="${barId}" style="
-                    position:absolute; bottom:0; left:0; height:3px;
-                    width:100%; border-radius:0 0 18px 18px;
-                    background:${c.barColor};
-                    transition: width ${TOAST_DURATION}ms linear;
-                "></div>
-            </div>`;
-
-        container.insertAdjacentHTML('beforeend', html);
-
-        const closeBtn = container.querySelector(`[data-toast-close="${id}"]`);
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => dismissToast(id));
-            closeBtn.addEventListener('mouseover', () => { closeBtn.style.color = '#fff'; });
-            closeBtn.addEventListener('mouseout', () => { closeBtn.style.color = 'rgba(255,255,255,0.35)'; });
-        }
-
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                const bar = document.getElementById(barId);
-                if (bar) bar.style.width = '0%';
-            });
+    // --- Add User Modal View Transitions ---
+    const addUserModalEl = document.getElementById('addUserModal');
+    const selectionView = document.getElementById('addSelectionView');
+    const xlsView = document.getElementById('xlsUploadView');
+    const manualView = document.getElementById('manualAddView');
+    const xlsCard = document.querySelector('.xls-card');
+    const manualCard = document.querySelector('.manual-card');
+    const backBtnsSelection = document.querySelectorAll('.btn-back-selection');
+    const uploadZone = document.querySelector('.upload-zone');
+    const fileInput = document.getElementById('xlsFileInput');
+    
+    if(xlsCard && selectionView && xlsView) {
+        xlsCard.addEventListener('click', () => {
+            selectionView.classList.add('d-none');
+            xlsView.classList.remove('d-none');
+            xlsView.style.animation = 'fadeInModal 0.4s ease forwards';
         });
-
-        setTimeout(() => dismissToast(id), TOAST_DURATION);
-    }
-
-    function dismissToast(id) {
-        const toast = document.getElementById(id);
-        if (!toast || toast.dataset.closing === 'true') return;
-        toast.dataset.closing = 'true';
-        toast.style.animation = 'toastSlideOut 0.22s ease forwards';
-        setTimeout(() => toast.remove(), 230);
-    }
-
-    // ─── ADD USER MODAL ───────────────────────────────────────────────────────
-    const addUserModalEl       = document.getElementById('addUserModal');
-    const selectionView        = document.getElementById('addSelectionView');
-    const xlsView              = document.getElementById('xlsUploadView');
-    const manualView           = document.getElementById('manualAddView');
-    const xlsCard              = document.querySelector('.xls-card');
-    const manualCard           = document.querySelector('.manual-card');
-    const backBtnsSelection    = document.querySelectorAll('.btn-back-selection');
-    const uploadZone           = document.querySelector('.upload-zone');
-    const fileInput            = document.getElementById('xlsFileInput');
-
-    if (xlsCard)   xlsCard.addEventListener('click', () => switchModalView(xlsView));
-    if (manualCard) manualCard.addEventListener('click', () => switchModalView(manualView));
-
-    function switchModalView(targetView) {
-        [selectionView, xlsView, manualView].forEach(v => v && v.classList.add('d-none'));
-        if (targetView) {
-            targetView.classList.remove('d-none');
-            targetView.style.animation = 'fadeInModal 0.4s ease forwards';
-        }
     }
     
-    if (sessionStorage.getItem('reopenUploadModal') === 'true') {
-        sessionStorage.removeItem('reopenUploadModal');
-        const addModal = new bootstrap.Modal(addUserModalEl);
-        addModal.show();
-        switchModalView(xlsView);
+    if(manualCard && selectionView && manualView) {
+        manualCard.addEventListener('click', () => {
+            selectionView.classList.add('d-none');
+            manualView.classList.remove('d-none');
+            manualView.style.animation = 'fadeInModal 0.4s ease forwards';
+        });
     }
-
-    backBtnsSelection.forEach(btn => btn.addEventListener('click', () => switchModalView(selectionView)));
-
-    if (uploadZone && fileInput) {
+    
+    backBtnsSelection.forEach(btn => {
+        btn.addEventListener('click', () => {
+            if(xlsView) xlsView.classList.add('d-none');
+            if(manualView) manualView.classList.add('d-none');
+            if(selectionView) {
+                selectionView.classList.remove('d-none');
+                selectionView.style.animation = 'fadeInModal 0.4s ease forwards';
+            }
+        });
+    });
+    
+    if(uploadZone && fileInput) {
         uploadZone.addEventListener('click', () => fileInput.click());
-        fileInput.addEventListener('change', function () {
-            if (this.files && this.files.length > 0) {
+        
+        fileInput.addEventListener('change', function() {
+            if(this.files && this.files.length > 0) {
                 uploadZone.querySelector('span').textContent = this.files[0].name;
-                const icon = uploadZone.querySelector('i');
-                icon.className = icon.className.replace('bi-file-earmark-spreadsheet', 'bi-file-earmark-check').replace('text-white-50', 'text-success');
+                uploadZone.querySelector('i').classList.replace('bi-file-earmark-spreadsheet', 'bi-file-earmark-check');
+                uploadZone.querySelector('i').classList.replace('text-white-50', 'text-success');
             }
         });
     }
-
-    if (addUserModalEl) {
+    
+    if(addUserModalEl) {
         addUserModalEl.addEventListener('hidden.bs.modal', () => {
-            switchModalView(selectionView);
-            if (fileInput) {
+            if (selectionView) {
+                if(xlsView) xlsView.classList.add('d-none');
+                if(manualView) manualView.classList.add('d-none');
+                selectionView.classList.remove('d-none');
+            }
+            if(fileInput) {
                 fileInput.value = '';
-                if (uploadZone) {
-                    uploadZone.querySelector('span').textContent = 'Click to upload an Excel or CSV file';
-                    const icon = uploadZone.querySelector('i');
-                    icon.className = icon.className.replace('bi-file-earmark-check', 'bi-file-earmark-spreadsheet').replace('text-success', 'text-white-50');
+                if(uploadZone) {
+                    uploadZone.querySelector('span').textContent = 'Click to export xls file';
+                    uploadZone.querySelector('i').classList.replace('bi-file-earmark-check', 'bi-file-earmark-spreadsheet');
+                    uploadZone.querySelector('i').classList.remove('text-success');
+                    uploadZone.querySelector('i').classList.add('text-white-50');
                 }
             }
+            
+            // Reset Manual Add Form
             const manualForm = document.getElementById('manualAddEmployeeForm');
             if (manualForm) {
                 manualForm.reset();
                 document.getElementById('teachingFields').classList.add('d-none');
                 document.getElementById('nonTeachingFields').classList.add('d-none');
                 document.getElementById('submitManualAddBtn').disabled = true;
+                if (document.getElementById('manualGenerateQrBtn')) document.getElementById('manualGenerateQrBtn').disabled = true;
+                if (document.getElementById('manualQrCodeImage')) document.getElementById('manualQrCodeImage').style.display = 'none';
+                if (document.getElementById('manualQrCodePlaceholder')) {
+                    document.getElementById('manualQrCodePlaceholder').style.display = 'block';
+                    document.getElementById('manualQrCodePlaceholder').textContent = 'QR CODE';
+                }
+                if (document.getElementById('manualResendEmailBtn')) document.getElementById('manualResendEmailBtn').style.display = 'none';
+                if (document.getElementById('manualQrCodeContainer')) document.getElementById('manualQrCodeContainer').style.borderStyle = 'dashed !important';
             }
         });
     }
 
-    // Manual Add — dynamic fields & validation
-    const manualIdInput               = document.getElementById('manualAddId');
-    const manualNameInput             = document.getElementById('manualAddName');
-    const typeTeachingRadio           = document.getElementById('typeTeaching');
-    const typeNonTeachingRadio        = document.getElementById('typeNonTeaching');
-    const teachingFields              = document.getElementById('teachingFields');
-    const nonTeachingFields           = document.getElementById('nonTeachingFields');
-    const manualAddCollege            = document.getElementById('manualAddCollege');
-    const manualAddTeachingPosition   = document.getElementById('manualAddTeachingPosition');
-    const manualAddOffice             = document.getElementById('manualAddOffice');
-    const manualAddNonTeachingPos     = document.getElementById('manualAddNonTeachingPosition');
-    const submitManualBtn             = document.getElementById('submitManualAddBtn');
-    const EMPLOYEE_ID_REGEX           = /^\d{5}$/;
+    // --- Dynamic Dropdowns & Validation for Manual Add ---
+    const manualIdInput = document.getElementById('manualAddId');
+    const manualNameInput = document.getElementById('manualAddName');
+    const typeTeachingRadio = document.getElementById('typeTeaching');
+    const typeNonTeachingRadio = document.getElementById('typeNonTeaching');
+    const teachingFields = document.getElementById('teachingFields');
+    const nonTeachingFields = document.getElementById('nonTeachingFields');
+    
+    const manualAddCollege = document.getElementById('manualAddCollege');
+    const manualAddTeachingPosition = document.getElementById('manualAddTeachingPosition');
+    
+    const manualAddOffice = document.getElementById('manualAddOffice');
+    const manualAddNonTeachingPosition = document.getElementById('manualAddNonTeachingPosition');
+    
+    const submitManualBtn = document.getElementById('submitManualAddBtn');
+    const manualGenerateQrBtn = document.getElementById('manualGenerateQrBtn');
 
     function togglePersonnelFields() {
         if (typeTeachingRadio.checked) {
             teachingFields.classList.remove('d-none');
             nonTeachingFields.classList.add('d-none');
-            if (manualAddOffice) manualAddOffice.value = '';
-            if (manualAddNonTeachingPos) manualAddNonTeachingPos.value = '';
-        } else {
+            manualAddOffice.value = "";
+            manualAddNonTeachingPosition.value = "";
+        } else if (typeNonTeachingRadio.checked) {
             teachingFields.classList.add('d-none');
             nonTeachingFields.classList.remove('d-none');
-            if (manualAddCollege) manualAddCollege.value = '';
-            if (manualAddTeachingPosition) manualAddTeachingPosition.value = '';
+            manualAddCollege.value = "";
+            manualAddTeachingPosition.value = "";
         }
         validateManualForm();
     }
 
+    if (typeTeachingRadio) typeTeachingRadio.addEventListener('change', togglePersonnelFields);
+    if (typeNonTeachingRadio) typeNonTeachingRadio.addEventListener('change', togglePersonnelFields);
+
     function validateManualForm() {
-        const idOk   = manualIdInput && EMPLOYEE_ID_REGEX.test(manualIdInput.value.trim());
-        const nameOk = manualNameInput && manualNameInput.value.trim().length > 0;
-        let typeOk   = false;
-        if (typeTeachingRadio && typeTeachingRadio.checked)
-            typeOk = manualAddCollege.value !== '';
-        else if (typeNonTeachingRadio && typeNonTeachingRadio.checked)
-            typeOk = manualAddOffice.value !== '';
-        if (submitManualBtn) submitManualBtn.disabled = !(idOk && nameOk && typeOk);
+        const idValid = manualIdInput && /^[A-Z0-9-]{5,15}$/.test(manualIdInput.value.trim());
+        const nameValid = manualNameInput && manualNameInput.value.trim().length > 0;
+        
+        let typeValid = false;
+        if (typeTeachingRadio && typeTeachingRadio.checked) {
+            typeValid = manualAddCollege.value !== "" && manualAddTeachingPosition.value !== "";
+        } else if (typeNonTeachingRadio && typeNonTeachingRadio.checked) {
+            typeValid = manualAddOffice.value !== "" && manualAddNonTeachingPosition.value !== "";
+        }
+        
+        if (submitManualBtn) {
+            submitManualBtn.disabled = !(idValid && nameValid && typeValid);
+        }
+        if (manualGenerateQrBtn) {
+            manualGenerateQrBtn.disabled = !(idValid && nameValid && typeValid);
+        }
     }
 
-    if (typeTeachingRadio)    typeTeachingRadio.addEventListener('change', togglePersonnelFields);
-    if (typeNonTeachingRadio) typeNonTeachingRadio.addEventListener('change', togglePersonnelFields);
-    [manualIdInput, manualNameInput, manualAddCollege, manualAddTeachingPosition, manualAddOffice, manualAddNonTeachingPos]
-        .forEach(el => el && el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', validateManualForm));
+    // --- Auto-Generate ID Logic ---
+    const generateEmployeeIdBtn = document.getElementById('generateEmployeeIdBtn');
+    if (generateEmployeeIdBtn) {
+        generateEmployeeIdBtn.addEventListener('click', function() {
+            const year = new Date().getFullYear().toString().slice(-2);
+            const randomNum = Math.floor(Math.random() * 9000) + 1000;
+            if (manualIdInput) {
+                manualIdInput.value = `EMP-${year}-${randomNum}`;
+                validateManualForm();
+            }
+        });
+    }
+
+    // --- Generate Manual QR Code Logic ---
+    const manualQrCodeImage = document.getElementById('manualQrCodeImage');
+    const manualQrCodePlaceholder = document.getElementById('manualQrCodePlaceholder');
+    const manualResendEmailBtn = document.getElementById('manualResendEmailBtn');
+    const manualQrCodeContainer = document.getElementById('manualQrCodeContainer');
+
+    if (manualGenerateQrBtn) {
+        manualGenerateQrBtn.addEventListener('click', function() {
+            const employeeId = manualIdInput.value.trim();
+            const employeeName = manualNameInput.value.trim();
+            const isTeaching = typeTeachingRadio.checked;
+            const department = isTeaching ? manualAddCollege.value : manualAddOffice.value;
+            
+            if (!employeeId || !employeeName || !department) return;
+
+            manualQrCodePlaceholder.style.display = 'block';
+            manualQrCodePlaceholder.textContent = 'GENERATING...';
+            if (manualQrCodeImage) manualQrCodeImage.style.display = 'none';
+            if (manualResendEmailBtn) manualResendEmailBtn.style.display = 'none';
+
+            const qrData = `${employeeName} [${employeeId}] ${department}`;
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(qrData)}`;
+
+            if (manualQrCodeImage) {
+                manualQrCodeImage.onload = () => {
+                    manualQrCodeImage.style.display = 'block';
+                    manualQrCodePlaceholder.style.display = 'none';
+                    if (manualResendEmailBtn) manualResendEmailBtn.style.display = 'inline-block';
+                    if (manualQrCodeContainer) manualQrCodeContainer.style.borderStyle = 'solid';
+                };
+                manualQrCodeImage.onerror = () => {
+                    manualQrCodePlaceholder.textContent = 'ERROR';
+                };
+                manualQrCodeImage.src = qrUrl;
+            }
+        });
+    }
+
+    if (manualIdInput) manualIdInput.addEventListener('input', validateManualForm);
+    if (manualNameInput) manualNameInput.addEventListener('input', validateManualForm);
+    if (manualAddCollege) manualAddCollege.addEventListener('change', validateManualForm);
+    if (manualAddTeachingPosition) manualAddTeachingPosition.addEventListener('change', validateManualForm);
+    if (manualAddOffice) manualAddOffice.addEventListener('change', validateManualForm);
+    if (manualAddNonTeachingPosition) manualAddNonTeachingPosition.addEventListener('change', validateManualForm);
 
     if (submitManualBtn) {
-        submitManualBtn.addEventListener('click', async function () {
-            const isTeaching = typeTeachingRadio && typeTeachingRadio.checked;
-            const payload = {
-                employee_id:   manualIdInput.value.trim(),
-                employee_name: manualNameInput.value.trim(),
-                department_id: isTeaching ? manualAddCollege.value : manualAddOffice.value,
-                position:      isTeaching ? manualAddTeachingPosition.value : manualAddNonTeachingPos.value
+        submitManualBtn.addEventListener('click', function() {
+            const isTeaching = typeTeachingRadio.checked;
+            const data = {
+                id: manualIdInput.value.trim(),
+                name: manualNameInput.value.trim(),
+                type: isTeaching ? 'teaching' : 'non-teaching',
+                department: isTeaching ? manualAddCollege.value : manualAddOffice.value,
+                position: isTeaching ? manualAddTeachingPosition.value : manualAddNonTeachingPosition.value
             };
-            try {
-                const res = await fetch('/add_employee', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                const result = await res.json();
-                if (result.success) {
-                    const modal = bootstrap.Modal.getInstance(addUserModalEl);
-                    if (modal) modal.hide();
-                    showToast(
-                        result.reactivated ? 'Employee reactivated successfully.' : 'Employee added successfully.',
-                        'success',
-                        result.reactivated
-                            ? `${payload.employee_name.toUpperCase()} was reactivated.`
-                            : `${payload.employee_name.toUpperCase()} has been added to records.`
-                    );
-                    setTimeout(() => location.reload(), 1800);
-                } else {
-                    showToast('Add employee failed.', 'danger', (result && result.error) || 'Could not add employee.');
-                }
-            } catch (err) {
-                showToast('Request failed.', 'danger', err.message || 'Could not reach the server.');
-            }
-        });
-    }
 
-    // XLS Upload (validate -> preview -> commit)
-    const uploadSubmitBtn = document.getElementById('uploadXlsBtn');
-    let uploadPreviewRows = [];
-
-    function escapeHtml(value) {
-        return String(value ?? '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-
-    function showConfirm(title, subtitle = '') {
-        return new Promise(resolve => {
-            const overlay = document.getElementById('confirmOverlay');
-            const titleEl = document.getElementById('confirmTitle');
-            const subEl = document.getElementById('confirmSubtitle');
-            const okBtn = document.getElementById('confirmOkBtn');
-            const cancelBtn = document.getElementById('confirmCancelBtn');
-
-            titleEl.textContent = title;
-            subEl.textContent = subtitle;
-
-            overlay.classList.remove('d-none');
-            overlay.style.display = 'flex';
-
-            function cleanup(result) {
-                overlay.style.display = 'none';
-                overlay.classList.add('d-none');
-                okBtn.replaceWith(okBtn.cloneNode(true));
-                cancelBtn.replaceWith(cancelBtn.cloneNode(true));
-                resolve(result);
-            }
-
-            document.getElementById('confirmOkBtn').addEventListener('click', () => cleanup(true));
-            document.getElementById('confirmCancelBtn').addEventListener('click', () => cleanup(false));
-            overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(false); }, { once: true });
-        });
-    }
-
-    async function parseApiResponseSafe(response) {
-        const contentType = response.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
-            try {
-                return await response.json();
-            } catch (_) {
-                return null;
-            }
-        }
-        try {
-            const text = (await response.text() || '').trim();
-            if (!text) return null;
-            const titleMatch = text.match(/<title>(.*?)<\/title>/i);
-            const bodyMatch = text.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-            const extracted = (titleMatch && titleMatch[1]) || (bodyMatch && bodyMatch[1]) || text;
-            const plainText = extracted
-                .replace(/<[^>]+>/g, ' ')
-                .replace(/\s+/g, ' ')
-                .trim();
-            return plainText ? { error: plainText } : null;
-        } catch (_) {
-            return null;
-        }
-    }
-
-    function renderUploadPreviewModal(result) {
-        const resultModalEl = document.getElementById('uploadResultModal');
-        const resultModal = new bootstrap.Modal(resultModalEl);
-        const title = document.getElementById('uploadResultTitle');
-        const subtitle = document.getElementById('uploadResultSubtitle');
-        const content = document.getElementById('uploadResultContent');
-        const tipContainer = document.getElementById('uploadResultTipContainer');
-        const paginationContainer = document.getElementById('uploadResultPagination');
-        const iconContainer = document.getElementById('uploadResultIconContainer');
-        const icon = document.getElementById('uploadResultIcon');
-        const footer = document.getElementById('uploadResultFooter');
-
-        paginationContainer.innerHTML = '';
-        iconContainer.style.background = 'rgba(13, 202, 240, 0.15)';
-        icon.className = 'bi bi-table text-info fs-4';
-        icon.style.color = '';
-        title.textContent = 'Review Employee Upload';
-        subtitle.textContent = `${uploadPreviewRows.length} valid row(s) ready to upload`;
-
-        const requiredBadges = (result.required_columns || [])
-            .map(col => `<span class="badge rounded-pill px-3 py-2 me-1 mb-1" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff;">${escapeHtml(col)}</span>`)
-            .join('');
-        const optionalBadges = (result.optional_columns || [])
-            .map(col => `<span class="badge rounded-pill px-3 py-2 me-1 mb-1" style="background: rgba(212,175,55,0.15); border: 1px solid rgba(212,175,55,0.35); color: #f1d582;">${escapeHtml(col)} (OPTIONAL)</span>`)
-            .join('');
-
-        const previewRowsHtml = uploadPreviewRows.length
-            ? uploadPreviewRows.map((row, index) => `
-                <tr>
-                    <td class="text-white-50">${escapeHtml(row.row_number)}</td>
-                    <td class="text-white">${escapeHtml(row.employee_id)}</td>
-                    <td class="text-white">${escapeHtml(row.employee_name)}</td>
-                    <td class="text-white-50">
-                        ${escapeHtml(row.department_name)}
-                        ${row.source_department_name && row.source_department_name !== row.department_name
-                            ? `<div class="small text-info mt-1">Mapped from ${escapeHtml(row.source_department_name)}</div>`
-                            : ''}
-                    </td>
-                    <td class="text-white-50">${escapeHtml(row.position || 'N/A')}</td>
-                    <td class="text-white-50">${row.action === 'reactivate' ? 'Reactivate existing employee' : 'Create new employee'}</td>
-                    <td class="text-end">
-                        <button type="button" class="btn btn-sm btn-outline-danger delete-preview-row" data-index="${index}">Delete</button>
-                    </td>
-                </tr>
-            `).join('')
-            : `<tr><td colspan="7" class="text-center text-white-50 py-4">No rows left to upload.</td></tr>`;
-
-        const validationErrors = (result.errors || []).length
-            ? `
-                <div class="mt-3">
-                    <div class="fw-bold text-warning mb-2">Rows skipped during validation</div>
-                    <ul class="list-unstyled mb-0" style="font-size: 0.88rem;">
-                        ${result.errors.map(err => `<li class="mb-2 text-white-50"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>${escapeHtml(err)}</li>`).join('')}
-                    </ul>
-                </div>
-            `
-            : '';
-
-        tipContainer.innerHTML = `
-            <div class="alert border-0 rounded-4 mb-3 px-4 py-3" style="background: rgba(13, 202, 240, 0.10); border: 1px solid rgba(13,202,240,0.25) !important;">
-                <div class="d-flex gap-3 align-items-start">
-                    <i class="bi bi-info-circle-fill fs-5 mt-1 text-info"></i>
-                    <div>
-                        <strong class="d-block mb-2 text-info">Required Excel Structure</strong>
-                        <div class="mb-2">${requiredBadges}</div>
-                        <div>${optionalBadges}</div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        content.innerHTML = `
-            <div class="table-responsive">
-                <table class="table table-dark-glass table-sm align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>Row</th>
-                            <th>Employee ID</th>
-                            <th>Employee Name</th>
-                            <th>Department</th>
-                            <th>Position</th>
-                            <th>Result</th>
-                            <th class="text-end">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>${previewRowsHtml}</tbody>
-                </table>
-            </div>
-            ${validationErrors}
-        `;
-
-        footer.innerHTML = `
-            <button type="button" class="btn btn-outline-light px-4 rounded-pill" data-bs-dismiss="modal">Back</button>
-            <button type="button" class="btn btn-primary-gold px-4 rounded-pill" id="confirmUploadPreviewBtn" ${uploadPreviewRows.length ? '' : 'disabled'}>Upload Selected Rows</button>
-        `;
-
-        const modal = bootstrap.Modal.getInstance(addUserModalEl);
-        if (modal) modal.hide();
-        resultModal.show();
-    }
-
-    async function commitPreviewRows() {
-        if (!uploadPreviewRows.length) {
-            showToast('No rows left to upload.', 'warning');
-            return;
-        }
-        const confirmBtn = document.getElementById('confirmUploadPreviewBtn');
-        const resultModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('uploadResultModal'));
-        if (confirmBtn) {
-            confirmBtn.disabled = true;
-            confirmBtn.textContent = 'Uploading...';
-        }
-
-        try {
-            const res = await fetch('/upload_employees/commit', {
+            fetch('/add_employee', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ rows: uploadPreviewRows })
-            });
-            const result = await parseApiResponseSafe(res);
-            const title = document.getElementById('uploadResultTitle');
-            const subtitle = document.getElementById('uploadResultSubtitle');
-            const content = document.getElementById('uploadResultContent');
-            const tipContainer = document.getElementById('uploadResultTipContainer');
-            const iconContainer = document.getElementById('uploadResultIconContainer');
-            const icon = document.getElementById('uploadResultIcon');
-            const footer = document.getElementById('uploadResultFooter');
-
-            if (res.ok && result && result.success) {
-                iconContainer.style.background = 'rgba(25,135,84,0.15)';
-                icon.className = 'bi bi-check-circle-fill text-success fs-4';
-                const inserted = result.inserted || 0;
-                const reactivated = result.reactivated || 0;
-                title.textContent = (inserted + reactivated) > 0 ? 'Upload Successful' : 'Upload Completed With No Changes';
-                subtitle.textContent = `${inserted} added, ${reactivated} reactivated`;
-                tipContainer.innerHTML = '';
-                content.innerHTML = result.errors && result.errors.length
-                    ? `<ul class="list-unstyled mb-0">${result.errors.map(err => `<li class="mb-2 text-white-50"><i class="bi bi-exclamation-circle text-warning me-2"></i>${escapeHtml(err)}</li>`).join('')}</ul>`
-                    : '<div class="text-center py-2 text-white">All selected rows were processed successfully.</div>';
-                footer.innerHTML = `<button type="button" class="btn btn-outline-light px-4 rounded-pill" data-bs-dismiss="modal">Close</button>`;
-                document.getElementById('uploadResultModal').addEventListener('hidden.bs.modal', function () {
-                    location.reload();
-                }, { once: true });
-            } else {
-                iconContainer.style.background = 'rgba(220,53,69,0.15)';
-                icon.className = 'bi bi-x-circle-fill text-danger fs-4';
-                title.textContent = 'Upload Failed';
-                subtitle.textContent = 'Could not save selected rows';
-                tipContainer.innerHTML = '';
-                content.innerHTML = `<div class="text-danger"><i class="bi bi-exclamation-triangle me-2"></i>${escapeHtml((result && result.error) || 'Unknown upload error')}</div>`;
-                footer.innerHTML = `
-                    <button type="button" class="btn btn-primary-gold px-4 rounded-pill" id="retryUploadPreviewBtn">Try Again</button>
-                    <button type="button" class="btn btn-outline-light px-4 rounded-pill" data-bs-dismiss="modal">Close</button>
-                `;
-            }
-        } catch (err) {
-            resultModal?.hide();
-            showToast('Upload failed.', 'danger', 'Please try again. If the issue persists, refresh the page and retry.');
-        } finally {
-            if (confirmBtn) {
-                confirmBtn.disabled = false;
-                confirmBtn.textContent = 'Upload Selected Rows';
-            }
-        }
-    }
-
-    document.addEventListener('click', function (e) {
-        const deleteBtn = e.target.closest('.delete-preview-row');
-        if (deleteBtn) {
-            const index = Number(deleteBtn.dataset.index);
-            if (!Number.isNaN(index)) {
-                uploadPreviewRows.splice(index, 1);
-                renderUploadPreviewModal({
-                    required_columns: ['EMPLOYEE ID', 'EMPLOYEE NAME', 'DEPARTMENT'],
-                    optional_columns: ['POSITION'],
-                    errors: []
-                });
-            }
-            return;
-        }
-
-        const commitBtn = e.target.closest('#confirmUploadPreviewBtn');
-        if (commitBtn) {
-            commitPreviewRows();
-            return;
-        }
-
-        const retryBtn = e.target.closest('#retryUploadPreviewBtn');
-        if (retryBtn) {
-            commitPreviewRows();
-        }
-    });
-
-    if (uploadSubmitBtn) {
-        uploadSubmitBtn.addEventListener('click', async function () {
-            const file = fileInput && fileInput.files[0];
-            if (!file) {
-                showToast('No file selected.', 'warning', 'Please choose an Excel or CSV file first.');
-                return;
-            }
-            const formData = new FormData();
-            formData.append('file', file);
-            uploadSubmitBtn.disabled = true;
-            uploadSubmitBtn.textContent = 'Validating...';
-            try {
-                const res = await fetch('/upload_employees/preview', { method: 'POST', body: formData });
-                const result = await parseApiResponseSafe(res);
-                if (res.ok && result && result.success) {
-                    uploadPreviewRows = result.preview_rows || [];
-                    renderUploadPreviewModal(result);
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    showStatusCard('success', 'Added', 'Employee successfully added to the database!');
+                    setTimeout(() => window.location.reload(), 1500);
                 } else {
-                    const message = (result && (result.error || (result.errors && result.errors.join('\n'))))
-                        || 'Validation failed. Please check the file format and required columns, then try again.';
-                    showToast('Validation failed.', 'danger', message);
+                    showStatusCard('fail', 'Error', 'Failed to add employee: ' + result.error);
                 }
-            } catch (err) {
-                showToast('Validation failed.', 'danger', 'Something went wrong while validating the file. Please try again.');
-            }
-            finally { uploadSubmitBtn.disabled = false; uploadSubmitBtn.textContent = 'Validate File'; }
+            })
+            .catch(error => showStatusCard('fail', 'Error', 'An error occurred connecting to the server.'));
         });
     }
 
-
-    // ─── VIEW TOGGLE ──────────────────────────────────────────────────────────
+    // --- View Toggler Logic ---
     const viewRadios = document.querySelectorAll('.view-toggle');
-    const viewMap    = {
-        activity: document.getElementById('activity-view'),
-        records:  document.getElementById('records-view')
+    const views = {
+        'activity': document.getElementById('activity-view'),
+        'records': document.getElementById('records-view')
     };
 
     viewRadios.forEach(radio => {
         radio.addEventListener('change', function (e) {
-            Object.values(viewMap).forEach(v => v && v.classList.remove('active-view'));
-            const target = viewMap[e.target.value];
-            if (target) { target.classList.add('active-view'); history.replaceState(null, null, '#' + e.target.value); }
+            Object.values(views).forEach(v => v?.classList.remove('active-view'));
+            const targetView = views[e.target.value];
+            if (targetView) {
+                targetView.classList.add('active-view');
+                history.replaceState(null, null, '#' + e.target.value);
+            }
         });
     });
 
     function handleHash() {
         const hash = window.location.hash.replace('#', '');
-        if (hash && viewMap[hash]) {
+        if (hash && views[hash]) {
             const radio = document.getElementById('view' + hash.charAt(0).toUpperCase() + hash.slice(1));
-            if (radio) { radio.checked = true; radio.dispatchEvent(new Event('change')); }
+            if (radio) {
+                radio.checked = true;
+                radio.dispatchEvent(new Event('change'));
+            }
         }
     }
     window.addEventListener('hashchange', handleHash);
     handleHash();
 
-
-    // ─── ACTIVITY LOGS FILTER + PAGINATION ───────────────────────────────────
-    const searchInput         = document.getElementById('searchInput');
-    const departmentFilter    = document.getElementById('departmentFilter');
-    const dateFilter          = document.getElementById('dateFilter');
-    const tableCard           = document.getElementById('tableCard');
-    const activityTableResponsive = tableCard ? tableCard.querySelector('.table-responsive') : null;
-    const noResults           = document.getElementById('noResults');
-    const resultCount         = document.getElementById('resultCount');
+    const searchInput  = document.getElementById('searchInput');
+    const departmentFilter = document.getElementById('departmentFilter');
+    const dateFilter   = document.getElementById('dateFilter');
+    const tableCard    = document.getElementById('tableCard');
+    const noResults    = document.getElementById('noResults');
+    const resultCount  = document.getElementById('resultCount');
     const paginationContainer = document.getElementById('paginationContainer');
-    const paginationList      = document.getElementById('paginationList');
-    const getActivityRows     = () => document.querySelectorAll('.employee-row');
+    const paginationList = document.getElementById('paginationList');
+    const getRows      = () => document.querySelectorAll('.employee-row');
 
+    // Pagination settings
+    const ITEMS_PER_PAGE = 6;
     let currentPage = 1;
 
-    function buildPagination(listEl, containerEl, visibleCount, curPage, onPageChange) {
+    function renderPagination(visibleCount) {
         const totalPages = Math.ceil(visibleCount / ITEMS_PER_PAGE);
-        listEl.innerHTML = '';
+        paginationList.innerHTML = '';
 
         if (totalPages <= 1) {
-            containerEl.classList.remove('show');
-            containerEl.style.display = 'none';
+            paginationContainer.classList.remove('show');
+            paginationContainer.style.display = 'none';
             return;
         }
 
-        containerEl.classList.add('show');
-        containerEl.style.display = 'flex';
+        paginationContainer.classList.add('show');
+        paginationContainer.style.display = 'flex';
 
-        function makeBtn(label, cls, onClick, disabled) {
-            const li  = document.createElement('li'); li.className = 'page-item';
-            const btn = document.createElement('button'); btn.type = 'button';
-            btn.className = 'page-link ' + cls; btn.innerHTML = label;
-            if (disabled) btn.disabled = true;
-            else btn.addEventListener('click', onClick);
-            li.appendChild(btn); listEl.appendChild(li);
-            return btn;
-        }
+        const prevLi = document.createElement('li');
+        prevLi.className = 'page-item';
+        const prevBtn = document.createElement('button');
+        prevBtn.type = 'button';
+        prevBtn.className = 'page-link page-prev';
+        prevBtn.innerHTML = '<i class="bi bi-chevron-left me-1"></i>Previous';
+        prevLi.appendChild(prevBtn);
+        paginationList.appendChild(prevLi);
 
-        makeBtn('<i class="bi bi-chevron-left me-1"></i>Previous', 'page-prev',
-            () => onPageChange(curPage - 1), curPage === 1);
+        // Determine which pages to show (simplified logic: show max 5 page numbers)
+        let startPage = 1;
+        let endPage = totalPages;
 
-        let startPage = 1, endPage = totalPages;
         if (totalPages > 5) {
-            startPage = Math.max(1, curPage - 2);
-            endPage   = Math.min(totalPages, startPage + 4);
-            if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+            startPage = Math.max(1, currentPage - 2);
+            endPage = Math.min(totalPages, startPage + 4);
+            if (endPage - startPage < 4) {
+                startPage = Math.max(1, endPage - 4);
+            }
         }
 
         for (let i = startPage; i <= endPage; i++) {
-            const active = i === curPage;
-            makeBtn(String(i), 'page-number' + (active ? ' active' : ''), () => onPageChange(i), false);
+            const li = document.createElement('li');
+            li.className = 'page-item';
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = `page-link page-number ${i === currentPage ? 'active' : ''}`;
+            button.textContent = i;
+            button.dataset.page = i;
+            button.addEventListener('click', () => goToPage(i, visibleCount));
+            li.appendChild(button);
+            paginationList.appendChild(li);
         }
 
         if (endPage < totalPages) {
-            makeBtn('...', 'page-number-separator', null, true);
-            makeBtn(String(totalPages), 'page-number', () => onPageChange(totalPages), false);
+            const separatorLi = document.createElement('li');
+            separatorLi.className = 'page-item';
+            const separatorSpan = document.createElement('span');
+            separatorSpan.className = 'page-link page-number-separator';
+            separatorSpan.textContent = '...';
+            separatorLi.appendChild(separatorSpan);
+            paginationList.appendChild(separatorLi);
+
+            const lastLi = document.createElement('li');
+            lastLi.className = 'page-item';
+            const lastButton = document.createElement('button');
+            lastButton.type = 'button';
+            lastButton.className = 'page-link page-number';
+            lastButton.textContent = totalPages;
+            lastButton.dataset.page = totalPages;
+            lastButton.addEventListener('click', () => goToPage(totalPages, visibleCount));
+            lastLi.appendChild(lastButton);
+            paginationList.appendChild(lastLi);
         }
 
-        makeBtn('Next <i class="bi bi-chevron-right ms-1"></i>', 'page-next',
-            () => onPageChange(curPage + 1), curPage === totalPages);
+        const nextLi = document.createElement('li');
+        nextLi.className = 'page-item';
+        const nextBtn = document.createElement('button');
+        nextBtn.type = 'button';
+        nextBtn.className = 'page-link page-next';
+        nextBtn.innerHTML = 'Next <i class="bi bi-chevron-right ms-1"></i>';
+        nextLi.appendChild(nextBtn);
+        paginationList.appendChild(nextLi);
+
+        updatePrevNextButtons(totalPages);
     }
 
-    function getActivityVisibleCount() {
-        return Array.from(getActivityRows()).filter(r => r.dataset.filterVisible !== 'false').length;
+    function goToPage(page, visibleCount) {
+        const totalPages = Math.ceil(visibleCount / ITEMS_PER_PAGE);
+        if (page < 1 || page > totalPages) return;
+        
+        currentPage = page;
+        updateTableDisplay();
+        renderPagination(visibleCount);
     }
 
-    function updateActivityTableDisplay() {
-        const visibleRows = Array.from(getActivityRows()).filter(r => r.dataset.filterVisible !== 'false');
-        const start = (currentPage - 1) * ITEMS_PER_PAGE;
-        const end   = start + ITEMS_PER_PAGE;
-        getActivityRows().forEach(row => {
-            if (row.dataset.filterVisible === 'false') { row.style.display = 'none'; return; }
+    function updatePrevNextButtons(totalPages) {
+        const prevBtn = paginationList.querySelector('.page-prev');
+        const nextBtn = paginationList.querySelector('.page-next');
+        
+        if (!prevBtn || !nextBtn) return;
+
+        prevBtn.disabled = currentPage === 1;
+        nextBtn.disabled = currentPage === totalPages;
+
+        prevBtn.onclick = () => {
+            if (currentPage > 1) {
+                goToPage(currentPage - 1, getVisibleRowCount());
+            }
+        };
+
+        nextBtn.onclick = () => {
+            if (currentPage < totalPages) {
+                goToPage(currentPage + 1, getVisibleRowCount());
+            }
+        };
+    }
+
+    function getVisibleRowCount() {
+        let count = 0;
+        getRows().forEach(row => {
+            if (row.dataset.filterVisible !== 'false') count++;
+        });
+        return count;
+    }
+
+    function updateTableDisplay() {
+        const visibleRows = Array.from(getRows()).filter(row => row.dataset.filterVisible !== 'false');
+        const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
+        const endIdx = startIdx + ITEMS_PER_PAGE;
+
+        getRows().forEach(row => {
+            if (row.dataset.filterVisible === 'false') {
+                row.style.display = 'none';
+                return;
+            }
             const idx = visibleRows.indexOf(row);
-            row.style.display = (idx >= start && idx < end) ? '' : 'none';
+            row.style.display = (idx >= startIdx && idx < endIdx) ? '' : 'none';
         });
     }
 
-    function goToActivityPage(page) {
-        const total = Math.ceil(getActivityVisibleCount() / ITEMS_PER_PAGE);
-        if (page < 1 || page > total) return;
-        currentPage = page;
-        updateActivityTableDisplay();
-        buildPagination(paginationList, paginationContainer, getActivityVisibleCount(), currentPage, goToActivityPage);
-    }
-
-    function applyActivityFilters() {
+    function applyFilters() {
         const search = searchInput.value.trim().toLowerCase();
-        const dept   = departmentFilter.value;
+        const department = departmentFilter.value;
         const date   = dateFilter.value;
-        let visible  = 0;
 
-        getActivityRows().forEach(row => {
-            const matchSearch = !search || row.dataset.employeeId.includes(search) || row.dataset.employeeName.includes(search);
-            const matchDept   = !dept   || row.dataset.department === dept;
+        let visible = 0;
+
+        getRows().forEach(function (row) {
+            const matchSearch = !search ||
+                row.dataset.employeeId.includes(search) ||
+                row.dataset.employeeName.includes(search);
+            const matchDepartment = !department || row.dataset.department === department;
             const matchDate   = !date   || row.dataset.date === date;
 
-            if (matchSearch && matchDept && matchDate) {
+            if (matchSearch && matchDepartment && matchDate) {
                 row.dataset.filterVisible = 'true';
+                row.style.display = '';
                 visible++;
             } else {
                 row.dataset.filterVisible = 'false';
+                row.style.display = 'none';
             }
         });
 
-        currentPage = 1;
-        const hasFilters = search || dept || date;
+        currentPage = 1; // Reset to first page when filtering
+        const hasFilters = search || department || date;
 
-        if (getActivityRows().length === 0) {
-            // No rows at all — keep table visible (shows built-in empty row), hide pagination & count
-            tableCard.style.display  = '';
-            if (activityTableResponsive) activityTableResponsive.style.display = '';
-            noResults.style.display  = 'none';
-            resultCount.textContent  = '';
-            paginationContainer.classList.remove('show');
-            paginationContainer.style.display = 'none';
+        if (getRows().length > 0) {
+            const tableResponsive = tableCard.querySelector('.table-responsive');
+            if (visible === 0 && hasFilters) {
+                if (tableResponsive) tableResponsive.style.display = 'none';
+                paginationContainer.classList.remove('show');
+                paginationContainer.style.display = 'none';
+                noResults.style.display  = 'block';
+                resultCount.textContent  = '';
+            } else {
+                if (tableResponsive) tableResponsive.style.display = '';
+                noResults.style.display  = 'none';
+                resultCount.textContent  = hasFilters
+                    ? 'Showing up to ' + Math.min(ITEMS_PER_PAGE, visible) + ' of ' + visible + ' record' + (visible !== 1 ? 's' : '')
+                    : '';
+                
+                updateTableDisplay();
+                renderPagination(visible);
+            }
+        }
+    }
+
+    // Live search while typing
+    searchInput.addEventListener('input', applyFilters);
+    departmentFilter.addEventListener('change', applyFilters);
+    dateFilter.addEventListener('change', applyFilters);
+    
+    // Records search
+    const recordsSearch = document.getElementById('recordsSearchInput');
+    const recordsDeptFilter = document.getElementById('recordsDepartmentFilter');
+    const recordsRows = document.querySelectorAll('.employee-record-row');
+    const recordsPaginationContainer = document.getElementById('recordsPaginationContainer');
+    const recordsPaginationList = document.getElementById('recordsPaginationList');
+    const recordsTableCard = document.getElementById('recordsTableCard');
+    const recordsNoResults = document.getElementById('recordsNoResults');
+    const recordsResultCount = document.getElementById('recordsResultCount');
+    
+    let recordsCurrentPage = 1;
+
+    function renderRecordsPagination(visibleCount) {
+        const totalPages = Math.ceil(visibleCount / ITEMS_PER_PAGE);
+        recordsPaginationList.innerHTML = '';
+
+        if (totalPages <= 1) {
+            recordsPaginationContainer.classList.remove('show');
+            recordsPaginationContainer.style.display = 'none';
             return;
         }
 
-        if (visible === 0) {
-            // Rows exist but none match the current filter
-            tableCard.style.display  = '';
-            if (activityTableResponsive) activityTableResponsive.style.display = 'none';
-            noResults.style.display  = 'block';
-            resultCount.textContent  = '';
-            paginationContainer.classList.remove('show');
-            paginationContainer.style.display = 'none';
-        } else {
-            tableCard.style.display  = '';
-            if (activityTableResponsive) activityTableResponsive.style.display = '';
-            noResults.style.display  = 'none';
-            // Only show count text when a filter is actually active
-            resultCount.textContent  = hasFilters
-                ? `Showing up to ${Math.min(ITEMS_PER_PAGE, visible)} of ${visible} record${visible !== 1 ? 's' : ''}`
-                : '';
-            updateActivityTableDisplay();
-            buildPagination(paginationList, paginationContainer, visible, currentPage, goToActivityPage);
+        recordsPaginationContainer.classList.add('show');
+        recordsPaginationContainer.style.display = 'flex';
+
+        const prevLi = document.createElement('li');
+        prevLi.className = 'page-item';
+        const prevBtn = document.createElement('button');
+        prevBtn.type = 'button';
+        prevBtn.className = 'page-link page-prev';
+        prevBtn.innerHTML = '<i class="bi bi-chevron-left me-1"></i>Previous';
+        prevLi.appendChild(prevBtn);
+        recordsPaginationList.appendChild(prevLi);
+
+        let startPage = 1;
+        let endPage = totalPages;
+
+        if (totalPages > 5) {
+            startPage = Math.max(1, recordsCurrentPage - 2);
+            endPage = Math.min(totalPages, startPage + 4);
+            if (endPage - startPage < 4) {
+                startPage = Math.max(1, endPage - 4);
+            }
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            const li = document.createElement('li');
+            li.className = 'page-item';
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = `page-link page-number ${i === recordsCurrentPage ? 'active' : ''}`;
+            button.textContent = i;
+            button.addEventListener('click', () => goToRecordsPage(i, visibleCount));
+            li.appendChild(button);
+            recordsPaginationList.appendChild(li);
+        }
+
+        const nextLi = document.createElement('li');
+        nextLi.className = 'page-item';
+        const nextBtn = document.createElement('button');
+        nextBtn.type = 'button';
+        nextBtn.className = 'page-link page-next';
+        nextBtn.innerHTML = 'Next <i class="bi bi-chevron-right ms-1"></i>';
+        nextLi.appendChild(nextBtn);
+        recordsPaginationList.appendChild(nextLi);
+
+        const prevNode = recordsPaginationList.querySelector('.page-prev');
+        const nextNode = recordsPaginationList.querySelector('.page-next');
+        if (prevNode && nextNode) {
+            prevNode.disabled = recordsCurrentPage === 1;
+            nextNode.disabled = recordsCurrentPage === totalPages;
+            prevNode.onclick = () => { if (recordsCurrentPage > 1) goToRecordsPage(recordsCurrentPage - 1, visibleCount); };
+            nextNode.onclick = () => { if (recordsCurrentPage < totalPages) goToRecordsPage(recordsCurrentPage + 1, visibleCount); };
         }
     }
 
-    if (searchInput)      searchInput.addEventListener('input',  applyActivityFilters);
-    if (departmentFilter) departmentFilter.addEventListener('change', applyActivityFilters);
-    if (dateFilter)       dateFilter.addEventListener('change',  applyActivityFilters);
-
-
-    // ─── RECORDS FILTER + PAGINATION ─────────────────────────────────────────
-    const recordsSearch           = document.getElementById('recordsSearchInput');
-    const recordsDeptFilter       = document.getElementById('recordsDepartmentFilter');
-    const recordsStatusFilter     = document.getElementById('recordsStatusFilter');
-    const recordsSortFilter       = document.getElementById('recordsSortFilter');
-    const recordsTableCard        = document.getElementById('recordsTableCard');
-    const recordsTableResponsive  = recordsTableCard ? recordsTableCard.querySelector('.table-responsive') : null;
-    const recordsTableBody        = document.getElementById('recordsTableBody');
-    const recordsNoResults        = document.getElementById('recordsNoResults');
-    const recordsResultCount      = document.getElementById('recordsResultCount');
-    const recordsPaginationContainer = document.getElementById('recordsPaginationContainer');
-    const recordsPaginationList   = document.getElementById('recordsPaginationList');
-    const getRecordRows           = () => document.querySelectorAll('.employee-record-row');
-    let recordsCurrentPage = 1;
-
-    function sortRecordsRows() {
-        if (!recordsTableBody) return;
-
-        const sortValue = recordsSortFilter ? recordsSortFilter.value : 'recent';
-        const rows = Array.from(getRecordRows());
-        const compareText = (left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' });
-
-        rows.sort((rowA, rowB) => {
-            const nameA = rowA.dataset.name || '';
-            const nameB = rowB.dataset.name || '';
-            const deptA = rowA.dataset.dept || '';
-            const deptB = rowB.dataset.dept || '';
-            const orderA = Number(rowA.dataset.addedOrder || 0);
-            const orderB = Number(rowB.dataset.addedOrder || 0);
-
-            if (sortValue === 'name-asc') {
-                return compareText(nameA, nameB) || (orderB - orderA);
-            }
-            if (sortValue === 'name-desc') {
-                return compareText(nameB, nameA) || (orderB - orderA);
-            }
-            if (sortValue === 'group') {
-                return compareText(deptA, deptB) || compareText(nameA, nameB) || (orderB - orderA);
-            }
-            return (orderB - orderA) || compareText(nameA, nameB);
-        });
-
-        rows.forEach(row => recordsTableBody.appendChild(row));
-    }
-
-    function getRecordsVisibleCount() {
-        return Array.from(getRecordRows()).filter(r => r.dataset.filterVisible !== 'false').length;
+    function goToRecordsPage(page, visibleCount) {
+        const totalPages = Math.ceil(visibleCount / ITEMS_PER_PAGE);
+        if (page < 1 || page > totalPages) return;
+        recordsCurrentPage = page;
+        updateRecordsTableDisplay();
+        renderRecordsPagination(visibleCount);
     }
 
     function updateRecordsTableDisplay() {
-        const visibleRows = Array.from(getRecordRows()).filter(r => r.dataset.filterVisible !== 'false');
-        const start = (recordsCurrentPage - 1) * ITEMS_PER_PAGE;
-        const end   = start + ITEMS_PER_PAGE;
-        getRecordRows().forEach(row => {
-            if (row.dataset.filterVisible === 'false') { row.style.display = 'none'; return; }
+        const visibleRows = Array.from(recordsRows).filter(row => row.dataset.filterVisible !== 'false');
+        const startIdx = (recordsCurrentPage - 1) * ITEMS_PER_PAGE;
+        const endIdx = startIdx + ITEMS_PER_PAGE;
+        recordsRows.forEach(row => {
+            if (row.dataset.filterVisible === 'false') {
+                row.style.display = 'none';
+                return;
+            }
             const idx = visibleRows.indexOf(row);
-            row.style.display = (idx >= start && idx < end) ? '' : 'none';
+            row.style.display = (idx >= startIdx && idx < endIdx) ? '' : 'none';
         });
     }
-
-    function goToRecordsPage(page) {
-        const total = Math.ceil(getRecordsVisibleCount() / ITEMS_PER_PAGE);
-        if (page < 1 || page > total) return;
-        recordsCurrentPage = page;
-        updateRecordsTableDisplay();
-        buildPagination(recordsPaginationList, recordsPaginationContainer, getRecordsVisibleCount(), recordsCurrentPage, goToRecordsPage);
-    }
-
+    
     function applyRecordsFilter() {
-        const search  = recordsSearch  ? recordsSearch.value.trim().toLowerCase()  : '';
-        const deptVal = recordsDeptFilter ? recordsDeptFilter.value.toLowerCase()   : '';
-        const statusVal = recordsStatusFilter ? recordsStatusFilter.value.toLowerCase() : 'active';
-        let visible   = 0;
-
-        getRecordRows().forEach(row => {
+        const val = recordsSearch ? recordsSearch.value.trim().toLowerCase() : '';
+        const deptVal = recordsDeptFilter ? recordsDeptFilter.value.toLowerCase() : '';
+        
+        let visible = 0;
+        
+        recordsRows.forEach(row => {
             const name = row.dataset.name || '';
             const dept = row.dataset.dept || '';
-            const id   = row.dataset.id   || '';
-            const status = (row.dataset.status || '').toLowerCase();
-
-            const matchSearch = !search   || name.includes(search) || id.includes(search) || dept.includes(search);
-            const matchDept   = !deptVal  || dept === deptVal;
-            const matchStatus = statusVal === 'all' || status === 'active';
-
-            if (matchSearch && matchDept && matchStatus) {
+            
+            const matchSearch = name.includes(val) || dept.includes(val);
+            const matchDept = !deptVal || dept === deptVal;
+            
+            if (matchSearch && matchDept) {
                 row.dataset.filterVisible = 'true';
                 visible++;
             } else {
@@ -1434,221 +1391,366 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        sortRecordsRows();
         recordsCurrentPage = 1;
-        const hasFilters = search || deptVal || statusVal !== 'active';
+        const hasFilters = val || deptVal;
 
-        if (getRecordRows().length === 0) {
-            // No rows at all — keep table + filters visible, hide extra UI
-            recordsTableCard.style.display  = '';
-            recordsNoResults.style.display  = 'none';
-            recordsResultCount.textContent  = '';
-            recordsPaginationContainer.classList.remove('show');
-            recordsPaginationContainer.style.display = 'none';
+        if (recordsRows.length > 0) {
+            const recordsTableResponsive = recordsTableCard.querySelector('.table-responsive');
+            if (visible === 0 && hasFilters) {
+                if (recordsTableResponsive) recordsTableResponsive.style.display = 'none';
+                recordsPaginationContainer.classList.remove('show');
+                recordsPaginationContainer.style.display = 'none';
+                recordsNoResults.style.display = 'block';
+                recordsResultCount.textContent = '';
+            } else {
+                if (recordsTableResponsive) recordsTableResponsive.style.display = '';
+                recordsNoResults.style.display = 'none';
+                recordsResultCount.textContent = hasFilters
+                    ? `Showing up to ${Math.min(ITEMS_PER_PAGE, visible)} of ${visible} record${visible !== 1 ? 's' : ''}`
+                    : '';
+                
+                updateRecordsTableDisplay();
+                renderRecordsPagination(visible);
+            }
+        }
+    }
+
+    if (recordsSearch) recordsSearch.addEventListener('input', applyRecordsFilter);
+    if (recordsDeptFilter) recordsDeptFilter.addEventListener('change', applyRecordsFilter);
+
+    const editOverlay = document.getElementById('editOverlay');
+    const editCard = document.getElementById('employeeEditCard');
+    const editEmployeeId = document.getElementById('editEmployeeId');
+    const editEmployeeName = document.getElementById('editEmployeeName');
+    
+    const editTypeTeaching = document.getElementById('editTypeTeaching');
+    const editTypeNonTeaching = document.getElementById('editTypeNonTeaching');
+    const editTeachingFields = document.getElementById('editTeachingFields');
+    const editNonTeachingFields = document.getElementById('editNonTeachingFields');
+    const editCollege = document.getElementById('editCollege');
+    const editTeachingPosition = document.getElementById('editTeachingPosition');
+    const editOffice = document.getElementById('editOffice');
+    const editNonTeachingPosition = document.getElementById('editNonTeachingPosition');
+    
+    const saveEmployeeEdit = document.getElementById('saveEmployeeEdit');
+    const cancelEditEmployee = document.getElementById('cancelEditEmployee');
+    let currentEditRow = null;
+    
+    function toggleEditPersonnelFields() {
+        if (!editTypeTeaching || !editTypeNonTeaching) return;
+        if (editTypeTeaching.checked) {
+            editTeachingFields.classList.remove('d-none');
+            editNonTeachingFields.classList.add('d-none');
+        } else if (editTypeNonTeaching.checked) {
+            editTeachingFields.classList.add('d-none');
+            editNonTeachingFields.classList.remove('d-none');
+        }
+        updateEditQrCode();
+    }
+
+    if (editTypeTeaching) editTypeTeaching.addEventListener('change', toggleEditPersonnelFields);
+    if (editTypeNonTeaching) editTypeNonTeaching.addEventListener('change', toggleEditPersonnelFields);
+
+    function updateEditQrCode() {
+        if (!editEmployeeId || !editTypeTeaching || !editTypeNonTeaching) return;
+        const employeeId = editEmployeeId.value.trim();
+        const employeeName = editEmployeeName.value.trim();
+        
+        let department = '';
+        if (editTypeTeaching.checked) department = editCollege.value || '';
+        else if (editTypeNonTeaching.checked) department = editOffice.value || '';
+        
+        const qrImage = document.getElementById('editQrCodeImage');
+        const qrPlaceholder = document.getElementById('editQrCodePlaceholder');
+        const btnResendEmail = document.getElementById('btnResendEmail');
+
+        if (!qrImage || !qrPlaceholder) return;
+
+        if (!employeeId || !employeeName || !department) {
+            qrImage.style.display = 'none';
+            qrPlaceholder.style.display = 'block';
+            qrPlaceholder.textContent = 'INCOMPLETE DATA';
+            if (btnResendEmail) btnResendEmail.style.display = 'none';
             return;
         }
 
-        if (visible === 0) {
-                // Rows exist but nothing matches — hide only the table, keep controls visible
-            if (recordsTableResponsive) recordsTableResponsive.style.display = 'none';
-            recordsNoResults.style.display  = 'block';
-            recordsResultCount.textContent  = '';
-            recordsPaginationContainer.classList.remove('show');
-            recordsPaginationContainer.style.display = 'none';
-        } else {
-            if (recordsTableResponsive) recordsTableResponsive.style.display = '';
-            recordsNoResults.style.display  = 'none';
-            // Only show count when a filter is active
-            recordsResultCount.textContent  = hasFilters
-                ? `Showing up to ${Math.min(ITEMS_PER_PAGE, visible)} of ${visible} record${visible !== 1 ? 's' : ''}`
-                : '';
-            updateRecordsTableDisplay();
-            buildPagination(recordsPaginationList, recordsPaginationContainer, visible, recordsCurrentPage, goToRecordsPage);
-        }
+        qrPlaceholder.style.display = 'block';
+        qrPlaceholder.textContent = 'GENERATING...';
+        qrImage.style.display = 'none';
+        if (btnResendEmail) btnResendEmail.style.display = 'none';
+
+        const qrData = `${employeeName} [${employeeId}] ${department}`;
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrData)}`;
+
+        qrImage.onload = () => {
+            qrImage.style.display = 'block';
+            qrPlaceholder.style.display = 'none';
+            if (btnResendEmail) btnResendEmail.style.display = 'inline-block';
+        };
+
+        qrImage.onerror = () => {
+            qrImage.style.display = 'none';
+            qrPlaceholder.style.display = 'block';
+            qrPlaceholder.textContent = 'ERROR';
+            if (btnResendEmail) btnResendEmail.style.display = 'none';
+        };
+
+        qrImage.src = qrUrl;
     }
 
-    if (recordsSearch)     recordsSearch.addEventListener('input',  applyRecordsFilter);
-    if (recordsDeptFilter) recordsDeptFilter.addEventListener('change', applyRecordsFilter);
-    if (recordsStatusFilter) recordsStatusFilter.addEventListener('change', applyRecordsFilter);
-    if (recordsSortFilter) recordsSortFilter.addEventListener('change', applyRecordsFilter);
+    function updateLogsHistory(employeeId) {
+        const historyBody = document.getElementById('editLogsHistoryBody');
+        if (!historyBody) return;
 
+        if (!employeeId) {
+            historyBody.innerHTML = '<tr><td colspan="3" class="text-center text-white-50 py-3">No logs available</td></tr>';
+            return;
+        }
 
-    // ─── EDIT OVERLAY ─────────────────────────────────────────────────────────
-    const editOverlay      = document.getElementById('editOverlay');
-    const editEmployeeId   = document.getElementById('editEmployeeId');
-    const editEmployeeName = document.getElementById('editEmployeeName');
-    const editDepartmentId = document.getElementById('editDepartmentId');
-    const editPosition     = document.getElementById('editPosition');
-    const saveEmployeeEdit = document.getElementById('saveEmployeeEdit');
-    const cancelEdit       = document.getElementById('cancelEditEmployee');
+        const allActivityRows = document.querySelectorAll('.employee-row');
+        let logsHtml = '';
+        
+        allActivityRows.forEach(r => {
+            const rowId = r.dataset.employeeId || r.dataset.id || '';
+            if (rowId === employeeId) {
+                const dateVal = r.dataset.date || '--';
+                const timeIn = r.querySelector('td:nth-child(3)')?.textContent.trim() || '--:--';
+                const timeOut = r.querySelector('td:nth-child(4)')?.textContent.trim() || '--:--';
+                
+                logsHtml += `
+                    <tr>
+                        <td class="text-white text-center">${dateVal}</td>
+                        <td class="text-success text-center">${timeIn}</td>
+                        <td class="text-danger text-center">${timeOut}</td>
+                    </tr>
+                `;
+            }
+        });
 
-    function showEditCard(row, mode) {
-        const isActivityRow = row.classList.contains('employee-row');
-        const id = isActivityRow
-            ? (row.getAttribute('data-employee-id-original') || row.getAttribute('data-employee-id') || '')
-            : (row.getAttribute('data-id-original') || row.getAttribute('data-id') || '');
-        const name = isActivityRow
-            ? (row.getAttribute('data-employee-name-original') || row.querySelector('td:nth-child(1) span')?.textContent.trim() || '')
-            : (row.getAttribute('data-name-original') || row.querySelector('td:nth-child(2)')?.textContent.trim() || '');
-        const dept = isActivityRow
-            ? (row.getAttribute('data-department-original') || row.getAttribute('data-department') || '')
-            : (row.getAttribute('data-dept-original') || row.querySelector('td:nth-child(3)')?.textContent.trim() || '');
-        const departmentId = isActivityRow
-            ? (row.getAttribute('data-department-id-original') || '')
-            : (row.getAttribute('data-dept-id-original') || '');
-        const rawPosition = row.getAttribute('data-position-original')
-            || row.getAttribute('data-position')
-            || '';
-        const positionDisplay = row.getAttribute('data-position-display')
-            || (isActivityRow ? 'N/A' : row.querySelector('td:nth-child(4)')?.textContent.trim())
-            || 'N/A';
+        if (!logsHtml) {
+            logsHtml = '<tr><td colspan="3" class="text-center text-white-50 py-3">No logs available</td></tr>';
+        }
 
-        editEmployeeId.value   = id;
-        editEmployeeName.value = name;
-        editDepartmentId.value = departmentId;
-        editPosition.value     = mode === 'view' ? positionDisplay : rawPosition;
+        historyBody.innerHTML = logsHtml;
+    }
 
-        const title = document.querySelector('#employeeEditCard h5');
-        const desc  = document.querySelector('#employeeEditCard p');
-
-        if (mode === 'view') {
-            title.textContent = 'View Employee Details';
-            desc.textContent  = 'Read-only view of the employee details.';
-            saveEmployeeEdit.style.display = 'none';
-            editEmployeeName.readOnly = true;
-            editDepartmentId.disabled = true;
-            editPosition.readOnly = true;
+    function showEditCard(row, mode = 'edit') {
+        currentEditRow = row;
+        const employeeId = row.dataset.employeeId || row.dataset.id || row.querySelector('td:nth-child(1)')?.textContent.trim() || '';
+        
+        let employeeName = '';
+        const nameSpan = row.querySelector('td:nth-child(1) span');
+        if (nameSpan) {
+            employeeName = nameSpan.textContent.trim();
         } else {
-            title.textContent = 'Edit Employee Record';
-            desc.textContent  = 'Update the employee details and save the changes. Position is optional.';
+            employeeName = row.querySelector('td:nth-child(2)')?.textContent.trim() || '';
+        }
+        
+        let departmentId = row.dataset.department || row.dataset.dept || '';
+        if (!departmentId && mode === 'edit') {
+             departmentId = row.querySelector('td:nth-child(3)')?.textContent.trim() || '';
+        } else if (!departmentId) {
+             departmentId = row.querySelector('td:nth-child(2)')?.textContent.trim() || '';
+        }
+        
+        let position = row.dataset.position || '';
+        if (!position && mode === 'edit') {
+             position = row.querySelector('td:nth-child(4)')?.textContent.trim() || '';
+        }
+
+        editEmployeeId.value = employeeId;
+        editEmployeeName.value = employeeName;
+        
+        // Auto-detect Teaching vs Non-Teaching based on the row's Department String
+        const isNonTeaching = ["Registrar's Office", "Accounting Office", "Human Resources", "MIS Office", "Library"].includes(departmentId) || 
+                              departmentId.toLowerCase().includes('office') || 
+                              departmentId.toLowerCase().includes('human resources') || 
+                              departmentId.toLowerCase().includes('library') ||
+                              departmentId.toLowerCase().includes('mis');
+                              
+        if (isNonTeaching && editTypeNonTeaching) {
+            editTypeNonTeaching.checked = true;
+            if (editOffice) editOffice.value = departmentId || '';
+            if (editNonTeachingPosition) editNonTeachingPosition.value = position || '';
+            
+            // Add fallback options if value wasn't in strict select list
+            if (editOffice && !editOffice.value && departmentId) {
+                 const opt = document.createElement('option');
+                 opt.value = departmentId; opt.textContent = departmentId; opt.className = 'text-dark';
+                 editOffice.appendChild(opt); editOffice.value = departmentId;
+            }
+            if (editNonTeachingPosition && !editNonTeachingPosition.value && position) {
+                 const opt = document.createElement('option');
+                 opt.value = position; opt.textContent = position; opt.className = 'text-dark';
+                 editNonTeachingPosition.appendChild(opt); editNonTeachingPosition.value = position;
+            }
+        } else if (editTypeTeaching) {
+            editTypeTeaching.checked = true;
+            if (editCollege) editCollege.value = departmentId || '';
+            if (editTeachingPosition) editTeachingPosition.value = position || '';
+            
+            if (editCollege && !editCollege.value && departmentId) {
+                 const opt = document.createElement('option');
+                 opt.value = departmentId; opt.textContent = departmentId; opt.className = 'text-dark';
+                 editCollege.appendChild(opt); editCollege.value = departmentId;
+            }
+            if (editTeachingPosition && !editTeachingPosition.value && position) {
+                 const opt = document.createElement('option');
+                 opt.value = position; opt.textContent = position; opt.className = 'text-dark';
+                 editTeachingPosition.appendChild(opt); editTeachingPosition.value = position;
+            }
+        }
+        
+        toggleEditPersonnelFields();
+        
+        const title = document.querySelector('#employeeEditCard h5');
+        const desc = document.querySelector('#employeeEditCard p');
+        const inputs = [editEmployeeId, editEmployeeName, editTypeTeaching, editTypeNonTeaching, editCollege, editTeachingPosition, editOffice, editNonTeachingPosition];
+        const qrSection = document.getElementById('editQrCodeSection');
+        const logsSection = document.getElementById('viewLogsHistorySection');
+        
+        if (mode === 'view') {
+            title.textContent = 'VIEW RECORD';
+            desc.textContent = 'Read-only view of the activity log details.';
+            saveEmployeeEdit.style.display = 'none';
+            inputs.forEach(i => {
+                if (!i) return;
+                if(i.tagName === 'SELECT' || i.type === 'radio') i.disabled = true;
+                else i.readOnly = true;
+            });
+
+            if (qrSection) qrSection.classList.add('d-none');
+            if (logsSection) logsSection.classList.remove('d-none');
+            updateLogsHistory(employeeId);
+        } else {
+            title.textContent = 'EDIT RECORD';
+            desc.textContent = 'Update the current employee details and save the changes.';
             saveEmployeeEdit.style.display = 'block';
-            editEmployeeName.readOnly = false;
-            editDepartmentId.disabled = false;
-            editPosition.readOnly = false;
-            editPosition.value = rawPosition;
-        }
+            inputs.forEach(i => {
+                if (!i) return;
+                if(i.tagName === 'SELECT' || i.type === 'radio') i.disabled = false;
+                else i.readOnly = false;
+            });
+            if (editEmployeeId) editEmployeeId.readOnly = true;
 
-        if (!editDepartmentId.value && dept) {
-            const fallbackOption = Array.from(editDepartmentId.options).find(option => option.textContent.trim() === dept.trim());
-            if (fallbackOption) editDepartmentId.value = fallbackOption.value;
+            if (qrSection) qrSection.classList.remove('d-none');
+            if (logsSection) logsSection.classList.add('d-none');
+            updateEditQrCode();
         }
-
+        
         editOverlay.classList.remove('d-none');
+        editCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
     function hideEditCard() {
-        editOverlay.classList.add('d-none');
-        [editEmployeeId, editEmployeeName, editDepartmentId, editPosition].forEach(i => i.value = '');
-        editDepartmentId.disabled = false;
+        currentEditRow = null;
+        if (editOverlay) editOverlay.classList.add('d-none');
+        if (editEmployeeId) editEmployeeId.value = '';
+        if (editEmployeeName) editEmployeeName.value = '';
+        if (editTypeTeaching) editTypeTeaching.checked = false;
+        if (editTypeNonTeaching) editTypeNonTeaching.checked = false;
+        if (editCollege) editCollege.value = '';
+        if (editTeachingPosition) editTeachingPosition.value = '';
+        if (editOffice) editOffice.value = '';
+        if (editNonTeachingPosition) editNonTeachingPosition.value = '';
+        if (editTeachingFields) editTeachingFields.classList.add('d-none');
+        if (editNonTeachingFields) editNonTeachingFields.classList.add('d-none');
     }
 
-    if (cancelEdit) cancelEdit.addEventListener('click', hideEditCard);
-    if (editOverlay) editOverlay.addEventListener('click', e => { if (e.target === editOverlay) hideEditCard(); });
-
-    // Edit record via overlay + API
-    document.addEventListener('click', function (e) {
-        const btn = e.target.closest('.edit-employee-record');
-        if (!btn) return;
-        const row = btn.closest('tr');
-        if (row) showEditCard(row, 'edit');
-    });
-
-    // View activity log details
-    document.addEventListener('click', function (e) {
-        const btn = e.target.closest('.view-employee');
-        if (!btn) return;
-        const row = btn.closest('tr');
-        if (row) showEditCard(row, 'view');
-    });
-
-    if (saveEmployeeEdit) {
-        saveEmployeeEdit.addEventListener('click', function () {
-            const payload = {
-                employee_id:   editEmployeeId.value.trim(),
-                employee_name: editEmployeeName.value.trim(),
-                department_id: editDepartmentId.value.trim(),
-                position:      editPosition.value.trim()
-            };
-            if (!payload.employee_id || !payload.employee_name || !payload.department_id) {
-                showToast('Missing fields.', 'warning', 'Please fill in Employee ID, Employee Name, and Department before updating.');
-                return;
-            }
-            fetch('/update_employee', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    hideEditCard();
-                    showToast('Employee record updated successfully.', 'success', `${payload.employee_name.toUpperCase()} has been updated.`);
-                    setTimeout(() => location.reload(), 1800);
-                } else {
-                    showToast('Update failed.', 'danger', (data && data.error) || 'Could not update employee.');
+    function bindRowActions() {
+        document.querySelectorAll('.view-employee, .edit-employee-record').forEach(function (button) {
+            button.addEventListener('click', function (event) {
+                const row = event.target.closest('tr');
+                const isView = event.target.classList.contains('view-employee');
+                if (row) {
+                    showEditCard(row, isView ? 'view' : 'edit');
                 }
-            })
-            .catch(() => {
-                showToast('Server error.', 'danger', 'Could not reach the server. Please try again.');
+            });
+        });
+
+        document.querySelectorAll('.delete-employee, .delete-employee-record').forEach(function (button) {
+            button.addEventListener('click', function (event) {
+                const row = event.target.closest('tr');
+                if (!row) {
+                    return;
+                }
+                let employeeName = row.querySelector('td:nth-child(1) span')?.textContent.trim();
+                if (!employeeName) {
+                    employeeName = row.querySelector('td:nth-child(2)')?.textContent.trim() || 'this employee';
+                }
+
+                showConfirmModal('Delete Employee', `Are you sure you want to delete ${employeeName} from records?`, () => {
+                    row.remove();
+                    if (currentEditRow === row) {
+                        hideEditCard();
+                    }
+                    applyFilters(); // Refresh pagination
+                    if (typeof applyRecordsFilter === 'function') applyRecordsFilter();
+                        showStatusCard('success', 'Deleted', 'Employee deleted successfully!');
+                });
             });
         });
     }
 
+    if (editEmployeeName) editEmployeeName.addEventListener('input', updateEditQrCode);
+    if (editCollege) editCollege.addEventListener('change', updateEditQrCode);
+    if (editOffice) editOffice.addEventListener('change', updateEditQrCode);
 
-    // ─── DELETE RECORD ────────────────────────────────────────────────────────
-    async function handleDeleteEmployee(row) {
-        const isActivityRow = row.classList.contains('employee-row');
-        const employeeId = isActivityRow
-            ? (row.getAttribute('data-employee-id-original') || row.getAttribute('data-employee-id') || '')
-            : (row.getAttribute('data-id-original') || row.getAttribute('data-id') || '');
-        const name = isActivityRow
-            ? (row.getAttribute('data-employee-name-original') || row.querySelector('td:nth-child(1) span')?.textContent.trim() || 'this employee')
-            : (row.getAttribute('data-name-original') || row.querySelector('td:nth-child(2)')?.textContent.trim() || 'this employee');
-
-        const confirmed = await showConfirm(
-            `Delete "${name}"?`,
-            'This is a soft delete, so the employee will stay in the database as inactive.'
-        );
-        if (!confirmed) return;
-
-        try {
-            const res = await fetch('/delete_employee', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ employee_id: employeeId })
-            });
-            const data = await parseApiResponseSafe(res);
-            if (res.ok && data && data.success) {
-                showToast(
-                    data.already_inactive ? 'Employee is already inactive.' : 'Employee deleted successfully.',
-                    data.already_inactive ? 'info' : 'success',
-                    data.already_inactive
-                        ? `${name} is already inactive.`
-                        : `${name} has been marked inactive.`
-                );
-                setTimeout(() => location.reload(), 1800);
-            } else {
-                showToast('Delete failed.', 'danger', (data && data.error) || 'Could not delete employee.');
-            }
-        } catch (_) {
-            showToast('Delete failed.', 'danger', 'Could not delete employee.');
+    if (saveEmployeeEdit) {
+        saveEmployeeEdit.addEventListener('click', function () {
+        if (!currentEditRow) {
+            return;
         }
+
+        const newId = editEmployeeId.value.trim();
+        const newName = editEmployeeName.value.trim();
+        
+        let newDept = '';
+        let newPosition = '';
+        if (editTypeTeaching.checked) {
+            newDept = editCollege.value;
+            newPosition = editTeachingPosition.value;
+        } else if (editTypeNonTeaching.checked) {
+            newDept = editOffice.value;
+            newPosition = editNonTeachingPosition.value;
+        }
+
+        if (!newId || !newName || !newDept || !newPosition) {
+            showStatusCard('fail', 'Validation Error', 'Please fill in all fields before updating.');
+            return;
+        }
+
+        currentEditRow.dataset.employeeId = newId;
+        currentEditRow.dataset.employeeName = newName.toLowerCase();
+        currentEditRow.dataset.department = newDept;
+        currentEditRow.dataset.position = newPosition;
+        currentEditRow.querySelector('td:nth-child(1) span').textContent = newName;
+        currentEditRow.querySelector('td:nth-child(2)').textContent = newDept;
+        hideEditCard();
+        showStatusCard('success', 'Updated', 'Employee record updated successfully!');
+    });
     }
 
-    document.addEventListener('click', function (e) {
-        const btn = e.target.closest('.delete-employee, .delete-employee-record');
-        if (!btn) return;
-        const row = btn.closest('tr');
-        if (row) handleDeleteEmployee(row);
+    cancelEditEmployee.addEventListener('click', hideEditCard);
+    editOverlay.addEventListener('click', function (event) {
+        if (event.target === editOverlay) {
+            hideEditCard();
+        }
     });
 
+    bindRowActions();
 
-    // ─── INIT ─────────────────────────────────────────────────────────────────
+    // Initialize pagination after the page is fully ready
     setTimeout(() => {
-        applyActivityFilters();
+        const initialVisibleCount = getVisibleRowCount();
+        if (initialVisibleCount > 0) {
+            currentPage = 1;
+            updateTableDisplay();
+            renderPagination(initialVisibleCount);
+        }
+        // Run records pagination filter
         applyRecordsFilter();
     }, 50);
-
 });
 </script>
 {% endblock %}
