@@ -1332,10 +1332,35 @@ class Database:
         finally:
             cursor.close()
 
-    @staticmethod
-    def get_visitor_logs(conn):
+    def get_visitor_logs(self, search_term=None, visit_date=None, include_inactive=False):
+        conn = self.conn if hasattr(self, "conn") else self
         try:
             cursor = conn.cursor(dictionary=True)
+            filters = []
+            params = []
+
+            if not include_inactive:
+                filters.append("u.active = 1")
+
+            if search_term:
+                search_value = f"%{str(search_term).strip().lower()}%"
+                filters.append(
+                    """
+                    (
+                        LOWER(v.visitor_id) LIKE %s
+                        OR LOWER(v.visitor_name) LIKE %s
+                        OR LOWER(v.purpose) LIKE %s
+                        OR LOWER(COALESCE(v.details, '')) LIKE %s
+                    )
+                    """
+                )
+                params.extend([search_value] * 4)
+
+            if visit_date:
+                filters.append("DATE(COALESCE(gl.timestamp, v.visitor_last_updated)) = %s")
+                params.append(visit_date)
+
+            where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
             query = """
                 SELECT 
                     v.visitor_id AS id,
@@ -1349,10 +1374,11 @@ class Database:
                 FROM visitors v
                 JOIN users u ON v.user_id = u.user_id
                 LEFT JOIN general_log gl ON u.user_id = gl.user_id
+                {where_clause}
                 GROUP BY v.visitor_id, v.visitor_name, v.purpose, v.details, v.status, v.visitor_last_updated
                 ORDER BY v.visitor_id DESC
-            """
-            cursor.execute(query)
+            """.format(where_clause=where_clause)
+            cursor.execute(query, tuple(params))
             return cursor.fetchall()
         except Exception as err:
             print(f"Error fetching visitor logs: {err}")

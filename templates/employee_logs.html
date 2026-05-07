@@ -1680,13 +1680,28 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
                 showConfirmModal('Delete Employee', `Are you sure you want to delete ${employeeName} from records?`, () => {
-                    row.remove();
-                    if (currentEditRow === row) {
-                        hideEditCard();
-                    }
-                    applyFilters(); // Refresh pagination
-                    if (typeof applyRecordsFilter === 'function') applyRecordsFilter();
-                        showStatusCard('success', 'Deleted', 'Employee deleted successfully!');
+                    const deleteId = row.dataset.employeeId || row.dataset.id || row.querySelector('td:nth-child(1)')?.textContent.trim();
+
+                    fetch('/delete_employee', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ employee_id: deleteId })
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            row.remove();
+                            if (currentEditRow === row) {
+                                hideEditCard();
+                            }
+                            applyFilters();
+                            if (typeof applyRecordsFilter === 'function') applyRecordsFilter();
+                            showStatusCard('success', 'Deleted', 'Employee deleted successfully!');
+                        } else {
+                            showStatusCard('fail', 'Error', 'Delete failed: ' + (data.error || data.message || 'Unknown error'));
+                        }
+                    })
+                    .catch(err => showStatusCard('fail', 'Error', 'Error connecting to database: ' + err.message));
                 });
             });
         });
@@ -1720,19 +1735,37 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        currentEditRow.dataset.employeeId = newId;
-        currentEditRow.dataset.employeeName = newName.toLowerCase();
-        currentEditRow.dataset.department = newDept;
-        currentEditRow.dataset.position = newPosition;
-        currentEditRow.querySelector('td:nth-child(1) span').textContent = newName;
-        currentEditRow.querySelector('td:nth-child(2)').textContent = newDept;
-        hideEditCard();
-        showStatusCard('success', 'Updated', 'Employee record updated successfully!');
+        fetch('/update_employee', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                employee_id: newId,
+                employee_name: newName,
+                department: newDept,
+                position: newPosition
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                currentEditRow.dataset.employeeId = newId;
+                currentEditRow.dataset.employeeName = newName.toLowerCase();
+                currentEditRow.dataset.department = newDept;
+                currentEditRow.dataset.position = newPosition;
+                currentEditRow.querySelector('td:nth-child(1) span').textContent = newName;
+                currentEditRow.querySelector('td:nth-child(2)').textContent = newDept;
+                hideEditCard();
+                showStatusCard('success', 'Updated', 'Employee record updated successfully!');
+            } else {
+                showStatusCard('fail', 'Error', 'Update failed: ' + (data.error || data.message || 'Unknown error'));
+            }
+        })
+        .catch(err => showStatusCard('fail', 'Error', 'Error connecting to database: ' + err.message));
     });
     }
 
-    cancelEditEmployee.addEventListener('click', hideEditCard);
-    editOverlay.addEventListener('click', function (event) {
+    if (cancelEditEmployee) cancelEditEmployee.addEventListener('click', hideEditCard);
+    if (editOverlay) editOverlay.addEventListener('click', function (event) {
         if (event.target === editOverlay) {
             hideEditCard();
         }

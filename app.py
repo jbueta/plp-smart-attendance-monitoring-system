@@ -2,6 +2,7 @@ from datetime import date, datetime, timedelta
 from functools import wraps
 import csv
 import glob
+import importlib
 import io
 import json
 import os
@@ -11,6 +12,7 @@ import xml.etree.ElementTree as ET
 from urllib.parse import urlencode, urlsplit
 
 import requests
+import database as database_module
 from flask import Flask, Response, flash, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.exceptions import HTTPException
 from werkzeug.routing import BuildError
@@ -126,6 +128,8 @@ EMPLOYEE_UPLOAD_REQUIRED_COLUMNS = ["EMPLOYEE ID", "EMPLOYEE NAME", "DEPARTMENT"
 EMPLOYEE_UPLOAD_OPTIONAL_COLUMNS = ["POSITION"]
 STUDENT_UPLOAD_REQUIRED_COLUMNS = ["STUDENT ID", "STUDENT NAME"]
 STUDENT_UPLOAD_OPTIONAL_COLUMNS = ["COURSE", "COURSE ID", "STATUS"]
+VISITOR_UPLOAD_REQUIRED_COLUMNS = ["NAME", "PURPOSE/OFFICE"]
+VISITOR_UPLOAD_OPTIONAL_COLUMNS = ["DETAILS"]
 
 
 def sanitize_report_archive_filename(filename, default_stem="report"):
@@ -308,6 +312,64 @@ def clean_upload_text(text):
     return normalize_text(text)
 
 
+def resolve_course_id(value):
+    raw_value = str(value or "").strip()
+    if not raw_value:
+        return None
+
+    conn = connect_db()
+    if not conn:
+        return raw_value
+
+    cursor = None
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT course_id
+            FROM courses
+            WHERE course_id = %s OR UPPER(TRIM(course_name)) = UPPER(TRIM(%s))
+            LIMIT 1
+            """,
+            (raw_value, raw_value),
+        )
+        row = cursor.fetchone()
+        return str(row[0]) if row else raw_value
+    finally:
+        if cursor:
+            cursor.close()
+        release_db_connection(conn)
+
+
+def resolve_department_id(value):
+    raw_value = str(value or "").strip()
+    if not raw_value:
+        return None
+
+    conn = connect_db()
+    if not conn:
+        return raw_value
+
+    cursor = None
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT department_id
+            FROM departments
+            WHERE department_id = %s OR UPPER(TRIM(department_name)) = UPPER(TRIM(%s))
+            LIMIT 1
+            """,
+            (raw_value, raw_value),
+        )
+        row = cursor.fetchone()
+        return str(row[0]) if row else raw_value
+    finally:
+        if cursor:
+            cursor.close()
+        release_db_connection(conn)
+
+
 def build_name_match_lookup(names):
     lookup = {}
     for name in names:
@@ -472,16 +534,44 @@ def _read_csv_rows(file):
         file.seek(0)
 
 
+def _read_xls_rows(file):
+    try:
+        xlrd = importlib.import_module("xlrd")
+    except ImportError:
+        return {
+            "success": False,
+            "error": "Legacy .xls support requires xlrd. Install requirements.txt, or save the file as .xlsx or .csv.",
+        }
+
+    try:
+        workbook = xlrd.open_workbook(file_contents=file.read())
+        if workbook.nsheets < 1:
+            return {"success": False, "error": "The workbook does not contain any sheets."}
+
+        sheet = workbook.sheet_by_index(0)
+        rows = []
+        for row_index in range(sheet.nrows):
+            values = []
+            for cell in sheet.row(row_index):
+                value = cell.value
+                if cell.ctype == xlrd.XL_CELL_NUMBER and float(value).is_integer():
+                    value = str(int(value))
+                values.append(value)
+            rows.append({"source_row_number": row_index + 1, "values": values})
+        return {"success": True, "rows": rows}
+    except Exception as err:
+        return {"success": False, "error": f"Could not read the .xls workbook: {err}"}
+    finally:
+        file.seek(0)
+
+
 def _extract_upload_rows(file, file_ext):
     if file_ext == ".xlsx":
         return _read_xlsx_rows(file)
     if file_ext == ".csv":
         return _read_csv_rows(file)
     if file_ext == ".xls":
-        return {
-            "success": False,
-            "error": "Legacy .xls files are not supported by the current server runtime yet. Please save the file as .xlsx or .csv and try again.",
-        }
+        return _read_xls_rows(file)
 
     return {"success": False, "error": "Please upload a valid Excel or CSV file."}
 
@@ -829,6 +919,198 @@ def fetch_visitor_logs(status=None, search_term=None, visit_date=None, include_i
         logs = [log for log in logs if log.get("status") == status]
 
     return logs
+
+
+def get_next_visitor_id():
+    if database_module.global_pool is None:
+        return None
+
+    conn = connect_db()
+    if not conn:
+        return None
+
+    cursor = None
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT AUTO_INCREMENT
+            FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'visitors'
+            LIMIT 1
+            """
+        )
+        row = cursor.fetchone()
+        next_seq = int(row[0]) if row and row[0] else 1
+        return f"VT-{next_seq:05d}"
+    finally:
+        if cursor:
+            cursor.close()
+        release_db_connection(conn)
+
+
+def parse_visitor_upload_file(file):
+    if not file or not file.filename:
+        return {"success": False, "error": "No file uploaded"}
+
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in {".xls", ".xlsx", ".csv"}:
+        return {"success": False, "error": "Please upload a valid Excel or CSV file."}
+
+    extracted = _extract_upload_rows(file, file_ext)
+    if not extracted.get("success"):
+        return extracted
+
+    source_rows = extracted.get("rows", [])
+    header_aliases = {
+        "NAME": "NAME",
+        "VISITOR NAME": "NAME",
+        "FULL NAME": "NAME",
+        "PURPOSE": "PURPOSE/OFFICE",
+        "PURPOSE/OFFICE": "PURPOSE/OFFICE",
+        "PURPOSE / OFFICE": "PURPOSE/OFFICE",
+        "OFFICE": "PURPOSE/OFFICE",
+        "OFFICE/PURPOSE": "PURPOSE/OFFICE",
+        "OFFICE / PURPOSE": "PURPOSE/OFFICE",
+        "DETAIL": "DETAILS",
+        "DETAILS": "DETAILS",
+        "DESCRIPTION": "DETAILS",
+    }
+
+    if not source_rows:
+        return {"success": False, "error": "The uploaded file does not contain any rows."}
+
+    header_index = 0
+    header_source_row_number = source_rows[0].get("source_row_number") or 1
+    normalized_headers = [
+        header_aliases.get(clean_upload_text(value).upper(), clean_upload_text(value).upper())
+        for value in source_rows[0].get("values", [])
+    ]
+    header_values = {header for header in normalized_headers if header}
+
+    if not set(VISITOR_UPLOAD_REQUIRED_COLUMNS).issubset(header_values):
+        return {
+            "success": False,
+            "error": "The first row must contain the required headers: Name and Purpose/Office.",
+        }
+
+    missing_columns = [
+        column.title()
+        for column in VISITOR_UPLOAD_REQUIRED_COLUMNS
+        if column not in normalized_headers
+    ]
+    if missing_columns:
+        return {
+            "success": False,
+            "error": f"Missing required column(s): {', '.join(missing_columns)}",
+        }
+
+    parsed_rows = []
+    for row in source_rows[header_index + 1:]:
+        row_values = list(row.get("values", []))
+        row_map = {}
+        for column_index, header in enumerate(normalized_headers):
+            if not header:
+                continue
+            row_map[header] = clean_upload_text(row_values[column_index]) if column_index < len(row_values) else ""
+
+        relevant_values = [
+            row_map.get(column, "")
+            for column in VISITOR_UPLOAD_REQUIRED_COLUMNS + VISITOR_UPLOAD_OPTIONAL_COLUMNS
+        ]
+        if not any(value.strip() for value in relevant_values):
+            continue
+
+        parsed_rows.append(
+            {
+                "row_number": row.get("source_row_number") or (header_source_row_number + 1),
+                "name": row_map.get("NAME", ""),
+                "purpose": row_map.get("PURPOSE/OFFICE", ""),
+                "details": row_map.get("DETAILS", ""),
+            }
+        )
+
+    return {
+        "success": True,
+        "required_columns": VISITOR_UPLOAD_REQUIRED_COLUMNS,
+        "optional_columns": VISITOR_UPLOAD_OPTIONAL_COLUMNS,
+        "parsed_rows": parsed_rows,
+    }
+
+
+def normalize_visitor_upload_purpose_and_details(raw_purpose, raw_details):
+    purpose_or_office = clean_upload_text(raw_purpose)
+    details = clean_upload_text(raw_details)
+    purpose = normalize_visitor_purpose(purpose_or_office)
+
+    if purpose:
+        return purpose, details
+
+    if purpose_or_office:
+        combined_details = purpose_or_office
+        if details and details.lower() != purpose_or_office.lower():
+            combined_details = f"{purpose_or_office} - {details}"
+        return "Other", combined_details
+
+    return None, details
+
+
+def validate_visitor_upload_rows(parsed_rows):
+    valid_rows = []
+    errors = []
+    seen_names = {}
+
+    next_visitor_id = get_next_visitor_id()
+    next_seq = 1
+    if next_visitor_id:
+        match = re.match(r"^VT-(\d{5})$", next_visitor_id)
+        if match:
+            next_seq = int(match.group(1))
+
+    for row in parsed_rows:
+        row_number = row.get("row_number")
+        visitor_name = clean_upload_text(row.get("name"))
+        raw_purpose = clean_upload_text(row.get("purpose"))
+        purpose, details = normalize_visitor_upload_purpose_and_details(raw_purpose, row.get("details"))
+
+        missing_fields = []
+        if not visitor_name:
+            missing_fields.append("Name")
+        if not raw_purpose:
+            missing_fields.append("Purpose/Office")
+        if missing_fields:
+            errors.append(f"Row {row_number}: Missing {', '.join(missing_fields)}")
+            continue
+
+        if not purpose:
+            errors.append(f"Row {row_number}: Invalid purpose/office: {raw_purpose}")
+            continue
+
+        if purpose == "Other" and not details:
+            errors.append(f"Row {row_number}: Details is required when Purpose is Other.")
+            continue
+
+        name_key = visitor_name.upper()
+        if name_key in seen_names:
+            errors.append(
+                f"Row {row_number}: Duplicate visitor name already appears in row {seen_names[name_key]} of the uploaded file."
+            )
+            continue
+        seen_names[name_key] = row_number
+
+        preview_id = f"VT-{next_seq + len(valid_rows):05d}"
+        valid_rows.append(
+            {
+                "row_number": row_number,
+                "visitor_id": preview_id,
+                "name": visitor_name,
+                "purpose": purpose,
+                "details": details if purpose == "Other" else "",
+            }
+        )
+
+    return {"success": True, "valid_rows": valid_rows, "errors": errors}
 
 
 def fetch_live_student_logs():
@@ -1205,6 +1487,170 @@ def visitor_checkin():
         "success" if result.get("success") else "danger",
     )
     return redirect(url_for(source))
+
+
+@app.route("/add_visitor", methods=["POST"])
+@login_required
+def add_visitor():
+    data = request.get_json(silent=True) or {}
+    name = (data.get("visitor_name") or data.get("name") or "").strip()
+    purpose = normalize_visitor_purpose(data.get("purpose"))
+    details = (data.get("details") or "").strip()
+
+    if not name:
+        return jsonify({"success": False, "error": "Visitor name is required."}), 400
+    if not purpose:
+        return jsonify({"success": False, "error": "Select a valid visitor purpose."}), 400
+    if purpose == "Other" and not details:
+        return jsonify({"success": False, "error": "Visit description is required when purpose is Other."}), 400
+
+    conn = connect_db()
+    if not conn:
+        return jsonify({"success": False, "error": "Database offline"}), 500
+
+    result = Database(conn, (name, purpose, details, "Gate 1")).add_visitor_log()
+    status_code = 200 if result.get("success") else 400
+    return jsonify(result), status_code
+
+
+@app.route("/admin/visitors/send-qr-email", methods=["POST"])
+@login_required
+def send_visitor_qr_email():
+    data = request.get_json(silent=True) or {}
+    recipient = (data.get("email") or "").strip()
+    visitor_id = (data.get("visitor_id") or "").strip()
+    visitor_name = (data.get("visitor_name") or data.get("name") or "").strip()
+    purpose = normalize_visitor_purpose(data.get("purpose"))
+    details = (data.get("details") or "").strip()
+    qr_data = (data.get("qr_data") or "").strip()
+    qr_url = (data.get("qr_url") or "").strip()
+
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", recipient):
+        return jsonify({"success": False, "message": "Enter a valid visitor email address."}), 400
+    if not visitor_id or not visitor_name or not purpose:
+        return jsonify({"success": False, "message": "Generate the visitor QR code before sending email."}), 400
+    if purpose == "Other" and not details:
+        return jsonify({"success": False, "message": "Visit description is required when purpose is Other."}), 400
+
+    qr_data = qr_data or f"{visitor_name} [{visitor_id}] {details if purpose == 'Other' and details else purpose}"
+    qr_url = qr_url or f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={urlencode({'': qr_data})[1:]}"
+    attachment_data = None
+
+    try:
+        response = requests.get(qr_url, timeout=10)
+        response.raise_for_status()
+        attachment_data = response.content
+    except requests.RequestException as err:
+        app.logger.warning("Could not fetch visitor QR attachment: %s", err)
+
+    email_body = (
+        "Attached is your PLP visitor QR code.\n\n"
+        f"Visitor ID: {visitor_id}\n"
+        f"Visitor Name: {visitor_name}\n"
+        f"Purpose: {purpose}\n"
+    )
+    if purpose == "Other":
+        email_body += f"Details: {details}\n"
+    if not attachment_data:
+        email_body += f"\nQR Code Link: {qr_url}\n"
+
+    try:
+        send_email(
+            subject=f"PLP Visitor QR Code - {visitor_id}",
+            body=email_body,
+            recipient=recipient,
+            attachment_data=attachment_data,
+            filename=f"{visitor_id}_qr.png",
+        )
+    except ValueError as err:
+        return jsonify({"success": False, "message": str(err)}), 400
+    except Exception as err:
+        app.logger.exception("Failed to send visitor QR email to %s", recipient)
+        return jsonify({"success": False, "message": f"Failed to send visitor QR email: {err}"}), 500
+
+    return jsonify({"success": True, "message": f"Visitor QR email sent to {recipient}."})
+
+
+def commit_visitors_upload_payload(rows):
+    if not isinstance(rows, list) or not rows:
+        return jsonify({"success": False, "error": "No visitor rows provided for upload."}), 400
+
+    inserted = 0
+    errors = []
+    inserted_ids = []
+
+    for row in rows:
+        row_number = row.get("row_number") or "Unknown"
+        visitor_name = clean_upload_text(row.get("name"))
+        purpose, details = normalize_visitor_upload_purpose_and_details(row.get("purpose"), row.get("details"))
+
+        if not visitor_name or not purpose:
+            errors.append(f"Row {row_number}: Missing Name or Purpose/Office.")
+            continue
+        if purpose != "Other":
+            details = ""
+        if purpose == "Other" and not details:
+            errors.append(f"Row {row_number}: Details is required when Purpose is Other.")
+            continue
+
+        conn = connect_db()
+        if not conn:
+            errors.append(f"Row {row_number}: Database connection failed.")
+            continue
+
+        try:
+            result = Database(conn, (visitor_name, purpose, details, "Gate 1")).add_visitor_log()
+            if result.get("success"):
+                inserted += 1
+                if result.get("visitor_id"):
+                    inserted_ids.append(result.get("visitor_id"))
+            else:
+                errors.append(f"Row {row_number}: {result.get('message', 'Failed to add visitor.')}")
+        except Exception as err:
+            errors.append(f"Row {row_number}: {err}")
+        finally:
+            release_db_connection(conn)
+
+    return jsonify(
+        {
+            "success": inserted > 0,
+            "inserted": inserted,
+            "inserted_ids": inserted_ids,
+            "errors": errors,
+        }
+    ), (200 if inserted > 0 else 400)
+
+
+@app.route("/upload_visitors/preview", methods=["POST"])
+@login_required
+def preview_visitors_upload():
+    try:
+        file = request.files.get("file")
+        parsed = parse_visitor_upload_file(file)
+        if not parsed.get("success"):
+            return jsonify(parsed), 400
+    except Exception as err:
+        app.logger.exception("Unexpected visitor upload parsing failure.")
+        return jsonify({"success": False, "error": f"Upload parsing failed: {err}"}), 500
+
+    validation = validate_visitor_upload_rows(parsed.get("parsed_rows", []))
+    return jsonify(
+        {
+            "success": True,
+            "required_columns": parsed.get("required_columns", []),
+            "optional_columns": parsed.get("optional_columns", []),
+            "preview_rows": validation.get("valid_rows", []),
+            "errors": validation.get("errors", []),
+        }
+    )
+
+
+@app.route("/upload_visitors/commit", methods=["POST"])
+@login_required
+def commit_visitors_upload():
+    data = request.get_json(silent=True) or {}
+    rows = data.get("rows", [])
+    return commit_visitors_upload_payload(rows)
 
 
 @app.route("/api/visitor/checkout/<visitor_id>", methods=["POST"])
@@ -1630,6 +2076,15 @@ def retrieve_visitor_purposes():
     return jsonify(list(VISITOR_PURPOSES))
 
 
+@app.route("/api/visitors/next-id")
+@login_required
+def retrieve_next_visitor_id():
+    next_visitor_id = get_next_visitor_id()
+    if not next_visitor_id:
+        return jsonify({"success": False, "message": "Visitor ID generator unavailable."}), 503
+    return jsonify({"success": True, "visitor_id": next_visitor_id})
+
+
 @app.route("/api/attendance/update", methods=["POST"])
 @login_required
 def update_attendance_proxy():
@@ -2040,13 +2495,14 @@ def validate_student_upload_rows(conn, parsed_rows):
         cursor.close()
 
 
+@app.route("/add_student", methods=["POST"])
 @app.route("/add_student_manual", methods=["POST"])
 @login_required
 def add_student_manual():
     data = request.get_json(silent=True) or {}
-    student_id = (data.get("student_id") or "").strip()
-    student_name = (data.get("student_name") or "").strip()
-    course_id = (data.get("course_id") or "").strip()
+    student_id = (data.get("student_id") or data.get("id") or "").strip()
+    student_name = (data.get("student_name") or data.get("name") or "").strip()
+    course_id = resolve_course_id(data.get("course_id") or data.get("course"))
     status = (data.get("status") or "Outside").strip()
 
     validation_errors = validate_student_fields(student_id=student_id, student_name=student_name)
@@ -2212,9 +2668,9 @@ def commit_students_upload():
 @login_required
 def update_student():
     data = request.get_json(silent=True) or {}
-    student_id = (data.get("student_id") or "").strip()
-    student_name = (data.get("student_name") or "").strip()
-    course_id = (data.get("course_id") or "").strip()
+    student_id = (data.get("student_id") or data.get("id") or "").strip()
+    student_name = (data.get("student_name") or data.get("name") or "").strip()
+    course_id = resolve_course_id(data.get("course_id") or data.get("course"))
 
     validation_errors = validate_student_fields(student_id=student_id, student_name=student_name)
     if not course_id:
@@ -2347,9 +2803,9 @@ def add_employee():
     data = request.get_json(silent=True) or {}
 
     result = employee_model.add_employee(
-        employee_id=(data.get("employee_id") or "").strip(),
-        employee_name=(data.get("employee_name") or "").strip(),
-        department_id=(data.get("department_id") or "").strip(),
+        employee_id=(data.get("employee_id") or data.get("id") or "").strip(),
+        employee_name=(data.get("employee_name") or data.get("name") or "").strip(),
+        department_id=resolve_department_id(data.get("department_id") or data.get("department")),
         position=(data.get("position") or "").strip(),
     )
 
@@ -2505,13 +2961,13 @@ def commit_employees_upload():
 @login_required
 def update_employee():
     data = request.get_json(silent=True) or {}
-    employee_id = normalize_employee_id(data.get("employee_id"))
-    employee_name = (data.get("employee_name") or "").strip()
-    department_id = (data.get("department_id") or "").strip()
+    employee_id = normalize_employee_id(data.get("employee_id") or data.get("id"))
+    employee_name = (data.get("employee_name") or data.get("name") or "").strip()
+    department_id = resolve_department_id(data.get("department_id") or data.get("department"))
     position = (data.get("position") or "").strip()
 
     validation_errors = validate_employee_fields(
-        employee_id=data.get("employee_id"),
+        employee_id=data.get("employee_id") or data.get("id"),
         employee_name=employee_name,
         position=position,
         require_employee_id=True,
@@ -2612,7 +3068,7 @@ def update_employee():
 @login_required
 def delete_employee():
     data = request.get_json(silent=True) or {}
-    employee_id = normalize_employee_id(data.get("employee_id"))
+    employee_id = normalize_employee_id(data.get("employee_id") or data.get("id"))
 
     if not employee_id:
         return jsonify({"success": False, "error": "Missing employee_id."}), 400

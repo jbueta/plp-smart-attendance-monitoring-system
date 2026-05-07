@@ -98,6 +98,30 @@
                         <i class="bi bi-file-earmark-spreadsheet display-4 text-white-50 mb-3"></i>
                         <span class="text-white-50">Click to export xls file</span>
                     </div>
+
+                    <div id="visitorUploadPreviewPanel" class="d-none mt-4 card-glass border-secondary p-3" style="background: rgba(0,0,0,0.16); border-radius: 14px;">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <h6 class="text-white fw-bold mb-1">PREVIEW RECORDS</h6>
+                                <p id="visitorUploadPreviewSummary" class="text-white-50 small mb-0"></p>
+                            </div>
+                            <button type="button" id="commitVisitorUploadBtn" class="btn btn-sm btn-warning rounded-3 px-3 fw-bold text-dark" disabled>ADD VISITORS</button>
+                        </div>
+                        <div class="table-responsive border border-secondary rounded-3" style="max-height: 260px; overflow-y: auto;">
+                            <table class="table table-dark-glass table-sm align-middle mb-0">
+                                <thead class="text-white-50" style="position: sticky; top: 0; background: #0b2f23; z-index: 1;">
+                                    <tr>
+                                        <th>Visitor ID</th>
+                                        <th>Name</th>
+                                        <th>Purpose</th>
+                                        <th>Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="visitorUploadPreviewBody"></tbody>
+                            </table>
+                        </div>
+                        <div id="visitorUploadErrors" class="small mt-3"></div>
+                    </div>
                     
                     <div class="mt-4">
                         <button type="button" class="btn btn-link text-white-50 text-decoration-none p-0 btn-back-selection">
@@ -129,6 +153,15 @@
                                 <button type="button" class="btn btn-outline-light rounded-pill px-3 py-1 btn-sm fw-bold shadow-sm" id="manualResendEmailBtn" style="display: none; font-size: 0.75rem;">
                                     <i class="bi bi-envelope-check me-2"></i>SEND TO EMAIL
                                 </button>
+                                <div id="manualEmailPanel" class="mt-3 w-100 d-none text-start" style="background: rgba(0,0,0,0.18); border: 1px solid rgba(255,255,255,0.16); border-radius: 12px; padding: 12px;">
+                                    <label for="manualVisitorEmail" class="form-label text-white-50 small fw-bold mb-2">VISITOR EMAIL</label>
+                                    <input type="email" id="manualVisitorEmail" class="form-control form-control-sm bg-transparent text-white border-secondary rounded-3 shadow-none mb-2" placeholder="visitor@email.com">
+                                    <div class="d-flex justify-content-end gap-2">
+                                        <button type="button" id="cancelManualEmailBtn" class="btn btn-outline-light btn-sm rounded-pill px-3" style="font-size: 0.72rem;">Cancel</button>
+                                        <button type="button" id="sendManualEmailBtn" class="btn btn-warning btn-sm rounded-pill px-3 fw-bold text-dark" style="font-size: 0.72rem;">Send</button>
+                                    </div>
+                                    <div id="manualEmailStatus" class="small mt-2 text-white-50"></div>
+                                </div>
                             </div>
                         </div>
                         
@@ -184,13 +217,8 @@
                                             <label class="form-label text-white-50 small fw-bold mb-0 text-md-end d-block pe-2" for="manualAddVisitorDetails">DETAILS:</label>
                                         </div>
                                         <div class="col-sm-8">
-                                            <input type="text" id="manualAddVisitorDetails" class="form-control form-control-sm bg-transparent text-white border-secondary rounded-3 shadow-none" placeholder="e.g. Document Request (Optional)">
+                                            <input type="text" id="manualAddVisitorDetails" class="form-control form-control-sm bg-transparent text-white border-secondary rounded-3 shadow-none" placeholder="Select Other to enter details" disabled>
                                         </div>
-                                    </div>
-                                    <div class="d-flex justify-content-end mt-2">
-                                        <button type="button" class="btn btn-outline-warning btn-sm rounded-pill px-3" id="generateVisitorIdBtn">
-                                            <i class="bi bi-magic me-1"></i> Generate ID
-                                        </button>
                                     </div>
                                 </div>
                             </form>
@@ -688,6 +716,54 @@
             const backBtnsSelection = document.querySelectorAll('.btn-back-selection');
             const uploadZone = document.querySelector('.upload-zone');
             const fileInput = document.getElementById('xlsFileInput');
+            const visitorUploadPreviewPanel = document.getElementById('visitorUploadPreviewPanel');
+            const visitorUploadPreviewBody = document.getElementById('visitorUploadPreviewBody');
+            const visitorUploadPreviewSummary = document.getElementById('visitorUploadPreviewSummary');
+            const visitorUploadErrors = document.getElementById('visitorUploadErrors');
+            const commitVisitorUploadBtn = document.getElementById('commitVisitorUploadBtn');
+            let visitorUploadRows = [];
+
+            function escapeVisitorUploadHtml(value) {
+                return String(value || '').replace(/[&<>"']/g, char => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                }[char]));
+            }
+
+            function resetVisitorUploadPreview() {
+                visitorUploadRows = [];
+                if (visitorUploadPreviewPanel) visitorUploadPreviewPanel.classList.add('d-none');
+                if (visitorUploadPreviewBody) visitorUploadPreviewBody.innerHTML = '';
+                if (visitorUploadPreviewSummary) visitorUploadPreviewSummary.textContent = '';
+                if (visitorUploadErrors) visitorUploadErrors.innerHTML = '';
+                if (commitVisitorUploadBtn) commitVisitorUploadBtn.disabled = true;
+            }
+
+            function renderVisitorUploadPreview(rows, errors = []) {
+                visitorUploadRows = rows || [];
+                if (!visitorUploadPreviewPanel || !visitorUploadPreviewBody || !visitorUploadPreviewSummary || !visitorUploadErrors || !commitVisitorUploadBtn) return;
+
+                visitorUploadPreviewPanel.classList.remove('d-none');
+                visitorUploadPreviewBody.innerHTML = visitorUploadRows.length
+                    ? visitorUploadRows.map(row => `
+                        <tr>
+                            <td class="font-monospace text-white-50">${escapeVisitorUploadHtml(row.visitor_id)}</td>
+                            <td class="text-white fw-semibold">${escapeVisitorUploadHtml(row.name)}</td>
+                            <td class="text-white-50">${escapeVisitorUploadHtml(row.purpose)}</td>
+                            <td class="text-white-50 small">${escapeVisitorUploadHtml(row.details || 'N/A')}</td>
+                        </tr>
+                    `).join('')
+                    : '<tr><td colspan="4" class="text-center text-white-50 py-3">No valid visitor rows found.</td></tr>';
+
+                visitorUploadPreviewSummary.textContent = `${visitorUploadRows.length} valid visitor record${visitorUploadRows.length === 1 ? '' : 's'} ready to add.`;
+                visitorUploadErrors.innerHTML = errors.length
+                    ? `<div class="text-warning fw-semibold mb-1">Rows needing attention:</div><ul class="mb-0 text-warning ps-3">${errors.map(error => `<li>${escapeVisitorUploadHtml(error)}</li>`).join('')}</ul>`
+                    : '<span class="text-success">All rows passed validation.</span>';
+                commitVisitorUploadBtn.disabled = visitorUploadRows.length === 0;
+            }
             
             if(xlsCard && selectionView && xlsView) {
                 xlsCard.addEventListener('click', () => {
@@ -702,6 +778,9 @@
                     selectionView.classList.add('d-none');
                     manualView.classList.remove('d-none');
                     manualView.style.animation = 'fadeInModal 0.4s ease forwards';
+                    ensureManualVisitorId();
+                    syncManualDetailsState();
+                    validateManualForm();
                 });
             }
             
@@ -709,6 +788,7 @@
                 btn.addEventListener('click', () => {
                     if(xlsView) xlsView.classList.add('d-none');
                     if(manualView) manualView.classList.add('d-none');
+                    resetVisitorUploadPreview();
                     if(selectionView) {
                         selectionView.classList.remove('d-none');
                         selectionView.style.animation = 'fadeInModal 0.4s ease forwards';
@@ -720,11 +800,61 @@
                 uploadZone.addEventListener('click', () => fileInput.click());
                 
                 fileInput.addEventListener('change', function() {
+                    resetVisitorUploadPreview();
                     if(this.files && this.files.length > 0) {
                         uploadZone.querySelector('span').textContent = this.files[0].name;
                         uploadZone.querySelector('i').classList.replace('bi-file-earmark-spreadsheet', 'bi-file-earmark-check');
                         uploadZone.querySelector('i').classList.replace('text-white-50', 'text-success');
+
+                        const formData = new FormData();
+                        formData.append('file', this.files[0]);
+                        if (visitorUploadPreviewSummary) visitorUploadPreviewSummary.textContent = 'Reading file...';
+
+                        fetch('/upload_visitors/preview', { method: 'POST', body: formData })
+                            .then(response => response.json().then(data => ({ ok: response.ok, data })))
+                            .then(({ ok, data }) => {
+                                if (!ok || !data.success) {
+                                    renderVisitorUploadPreview([], [data.error || 'Failed to read visitor upload file.']);
+                                    return;
+                                }
+                                renderVisitorUploadPreview(data.preview_rows || [], data.errors || []);
+                            })
+                            .catch(() => {
+                                renderVisitorUploadPreview([], ['An error occurred while reading the upload file.']);
+                            });
                     }
+                });
+            }
+
+            if (commitVisitorUploadBtn) {
+                commitVisitorUploadBtn.addEventListener('click', function() {
+                    if (!visitorUploadRows.length) return;
+
+                    commitVisitorUploadBtn.disabled = true;
+                    commitVisitorUploadBtn.textContent = 'ADDING...';
+
+                    fetch('/upload_visitors/commit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ rows: visitorUploadRows })
+                    })
+                    .then(response => response.json().then(data => ({ ok: response.ok, data })))
+                    .then(({ ok, data }) => {
+                        if (ok && data.success) {
+                            showStatusCard('success', 'Added', `${data.inserted || 0} visitor record${data.inserted === 1 ? '' : 's'} added successfully.`);
+                            setTimeout(() => window.location.reload(), 1500);
+                        } else {
+                            const errors = data.errors && data.errors.length ? data.errors : [data.error || 'Failed to add visitor records.'];
+                            renderVisitorUploadPreview(visitorUploadRows, errors);
+                        }
+                    })
+                    .catch(() => {
+                        renderVisitorUploadPreview(visitorUploadRows, ['An error occurred while adding visitor records.']);
+                    })
+                    .finally(() => {
+                        commitVisitorUploadBtn.textContent = 'ADD VISITORS';
+                        commitVisitorUploadBtn.disabled = visitorUploadRows.length === 0;
+                    });
                 });
             }
             
@@ -737,6 +867,7 @@
                     }
                     if(fileInput) {
                         fileInput.value = '';
+                        resetVisitorUploadPreview();
                         if(uploadZone) {
                             uploadZone.querySelector('span').textContent = 'Click to export xls file';
                             uploadZone.querySelector('i').classList.replace('bi-file-earmark-check', 'bi-file-earmark-spreadsheet');
@@ -749,6 +880,8 @@
                     const manualForm = document.getElementById('manualAddVisitorForm');
                     if (manualForm) {
                         manualForm.reset();
+                        ensureManualVisitorId(true);
+                        syncManualDetailsState();
                         document.getElementById('submitManualAddBtn').disabled = true;
                         if (document.getElementById('manualGenerateQrBtn')) document.getElementById('manualGenerateQrBtn').disabled = true;
                         if (document.getElementById('manualQrCodeImage')) document.getElementById('manualQrCodeImage').style.display = 'none';
@@ -757,6 +890,9 @@
                             document.getElementById('manualQrCodePlaceholder').textContent = 'QR CODE';
                         }
                         if (document.getElementById('manualResendEmailBtn')) document.getElementById('manualResendEmailBtn').style.display = 'none';
+                        if (document.getElementById('manualEmailPanel')) document.getElementById('manualEmailPanel').classList.add('d-none');
+                        if (document.getElementById('manualVisitorEmail')) document.getElementById('manualVisitorEmail').value = '';
+                        if (document.getElementById('manualEmailStatus')) document.getElementById('manualEmailStatus').textContent = '';
                         if (document.getElementById('manualQrCodeContainer')) document.getElementById('manualQrCodeContainer').style.borderStyle = 'dashed !important';
                     }
                 });
@@ -766,43 +902,76 @@
             const manualIdInput = document.getElementById('manualAddVisitorId');
             const manualNameInput = document.getElementById('manualAddVisitorName');
             const manualPurposeInput = document.getElementById('manualAddVisitorPurpose');
+            const manualDetailsInput = document.getElementById('manualAddVisitorDetails');
             const submitManualBtn = document.getElementById('submitManualAddBtn');
             const manualGenerateQrBtn = document.getElementById('manualGenerateQrBtn');
 
-            function validateManualForm() {
-                if (!manualIdInput || !manualNameInput || !manualPurposeInput || !submitManualBtn) return;
-                const idValid = /^[A-Z]-[0-9]{4}$/.test(manualIdInput.value.trim());
-                const nameValid = manualNameInput.value.trim().length > 0;
-                const purposeValid = manualPurposeInput.value !== "";
-                submitManualBtn.disabled = !(idValid && nameValid && purposeValid);
-                if (manualGenerateQrBtn) {
-                    manualGenerateQrBtn.disabled = !(idValid && nameValid && purposeValid);
+            function fallbackManualVisitorId() {
+                const randomNum = Math.floor(Math.random() * 90000) + 10000;
+                return `VT-${randomNum}`;
+            }
+
+            async function ensureManualVisitorId(force = false) {
+                if (!manualIdInput) return;
+                if (!force && manualIdInput.value.trim()) return;
+
+                try {
+                    const response = await fetch('/api/visitors/next-id', { cache: 'no-store' });
+                    const data = await response.json();
+                    manualIdInput.value = data.success && data.visitor_id ? data.visitor_id : fallbackManualVisitorId();
+                } catch (error) {
+                    manualIdInput.value = fallbackManualVisitorId();
+                }
+                validateManualForm();
+            }
+
+            function syncManualDetailsState() {
+                if (!manualPurposeInput || !manualDetailsInput) return;
+
+                const requiresDetails = manualPurposeInput.value === 'Other';
+                manualDetailsInput.disabled = !requiresDetails;
+                manualDetailsInput.required = requiresDetails;
+                manualDetailsInput.placeholder = requiresDetails ? 'Describe the visit purpose' : 'Only required for Other';
+
+                if (!requiresDetails) {
+                    manualDetailsInput.value = '';
                 }
             }
 
-            // --- Auto-Generate ID Logic ---
-            const generateVisitorIdBtn = document.getElementById('generateVisitorIdBtn');
-            if (generateVisitorIdBtn) {
-                generateVisitorIdBtn.addEventListener('click', function() {
-                    const randomNum = Math.floor(Math.random() * 9000) + 1000;
-                    if (manualIdInput) {
-                        manualIdInput.value = `V-${randomNum}`;
-                        validateManualForm();
-                    }
-                });
+            function validateManualForm() {
+                if (!manualIdInput || !manualNameInput || !manualPurposeInput || !submitManualBtn) return;
+                const idValid = /^VT-[0-9]{5}$/.test(manualIdInput.value.trim());
+                const nameValid = manualNameInput.value.trim().length > 0;
+                const purposeValid = manualPurposeInput.value !== "";
+                const detailsRequired = manualPurposeInput.value === 'Other';
+                const detailsValid = !detailsRequired || (manualDetailsInput && manualDetailsInput.value.trim().length > 0);
+                submitManualBtn.disabled = !(idValid && nameValid && purposeValid && detailsValid);
+                if (manualGenerateQrBtn) {
+                    manualGenerateQrBtn.disabled = !(idValid && nameValid && purposeValid && detailsValid);
+                }
             }
+
+            ensureManualVisitorId();
+            syncManualDetailsState();
 
             // --- Generate Manual QR Code Logic ---
             const manualQrCodeImage = document.getElementById('manualQrCodeImage');
             const manualQrCodePlaceholder = document.getElementById('manualQrCodePlaceholder');
             const manualResendEmailBtn = document.getElementById('manualResendEmailBtn');
             const manualQrCodeContainer = document.getElementById('manualQrCodeContainer');
+            const manualEmailPanel = document.getElementById('manualEmailPanel');
+            const manualVisitorEmail = document.getElementById('manualVisitorEmail');
+            const sendManualEmailBtn = document.getElementById('sendManualEmailBtn');
+            const cancelManualEmailBtn = document.getElementById('cancelManualEmailBtn');
+            const manualEmailStatus = document.getElementById('manualEmailStatus');
+            let manualQrPayload = null;
 
             if (manualGenerateQrBtn) {
                 manualGenerateQrBtn.addEventListener('click', function() {
                     const visitorId = manualIdInput.value.trim();
                     const visitorName = manualNameInput.value.trim();
                     const purpose = manualPurposeInput.value;
+                    const details = manualDetailsInput ? manualDetailsInput.value.trim() : '';
                     
                     if (!visitorId || !visitorName || !purpose) return;
 
@@ -810,9 +979,20 @@
                     manualQrCodePlaceholder.textContent = 'GENERATING...';
                     if (manualQrCodeImage) manualQrCodeImage.style.display = 'none';
                     if (manualResendEmailBtn) manualResendEmailBtn.style.display = 'none';
+                    if (manualEmailPanel) manualEmailPanel.classList.add('d-none');
+                    if (manualEmailStatus) manualEmailStatus.textContent = '';
 
-                    const qrData = `${visitorName} [${visitorId}] ${purpose}`;
+                    const qrPurposeText = purpose === 'Other' && details ? details : purpose;
+                    const qrData = `${visitorName} [${visitorId}] ${qrPurposeText}`;
                     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(qrData)}`;
+                    manualQrPayload = {
+                        visitor_id: visitorId,
+                        visitor_name: visitorName,
+                        purpose: purpose,
+                        details: details,
+                        qr_data: qrData,
+                        qr_url: qrUrl
+                    };
 
                     if (manualQrCodeImage) {
                         manualQrCodeImage.onload = () => {
@@ -829,9 +1009,87 @@
                 });
             }
 
+            if (manualResendEmailBtn) {
+                manualResendEmailBtn.addEventListener('click', function() {
+                    if (!manualQrPayload) {
+                        showStatusCard('fail', 'QR Required', 'Generate the visitor QR code before sending email.');
+                        return;
+                    }
+                    if (manualEmailPanel) manualEmailPanel.classList.remove('d-none');
+                    if (manualVisitorEmail) manualVisitorEmail.focus();
+                    if (manualEmailStatus) manualEmailStatus.textContent = '';
+                });
+            }
+
+            if (cancelManualEmailBtn) {
+                cancelManualEmailBtn.addEventListener('click', function() {
+                    if (manualEmailPanel) manualEmailPanel.classList.add('d-none');
+                    if (manualVisitorEmail) manualVisitorEmail.value = '';
+                    if (manualEmailStatus) manualEmailStatus.textContent = '';
+                });
+            }
+
+            if (sendManualEmailBtn) {
+                sendManualEmailBtn.addEventListener('click', function() {
+                    const email = manualVisitorEmail ? manualVisitorEmail.value.trim() : '';
+                    if (!email || !manualVisitorEmail.checkValidity()) {
+                        if (manualEmailStatus) {
+                            manualEmailStatus.textContent = 'Enter a valid visitor email.';
+                            manualEmailStatus.className = 'small mt-2 text-warning';
+                        }
+                        return;
+                    }
+                    if (!manualQrPayload) {
+                        showStatusCard('fail', 'QR Required', 'Generate the visitor QR code before sending email.');
+                        return;
+                    }
+
+                    sendManualEmailBtn.disabled = true;
+                    if (manualEmailStatus) {
+                        manualEmailStatus.textContent = 'Sending email...';
+                        manualEmailStatus.className = 'small mt-2 text-white-50';
+                    }
+
+                    fetch('/admin/visitors/send-qr-email', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ...manualQrPayload, email })
+                    })
+                    .then(response => response.json().then(data => ({ ok: response.ok, data })))
+                    .then(({ ok, data }) => {
+                        if (ok && data.success) {
+                            if (manualEmailStatus) {
+                                manualEmailStatus.textContent = data.message || 'Visitor QR email sent.';
+                                manualEmailStatus.className = 'small mt-2 text-success';
+                            }
+                        } else {
+                            if (manualEmailStatus) {
+                                manualEmailStatus.textContent = data.message || 'Failed to send visitor QR email.';
+                                manualEmailStatus.className = 'small mt-2 text-warning';
+                            }
+                        }
+                    })
+                    .catch(() => {
+                        if (manualEmailStatus) {
+                            manualEmailStatus.textContent = 'An error occurred connecting to the server.';
+                            manualEmailStatus.className = 'small mt-2 text-warning';
+                        }
+                    })
+                    .finally(() => {
+                        sendManualEmailBtn.disabled = false;
+                    });
+                });
+            }
+
             if (manualIdInput) manualIdInput.addEventListener('input', validateManualForm);
             if (manualNameInput) manualNameInput.addEventListener('input', validateManualForm);
-            if (manualPurposeInput) manualPurposeInput.addEventListener('change', validateManualForm);
+            if (manualDetailsInput) manualDetailsInput.addEventListener('input', validateManualForm);
+            if (manualPurposeInput) {
+                manualPurposeInput.addEventListener('change', function() {
+                    syncManualDetailsState();
+                    validateManualForm();
+                });
+            }
 
     if (submitManualBtn) {
         submitManualBtn.addEventListener('click', function() {
