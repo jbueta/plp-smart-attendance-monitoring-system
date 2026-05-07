@@ -14,8 +14,8 @@ cffi==2.0.0
 cryptography==46.0.5
 flask-cors==6.0.2
 greenlet==3.3.2
-numpy==2.4.3
-opencv-python==4.13.0.92
+numpy
+opencv-python
 pycparser==3.0
 SQLAlchemy==2.0.47
 typing_extensions==4.15

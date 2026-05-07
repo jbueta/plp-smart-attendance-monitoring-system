@@ -1021,11 +1021,12 @@ def dashboard_student_stats():
 def dashboard_employee_stats():
     conn = None
     try:
+        instance_id = (request.args.get("instance_id") or "").strip() or None
         conn = connect_db()
         if not conn:
             return jsonify({"success": False, "message": "Database offline"}), 500
 
-        stats = Database.get_employee_dashboard_stats(conn)
+        stats = Database.get_employee_dashboard_stats(conn, instance_id=instance_id)
         if stats is None:
             return jsonify({"success": False, "message": "Error fetching employee stats"}), 500
 

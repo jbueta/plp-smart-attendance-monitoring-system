@@ -1885,36 +1885,78 @@ class Database:
             cursor.close()
 
     @staticmethod
-    def get_employee_dashboard_stats(conn):
+    def get_employee_dashboard_stats(conn, instance_id=None):
         cursor = conn.cursor(dictionary=True)
         try:
             today = datetime.now().date()
 
             cursor.execute(
                 """
-                SELECT MAX(ea.event_date) AS latest
-                FROM event_attendance ea
-                JOIN employees emp ON ea.user_id = emp.user_id
-                JOIN users u ON emp.user_id = u.user_id
-                WHERE u.active = 1
-                """,
-            )
-            latest_row = cursor.fetchone()
-            latest_date = latest_row["latest"] if latest_row and latest_row["latest"] else today
-
-            cursor.execute(
+                SELECT
+                    ei.instance_id,
+                    e.event_name,
+                    ei.event_date,
+                    DATE_FORMAT(ei.event_date, '%b %d, %Y') AS date_str
+                FROM event_instances ei
+                JOIN events e ON ei.event_id = e.event_id
+                WHERE ei.event_date <= CURDATE()
+                  AND e.active = 1
+                ORDER BY ei.event_date DESC, ei.instance_id DESC
+                LIMIT 20
                 """
-                SELECT COUNT(*) AS cnt
-                FROM event_attendance ea
-                JOIN employees emp ON ea.user_id = emp.user_id
-                JOIN users u ON emp.user_id = u.user_id
-                WHERE ea.event_date = %s
-                  AND u.active = 1
-                """,
-                (today,),
             )
-            today_count = cursor.fetchone()["cnt"] or 0
-            target_date = today if today_count > 0 else latest_date
+            event_instances_list = cursor.fetchall()
+
+            target_instance_id = None
+            target_date = today
+            parsed_instance_id = None
+
+            if instance_id not in (None, ""):
+                try:
+                    parsed_instance_id = int(str(instance_id).strip())
+                except (TypeError, ValueError):
+                    parsed_instance_id = None
+
+            if parsed_instance_id is not None:
+                cursor.execute(
+                    """
+                    SELECT ei.instance_id, ei.event_date
+                    FROM event_instances ei
+                    JOIN events e ON ei.event_id = e.event_id
+                    WHERE ei.instance_id = %s
+                      AND e.active = 1
+                    LIMIT 1
+                    """,
+                    (parsed_instance_id,),
+                )
+                selected_row = cursor.fetchone()
+                if selected_row:
+                    target_instance_id = selected_row["instance_id"]
+                    target_date = selected_row["event_date"]
+
+            if target_instance_id is None:
+                cursor.execute(
+                    """
+                    SELECT ei.instance_id, ei.event_date
+                    FROM event_instances ei
+                    JOIN events e ON ei.event_id = e.event_id
+                    JOIN event_attendance ea ON ea.instance_id = ei.instance_id
+                    JOIN employees emp ON ea.user_id = emp.user_id
+                    JOIN users u ON emp.user_id = u.user_id
+                    WHERE u.active = 1
+                      AND e.active = 1
+                    GROUP BY ei.instance_id, ei.event_date
+                    ORDER BY ei.event_date DESC, ei.instance_id DESC
+                    LIMIT 1
+                    """
+                )
+                latest_row = cursor.fetchone()
+                if latest_row:
+                    target_instance_id = latest_row["instance_id"]
+                    target_date = latest_row["event_date"]
+                elif event_instances_list:
+                    target_instance_id = event_instances_list[0]["instance_id"]
+                    target_date = event_instances_list[0]["event_date"]
 
             cursor.execute(
                 """
@@ -1922,11 +1964,11 @@ class Database:
                 FROM event_attendance ea
                 JOIN employees emp ON ea.user_id = emp.user_id
                 JOIN users u ON emp.user_id = u.user_id
-                WHERE ea.event_date = %s
+                WHERE ea.instance_id = %s
                   AND u.active = 1
                 GROUP BY ea.status
                 """,
-                (target_date,),
+                (target_instance_id,),
             )
             attendance_map = {row["status"]: row["cnt"] for row in cursor.fetchall()}
             attendance_data = [
@@ -1962,7 +2004,7 @@ class Database:
                 SELECT AVG(
                     TIMESTAMPDIFF(
                         MINUTE,
-                        TIMESTAMP(ea.event_date, e.time_start),
+                        TIMESTAMP(ei.event_date, e.time_start),
                         ea.first_in
                     )
                 ) AS avg_late
@@ -1971,11 +2013,11 @@ class Database:
                 JOIN events e ON ei.event_id = e.event_id
                 JOIN employees emp ON ea.user_id = emp.user_id
                 JOIN users u ON emp.user_id = u.user_id
-                WHERE ea.event_date = %s
+                WHERE ea.instance_id = %s
                   AND ea.status = 'Late'
                   AND u.active = 1
                 """,
-                (target_date,),
+                (target_instance_id,),
             )
             avg_late = cursor.fetchone()["avg_late"] or 0
             avg_tardiness = f"{int(avg_late)} mins"
@@ -1983,32 +2025,26 @@ class Database:
             cursor.execute(
                 """
                 SELECT
-                    d.department_name AS dept,
-                    AVG(
-                        TIMESTAMPDIFF(
-                            MINUTE,
-                            TIMESTAMP(ea.event_date, e.time_start),
-                            ea.first_in
-                        )
-                    ) AS avg_late
+                    CONCAT(
+                        DATE_FORMAT(ea.first_in, '%h:'),
+                        LPAD(FLOOR(MINUTE(ea.first_in) / 15) * 15, 2, '0'),
+                        DATE_FORMAT(ea.first_in, ' %p')
+                    ) AS time_bucket,
+                    COUNT(*) AS checkins
                 FROM event_attendance ea
-                JOIN event_instances ei ON ea.instance_id = ei.instance_id
-                JOIN events e ON ei.event_id = e.event_id
                 JOIN employees emp ON ea.user_id = emp.user_id
                 JOIN users u ON emp.user_id = u.user_id
-                JOIN departments d ON emp.department_id = d.department_id
-                WHERE ea.event_date = %s
-                  AND ea.status = 'Late'
+                WHERE ea.instance_id = %s
+                  AND ea.first_in IS NOT NULL
                   AND u.active = 1
-                GROUP BY d.department_name
-                ORDER BY avg_late DESC
-                LIMIT 7
+                GROUP BY time_bucket
+                ORDER BY MIN(ea.first_in) ASC
                 """,
-                (target_date,),
+                (target_instance_id,),
             )
-            tardiness_rows = cursor.fetchall()
-            tardiness_data = [int(round(row["avg_late"] or 0)) for row in tardiness_rows]
-            tardiness_labels = [_format_department_label(row["dept"]) for row in tardiness_rows]
+            peak_rows = cursor.fetchall()
+            peak_checkin_data = [row["checkins"] for row in peak_rows]
+            peak_checkin_labels = [row["time_bucket"] for row in peak_rows]
 
             cursor.execute(
                 """
@@ -2019,13 +2055,13 @@ class Database:
                 JOIN employees emp ON ea.user_id = emp.user_id
                 JOIN users u ON emp.user_id = u.user_id
                 JOIN departments d ON emp.department_id = d.department_id
-                WHERE ea.event_date = %s
+                WHERE ea.instance_id = %s
                   AND u.active = 1
                 GROUP BY d.department_name
                 ORDER BY value DESC, d.department_name ASC
                 LIMIT 5
                 """,
-                (target_date,),
+                (target_instance_id,),
             )
             dept_participation = [
                 {"name": row["name"], "value": row["value"]}
@@ -2044,9 +2080,10 @@ class Database:
                 JOIN event_participants ep ON ei.event_id = ep.event_id
                 JOIN employees emp ON ep.user_id = emp.user_id
                 JOIN users u ON emp.user_id = u.user_id
-                WHERE ei.event_date >= CURDATE()
+                WHERE (ei.event_date > CURDATE() OR (ei.event_date = CURDATE() AND e.time_end >= CURTIME()))
                   AND ei.status = 'Scheduled'
                   AND u.active = 1
+                  AND e.active = 1
                 GROUP BY ei.instance_id, e.event_name, ei.event_date, e.time_start, e.location
                 ORDER BY ei.event_date ASC, e.time_start ASC
                 LIMIT 3
@@ -2101,19 +2138,21 @@ class Database:
                 JOIN employees emp ON ea.user_id = emp.user_id
                 JOIN users u ON emp.user_id = u.user_id
                 JOIN departments d ON emp.department_id = d.department_id
-                WHERE ea.event_date = %s
+                WHERE ea.instance_id = %s
                   AND u.active = 1
                 GROUP BY d.department_id, d.department_name
                 ORDER BY rate DESC, d.department_name ASC
                 """,
-                (target_date,),
+                (target_instance_id,),
             )
             dept_comparison = cursor.fetchall()
 
             return {
                 "attendance_data": attendance_data,
-                "tardiness_data": tardiness_data if tardiness_data else [0] * 7,
-                "tardiness_labels": tardiness_labels if tardiness_labels else ["N/A"] * 7,
+                "tardiness_data": [0] * 7,
+                "tardiness_labels": ["N/A"] * 7,
+                "peak_checkin_data": peak_checkin_data if peak_checkin_data else [0] * 5,
+                "peak_checkin_labels": peak_checkin_labels if peak_checkin_labels else ["N/A"] * 5,
                 "dept_participation": dept_participation,
                 "avg_tardiness": avg_tardiness,
                 "on_time_rate": on_time_rate,
@@ -2124,6 +2163,8 @@ class Database:
                 "recent_activity": recent_activity,
                 "leaderboard": leaderboard,
                 "dept_comparison": dept_comparison,
+                "event_instances_list": event_instances_list,
+                "selected_instance_id": target_instance_id,
             }
         except connector.Error as err:
             print(f"Error fetching employee dashboard stats: {err}")
