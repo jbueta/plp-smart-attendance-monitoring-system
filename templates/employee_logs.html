@@ -15,6 +15,7 @@
     <hr>
     <ul class="nav nav-pills flex-column mb-auto">
         <li><a href="{{ url_for('dashboard') }}" class="nav-link"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+        <li><a href="{{ url_for('announcement_manager') }}" class="nav-link"><i class="bi bi-megaphone"></i> Announcements</a></li>
         <li><a href="{{ url_for('manage_events') }}" class="nav-link"><i class="bi bi-calendar-event"></i> Events</a></li>
         <li><a href="{{ url_for('admin_visitors') }}" class="nav-link"><i class="bi bi-person-lines-fill"></i> Visitors</a></li>
         <li><a href="{{ url_for('admin_employees') }}" class="nav-link active"><i class="bi bi-person-badge"></i> Employees</a></li>
@@ -57,7 +58,7 @@
                 <div class="d-flex flex-wrap gap-2 p-3 justify-content-end">
                     <div class="input-group input-group-sm" style="width: 200px;">
                         <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
-                        <input type="text" id="searchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search ID or Name...">
+                        <input type="text" id="searchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search Employee...">
                     </div>
                     <select id="departmentFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
                         <option value="">All Departments</option>
@@ -85,15 +86,9 @@
                             {% for log in logs %}
                             <tr class="employee-row"
                                 data-employee-id="{{ log.id | lower }}"
-                                data-employee-id-original="{{ log.id }}"
                                 data-employee-name="{{ log.name | lower }}"
-                                data-employee-name-original="{{ log.name }}"
-                                data-department-id-original="{{ log.department_id or '' }}"
                                 data-department="{{ log.dept }}"
-                                data-department-original="{{ log.dept }}"
                                 data-position="{{ log.position or '' }}"
-                                data-position-original="{{ log.position or '' }}"
-                                data-position-display="{{ log.position_display or 'N/A' }}"
                                 data-date="{{ log.date or '' }}">
                                 <td class="fw-bold text-white ps-4">
                                     <div class="d-flex align-items-center">
@@ -119,7 +114,7 @@
                                         </button>
                                         <ul class="dropdown-menu dropdown-menu-end shadow-sm employee-action-menu">
                                             <li><button type="button" class="dropdown-item view-employee text-white" data-id="{{ log.id }}">View Details</button></li>
-                                            <li><button type="button" class="dropdown-item text-danger delete-employee-record" data-id="{{ log.id }}">Delete</button></li>
+                                            <li><button type="button" class="dropdown-item text-danger delete-employee" data-id="{{ log.id }}">Delete</button></li>
                                         </ul>
                                     </div>
                                 </td>
@@ -135,13 +130,6 @@
                         </tbody>
                     </table>
                 </div>
-
-                <!-- Pagination (activity) -->
-                <div id="paginationContainer" class="pagination-footer" style="display: none;">
-                    <nav aria-label="Page navigation">
-                        <ul id="paginationList" class="pagination pagination-custom mb-0 gap-1"></ul>
-                    </nav>
-                </div>
             </div>
 
             <!-- No results (activity) -->
@@ -152,6 +140,13 @@
 
             <!-- Result count (activity only) -->
             <p id="resultCount" class="text-white-50 small ms-1"></p>
+
+            <!-- Pagination (activity) -->
+            <div id="paginationContainer" class="pagination-footer" style="display: none;">
+                <nav aria-label="Page navigation">
+                    <ul id="paginationList" class="pagination pagination-custom mb-0 gap-1"></ul>
+                </nav>
+            </div>
 
         </div><!-- end activity-view -->
 
@@ -169,23 +164,13 @@
                     <div class="d-flex gap-2">
                         <div class="input-group input-group-sm" style="width: 220px;">
                             <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
-                            <input type="text" id="recordsSearchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search ID, Name, or Dept...">
+                            <input type="text" id="recordsSearchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search Name or Dept...">
                         </div>
                         <select id="recordsDepartmentFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
                             <option value="">All Departments</option>
                             {% for dept in departments %}
-                            <option value="{{ dept.department_name | lower }}">{{ dept.department_name }}</option>
+                            <option value="{{ dept.name | lower }}">{{ dept.name }}</option>
                             {% endfor %}
-                        </select>
-                        <select id="recordsStatusFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
-                            <option value="active" selected>Active</option>
-                            <option value="all">Active / Inactive</option>
-                        </select>
-                        <select id="recordsSortFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
-                            <option value="recent">Recent to Oldest</option>
-                            <option value="name-asc">Name A-Z</option>
-                            <option value="name-desc">Name Z-A</option>
-                            <option value="group">Group by Department</option>
                         </select>
                     </div>
                 </div>
@@ -205,20 +190,12 @@
                             {% for emp in employees %}
                             <tr class="employee-record-row"
                                 data-id="{{ emp.id | lower }}"
-                                data-id-original="{{ emp.id }}"
-                                data-added-order="{{ emp.added_order or 0 }}"
                                 data-name="{{ emp.name | lower }}"
-                                data-name-original="{{ emp.name }}"
-                                data-dept-id-original="{{ emp.department_id or '' }}"
-                                data-dept="{{ emp.dept | lower }}"
-                                data-dept-original="{{ emp.dept }}"
-                                data-position-original="{{ emp.position or '' }}"
-                                data-position-display="{{ emp.position_display or 'N/A' }}"
-                                data-status="{{ emp.status | lower }}">
+                                data-dept="{{ emp.dept | lower }}">
                                 <td class="font-monospace text-white-50 ps-4">{{ emp.id }}</td>
                                 <td class="fw-bold text-white">{{ emp.name }}</td>
                                 <td class="text-white-50">{{ emp.dept }}</td>
-                                <td class="text-white-50">{{ emp.position_display }}</td>
+                                <td class="text-white-50">{{ emp.position }}</td>
                                 <td class="text-center">
                                     <span class="badge bg-{{ emp.status_class or 'success' }} bg-opacity-25 border border-{{ emp.status_class or 'success' }} text-{{ emp.status_class or 'success' }} rounded-pill px-3">
                                         {{ emp.status }}
@@ -231,11 +208,7 @@
                                         </button>
                                         <ul class="dropdown-menu dropdown-menu-end shadow-sm employee-action-menu">
                                             <li><button type="button" class="dropdown-item edit-employee-record" data-id="{{ emp.id }}">Edit</button></li>
-                                            {% if emp.status == 'Active' %}
                                             <li><button type="button" class="dropdown-item text-danger delete-employee-record" data-id="{{ emp.id }}">Delete</button></li>
-                                            {% else %}
-                                            <li><button type="button" class="dropdown-item text-white-50" disabled>Already Inactive</button></li>
-                                            {% endif %}
                                         </ul>
                                     </div>
                                 </td>
@@ -251,13 +224,6 @@
                         </tbody>
                     </table>
                 </div>
-
-                <!-- Pagination (records) -->
-                <div id="recordsPaginationContainer" class="pagination-footer" style="display: none;">
-                    <nav aria-label="Page navigation">
-                        <ul id="recordsPaginationList" class="pagination pagination-custom mb-0 gap-1"></ul>
-                    </nav>
-                </div>
             </div>
 
             <!-- No results (records) -->
@@ -268,6 +234,13 @@
 
             <!-- Result count (records only) -->
             <p id="recordsResultCount" class="text-white-50 small ms-1"></p>
+
+            <!-- Pagination (records) -->
+            <div id="recordsPaginationContainer" class="pagination-footer" style="display: none;">
+                <nav aria-label="Page navigation">
+                    <ul id="recordsPaginationList" class="pagination pagination-custom mb-0 gap-1"></ul>
+                </nav>
+            </div>
 
         </div><!-- end records-view -->
 
@@ -292,8 +265,8 @@
                         <div class="col-md-6">
                             <div class="add-option-card xls-card h-100 p-5 rounded-4 border text-center d-flex flex-column justify-content-center align-items-center">
                                 <i class="bi bi-file-earmark-spreadsheet display-3 text-light mb-4"></i>
-                                <h5 class="fw-bold text-white mb-2 tracking-wider">UPLOAD EXCEL OR CSV</h5>
-                                <p class="text-white-50 small mb-0">Add many employees from a spreadsheet file.</p>
+                                <h5 class="fw-bold text-white mb-2 tracking-wider">EXPORT XLS FILE</h5>
+                                <p class="text-white-50 small mb-0">Add all the records from the excel</p>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -310,21 +283,15 @@
                 <div id="xlsUploadView" class="d-none w-100">
                     <div class="d-flex justify-content-between align-items-start mb-4 pe-5">
                         <div>
-                            <h4 class="fw-bold text-white mb-1 tracking-wider">UPLOAD EXCEL OR CSV</h4>
-                            <p class="text-white-50 small mb-0">Accepted formats: `.xlsx` and `.csv`.</p>
-                            <a
-                                href="{{ url_for('download_employee_upload_template') }}"
-                                class="btn btn-link btn-sm text-info text-decoration-none px-0 mt-2"
-                            >
-                                <i class="bi bi-download me-1"></i>Download Upload Template
-                            </a>
+                            <h4 class="fw-bold text-white mb-1 tracking-wider">EXPORT XLS FILE</h4>
+                            <p class="text-white-50 small mb-0">Add all the records from the excel</p>
                         </div>
-                        <button type="button" class="btn btn-sm btn-primary-gold rounded-3 px-3 fw-bold shadow-sm mt-1" id="uploadXlsBtn">VALIDATE FILE</button>
+                        <button type="button" class="btn btn-sm btn-primary-gold rounded-3 px-3 fw-bold shadow-sm mt-1" id="uploadXlsBtn">EXPORT</button>
                     </div>
                     <div class="upload-zone border border-secondary rounded-4 d-flex flex-column align-items-center justify-content-center p-5" style="border-style: dashed !important; border-width: 2px !important; cursor: pointer; background: rgba(255,255,255,0.02); min-height: 250px;">
-                        <input type="file" id="xlsFileInput" accept=".xlsx,.csv" class="d-none">
+                        <input type="file" id="xlsFileInput" accept=".xls,.xlsx,.csv" class="d-none">
                         <i class="bi bi-file-earmark-spreadsheet display-4 text-white-50 mb-3"></i>
-                        <span class="text-white-50">Click to upload an Excel or CSV file</span>
+                        <span class="text-white-50">Click to export xls file</span>
                     </div>
                     <div class="mt-4">
                         <button type="button" class="btn btn-link text-white-50 text-decoration-none p-0 btn-back-selection">
@@ -345,13 +312,23 @@
                         </div>
                     </div>
                     <div class="row g-3 mb-0">
-                        <div class="col-12">
+                        <div class="col-md-5">
+                            <div class="card-glass border-secondary p-3 h-100 d-flex flex-column align-items-center justify-content-center text-center shadow-sm" style="background: linear-gradient(135deg, #0f3d2e 0%, #0b2f23 100%); border-radius: 16px;">
+                                <div class="bg-transparent border border-secondary rounded-4 mb-3 d-flex align-items-center justify-content-center p-3" style="width: 180px; height: 180px; border-style: dashed !important; border-width: 2px !important;">
+                                    <span class="text-white-50 small fw-bold tracking-wider">QR CODE WILL APPEAR HERE</span>
+                                </div>
+                                <button type="button" class="btn btn-light rounded-pill px-4 py-2 btn-sm fw-bold text-dark shadow-sm">
+                                    GENERATE QR CODE
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-7">
                             <form id="manualAddEmployeeForm" class="d-flex flex-column h-100 justify-content-between card-glass border-secondary p-3 shadow-sm" style="background: linear-gradient(135deg, #0f3d2e 0%, #0b2f23 100%); border-radius: 16px;">
                                 <h6 class="text-white fw-bold mb-3 tracking-wider">INFORMATION DETAILS</h6>
                                 <div class="vstack gap-2 text-start flex-grow-1">
                                     <div class="row align-items-center">
                                         <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0" for="manualAddId">EMPLOYEE ID:</label></div>
-                                        <div class="col-sm-8"><input type="text" id="manualAddId" class="form-control form-control-sm bg-transparent text-white border-secondary rounded-3 shadow-none" placeholder="e.g. 00001" inputmode="numeric" pattern="^[0-9]{5}$" maxlength="5" required></div>
+                                        <div class="col-sm-8"><input type="text" id="manualAddId" class="form-control form-control-sm bg-transparent text-white border-secondary rounded-3 shadow-none" placeholder="e.g. 00-00000" pattern="^[0-9]{2}-[0-9]{5}$" required></div>
                                     </div>
                                     <div class="row align-items-center">
                                         <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0" for="manualAddName">FULL NAME:</label></div>
@@ -377,9 +354,13 @@
                                                 <div class="col-sm-8">
                                                     <select id="manualAddCollege" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
                                                         <option value="" disabled selected class="text-dark">Select College</option>
-                                                        {% for dept in teaching_departments %}
-                                                        <option value="{{ dept.department_id }}" class="text-dark">{{ dept.department_name }}</option>
-                                                        {% endfor %}
+                                                        <option value="1" class="text-dark">College of Engineering</option>
+                                                        <option value="2" class="text-dark">College of Nursing</option>
+                                                        <option value="3" class="text-dark">College of Computer Studies</option>
+                                                        <option value="4" class="text-dark">College of Business and Accountancy</option>
+                                                        <option value="5" class="text-dark">College of Education</option>
+                                                        <option value="6" class="text-dark">College of Arts and Sciences</option>
+                                                        <option value="7" class="text-dark">College of International Hospitality Management</option>
                                                     </select>
                                                 </div>
                                             </div>
@@ -403,9 +384,11 @@
                                                 <div class="col-sm-8">
                                                     <select id="manualAddOffice" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
                                                         <option value="" selected disabled class="text-dark">Select Office</option>
-                                                        {% for dept in office_departments %}
-                                                        <option value="{{ dept.department_id }}" class="text-dark">{{ dept.department_name }}</option>
-                                                        {% endfor %}
+                                                        <option class="text-dark" value="8">Registrar's Office</option>
+                                                        <option class="text-dark" value="9">Accounting Office</option>
+                                                        <option class="text-dark" value="10">Human Resources</option>
+                                                        <option class="text-dark" value="11">MIS Office</option>
+                                                        <option class="text-dark" value="12">Library</option>
                                                     </select>
                                                 </div>
                                             </div>
@@ -426,7 +409,7 @@
                                     </div>
                                 </div>
                                 <div class="mt-3 pt-2 border-top border-secondary">
-                                    <span class="text-white-50" style="font-size: 0.70rem;">Employee ID must be a 5-digit number such as 00001. Position is optional.</span>
+                                    <span class="text-white-50" style="font-size: 0.70rem;">Once complete, click generate QR</span>
                                 </div>
                             </form>
                         </div>
@@ -465,12 +448,7 @@
             </div>
             <div class="col-md-3">
                 <label class="form-label text-white-50" for="editDepartmentId">Department</label>
-                <select id="editDepartmentId" class="form-select bg-dark text-white border-secondary">
-                    <option value="" disabled>Select Department</option>
-                    {% for dept in departments %}
-                    <option value="{{ dept.department_id }}">{{ dept.department_name }}</option>
-                    {% endfor %}
-                </select>
+                <input id="editDepartmentId" class="form-control bg-dark text-white border-secondary" type="text" />
             </div>
             <div class="col-md-3">
                 <label class="form-label text-white-50" for="editPosition">Position</label>
@@ -485,49 +463,42 @@
 </div>
 
 
-<!-- Toast notification -->
-<div id="toastContainer" class="position-fixed" style="z-index: 9999; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; pointer-events: none;"></div>
-
-
-<!-- ===================== CONFIRM DIALOG ===================== -->
-<div id="confirmOverlay" class="d-none position-fixed top-0 start-0 w-100 h-100"
-    style="background: rgba(0,0,0,0.55); backdrop-filter: blur(6px); z-index: 9998; display: flex; align-items: center; justify-content: center;">
-    <div style="
-        background: rgba(10,40,25,0.98);
-        border: 1px solid rgba(239,68,68,0.3);
-        border-radius: 20px;
-        padding: 32px 28px;
-        min-width: 320px;
-        max-width: 400px;
-        box-shadow: 0 24px 60px rgba(0,0,0,0.6);
-        text-align: center;
-        animation: toastSlideIn 0.25s cubic-bezier(0.34,1.56,0.64,1) forwards;
-    ">
-        <div style="
-            width:52px; height:52px; border-radius:50%;
-            background:#ef4444; margin: 0 auto 16px;
-            display:flex; align-items:center; justify-content:center;
-            box-shadow: 0 0 0 8px rgba(239,68,68,0.15);
-        ">
-            <i class="bi bi-exclamation-triangle-fill" style="font-size:1.4rem; color:#fff;"></i>
+<!-- ========== SUCCESS TOAST ========== -->
+<div id="successToast" style="
+    display: none; position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%); z-index: 9999;
+    background: rgba(25, 135, 84, 0.15); border: 1px solid rgba(25, 135, 84, 0.4);
+    backdrop-filter: blur(10px); border-radius: 16px; padding: 2rem 2.5rem;
+    color: #fff; min-width: 380px; box-shadow: 0 8px 32px rgba(0,0,0,0.3);">
+    <div class="d-flex align-items-center gap-3">
+        <i class="bi bi-check-circle-fill text-success" style="font-size: 2.5rem;"></i>
+        <div>
+            <div class="fw-bold fs-5">Success</div>
+            <div class="text-white-50" id="successToastMsg">Employee updated successfully.</div>
         </div>
-        <h6 id="confirmTitle" style="color:#fff; font-weight:700; font-size:1rem; margin-bottom:8px;"></h6>
-        <p id="confirmSubtitle" style="color:rgba(255,255,255,0.55); font-size:0.83rem; margin-bottom:24px;"></p>
-        <div class="d-flex gap-3 justify-content-center">
-            <button id="confirmCancelBtn" style="
-                flex:1; padding:10px; border-radius:12px;
-                background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15);
-                color:#fff; font-weight:600; cursor:pointer; font-size:0.9rem;
-                transition: background 0.2s;
-            " onmouseover="this.style.background='rgba(255,255,255,0.15)'"
-               onmouseout="this.style.background='rgba(255,255,255,0.08)'">Cancel</button>
-            <button id="confirmOkBtn" style="
-                flex:1; padding:10px; border-radius:12px;
-                background:#ef4444; border:none;
-                color:#fff; font-weight:700; cursor:pointer; font-size:0.9rem;
-                transition: background 0.2s;
-            " onmouseover="this.style.background='#dc2626'"
-               onmouseout="this.style.background='#ef4444'">Delete</button>
+        <button onclick="hideToast()" class="btn-close btn-close-white ms-auto" style="opacity:0.6"></button>
+    </div>
+</div>
+
+
+<!-- ========== CONFIRM DELETE TOAST ========== -->
+<div id="confirmDeleteToast" style="
+    display: none; position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%); z-index: 9999;
+    background: rgba(20, 20, 30, 0.95); border: 1px solid rgba(220, 53, 69, 0.4);
+    backdrop-filter: blur(10px); border-radius: 16px; padding: 2rem 2.5rem;
+    color: #fff; min-width: 380px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
+    <div class="d-flex flex-column gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-trash3-fill text-danger" style="font-size: 2rem;"></i>
+            <div>
+                <div class="fw-bold fs-5">Delete Employee</div>
+                <div class="text-white-50 small" id="confirmDeleteMsg">Are you sure you want to delete this employee?</div>
+            </div>
+        </div>
+        <div class="d-flex justify-content-end gap-2 mt-1">
+            <button id="cancelDeleteBtn" class="btn btn-outline-light btn-sm px-4">Cancel</button>
+            <button id="confirmDeleteBtn" class="btn btn-danger btn-sm px-4">Delete</button>
         </div>
     </div>
 </div>
@@ -565,13 +536,8 @@
 
 <style>
 .employee-action-menu {
-    background: rgba(255,255,255,0.08);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255,255,255,0.15);
+    /* Inherit from global .dropdown-menu and .dropdown-item in style.css */
 }
-.employee-action-menu .dropdown-item { color: #fff; }
-.employee-action-menu .dropdown-item:hover,
-.employee-action-menu .dropdown-item:focus { background: #d4af37; color: #051a10; }
 .dropdown .btn { width: 2rem; height: 2rem; border-radius: 50%; }
 .dropdown .btn:hover {
     background: transparent !important;
@@ -581,15 +547,20 @@
 }
 .pagination-footer {
     display: none;
+    position: fixed;
+    bottom: 1rem;
+    left: 60%;
+    transform: translateX(-50%);
     justify-content: center;
-    width: 100%;
-    margin-top: 0.75rem;
-    padding: 0 1rem 1rem;
+    pointer-events: none;
+    z-index: 1100;
+    width: auto;
+    max-width: 90vw;
+    padding: 0 0.5rem;
 }
 .pagination-footer.show { display: flex !important; }
-.pagination-footer nav { width: 100%; display: flex; justify-content: center; }
-.pagination-footer .pagination { background: transparent; flex-wrap: wrap; justify-content: center; }
-.main-content { padding-bottom: 0; }
+.pagination-footer .pagination { pointer-events: auto; background: transparent; }
+.main-content { padding-bottom: 4rem; }
 .pagination-custom { list-style: none; display: flex; align-items: center; gap: 0.5rem; margin: 0; padding: 0; }
 .pagination-custom .page-item { margin: 0; }
 .pagination-custom .page-link {
@@ -625,8 +596,6 @@
 .upload-zone:hover { background: rgba(255,255,255,0.05) !important; border-color: #d4af37 !important; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
 .upload-zone:hover i, .upload-zone:hover span { color: #d4af37 !important; transition: color 0.3s ease; }
 @keyframes fadeInModal { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes toastSlideIn { from { opacity: 0; transform: scale(0.88); } to { opacity: 1; transform: scale(1); } }
-@keyframes toastSlideOut { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.88); } }
 </style>
 
 
@@ -642,107 +611,19 @@ document.addEventListener('DOMContentLoaded', function () {
     const ITEMS_PER_PAGE = 6;
 
     // ─── TOAST HELPERS ────────────────────────────────────────────────────────
-    const TOAST_DURATION = 5000;
-
-    function escapeToastHtml(value) {
-        return String(value ?? '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
+    function showToast(msg) {
+        const toast = document.getElementById('successToast');
+        document.getElementById('successToastMsg').textContent = msg;
+        toast.style.display = 'block';
+        clearTimeout(window._toastTimer);
+        window._toastTimer = setTimeout(() => hideToast(), 3000);
     }
-
-    function showToast(message, type = 'success', subtitle = '') {
-        const container = document.getElementById('toastContainer');
-        if (!container) return;
-
-        const id = 'toast-' + Date.now();
-        const barId = id + '-bar';
-
-        const cfg = {
-            success: { icon: 'check-circle-fill', iconBg: '#22c55e', border: 'rgba(34,197,94,0.35)', barColor: '#22c55e', title: 'Success' },
-            danger: { icon: 'x-circle-fill', iconBg: '#ef4444', border: 'rgba(239,68,68,0.35)', barColor: '#ef4444', title: 'Error' },
-            warning: { icon: 'exclamation-circle-fill', iconBg: '#f59e0b', border: 'rgba(245,158,11,0.35)', barColor: '#f59e0b', title: 'Warning' },
-            info: { icon: 'info-circle-fill', iconBg: '#3b82f6', border: 'rgba(59,130,246,0.35)', barColor: '#3b82f6', title: 'Info' }
-        };
-
-        const c = cfg[type] || cfg.success;
-        const titleText = escapeToastHtml(message || c.title);
-        const bodyText = escapeToastHtml(subtitle || message || '');
-        const html = `
-            <div id="${id}" style="
-                position: relative; overflow: hidden;
-                display: flex; align-items: flex-start; gap: 14px;
-                width: min(520px, calc(100vw - 32px));
-                padding: 18px 18px 24px;
-                border-radius: 18px;
-                background: rgba(8, 32, 20, 0.98);
-                border: 1px solid ${c.border};
-                box-shadow: 0 24px 60px rgba(0,0,0,0.65);
-                backdrop-filter: blur(20px);
-                animation: toastSlideIn 0.32s cubic-bezier(0.34,1.56,0.64,1) forwards;
-                pointer-events: auto;
-            ">
-                <div style="
-                    width:46px; height:46px; border-radius:50%; flex-shrink:0;
-                    background:${c.iconBg};
-                    display:flex; align-items:center; justify-content:center;
-                    box-shadow: 0 0 0 7px ${c.iconBg}28;
-                ">
-                    <i class="bi bi-${c.icon}" style="font-size:1.25rem; color:#fff;"></i>
-                </div>
-                <div style="flex:1; min-width:0;">
-                    <div style="font-weight:700; font-size:0.95rem; color:#fff; margin-bottom:4px; letter-spacing:0.01em;">${titleText}</div>
-                    <div style="
-                        font-size:0.84rem;
-                        color:rgba(255,255,255,0.74);
-                        line-height:1.45;
-                        white-space:pre-wrap;
-                        overflow-wrap:anywhere;
-                        word-break:break-word;
-                    ">${bodyText}</div>
-                </div>
-                <button type="button" data-toast-close="${id}" style="
-                    background:none; border:none; cursor:pointer; padding:0; line-height:1; flex-shrink:0;
-                    color:rgba(255,255,255,0.35); font-size:0.9rem; transition:color 0.15s;
-                ">
-                    <i class="bi bi-x-lg"></i>
-                </button>
-                <div id="${barId}" style="
-                    position:absolute; bottom:0; left:0; height:3px;
-                    width:100%; border-radius:0 0 18px 18px;
-                    background:${c.barColor};
-                    transition: width ${TOAST_DURATION}ms linear;
-                "></div>
-            </div>`;
-
-        container.insertAdjacentHTML('beforeend', html);
-
-        const closeBtn = container.querySelector(`[data-toast-close="${id}"]`);
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => dismissToast(id));
-            closeBtn.addEventListener('mouseover', () => { closeBtn.style.color = '#fff'; });
-            closeBtn.addEventListener('mouseout', () => { closeBtn.style.color = 'rgba(255,255,255,0.35)'; });
-        }
-
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                const bar = document.getElementById(barId);
-                if (bar) bar.style.width = '0%';
-            });
-        });
-
-        setTimeout(() => dismissToast(id), TOAST_DURATION);
-    }
-
-    function dismissToast(id) {
-        const toast = document.getElementById(id);
-        if (!toast || toast.dataset.closing === 'true') return;
-        toast.dataset.closing = 'true';
-        toast.style.animation = 'toastSlideOut 0.22s ease forwards';
-        setTimeout(() => toast.remove(), 230);
-    }
+    window.hideToast = function () {
+        const toast = document.getElementById('successToast');
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s ease';
+        setTimeout(() => { toast.style.display = 'none'; toast.style.opacity = '1'; }, 300);
+    };
 
     // ─── ADD USER MODAL ───────────────────────────────────────────────────────
     const addUserModalEl       = document.getElementById('addUserModal');
@@ -792,7 +673,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (fileInput) {
                 fileInput.value = '';
                 if (uploadZone) {
-                    uploadZone.querySelector('span').textContent = 'Click to upload an Excel or CSV file';
+                    uploadZone.querySelector('span').textContent = 'Click to export xls file';
                     const icon = uploadZone.querySelector('i');
                     icon.className = icon.className.replace('bi-file-earmark-check', 'bi-file-earmark-spreadsheet').replace('text-success', 'text-white-50');
                 }
@@ -819,7 +700,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const manualAddOffice             = document.getElementById('manualAddOffice');
     const manualAddNonTeachingPos     = document.getElementById('manualAddNonTeachingPosition');
     const submitManualBtn             = document.getElementById('submitManualAddBtn');
-    const EMPLOYEE_ID_REGEX           = /^\d{5}$/;
 
     function togglePersonnelFields() {
         if (typeTeachingRadio.checked) {
@@ -837,13 +717,13 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function validateManualForm() {
-        const idOk   = manualIdInput && EMPLOYEE_ID_REGEX.test(manualIdInput.value.trim());
+        const idOk   = manualIdInput && manualIdInput.value.trim().length > 0;
         const nameOk = manualNameInput && manualNameInput.value.trim().length > 0;
         let typeOk   = false;
         if (typeTeachingRadio && typeTeachingRadio.checked)
-            typeOk = manualAddCollege.value !== '';
+            typeOk = manualAddCollege.value !== '' && manualAddTeachingPosition.value !== '';
         else if (typeNonTeachingRadio && typeNonTeachingRadio.checked)
-            typeOk = manualAddOffice.value !== '';
+            typeOk = manualAddOffice.value !== '' && manualAddNonTeachingPos.value !== '';
         if (submitManualBtn) submitManualBtn.disabled = !(idOk && nameOk && typeOk);
     }
 
@@ -867,308 +747,147 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (result.success) {
                     const modal = bootstrap.Modal.getInstance(addUserModalEl);
                     if (modal) modal.hide();
-                    showToast(
-                        result.reactivated ? 'Employee reactivated successfully.' : 'Employee added successfully.',
-                        'success',
-                        result.reactivated
-                            ? `${payload.employee_name.toUpperCase()} was reactivated.`
-                            : `${payload.employee_name.toUpperCase()} has been added to records.`
-                    );
+                    showToast('Employee added successfully.');
                     setTimeout(() => location.reload(), 1800);
-                } else {
-                    showToast('Add employee failed.', 'danger', (result && result.error) || 'Could not add employee.');
-                }
-            } catch (err) {
-                showToast('Request failed.', 'danger', err.message || 'Could not reach the server.');
-            }
+                } else { window.showSystemFeedback('Error: ' + result.error, 'error'); }
+
+            } catch (err) { window.showSystemFeedback('Request failed: ' + err.message, 'error'); }
+
         });
     }
 
-    // XLS Upload (validate -> preview -> commit)
+    // XLS Upload
     const uploadSubmitBtn = document.getElementById('uploadXlsBtn');
-    let uploadPreviewRows = [];
-
-    function escapeHtml(value) {
-        return String(value ?? '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-
-    function showConfirm(title, subtitle = '') {
-        return new Promise(resolve => {
-            const overlay = document.getElementById('confirmOverlay');
-            const titleEl = document.getElementById('confirmTitle');
-            const subEl = document.getElementById('confirmSubtitle');
-            const okBtn = document.getElementById('confirmOkBtn');
-            const cancelBtn = document.getElementById('confirmCancelBtn');
-
-            titleEl.textContent = title;
-            subEl.textContent = subtitle;
-
-            overlay.classList.remove('d-none');
-            overlay.style.display = 'flex';
-
-            function cleanup(result) {
-                overlay.style.display = 'none';
-                overlay.classList.add('d-none');
-                okBtn.replaceWith(okBtn.cloneNode(true));
-                cancelBtn.replaceWith(cancelBtn.cloneNode(true));
-                resolve(result);
-            }
-
-            document.getElementById('confirmOkBtn').addEventListener('click', () => cleanup(true));
-            document.getElementById('confirmCancelBtn').addEventListener('click', () => cleanup(false));
-            overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(false); }, { once: true });
-        });
-    }
-
-    async function parseApiResponseSafe(response) {
-        const contentType = response.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
-            try {
-                return await response.json();
-            } catch (_) {
-                return null;
-            }
-        }
-        try {
-            const text = (await response.text() || '').trim();
-            if (!text) return null;
-            const titleMatch = text.match(/<title>(.*?)<\/title>/i);
-            const bodyMatch = text.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-            const extracted = (titleMatch && titleMatch[1]) || (bodyMatch && bodyMatch[1]) || text;
-            const plainText = extracted
-                .replace(/<[^>]+>/g, ' ')
-                .replace(/\s+/g, ' ')
-                .trim();
-            return plainText ? { error: plainText } : null;
-        } catch (_) {
-            return null;
-        }
-    }
-
-    function renderUploadPreviewModal(result) {
-        const resultModalEl = document.getElementById('uploadResultModal');
-        const resultModal = new bootstrap.Modal(resultModalEl);
-        const title = document.getElementById('uploadResultTitle');
-        const subtitle = document.getElementById('uploadResultSubtitle');
-        const content = document.getElementById('uploadResultContent');
-        const tipContainer = document.getElementById('uploadResultTipContainer');
-        const paginationContainer = document.getElementById('uploadResultPagination');
-        const iconContainer = document.getElementById('uploadResultIconContainer');
-        const icon = document.getElementById('uploadResultIcon');
-        const footer = document.getElementById('uploadResultFooter');
-
-        paginationContainer.innerHTML = '';
-        iconContainer.style.background = 'rgba(13, 202, 240, 0.15)';
-        icon.className = 'bi bi-table text-info fs-4';
-        icon.style.color = '';
-        title.textContent = 'Review Employee Upload';
-        subtitle.textContent = `${uploadPreviewRows.length} valid row(s) ready to upload`;
-
-        const requiredBadges = (result.required_columns || [])
-            .map(col => `<span class="badge rounded-pill px-3 py-2 me-1 mb-1" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff;">${escapeHtml(col)}</span>`)
-            .join('');
-        const optionalBadges = (result.optional_columns || [])
-            .map(col => `<span class="badge rounded-pill px-3 py-2 me-1 mb-1" style="background: rgba(212,175,55,0.15); border: 1px solid rgba(212,175,55,0.35); color: #f1d582;">${escapeHtml(col)} (OPTIONAL)</span>`)
-            .join('');
-
-        const previewRowsHtml = uploadPreviewRows.length
-            ? uploadPreviewRows.map((row, index) => `
-                <tr>
-                    <td class="text-white-50">${escapeHtml(row.row_number)}</td>
-                    <td class="text-white">${escapeHtml(row.employee_id)}</td>
-                    <td class="text-white">${escapeHtml(row.employee_name)}</td>
-                    <td class="text-white-50">
-                        ${escapeHtml(row.department_name)}
-                        ${row.source_department_name && row.source_department_name !== row.department_name
-                            ? `<div class="small text-info mt-1">Mapped from ${escapeHtml(row.source_department_name)}</div>`
-                            : ''}
-                    </td>
-                    <td class="text-white-50">${escapeHtml(row.position || 'N/A')}</td>
-                    <td class="text-white-50">${row.action === 'reactivate' ? 'Reactivate existing employee' : 'Create new employee'}</td>
-                    <td class="text-end">
-                        <button type="button" class="btn btn-sm btn-outline-danger delete-preview-row" data-index="${index}">Delete</button>
-                    </td>
-                </tr>
-            `).join('')
-            : `<tr><td colspan="7" class="text-center text-white-50 py-4">No rows left to upload.</td></tr>`;
-
-        const validationErrors = (result.errors || []).length
-            ? `
-                <div class="mt-3">
-                    <div class="fw-bold text-warning mb-2">Rows skipped during validation</div>
-                    <ul class="list-unstyled mb-0" style="font-size: 0.88rem;">
-                        ${result.errors.map(err => `<li class="mb-2 text-white-50"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>${escapeHtml(err)}</li>`).join('')}
-                    </ul>
-                </div>
-            `
-            : '';
-
-        tipContainer.innerHTML = `
-            <div class="alert border-0 rounded-4 mb-3 px-4 py-3" style="background: rgba(13, 202, 240, 0.10); border: 1px solid rgba(13,202,240,0.25) !important;">
-                <div class="d-flex gap-3 align-items-start">
-                    <i class="bi bi-info-circle-fill fs-5 mt-1 text-info"></i>
-                    <div>
-                        <strong class="d-block mb-2 text-info">Required Excel Structure</strong>
-                        <div class="mb-2">${requiredBadges}</div>
-                        <div>${optionalBadges}</div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        content.innerHTML = `
-            <div class="table-responsive">
-                <table class="table table-dark-glass table-sm align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>Row</th>
-                            <th>Employee ID</th>
-                            <th>Employee Name</th>
-                            <th>Department</th>
-                            <th>Position</th>
-                            <th>Result</th>
-                            <th class="text-end">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>${previewRowsHtml}</tbody>
-                </table>
-            </div>
-            ${validationErrors}
-        `;
-
-        footer.innerHTML = `
-            <button type="button" class="btn btn-outline-light px-4 rounded-pill" data-bs-dismiss="modal">Back</button>
-            <button type="button" class="btn btn-primary-gold px-4 rounded-pill" id="confirmUploadPreviewBtn" ${uploadPreviewRows.length ? '' : 'disabled'}>Upload Selected Rows</button>
-        `;
-
-        const modal = bootstrap.Modal.getInstance(addUserModalEl);
-        if (modal) modal.hide();
-        resultModal.show();
-    }
-
-    async function commitPreviewRows() {
-        if (!uploadPreviewRows.length) {
-            showToast('No rows left to upload.', 'warning');
-            return;
-        }
-        const confirmBtn = document.getElementById('confirmUploadPreviewBtn');
-        const resultModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('uploadResultModal'));
-        if (confirmBtn) {
-            confirmBtn.disabled = true;
-            confirmBtn.textContent = 'Uploading...';
-        }
-
-        try {
-            const res = await fetch('/upload_employees/commit', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ rows: uploadPreviewRows })
-            });
-            const result = await parseApiResponseSafe(res);
-            const title = document.getElementById('uploadResultTitle');
-            const subtitle = document.getElementById('uploadResultSubtitle');
-            const content = document.getElementById('uploadResultContent');
-            const tipContainer = document.getElementById('uploadResultTipContainer');
-            const iconContainer = document.getElementById('uploadResultIconContainer');
-            const icon = document.getElementById('uploadResultIcon');
-            const footer = document.getElementById('uploadResultFooter');
-
-            if (res.ok && result && result.success) {
-                iconContainer.style.background = 'rgba(25,135,84,0.15)';
-                icon.className = 'bi bi-check-circle-fill text-success fs-4';
-                const inserted = result.inserted || 0;
-                const reactivated = result.reactivated || 0;
-                title.textContent = (inserted + reactivated) > 0 ? 'Upload Successful' : 'Upload Completed With No Changes';
-                subtitle.textContent = `${inserted} added, ${reactivated} reactivated`;
-                tipContainer.innerHTML = '';
-                content.innerHTML = result.errors && result.errors.length
-                    ? `<ul class="list-unstyled mb-0">${result.errors.map(err => `<li class="mb-2 text-white-50"><i class="bi bi-exclamation-circle text-warning me-2"></i>${escapeHtml(err)}</li>`).join('')}</ul>`
-                    : '<div class="text-center py-2 text-white">All selected rows were processed successfully.</div>';
-                footer.innerHTML = `<button type="button" class="btn btn-outline-light px-4 rounded-pill" data-bs-dismiss="modal">Close</button>`;
-                document.getElementById('uploadResultModal').addEventListener('hidden.bs.modal', function () {
-                    location.reload();
-                }, { once: true });
-            } else {
-                iconContainer.style.background = 'rgba(220,53,69,0.15)';
-                icon.className = 'bi bi-x-circle-fill text-danger fs-4';
-                title.textContent = 'Upload Failed';
-                subtitle.textContent = 'Could not save selected rows';
-                tipContainer.innerHTML = '';
-                content.innerHTML = `<div class="text-danger"><i class="bi bi-exclamation-triangle me-2"></i>${escapeHtml((result && result.error) || 'Unknown upload error')}</div>`;
-                footer.innerHTML = `
-                    <button type="button" class="btn btn-primary-gold px-4 rounded-pill" id="retryUploadPreviewBtn">Try Again</button>
-                    <button type="button" class="btn btn-outline-light px-4 rounded-pill" data-bs-dismiss="modal">Close</button>
-                `;
-            }
-        } catch (err) {
-            resultModal?.hide();
-            showToast('Upload failed.', 'danger', 'Please try again. If the issue persists, refresh the page and retry.');
-        } finally {
-            if (confirmBtn) {
-                confirmBtn.disabled = false;
-                confirmBtn.textContent = 'Upload Selected Rows';
-            }
-        }
-    }
-
-    document.addEventListener('click', function (e) {
-        const deleteBtn = e.target.closest('.delete-preview-row');
-        if (deleteBtn) {
-            const index = Number(deleteBtn.dataset.index);
-            if (!Number.isNaN(index)) {
-                uploadPreviewRows.splice(index, 1);
-                renderUploadPreviewModal({
-                    required_columns: ['EMPLOYEE ID', 'EMPLOYEE NAME', 'DEPARTMENT'],
-                    optional_columns: ['POSITION'],
-                    errors: []
-                });
-            }
-            return;
-        }
-
-        const commitBtn = e.target.closest('#confirmUploadPreviewBtn');
-        if (commitBtn) {
-            commitPreviewRows();
-            return;
-        }
-
-        const retryBtn = e.target.closest('#retryUploadPreviewBtn');
-        if (retryBtn) {
-            commitPreviewRows();
-        }
-    });
-
     if (uploadSubmitBtn) {
         uploadSubmitBtn.addEventListener('click', async function () {
             const file = fileInput && fileInput.files[0];
-            if (!file) {
-                showToast('No file selected.', 'warning', 'Please choose an Excel or CSV file first.');
-                return;
-            }
+            if (!file) { alert('Please select an Excel file first.'); return; }
             const formData = new FormData();
             formData.append('file', file);
             uploadSubmitBtn.disabled = true;
-            uploadSubmitBtn.textContent = 'Validating...';
+            uploadSubmitBtn.textContent = 'Uploading...';
             try {
-                const res = await fetch('/upload_employees/preview', { method: 'POST', body: formData });
-                const result = await parseApiResponseSafe(res);
-                if (res.ok && result && result.success) {
-                    uploadPreviewRows = result.preview_rows || [];
-                    renderUploadPreviewModal(result);
-                } else {
-                    const message = (result && (result.error || (result.errors && result.errors.join('\n'))))
-                        || 'Validation failed. Please check the file format and required columns, then try again.';
-                    showToast('Validation failed.', 'danger', message);
+                const res = await fetch('/upload_employees', { method: 'POST', body: formData });
+                const contentType = res.headers.get("content-type");
+                
+                if (!res.ok || (contentType && contentType.includes("text/html"))) {
+                    console.error("Upload failed with status:", res.status, "Content-Type:", contentType);
+                    const text = await res.text();
+                    console.error("Response snippet:", text.substring(0, 200));
+                    
+                    if (contentType && contentType.includes("text/html") && text.includes("login")) {
+                        alert("Your session has expired. Please refresh the page and log in again.");
+                    } else {
+                        alert("Server error (" + res.status + "). Please check the logs or contact support.");
+                    }
+                    window.location.reload();
+                    return;
                 }
-            } catch (err) {
-                showToast('Validation failed.', 'danger', 'Something went wrong while validating the file. Please try again.');
-            }
-            finally { uploadSubmitBtn.disabled = false; uploadSubmitBtn.textContent = 'Validate File'; }
+                const result = await res.json();
+
+                const resultModalEl = document.getElementById('uploadResultModal');
+                const resultModal = new bootstrap.Modal(resultModalEl);
+                const title = document.getElementById('uploadResultTitle');
+                const subtitle = document.getElementById('uploadResultSubtitle');
+                const content = document.getElementById('uploadResultContent');
+                const iconContainer = document.getElementById('uploadResultIconContainer');
+                const icon = document.getElementById('uploadResultIcon');
+
+                if (result.success) {
+                    const hasErrors = result.errors && result.errors.length > 0;
+
+                    if (result.inserted === 0) {
+                        title.textContent = 'Upload Needs Attention';
+                        subtitle.textContent = 'No records were added';
+                    } else {
+                        title.textContent = hasErrors ? 'Upload Partially Successful' : 'Upload Successful';
+                        subtitle.textContent = `${result.inserted} employee(s) added successfully`;
+                    }
+
+                    const tipContainer = document.getElementById('uploadResultTipContainer');
+                    const paginationContainer = document.getElementById('uploadResultPagination');
+
+                    if (hasErrors) {
+                        iconContainer.style.background = 'rgba(255, 193, 7, 0.15)';
+                        icon.className = 'bi bi-exclamation-triangle-fill text-warning fs-4';
+                        icon.style.color = '';
+
+                        tipContainer.innerHTML = `
+                            <div class="alert border-0 rounded-4 mb-4 px-4 py-3" style="background: rgba(13, 202, 240, 0.12); border: 1px solid rgba(13,202,240,0.2) !important;">
+                                <div class="d-flex gap-3 align-items-start">
+                                    <i class="bi bi-info-circle-fill fs-5 mt-1 text-info"></i>
+                                    <div>
+                                        <strong class="d-block mb-1 text-info" style="font-size: 0.95rem;">Required Excel Format</strong>
+                                        <p class="mb-3 text-white-50" style="font-size: 0.85rem;">To successfully upload records, your file must include these exact column headers. Please ensure no required fields are left blank. If errors persist, verify that your spreadsheet has no hidden columns, empty rows, or duplicate employee IDs.</p>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <span class="badge rounded-pill px-3 py-2" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-weight: 500; letter-spacing: 0.5px;">EMPLOYEE NUMBER</span>
+                                            <span class="badge rounded-pill px-3 py-2" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-weight: 500; letter-spacing: 0.5px;">EMPLOYEE NAME</span>
+                                            <span class="badge rounded-pill px-3 py-2" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-weight: 500; letter-spacing: 0.5px;">DEPARTMENT</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-1 fw-bold text-warning" style="font-size: 0.95rem;">Upload Errors Summary</div>
+                            <p class="text-white-50 mb-3" style="font-size: 0.85rem;">We couldn't add the following rows due to missing information or duplicate employee records:</p>`;
+
+                        let ulHtml = '<ul class="list-unstyled mb-0 pe-2" style="opacity: 0.9; font-size: 0.9rem;">';
+                        result.errors.forEach(err => {
+                            ulHtml += `<li class="mb-2 pb-2 border-bottom border-secondary border-opacity-25 d-flex gap-2 align-items-start"><i class="bi bi-x-circle text-danger mt-1"></i> <span class="text-white-50">${err}</span></li>`;
+                        });
+                        ulHtml += '</ul>';
+                        content.innerHTML = ulHtml;
+                        paginationContainer.innerHTML = '';
+
+                        document.getElementById('uploadResultFooter').innerHTML = `
+                            <button type="button" class="btn btn-primary-gold px-4 rounded-pill" onclick="window.reopenUploadModal()">Upload a New File</button>
+                            <button type="button" class="btn btn-outline-light px-4 rounded-pill" data-bs-dismiss="modal">Exit</button>
+                        `;
+                    } else {
+                        iconContainer.style.background = 'rgba(25,135,84,0.15)';
+                        icon.className = 'bi bi-check-circle-fill text-success fs-4';
+                        icon.style.color = '';
+                        tipContainer.innerHTML = '';
+                        paginationContainer.innerHTML = '';
+                        content.innerHTML = '<div class="text-center py-2 text-white">All records were uploaded and saved successfully!</div>';
+
+                        document.getElementById('uploadResultFooter').innerHTML = `
+                            <button type="button" class="btn btn-primary-gold px-4 rounded-pill" onclick="window.reopenUploadModal()">Add another file</button>
+                            <button type="button" class="btn btn-outline-light px-4 rounded-pill" data-bs-dismiss="modal">Exit</button>
+                        `;
+                    }
+
+                    const modal = bootstrap.Modal.getInstance(addUserModalEl);
+                    if (modal) modal.hide();
+
+                    resultModalEl.addEventListener('hidden.bs.modal', function() {
+                        location.reload();
+                    }, { once: true });
+
+                    resultModal.show();
+
+                } else {
+                    title.textContent = 'Upload Failed';
+                    subtitle.textContent = 'An error occurred during upload';
+                    iconContainer.style.background = 'rgba(220,53,69,0.15)';
+                    icon.className = 'bi bi-x-circle-fill text-danger fs-4';
+                    icon.style.color = '';
+
+                    document.getElementById('uploadResultTipContainer').innerHTML = '';
+                    document.getElementById('uploadResultPagination').innerHTML = '';
+                    content.innerHTML = `<div class="text-danger"><i class="bi bi-exclamation-triangle me-2"></i> ${result.error}</div>`;
+
+                    document.getElementById('uploadResultFooter').innerHTML = `
+                        <button type="button" class="btn btn-primary-gold px-4 rounded-pill" onclick="window.reopenUploadModal()">Upload a New File</button>
+                        <button type="button" class="btn btn-outline-light px-4 rounded-pill" data-bs-dismiss="modal">Exit</button>
+                    `;
+
+                    const modal = bootstrap.Modal.getInstance(addUserModalEl);
+                    if (modal) modal.hide();
+
+                    resultModal.show();
+                }
+            } catch (err) { alert('Request failed: ' + err.message); }
+            finally { uploadSubmitBtn.disabled = false; uploadSubmitBtn.textContent = 'Export'; }
         });
     }
 
@@ -1204,7 +923,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const departmentFilter    = document.getElementById('departmentFilter');
     const dateFilter          = document.getElementById('dateFilter');
     const tableCard           = document.getElementById('tableCard');
-    const activityTableResponsive = tableCard ? tableCard.querySelector('.table-responsive') : null;
     const noResults           = document.getElementById('noResults');
     const resultCount         = document.getElementById('resultCount');
     const paginationContainer = document.getElementById('paginationContainer');
@@ -1308,7 +1026,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (getActivityRows().length === 0) {
             // No rows at all — keep table visible (shows built-in empty row), hide pagination & count
             tableCard.style.display  = '';
-            if (activityTableResponsive) activityTableResponsive.style.display = '';
             noResults.style.display  = 'none';
             resultCount.textContent  = '';
             paginationContainer.classList.remove('show');
@@ -1316,17 +1033,15 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        if (visible === 0) {
+        if (visible === 0 && hasFilters) {
             // Rows exist but none match the current filter
-            tableCard.style.display  = '';
-            if (activityTableResponsive) activityTableResponsive.style.display = 'none';
+            tableCard.style.display  = 'none';
             noResults.style.display  = 'block';
             resultCount.textContent  = '';
             paginationContainer.classList.remove('show');
             paginationContainer.style.display = 'none';
         } else {
             tableCard.style.display  = '';
-            if (activityTableResponsive) activityTableResponsive.style.display = '';
             noResults.style.display  = 'none';
             // Only show count text when a filter is actually active
             resultCount.textContent  = hasFilters
@@ -1345,47 +1060,13 @@ document.addEventListener('DOMContentLoaded', function () {
     // ─── RECORDS FILTER + PAGINATION ─────────────────────────────────────────
     const recordsSearch           = document.getElementById('recordsSearchInput');
     const recordsDeptFilter       = document.getElementById('recordsDepartmentFilter');
-    const recordsStatusFilter     = document.getElementById('recordsStatusFilter');
-    const recordsSortFilter       = document.getElementById('recordsSortFilter');
     const recordsTableCard        = document.getElementById('recordsTableCard');
-    const recordsTableResponsive  = recordsTableCard ? recordsTableCard.querySelector('.table-responsive') : null;
-    const recordsTableBody        = document.getElementById('recordsTableBody');
     const recordsNoResults        = document.getElementById('recordsNoResults');
     const recordsResultCount      = document.getElementById('recordsResultCount');
     const recordsPaginationContainer = document.getElementById('recordsPaginationContainer');
     const recordsPaginationList   = document.getElementById('recordsPaginationList');
     const getRecordRows           = () => document.querySelectorAll('.employee-record-row');
     let recordsCurrentPage = 1;
-
-    function sortRecordsRows() {
-        if (!recordsTableBody) return;
-
-        const sortValue = recordsSortFilter ? recordsSortFilter.value : 'recent';
-        const rows = Array.from(getRecordRows());
-        const compareText = (left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' });
-
-        rows.sort((rowA, rowB) => {
-            const nameA = rowA.dataset.name || '';
-            const nameB = rowB.dataset.name || '';
-            const deptA = rowA.dataset.dept || '';
-            const deptB = rowB.dataset.dept || '';
-            const orderA = Number(rowA.dataset.addedOrder || 0);
-            const orderB = Number(rowB.dataset.addedOrder || 0);
-
-            if (sortValue === 'name-asc') {
-                return compareText(nameA, nameB) || (orderB - orderA);
-            }
-            if (sortValue === 'name-desc') {
-                return compareText(nameB, nameA) || (orderB - orderA);
-            }
-            if (sortValue === 'group') {
-                return compareText(deptA, deptB) || compareText(nameA, nameB) || (orderB - orderA);
-            }
-            return (orderB - orderA) || compareText(nameA, nameB);
-        });
-
-        rows.forEach(row => recordsTableBody.appendChild(row));
-    }
 
     function getRecordsVisibleCount() {
         return Array.from(getRecordRows()).filter(r => r.dataset.filterVisible !== 'false').length;
@@ -1413,20 +1094,17 @@ document.addEventListener('DOMContentLoaded', function () {
     function applyRecordsFilter() {
         const search  = recordsSearch  ? recordsSearch.value.trim().toLowerCase()  : '';
         const deptVal = recordsDeptFilter ? recordsDeptFilter.value.toLowerCase()   : '';
-        const statusVal = recordsStatusFilter ? recordsStatusFilter.value.toLowerCase() : 'active';
         let visible   = 0;
 
         getRecordRows().forEach(row => {
             const name = row.dataset.name || '';
             const dept = row.dataset.dept || '';
             const id   = row.dataset.id   || '';
-            const status = (row.dataset.status || '').toLowerCase();
 
             const matchSearch = !search   || name.includes(search) || id.includes(search) || dept.includes(search);
             const matchDept   = !deptVal  || dept === deptVal;
-            const matchStatus = statusVal === 'all' || status === 'active';
 
-            if (matchSearch && matchDept && matchStatus) {
+            if (matchSearch && matchDept) {
                 row.dataset.filterVisible = 'true';
                 visible++;
             } else {
@@ -1434,9 +1112,8 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        sortRecordsRows();
         recordsCurrentPage = 1;
-        const hasFilters = search || deptVal || statusVal !== 'active';
+        const hasFilters = search || deptVal;
 
         if (getRecordRows().length === 0) {
             // No rows at all — keep table + filters visible, hide extra UI
@@ -1448,15 +1125,15 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        if (visible === 0) {
+        if (visible === 0 && hasFilters) {
                 // Rows exist but nothing matches — hide only the table, keep controls visible
-            if (recordsTableResponsive) recordsTableResponsive.style.display = 'none';
+            recordsTableCard.querySelector('.table-responsive').style.display = 'none';
             recordsNoResults.style.display  = 'block';
             recordsResultCount.textContent  = '';
             recordsPaginationContainer.classList.remove('show');
             recordsPaginationContainer.style.display = 'none';
         } else {
-            if (recordsTableResponsive) recordsTableResponsive.style.display = '';
+            recordsTableCard.querySelector('.table-responsive').style.display = '';
             recordsNoResults.style.display  = 'none';
             // Only show count when a filter is active
             recordsResultCount.textContent  = hasFilters
@@ -1469,8 +1146,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (recordsSearch)     recordsSearch.addEventListener('input',  applyRecordsFilter);
     if (recordsDeptFilter) recordsDeptFilter.addEventListener('change', applyRecordsFilter);
-    if (recordsStatusFilter) recordsStatusFilter.addEventListener('change', applyRecordsFilter);
-    if (recordsSortFilter) recordsSortFilter.addEventListener('change', applyRecordsFilter);
 
 
     // ─── EDIT OVERLAY ─────────────────────────────────────────────────────────
@@ -1483,54 +1158,30 @@ document.addEventListener('DOMContentLoaded', function () {
     const cancelEdit       = document.getElementById('cancelEditEmployee');
 
     function showEditCard(row, mode) {
-        const isActivityRow = row.classList.contains('employee-row');
-        const id = isActivityRow
-            ? (row.getAttribute('data-employee-id-original') || row.getAttribute('data-employee-id') || '')
-            : (row.getAttribute('data-id-original') || row.getAttribute('data-id') || '');
-        const name = isActivityRow
-            ? (row.getAttribute('data-employee-name-original') || row.querySelector('td:nth-child(1) span')?.textContent.trim() || '')
-            : (row.getAttribute('data-name-original') || row.querySelector('td:nth-child(2)')?.textContent.trim() || '');
-        const dept = isActivityRow
-            ? (row.getAttribute('data-department-original') || row.getAttribute('data-department') || '')
-            : (row.getAttribute('data-dept-original') || row.querySelector('td:nth-child(3)')?.textContent.trim() || '');
-        const departmentId = isActivityRow
-            ? (row.getAttribute('data-department-id-original') || '')
-            : (row.getAttribute('data-dept-id-original') || '');
-        const rawPosition = row.getAttribute('data-position-original')
-            || row.getAttribute('data-position')
-            || '';
-        const positionDisplay = row.getAttribute('data-position-display')
-            || (isActivityRow ? 'N/A' : row.querySelector('td:nth-child(4)')?.textContent.trim())
-            || 'N/A';
+        const id       = row.querySelector('td:nth-child(1)').textContent.trim();
+        const name     = row.querySelector('td:nth-child(2)').textContent.trim();
+        const dept     = row.querySelector('td:nth-child(3)').textContent.trim();
+        const position = row.querySelector('td:nth-child(4)').textContent.trim();
 
         editEmployeeId.value   = id;
         editEmployeeName.value = name;
-        editDepartmentId.value = departmentId;
-        editPosition.value     = mode === 'view' ? positionDisplay : rawPosition;
+        editDepartmentId.value = dept;
+        editPosition.value     = position;
 
         const title = document.querySelector('#employeeEditCard h5');
         const desc  = document.querySelector('#employeeEditCard p');
+        const inputs = [editEmployeeName, editDepartmentId, editPosition];
 
         if (mode === 'view') {
             title.textContent = 'View Employee Details';
             desc.textContent  = 'Read-only view of the employee details.';
             saveEmployeeEdit.style.display = 'none';
-            editEmployeeName.readOnly = true;
-            editDepartmentId.disabled = true;
-            editPosition.readOnly = true;
+            inputs.forEach(i => i.readOnly = true);
         } else {
             title.textContent = 'Edit Employee Record';
-            desc.textContent  = 'Update the employee details and save the changes. Position is optional.';
+            desc.textContent  = 'Update the employee details and save the changes.';
             saveEmployeeEdit.style.display = 'block';
-            editEmployeeName.readOnly = false;
-            editDepartmentId.disabled = false;
-            editPosition.readOnly = false;
-            editPosition.value = rawPosition;
-        }
-
-        if (!editDepartmentId.value && dept) {
-            const fallbackOption = Array.from(editDepartmentId.options).find(option => option.textContent.trim() === dept.trim());
-            if (fallbackOption) editDepartmentId.value = fallbackOption.value;
+            inputs.forEach(i => i.readOnly = false);
         }
 
         editOverlay.classList.remove('d-none');
@@ -1539,7 +1190,6 @@ document.addEventListener('DOMContentLoaded', function () {
     function hideEditCard() {
         editOverlay.classList.add('d-none');
         [editEmployeeId, editEmployeeName, editDepartmentId, editPosition].forEach(i => i.value = '');
-        editDepartmentId.disabled = false;
     }
 
     if (cancelEdit) cancelEdit.addEventListener('click', hideEditCard);
@@ -1569,10 +1219,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 department_id: editDepartmentId.value.trim(),
                 position:      editPosition.value.trim()
             };
-            if (!payload.employee_id || !payload.employee_name || !payload.department_id) {
-                showToast('Missing fields.', 'warning', 'Please fill in Employee ID, Employee Name, and Department before updating.');
+            if (!payload.employee_id || !payload.employee_name || !payload.department_id || !payload.position) {
+                window.showSystemFeedback('Please fill in all fields before updating.', 'error');
                 return;
             }
+
             fetch('/update_employee', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1582,64 +1233,49 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(data => {
                 if (data.success) {
                     hideEditCard();
-                    showToast('Employee record updated successfully.', 'success', `${payload.employee_name.toUpperCase()} has been updated.`);
+                    showToast('Employee record updated successfully.');
                     setTimeout(() => location.reload(), 1800);
-                } else {
-                    showToast('Update failed.', 'danger', (data && data.error) || 'Could not update employee.');
-                }
-            })
-            .catch(() => {
-                showToast('Server error.', 'danger', 'Could not reach the server. Please try again.');
+                } else { window.showSystemFeedback('Update failed: ' + data.error, 'error'); }
+
             });
         });
     }
 
 
     // ─── DELETE RECORD ────────────────────────────────────────────────────────
-    async function handleDeleteEmployee(row) {
-        const isActivityRow = row.classList.contains('employee-row');
-        const employeeId = isActivityRow
-            ? (row.getAttribute('data-employee-id-original') || row.getAttribute('data-employee-id') || '')
-            : (row.getAttribute('data-id-original') || row.getAttribute('data-id') || '');
-        const name = isActivityRow
-            ? (row.getAttribute('data-employee-name-original') || row.querySelector('td:nth-child(1) span')?.textContent.trim() || 'this employee')
-            : (row.getAttribute('data-name-original') || row.querySelector('td:nth-child(2)')?.textContent.trim() || 'this employee');
-
-        const confirmed = await showConfirm(
-            `Delete "${name}"?`,
-            'This is a soft delete, so the employee will stay in the database as inactive.'
-        );
-        if (!confirmed) return;
-
-        try {
-            const res = await fetch('/delete_employee', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ employee_id: employeeId })
-            });
-            const data = await parseApiResponseSafe(res);
-            if (res.ok && data && data.success) {
-                showToast(
-                    data.already_inactive ? 'Employee is already inactive.' : 'Employee deleted successfully.',
-                    data.already_inactive ? 'info' : 'success',
-                    data.already_inactive
-                        ? `${name} is already inactive.`
-                        : `${name} has been marked inactive.`
-                );
-                setTimeout(() => location.reload(), 1800);
-            } else {
-                showToast('Delete failed.', 'danger', (data && data.error) || 'Could not delete employee.');
-            }
-        } catch (_) {
-            showToast('Delete failed.', 'danger', 'Could not delete employee.');
-        }
-    }
+    let pendingDeleteId = null;
 
     document.addEventListener('click', function (e) {
-        const btn = e.target.closest('.delete-employee, .delete-employee-record');
+        const btn = e.target.closest('.delete-employee-record');
         if (!btn) return;
-        const row = btn.closest('tr');
-        if (row) handleDeleteEmployee(row);
+        pendingDeleteId = btn.dataset.id;
+        document.getElementById('confirmDeleteMsg').textContent =
+            `Are you sure you want to delete employee ${pendingDeleteId}? This cannot be undone.`;
+        document.getElementById('confirmDeleteToast').style.display = 'block';
+    });
+
+    document.getElementById('cancelDeleteBtn').addEventListener('click', function () {
+        document.getElementById('confirmDeleteToast').style.display = 'none';
+        pendingDeleteId = null;
+    });
+
+    document.getElementById('confirmDeleteBtn').addEventListener('click', function () {
+        if (!pendingDeleteId) return;
+        document.getElementById('confirmDeleteToast').style.display = 'none';
+        fetch('/delete_employee', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ employee_id: pendingDeleteId })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Employee deleted successfully.');
+                setTimeout(() => location.reload(), 1800);
+            } else { window.showSystemFeedback('Delete failed: ' + data.error, 'error'); }
+
+        });
+        pendingDeleteId = null;
     });
 
 

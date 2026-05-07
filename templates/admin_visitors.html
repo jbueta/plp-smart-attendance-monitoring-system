@@ -15,6 +15,7 @@
     <hr>
     <ul class="nav nav-pills flex-column mb-auto">
         <li><a href="{{ url_for('dashboard') }}" class="nav-link"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+        <li><a href="{{ url_for('announcement_manager') }}" class="nav-link"><i class="bi bi-megaphone"></i> Announcements</a></li>
         <li><a href="{{ url_for('manage_events') }}" class="nav-link"><i class="bi bi-calendar-event"></i> Events</a></li>
         <li><a href="{{ url_for('admin_visitors') }}" class="nav-link active"><i class="bi bi-person-lines-fill"></i> Visitors</a></li>
         <li><a href="{{ url_for('admin_employees') }}" class="nav-link"><i class="bi bi-person-badge"></i> Employees</a></li>
@@ -113,17 +114,7 @@
 
     <style>
         .visitor-action-menu {
-            background: rgba(33, 37, 41, 0.95);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        .visitor-action-menu .dropdown-item {
-            color: #fff;
-        }
-        .visitor-action-menu .dropdown-item:hover,
-        .visitor-action-menu .dropdown-item:focus {
-            background-color: #d4af37;
-            color: #051a10;
+            /* Inherit from global .dropdown-menu and .dropdown-item in style.css */
         }
         .dropdown .btn {
             width: 2rem;
@@ -613,37 +604,13 @@
 <!-- ===================== CONFIRM DIALOG ===================== -->
 <div id="confirmOverlay" class="d-none position-fixed top-0 start-0 w-100 h-100"
     style="background: rgba(0,0,0,0.55); backdrop-filter: blur(6px); z-index: 9998; display: flex; align-items: center; justify-content: center;">
-    <div style="
-        background: rgba(10,40,25,0.98);
-        border: 1px solid rgba(239,68,68,0.3);
-        border-radius: 20px;
-        padding: 32px 28px;
-        min-width: 320px;
-        max-width: 400px;
-        box-shadow: 0 24px 60px rgba(0,0,0,0.6);
-        text-align: center;
-        animation: toastSlideIn 0.25s cubic-bezier(0.34,1.56,0.64,1) forwards;
-    ">
-        <div style="
-            width:52px; height:52px; border-radius:50%;
-            background:#ef4444; margin: 0 auto 16px;
-            display:flex; align-items:center; justify-content:center;
-            box-shadow: 0 0 0 8px rgba(239,68,68,0.15);
-        ">
-            <i class="bi bi-exclamation-triangle-fill" style="font-size:1.4rem; color:#fff;"></i>
+    <div class="confirm-modal-content">
+        <div class="confirm-icon-box">
+            <i class="bi bi-exclamation-triangle-fill"></i>
         </div>
-        <h6 id="confirmTitle" style="color:#fff; font-weight:700; font-size:1rem; margin-bottom:8px;"></h6>
-        <p id="confirmSubtitle" style="color:rgba(255,255,255,0.55); font-size:0.83rem; margin-bottom:24px;"></p>
+        <h6 id="confirmTitle" class="confirm-title"></h6>
+        <p id="confirmSubtitle" class="confirm-subtitle"></p>
         <div class="d-flex gap-3 justify-content-center">
-            <button id="confirmCancelBtn" style="
-                flex:1; padding:10px; border-radius:12px;
-                background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15);
-                color:#fff; font-weight:600; cursor:pointer; font-size:0.9rem;
-                transition: background 0.2s;
-            " onmouseover="this.style.background='rgba(255,255,255,0.15)'"
-               onmouseout="this.style.background='rgba(255,255,255,0.08)'">Cancel</button>
-            <button id="confirmOkBtn" style="
-                flex:1; padding:10px; border-radius:12px;
                 background:#ef4444; border:none;
                 color:#fff; font-weight:700; cursor:pointer; font-size:0.9rem;
                 transition: background 0.2s;
@@ -1263,8 +1230,9 @@
                             window.location.reload();
                         })
                         .catch(error => {
-                            alert(error.message || 'Failed to delete visitor.');
+                            window.showSystemFeedback(error.message || 'Failed to delete visitor.', 'error');
                         });
+
                     });
                 }
             });
@@ -1305,8 +1273,9 @@
                             window.location.reload();
                         })
                         .catch(error => {
-                            alert(error.message || 'Failed to update visitor.');
+                            window.showSystemFeedback(error.message || 'Failed to update visitor.', 'error');
                         });
+
                     }
                 } else {
                     editVisitorForm.reportValidity();

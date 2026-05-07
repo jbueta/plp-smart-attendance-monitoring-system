@@ -169,9 +169,10 @@ function submitManualEntry(type, manualId = null) {
     const id = manualId !== null ? manualId : inputElement.value.trim();
     
     if (!id) {
-        alert("Please enter an ID");
+        window.showSystemFeedback("Please enter an ID", 'error');
         return;
     }
+
 
     if (inputElement && !inputElement.checkValidity()) {
         inputElement.reportValidity();
@@ -224,16 +225,24 @@ function submitManualEntry(type, manualId = null) {
                     document.getElementById(idField).value = '';
                 }
 
+                // [ANNOUNCEMENT FEATURE] - Update context for targeted/departmental bulletins
+                window.lastScannedId = id;
+                window.currentDept = data.log ? data.log.dept : null;
+                if (typeof window.fetchBulletins === 'function') window.fetchBulletins();
+                if (typeof window.fetchActiveAlerts === 'function') window.fetchActiveAlerts();
+
             } else {
-                alert(data.message || "Failed to log attendance.");
+                window.showSystemFeedback(data.message || "Failed to log attendance.", 'error');
                 if (typeof showScanBanner === 'function') showScanBanner('error', { id: id });
             }
+
         })
         .catch(err => {
             console.error('Manual entry error:', err);
-            alert(`Error: ${err.message}`);
+            window.showSystemFeedback(`Error: ${err.message}`, 'error');
             if (typeof showScanBanner === 'function') showScanBanner('error', { id: id });
         });
+
     } else {
         // Fallback to general authentication (students, visitor, etc.)
         const requestedLogType = window.GENERAL_KIOSK_ACTION || null;
@@ -273,16 +282,24 @@ function submitManualEntry(type, manualId = null) {
                     document.getElementById(idField).value = '';
                 }
 
+                // [ANNOUNCEMENT FEATURE] - Update context for targeted/departmental bulletins
+                window.lastScannedId = id;
+                window.currentDept = data.affiliation;
+                if (typeof window.fetchBulletins === 'function') window.fetchBulletins();
+                if (typeof window.fetchActiveAlerts === 'function') window.fetchActiveAlerts();
+
                 appendToLiveFeed(data.name, data.affiliation, logType);
             } else {
-                alert(data.message || data.Invalid || "ID not found!");
+                window.showSystemFeedback(data.message || data.Invalid || "ID not found!", 'error');
                 if (typeof showScanBanner === 'function') showScanBanner('error', { id: id });
             }
+
         })
         .catch(err => {
             console.error('General auth error:', err);
-            alert("Connection error: " + err.message + ". Please try again.");
+            window.showSystemFeedback("Connection error: " + err.message + ". Please try again.", 'error');
             if (typeof showScanBanner === 'function') showScanBanner('error', { id: id });
         });
+
     }
 }

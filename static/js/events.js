@@ -239,8 +239,9 @@ function updateStatus(attendanceId, newStatus, selectElement) {
         if(data.success) {
             fetchAttendanceData(currentInstanceId); 
         } else {
-            alert('Failed to update status.');
+            window.showSystemFeedback('Failed to update status.', 'error');
         }
+
     })
     .catch(error => console.error("Update Error:", error));
 }
@@ -270,22 +271,25 @@ function deleteSingleEvent(eventId) {
             
             console.log(data.message); 
         } else {
-            alert(data.message || 'Failed to delete event.');
+            window.showSystemFeedback(data.message || 'Failed to delete event.', 'error');
         }
+
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('A network error occurred while trying to delete the event.');
+        window.showSystemFeedback('A network error occurred while trying to delete the event.', 'error');
     });
+
 }
 
 function deleteSelectedEvents() {
     const selectedCheckboxes = document.querySelectorAll('.event-checkbox:checked');
     
     if (selectedCheckboxes.length === 0) {
-        alert("Please select at least one event to delete.");
+        window.showSystemFeedback("Please select at least one event to delete.", 'error');
         return;
     }
+
 
     const eventIds = Array.from(selectedCheckboxes).map(cb => cb.value);
 
@@ -315,13 +319,15 @@ function deleteSelectedEvents() {
             toggleSelectionMode(); 
             console.log(data.message);
         } else {
-            alert(data.message || 'Failed to delete selected events.');
+            window.showSystemFeedback(data.message || 'Failed to delete selected events.', 'error');
         }
+
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('A network error occurred while trying to delete events.');
+        window.showSystemFeedback('A network error occurred while trying to delete events.', 'error');
     });
+
 }
 
 function filterEvents() {
@@ -337,7 +343,7 @@ function filterEvents() {
 
         if (nameCell && dateCell) {
             const eventName = nameCell.textContent.toLowerCase();
-            const eventDate = dateCell.textContent.trim();
+            const eventDate = dateCell.getAttribute('data-date') || dateCell.textContent.trim();
 
             const matchesSearch = eventName.includes(searchQuery);
             const matchesDate = (dateQuery === "") || (eventDate === dateQuery);

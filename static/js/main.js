@@ -5,7 +5,31 @@ document.addEventListener('DOMContentLoaded', () => {
     initAnimations();
     initInstanceGeneratorToast();
     populateRandomStudentRecords();
+    initSystemFeedback();
 });
+
+function initSystemFeedback() {
+    window.showSystemFeedback = function (message, type = 'success') {
+        const indicator = document.getElementById('system-feedback-indicator');
+        const icon = document.getElementById('feedback-icon');
+        const messageEl = document.getElementById('feedback-message');
+
+        if (!indicator || !icon || !messageEl) return;
+
+        // Update content
+        messageEl.textContent = message;
+
+        // Update style
+        indicator.classList.remove('success', 'error');
+        indicator.classList.add(type);
+
+        icon.className = type === 'success' ? 'bi bi-check-circle-fill' : 'bi bi-exclamation-triangle-fill';
+
+        // Show
+        indicator.classList.add('show');
+    };
+}
+
 
 function initInstanceGeneratorToast() {
     const toast = document.getElementById('instance-generator-toast');
@@ -131,56 +155,68 @@ function showSuccessOverlay(type, manualData = null) {
     const overlayStatus = document.getElementById('scan-status');
     const overlayRing = document.getElementById('scan-ring');
 
-    // Randomize Data (if not manual)
-    const names = ["Juan Dela Cruz", "Maria Clara", "Jose Rizal", "Andres Bonifacio"];
-    const depts = ["College of Computer Studies", "College of Nursing", "College of Engineering", "College of Arts"];
-    let randIndex = Math.floor(Math.random() * names.length);
+    // Setup Data
+    let name = manualData ? (manualData.name || "Unknown User") : "User";
+    let id = manualData ? (manualData.id || "N/A") : "N/A";
+    let dept = manualData ? (manualData.affiliation || "Department") : "Department";
 
-    let name = names[randIndex];
-    let dept = depts[randIndex];
-    let id = "2026-00" + Math.floor(Math.random() * 9000 + 1000);
-
-    // Override with Manual Data if provided
-    if (manualData) {
-        name = manualData.name || "Unknown User";
-        id = manualData.id || "N/A";
-        // Dept is mocked for manual entry for now
-        dept = manualData.affiliation
-    }
-
-    overlayName.innerText = name;
-    overlayId.innerText = "ID: " + id;
+    // Update overlay content if elements exist
+    if (overlayName) overlayName.innerText = name;
+    if (overlayId) overlayId.innerText = "ID: " + id;
 
     if (type === 'entry') {
-        overlayTitle.innerText = "ACCESS GRANTED";
-        overlayTitle.className = "display-6 fw-bold text-success mb-2";
-        overlayStatus.innerText = "ENTRY RECORDED • " + dept;
-        overlayRing.className = "rounded-circle border border-5 border-success p-1 mb-3";
+        if (overlayTitle) {
+            overlayTitle.innerText = "ACCESS GRANTED";
+            overlayTitle.className = "display-6 fw-bold text-success mb-2";
+        }
+        if (overlayStatus) overlayStatus.innerText = "ENTRY RECORDED • " + dept;
+        if (overlayRing) overlayRing.className = "rounded-circle border border-5 border-success p-1 mb-3 d-inline-block";
     } else if (type === 'employee') {
-        overlayTitle.innerText = "ATTENDANCE LOGGED";
-        overlayTitle.className = "display-6 fw-bold text-gold mb-2";
-        overlayStatus.innerText = "FLAG CEREMONY: PRESENT";
-        overlayRing.className = "rounded-circle border border-5 border-warning p-1 mb-3";
+        if (overlayTitle) {
+            overlayTitle.innerText = "ATTENDANCE LOGGED";
+            overlayTitle.className = "display-6 fw-bold text-gold mb-2";
+        }
+        if (overlayStatus) overlayStatus.innerText = "FLAG CEREMONY: PRESENT";
+        if (overlayRing) overlayRing.className = "rounded-circle border border-5 border-warning p-1 mb-3 d-inline-block";
     } else if (type === 'employee-out') {
-        overlayTitle.innerText = "LOGGED OUT";
-        overlayTitle.className = "display-6 fw-bold text-info mb-2";
-        overlayStatus.innerText = "TIME OUT RECORDED";
-        overlayRing.className = "rounded-circle border border-5 border-info p-1 mb-3";
+        if (overlayTitle) {
+            overlayTitle.innerText = "LOGGED OUT";
+            overlayTitle.className = "display-6 fw-bold text-info mb-2";
+        }
+        if (overlayStatus) overlayStatus.innerText = "TIME OUT RECORDED";
+        if (overlayRing) overlayRing.className = "rounded-circle border border-5 border-info p-1 mb-3 d-inline-block";
     } else {
-        overlayTitle.innerText = "EXIT RECORDED";
-        overlayTitle.className = "display-6 fw-bold text-info mb-2";
-        overlayStatus.innerText = "SEE YOU TOMORROW • " + dept;
-        overlayRing.className = "rounded-circle border border-5 border-info p-1 mb-3";
+        if (overlayTitle) {
+            overlayTitle.innerText = "EXIT RECORDED";
+            overlayTitle.className = "display-6 fw-bold text-info mb-2";
+        }
+        if (overlayStatus) overlayStatus.innerText = "SEE YOU TOMORROW • " + dept;
+        if (overlayRing) overlayRing.className = "rounded-circle border border-5 border-info p-1 mb-3 d-inline-block";
     }
 
-    overlay.classList.remove('d-none');
-    overlay.classList.add('d-flex');
+    // Only show visual overlay if it's a visitor
+    const isVisitor = id === 'VISITOR' || (id && String(id).startsWith('VT-'));
+    
+    if (overlay && isVisitor) {
+        overlay.classList.remove('d-none');
+        overlay.classList.add('d-flex');
 
-    setTimeout(() => {
-        overlay.classList.remove('d-flex');
-        overlay.classList.add('d-none');
-    }, 1500);
+        setTimeout(() => {
+            overlay.classList.remove('d-flex');
+            overlay.classList.add('d-none');
+        }, 1500);
+    }
+
+    // [MODERNIZED FEEDBACK] - Always show the top indicator for ALL successful scans
+    if (window.showSystemFeedback) {
+        const feedbackMsg = type === 'entry' ? `Access Granted: Welcome, ${name}` :
+                           type === 'employee' ? `Attendance Logged: ${name}` :
+                           type === 'employee-out' ? `Logged Out: ${name}` :
+                           `Exit Recorded: Goodbye, ${name}`;
+        window.showSystemFeedback(feedbackMsg, 'success');
+    }
 }
+
 
 function initAnimations() {
     const cards = document.querySelectorAll('.transition-hover');
