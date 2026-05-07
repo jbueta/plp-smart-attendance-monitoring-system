@@ -72,7 +72,7 @@
                     <div class="mt-3 pt-3 border-top border-secondary bulletin-container">
                         <div class="d-flex align-items-center mb-1">
                             <i class="bi bi-info-circle-fill text-info me-2"></i>
-                            <small id="bulletin-category" class="fw-bold text-info">ANNOUNCEMENT</small>
+                            <small id="bulletin-category" class="fw-bold text-info">HR MEMO</small>
                             <small id="bulletin-source" class="ms-2 text-white-50">PLP Attendance Monitoring System</small>
                         </div>
                         <p id="bulletin-title" class="fw-bold text-white small mb-1">Status Update</p>
@@ -108,13 +108,15 @@
     {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/kiosk.js') }}"></script>
-<script src="{{ url_for('static', filename='js/announcement_bulletin_kiosk.js') }}"></script>
-<script src="{{ url_for('static', filename='js/announcement_paging_kiosk.js') }}"></script>
 <script>
     window.currentEventId = JSON.parse('{{ event_id|tojson|safe }}');
     window.currentInstanceId = JSON.parse('{{ instance_id|tojson|safe }}');
     window.currentEventName = JSON.parse('{{ event_name|tojson|safe }}');
+</script>
+<script src="{{ url_for('static', filename='js/kiosk.js') }}"></script>
+<script src="{{ url_for('static', filename='js/announcement_bulletin_kiosk.js') }}"></script>
+<script src="{{ url_for('static', filename='js/announcement_paging_kiosk.js') }}"></script>
+<script>
 
     // Live clock (unchanged)
     function updateClock() {
