@@ -6,22 +6,6 @@
 
 <!-- Page content -->
 {% block content %}
-<!-- Full Screen Scan Overlay (Hidden by default) -->
-<div id="scan-overlay"
-    class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-75 d-none align-items-center justify-content-center"
-    style="z-index: 2000; backdrop-filter: blur(10px);">
-    <div class="card-glass p-5 text-center shadow-lg" style="min-width: 400px; transform: scale(1.1);">
-        <div id="scan-ring" class="rounded-circle border border-5 border-success p-1 mb-3 d-inline-block">
-            <i class="bi bi-person-circle text-white display-1"></i>
-        </div>
-        <h2 id="scan-title" class="display-6 fw-bold text-success mb-2">ACCESS GRANTED</h2>
-        <h3 id="scan-name" class="h2 text-white mb-0">Juan Dela Cruz</h3>
-        <p id="scan-id" class="text-white-50 font-monospace mb-3">ID: 2026-01234</p>
-        <div class="badge bg-white bg-opacity-10 text-white px-3 py-2 rounded-pill">
-            <i class="bi bi-check-circle-fill me-2 text-success"></i><span id="scan-status">ENTRY RECORDED</span>
-        </div>
-    </div>
-</div>
 
 <div id="visitor-welcome-overlay"
     class="position-fixed top-0 start-0 w-100 h-100 {% if visitor_welcome %}d-flex{% else %}d-none{% endif %} align-items-center justify-content-center px-3"
@@ -140,14 +124,14 @@
             </div>
 
             <!-- NEW: Campus Bulletin -->
-            <div class="card-glass p-4 bg-gradient"
+            <div class="card-glass p-4 bg-gradient bulletin-container"
                 style="background: linear-gradient(135deg, rgba(11, 125, 63, 0.4), rgba(5, 26, 16, 0.8));">
                 <div class="d-flex align-items-center mb-2">
-                    <span class="badge bg-warning text-dark me-2">{{ kiosk_data.bulletin.tag }}</span>
-                    <small class="text-white-50">{{ kiosk_data.bulletin.author }}</small>
+                    <span id="bulletin-category" class="badge bg-warning text-dark me-2">{{ kiosk_data.bulletin.tag }}</span>
+                    <small id="bulletin-source" class="text-white-50">{{ kiosk_data.bulletin.author }}</small>
                 </div>
-                <h5 class="fw-bold mb-1">{{ kiosk_data.bulletin.title }}</h5>
-                <p class="small text-white-50 mb-0">{{ kiosk_data.bulletin.body }}</p>
+                <h5 id="bulletin-title" class="fw-bold mb-1">{{ kiosk_data.bulletin.title }}</h5>
+                <p id="bulletin-body" class="small text-white-50 mb-0">{{ kiosk_data.bulletin.body }}</p>
             </div>
         </div>
     </div>
@@ -258,6 +242,11 @@
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/kiosk.js') }}"></script>
 <script>
+    window.currentEventName = "General Attendance";
+</script>
+<script src="{{ url_for('static', filename='js/announcement_bulletin_kiosk.js') }}"></script>
+<script src="{{ url_for('static', filename='js/announcement_paging_kiosk.js') }}"></script>
+<script>
     window.GENERAL_KIOSK_ACTION = 'Entry';
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -357,7 +346,7 @@
                         'entry'
                     );
                 } catch (error) {
-                    alert(error.message || 'Visitor check-in failed.');
+                    window.showSystemFeedback(error.message || 'Visitor check-in failed.', 'error');
                 } finally {
                     if (submitButton) {
                         submitButton.disabled = false;
@@ -481,6 +470,12 @@
                                 });
 
                                 appendToLiveFeed(data.name, data.affiliation, logType);
+                                
+                                // [ANNOUNCEMENT FEATURE] - Update context for targeted/departmental bulletins
+                                window.lastScannedId = extractedId;
+                                window.currentDept = data.affiliation;
+                                if (typeof window.fetchBulletins === 'function') window.fetchBulletins();
+                                if (typeof window.fetchActiveAlerts === 'function') window.fetchActiveAlerts();
                             } else {
                                 frame.style.borderColor = '#ef4444';
                                 feedText.innerText = data.message || data.Invalid || "SCAN FAILED";
