@@ -6,23 +6,6 @@
 
     <!-- Page content -->
     {% block content %}
-    <!-- Full Screen Scan Overlay (Hidden by default) -->
-    <div id="scan-overlay"
-        class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-75 d-none align-items-center justify-content-center"
-        style="z-index: 2000; backdrop-filter: blur(10px);">
-        <div class="card-glass p-5 text-center shadow-lg" style="min-width: 400px; transform: scale(1.1);">
-            <div id="scan-ring" class="rounded-circle border border-5 border-success p-1 mb-3 d-inline-block">
-                <i class="bi bi-person-badge text-white display-1"></i>
-            </div>
-            <h2 id="scan-title" class="display-6 fw-bold text-success mb-2">ATTENDANCE LOGGED</h2>
-            <h3 id="scan-name" class="h2 text-white mb-0">Faculty Member</h3>
-            <p id="scan-id" class="text-white-50 font-monospace mb-3">ID: 00001</p>
-            <div class="badge bg-white bg-opacity-10 text-white px-3 py-2 rounded-pill">
-                <i class="bi bi-check-circle-fill me-2 text-success"></i><span id="scan-status">FLAG CEREMONY:
-                    PRESENT</span>
-            </div>
-        </div>
-    </div>
 
     <div class="container py-4 d-flex flex-column min-vh-100">
         <!-- Header -->
@@ -86,12 +69,14 @@
                         <!-- Logs will be inserted here by JavaScript -->
                     </div>
                     <!-- Bulletin for Employees -->
-                    <div class="mt-3 pt-3 border-top border-secondary">
+                    <div class="mt-3 pt-3 border-top border-secondary bulletin-container">
                         <div class="d-flex align-items-center mb-1">
                             <i class="bi bi-info-circle-fill text-info me-2"></i>
-                            <small class="fw-bold text-info">HR MEMO</small>
+                            <small id="bulletin-category" class="fw-bold text-info">HR MEMO</small>
+                            <small id="bulletin-source" class="ms-2 text-white-50">PLP Attendance Monitoring System</small>
                         </div>
-                        <p class="small text-white-50 mb-0">Submission of IPCR is due on Friday. Please coordinate with your department heads.</p>
+                        <p id="bulletin-title" class="fw-bold text-white small mb-1">Status Update</p>
+                        <p id="bulletin-body" class="small text-white-50 mb-0">No announcements displayed at this time.</p>
                     </div>
                 </div>
             </div>
@@ -123,10 +108,15 @@
     {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/kiosk.js') }}"></script>
 <script>
     window.currentEventId = JSON.parse('{{ event_id|tojson|safe }}');
     window.currentInstanceId = JSON.parse('{{ instance_id|tojson|safe }}');
+    window.currentEventName = JSON.parse('{{ event_name|tojson|safe }}');
+</script>
+<script src="{{ url_for('static', filename='js/kiosk.js') }}"></script>
+<script src="{{ url_for('static', filename='js/announcement_bulletin_kiosk.js') }}"></script>
+<script src="{{ url_for('static', filename='js/announcement_paging_kiosk.js') }}"></script>
+<script>
 
     // Live clock (unchanged)
     function updateClock() {

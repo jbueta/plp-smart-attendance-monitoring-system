@@ -17,6 +17,8 @@ from werkzeug.routing import BuildError
 from werkzeug.utils import secure_filename
 
 from app_tasks import fetch_report_data
+from announcement_bulletin_routes import bulletin_bp
+from announcement_paging_routes import paging_bp
 from config import get_config
 from database import close_db, connect_db, init_db_pool, release_db_connection
 from db_connect import Database, EmployeeModel, StudentModel, VISITOR_PURPOSES, normalize_visitor_purpose
@@ -43,6 +45,8 @@ from utils.student_schema import (
 app = Flask(__name__)
 app.config.from_object(get_config())
 app.permanent_session_lifetime = timedelta(minutes=3)
+app.register_blueprint(bulletin_bp)
+app.register_blueprint(paging_bp)
 
 os.makedirs(os.path.dirname(app.config["LOG_FILE"]) or ".", exist_ok=True)
 REPORT_ARCHIVE_DIR = os.path.join(app.static_folder, "reports")
@@ -113,15 +117,12 @@ MOCK_STUDENT_STATS = {
 
 MOCK_KIOSK_DATA = {
     "bulletin": {
-        "tag": "ANNOUNCEMENT",
-        "author": "Admin Office",
-        "title": "Midterm Examinations Week",
-        "body": "Please ensure your test permits are validated before entering the examination rooms. Library hours are extended until 8:00 PM.",
+        "tag": "ANNOUNCEMENTS",
+        "author": "PLP Attendance Monitoring System",
+        "title": "Status Update",
+        "body": "No announcements displayed at this time.",
     },
-    "recent_student_logs": [
-        {"type": "in", "name": "Maria Clara", "course": "BS Psychology", "time": "07:30 AM"},
-        {"type": "out", "name": "Jose Rizal", "course": "BS Accountancy", "time": "05:15 PM"},
-    ],
+    "recent_student_logs": [],
 }
 
 EVENT_TYPES = {"Meeting", "Training", "Seminar", "Workshop", "Drill", "Activity", "Flag Ceremony", "Other"}
@@ -866,11 +867,40 @@ def build_recent_kiosk_feed(limit=6):
     return visitor_feed
 
 
-def get_kiosk_data_with_live_feed(limit=6):
-    kiosk_data = fetch_live_student_logs()
-    kiosk_data["recent_activity_logs"] = (
+def get_kiosk_live_feed(limit=6, kiosk_data=None):
+    kiosk_data = kiosk_data or fetch_live_student_logs()
+    return (
         build_recent_kiosk_feed(limit=limit) + kiosk_data.get("recent_student_logs", [])
     )[:limit]
+
+
+def get_kiosk_data_with_live_feed(limit=6, target_event=None):
+    kiosk_data = fetch_live_student_logs()
+
+    try:
+        from announcement_models import AnnouncementModel
+
+        model = AnnouncementModel()
+        active_bulletins = model.get_active_bulletins(
+            scheduled_date=date.today().isoformat(),
+            target_event=target_event,
+        )
+
+        if active_bulletins:
+            latest = active_bulletins[0]
+            kiosk_data["bulletin"] = {
+                "tag": "ANNOUNCEMENTS",
+                "title": latest.get("category", "ANNOUNCEMENTS"),
+                "body": latest.get("content", "No announcements displayed at this time."),
+                "author": latest.get("from_source", "PLP Attendance Monitoring System"),
+            }
+    except Exception as err:
+        app.logger.error("Error fetching bulletin for kiosk (event=%s): %s", target_event, err)
+
+    if "bulletin" not in kiosk_data:
+        kiosk_data["bulletin"] = dict(MOCK_KIOSK_DATA["bulletin"])
+
+    kiosk_data["recent_activity_logs"] = get_kiosk_live_feed(limit=limit, kiosk_data=kiosk_data)
     return kiosk_data
 
 
@@ -1118,6 +1148,13 @@ def kiosk_exit():
     return render_template("kiosk_exit.html", kiosk_data=get_kiosk_data_with_live_feed())
 
 
+@app.route("/api/kiosk/live-feed")
+def kiosk_live_feed():
+    limit = request.args.get("limit", default=6, type=int) or 6
+    limit = min(max(limit, 1), 20)
+    return jsonify({"success": True, "logs": get_kiosk_live_feed(limit=limit)})
+
+
 @app.route("/kiosk/employee/select-event")
 def kiosk_employee_select_event():
     session.clear()
@@ -1136,7 +1173,9 @@ def kiosk_employee():
         event_name=selected_event.get("name", "General Attendance") if selected_event else "General Attendance",
         event_id=selected_event.get("event_id") if selected_event else None,
         instance_id=instance_id,
-        kiosk_data=get_kiosk_data_with_live_feed(),
+        kiosk_data=get_kiosk_data_with_live_feed(
+            target_event=selected_event.get("name") if selected_event else None
+        ),
     )
 
 
@@ -1375,6 +1414,16 @@ def sample_report():
         metrics={},
         logs=[],
         archive_report_url=resolve_archive_report_url(),
+    )
+
+
+@app.route("/admin/announcements")
+@login_required
+def announcement_manager():
+    return render_template(
+        "announcement_manager.html",
+        events=fetch_backend_events(),
+        departments=fetch_departments(),
     )
 
 

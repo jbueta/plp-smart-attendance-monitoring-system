@@ -105,14 +105,14 @@
             </div>
 
             <!-- NEW: Campus Bulletin -->
-            <div class="card-glass p-4 bg-gradient"
+            <div class="card-glass p-4 bg-gradient bulletin-container"
                 style="background: linear-gradient(135deg, rgba(11, 125, 63, 0.4), rgba(5, 26, 16, 0.8));">
                 <div class="d-flex align-items-center mb-2">
-                    <span class="badge bg-warning text-dark me-2">{{ kiosk_data.bulletin.tag }}</span>
-                    <small class="text-white-50">{{ kiosk_data.bulletin.author }}</small>
+                    <span id="bulletin-category" class="badge bg-warning text-dark me-2">ANNOUNCEMENTS</span>
+                    <small id="bulletin-source" class="text-white-50">{{ kiosk_data.bulletin.author }}</small>
                 </div>
-                <h5 class="fw-bold mb-1">{{ kiosk_data.bulletin.title }}</h5>
-                <p class="small text-white-50 mb-0">{{ kiosk_data.bulletin.body }}</p>
+                <h5 id="bulletin-title" class="fw-bold mb-1">{{ kiosk_data.bulletin.title }}</h5>
+                <p id="bulletin-body" class="small text-white-50 mb-0">{{ kiosk_data.bulletin.body }}</p>
             </div>
         </div>
     </div>
@@ -226,6 +226,11 @@
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/kiosk.js') }}"></script>
 <script>
+    window.currentEventName = "General Attendance";
+</script>
+<script src="{{ url_for('static', filename='js/announcement_bulletin_kiosk.js') }}"></script>
+<script src="{{ url_for('static', filename='js/announcement_paging_kiosk.js') }}"></script>
+<script>
     window.GENERAL_KIOSK_ACTION = 'Exit';
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -267,42 +272,6 @@
         }
         setInterval(updateClock, 1000);
         updateClock();
-
-        function appendToLiveFeed(name, course, logType) {
-            const feedContainer = document.getElementById('live-feed-list');
-            if (!feedContainer) return;
-
-            const now = new Date();
-            const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-            const isEntry = (logType === 'entry');
-            const iconBg = isEntry ? 'bg-success text-success' : 'bg-secondary text-white';
-            const iconClass = isEntry ? 'bi-check-lg' : 'bi-arrow-right';
-            const badgeClass = isEntry ? 'bg-success text-success' : 'bg-secondary text-white';
-            const badgeText = isEntry ? 'TIME IN' : 'TIME OUT';
-
-            const logHtml = `
-                <div class="d-flex align-items-center p-2 rounded" style="background: rgba(255,255,255,0.03);">
-                    <div class="rounded-circle ${iconBg} bg-opacity-25 p-2 me-3">
-                        <i class="bi ${iconClass}"></i>
-                    </div>
-                    <div class="flex-grow-1 lh-1">
-                        <h6 class="mb-0 small">${name}</h6>
-                        <small class="text-white-50" style="font-size: 0.75rem">${course || 'N/A'}</small>
-                    </div>
-                    <div class="text-end">
-                        <div class="badge ${badgeClass} bg-opacity-10 mb-1">${badgeText}</div>
-                        <div class="font-monospace small text-white-50">${timeString}</div>
-                    </div>
-                </div>
-            `;
-
-            feedContainer.insertAdjacentHTML('afterbegin', logHtml);
-
-            if (feedContainer.children.length > 6) {
-                feedContainer.lastElementChild.remove();
-            }
-        }
 
         // --- 2. FLASHED MESSAGE HANDLER (VISITORS) ---
         {% with messages = get_flashed_messages(category_filter=["success"]) %}
@@ -392,6 +361,12 @@
                             });
                             
                             appendToLiveFeed(data.name, data.affiliation, logType);
+
+                            // [ANNOUNCEMENT FEATURE] - Update context for targeted/departmental bulletins
+                            window.lastScannedId = extractedId;
+                            window.currentDept = data.affiliation;
+                            if (typeof window.fetchBulletins === 'function') window.fetchBulletins();
+                            if (typeof window.fetchActiveAlerts === 'function') window.fetchActiveAlerts();
                         } else {
                             frame.style.borderColor = '#ef4444'; 
                             feedText.innerText = data.message || data.Invalid || "SCAN FAILED";

@@ -73,6 +73,7 @@
                 opacity: 0;
                 transform: scale(0.9);
             }
+
             to {
                 opacity: 1;
                 transform: scale(1);
@@ -92,13 +93,15 @@
 
     <div id="instance-generator-toast" class="instance-generator-toast d-none" role="status" aria-live="polite">
         <div class="instance-generator-toast__icon">
-            <div class="spinner-border spinner-border-sm text-gold" id="instance-generator-spinner" aria-hidden="true"></div>
+            <div class="spinner-border spinner-border-sm text-gold" id="instance-generator-spinner" aria-hidden="true">
+            </div>
             <i class="bi bi-check-circle-fill text-success d-none" id="instance-generator-success"></i>
             <i class="bi bi-exclamation-triangle-fill text-danger d-none" id="instance-generator-error"></i>
         </div>
         <div class="instance-generator-toast__body">
             <div class="instance-generator-toast__title" id="instance-generator-title">Preparing event instances</div>
-            <div class="instance-generator-toast__message" id="instance-generator-message">Checking scheduler status...</div>
+            <div class="instance-generator-toast__message" id="instance-generator-message">Checking scheduler status...
+            </div>
         </div>
     </div>
 
@@ -121,12 +124,40 @@
     </div>
     {% endif %}
 
+    <!-- Global Feedback Indicator -->
+    <div id="system-feedback-indicator" class="feedback-indicator" role="status" aria-live="polite">
+        <div class="feedback-indicator__icon">
+            <i id="feedback-icon" class="bi bi-check-circle-fill"></i>
+        </div>
+        <div class="feedback-indicator__title" id="feedback-message">
+            Action completed successfully.
+        </div>
+    </div>
+
+    <div id="global-confirm-overlay" class="global-confirm-overlay d-none" role="alertdialog" aria-modal="true"
+        aria-labelledby="global-confirm-title" aria-describedby="global-confirm-message">
+        <div class="global-confirm-modal">
+            <div class="global-confirm-modal__icon">
+                <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+            </div>
+            <div class="global-confirm-modal__body">
+                <h5 id="global-confirm-title" class="global-confirm-modal__title">Confirm action</h5>
+                <p id="global-confirm-message" class="global-confirm-modal__message mb-0"></p>
+            </div>
+            <div class="global-confirm-modal__actions">
+                <button type="button" id="global-confirm-cancel" class="btn btn-outline-light px-4">Cancel</button>
+                <button type="button" id="global-confirm-ok" class="btn btn-danger px-4">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+
     <!-- Bootstrap JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Main Custom JS -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script>
-        window.APP_CONFIG = {{ {"backendApiUrl": backend_api_url}|tojson }};
+        window.APP_CONFIG = {{ { "backendApiUrl": backend_api_url }| tojson }};
     </script>
     {% if is_logged_in %}
     <script>

@@ -251,17 +251,19 @@ function generateReport() {
 
     if (category === "event") {
         if (!selectedOption || !type) {
-            alert("Please select an event.");
+            window.showSystemFeedback("Please select an event.", 'error');
             return;
         }
+
 
         const dateMode = selectedOption.getAttribute("data-date-mode");
         if (dateMode === "fixed") {
             const eventDate = selectedOption.getAttribute("data-date") || "";
             if (!eventDate) {
-                alert("This event does not have a valid date yet.");
+                window.showSystemFeedback("This event does not have a valid date yet.", 'error');
                 return;
             }
+
             startDate = eventDate;
             endDate = eventDate;
         } else {
@@ -270,25 +272,28 @@ function generateReport() {
             const instanceDate = selectedInstance?.dataset.date || eventInstanceSelect?.value || "";
 
             if (!instanceDate) {
-                alert("Please select which recurring event date instance to generate the report from.");
+                window.showSystemFeedback("Please select which recurring event date instance to generate the report from.", 'error');
                 return;
             }
+
 
             startDate = instanceDate;
             endDate = instanceDate;
         }
     } else {
         if (!startDate || !endDate) {
-            alert("Please select a date range.");
+            window.showSystemFeedback("Please select a date range.", 'error');
             return;
         }
+
 
         const start = new Date(startDate);
         const end = new Date(endDate);
         if (start > end) {
-            alert("Invalid date range: 'From' date cannot be after 'To' date.\n\nExample of invalid range: From April 1, 2025 to March 31, 2025");
+            window.showSystemFeedback("Invalid date range: 'From' date cannot be after 'To' date.", 'error');
             return;
         }
+
     }
 
     const params = new URLSearchParams({

@@ -55,9 +55,44 @@
             .d-print-none { display: none !important; }
             @page { margin: 1cm; }
         }
+
+        /* Feedback Indicator - Standalone for Sample Report */
+        .feedback-indicator {
+            font-family: Arial, sans-serif;
+            min-width: 320px;
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            background: #fff;
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            opacity: 0;
+            transition: all 0.4s ease;
+            z-index: 10000;
+            border: 1px solid #ccc;
+        }
+        .feedback-indicator.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+        .feedback-indicator.success { border-color: #10B981; background: #ecfdf5; color: #065f46; }
+        .feedback-indicator.error { border-color: #EF4444; background: #fef2f2; color: #991b1b; }
+        .feedback-indicator__icon { margin-right: 12px; font-size: 18px; }
+        .feedback-indicator__title { font-weight: bold; font-size: 14px; }
     </style>
+
 </head>
 <body>
+
+    <!-- Feedback Indicator -->
+    <div id="system-feedback-indicator" class="feedback-indicator" role="status">
+        <div class="feedback-indicator__icon" id="feedback-icon-container">
+            <i id="feedback-icon" class="bi"></i>
+        </div>
+        <div class="feedback-indicator__title" id="feedback-message"></div>
+    </div>
+
 
     <div class="container d-print-none mb-4" style="max-width: 950px;">
         <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center">
@@ -333,17 +368,34 @@
                     delete element.dataset.previousDisplay;
                 });
             }
+            }
         }
 
+        function showLocalFeedback(message, type = 'success') {
+            const indicator = document.getElementById('system-feedback-indicator');
+            const icon = document.getElementById('feedback-icon');
+            const messageEl = document.getElementById('feedback-message');
+            if (!indicator || !icon || !messageEl) return;
+            messageEl.textContent = message;
+            indicator.classList.remove('success', 'error');
+            indicator.classList.add(type);
+            icon.className = type === 'success' ? 'bi bi-check-circle-fill' : 'bi bi-exclamation-triangle-fill';
+            indicator.classList.add('show');
+        }
+
+
         async function downloadPDF() {
+
             try {
                 const pdfResult = await createReportPdfBlob(archiveFilename);
                 triggerPDFDownload(pdfResult.blob, pdfResult.filename);
                 await archivePDF(pdfResult.blob, pdfResult.filename);
+                showLocalFeedback('Report archived successfully.', 'success');
             } catch (error) {
-                alert('The PDF was not fully archived. Please try again.');
+                showLocalFeedback('The PDF was not fully archived. Please try again.', 'error');
             }
         }
+
 
         if (sendReportEmailForm) {
             sendReportEmailForm.addEventListener('submit', async (event) => {
@@ -383,12 +435,10 @@
                 } catch (error) {
                     console.error('Failed to email report:', error);
                     if (sendReportEmailStatus) {
-                        sendReportEmailStatus.textContent = error.message || 'Could not send the report email.';
-                        sendReportEmailStatus.className = 'small text-danger';
-                    } else {
-                        alert('Could not send the report email. Please try again.');
+                        showLocalFeedback(error.message || 'Could not send the report email.', 'error');
                     }
                 } finally {
+
                     if (submitButton) {
                         submitButton.disabled = false;
                         submitButton.textContent = originalLabel;
