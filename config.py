@@ -1,22 +1,19 @@
 """Centralized configuration management for the Smart Attendance System."""
 
-import importlib
 import os
 import secrets
 from datetime import timedelta
+from pathlib import Path
 
 
 def _load_dotenv_if_available() -> bool:
     try:
-        dotenv = importlib.import_module("dotenv")
+        from dotenv import load_dotenv
     except ImportError:
         return False
 
-    load_dotenv = getattr(dotenv, "load_dotenv", None)
-    if not callable(load_dotenv):
-        return False
-
-    return bool(load_dotenv())
+    env_path = Path(__file__).resolve().with_name(".env")
+    return bool(load_dotenv(dotenv_path=env_path, override=True))
 
 
 _load_dotenv_if_available()

@@ -37,7 +37,13 @@ def init_db_pool():
     """Attempts to create the database pool."""
     global global_pool
     try:
-        current_app.logger.info("Creating database connection pool...")
+        current_app.logger.info(
+            "Creating database connection pool for %s:%s/%s as %s...",
+            dbconfig["host"],
+            dbconfig["port"],
+            dbconfig["database"],
+            dbconfig["user"],
+        )
         global_pool = pooling.MySQLConnectionPool(
             pool_name="main_entry_exit",
             pool_size=config.DB_POOL_SIZE,
