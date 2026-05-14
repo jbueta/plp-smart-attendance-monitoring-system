@@ -6,36 +6,52 @@
 
 <!-- Page content -->
 {% block content %}
-<div class="container py-5 min-vh-100 d-flex flex-column justify-content-center">
-    {% if visitor_welcome %}
-    <div id="visitor-welcome-overlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center px-3"
-        style="z-index: 2000; background: rgba(3, 17, 8, 0.72); backdrop-filter: blur(10px);">
-        <div class="card-glass p-4 p-md-5 position-relative text-center shadow-lg w-100"
-            style="max-width: 540px; border-color: rgba(245, 221, 0, 0.28);">
-            <button type="button" id="close-visitor-welcome"
-                class="btn btn-glass rounded-circle position-absolute top-0 end-0 mt-3 me-3 d-inline-flex align-items-center justify-content-center"
-                style="width: 42px; height: 42px;" aria-label="Close welcome panel">
-                <i class="bi bi-x-lg"></i>
-            </button>
+<div id="welcome-overlay"
+    class="position-fixed top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center px-3"
+    style="z-index: 2100; background: rgba(3, 17, 8, 0.85); backdrop-filter: blur(12px);">
+    <div class="p-4 p-md-5 position-relative text-center shadow-lg w-100"
+        style="max-width: 500px; background: #1a2c20; border: 1px solid rgba(245, 221, 0, 0.2); border-radius: 20px;">
+        
+        <button type="button" id="close-welcome-overlay"
+            class="btn rounded-circle position-absolute top-0 end-0 mt-3 me-3 d-inline-flex align-items-center justify-content-center hover-scale"
+            style="width: 36px; height: 36px; background: rgba(255,255,255,0.05); color: #a1a1aa; border: 1px solid rgba(255,255,255,0.1);" 
+            aria-label="Close panel">
+            <i class="bi bi-x-lg"></i>
+        </button>
 
-            <div class="rounded-circle border border-5 border-success p-1 mb-3 d-inline-block">
-                <div class="rounded-circle bg-success bg-opacity-10 d-flex align-items-center justify-content-center"
-                    style="width: 92px; height: 92px;">
-                    <i class="bi bi-person-check text-success display-5 mb-0"></i>
-                </div>
+        <div class="rounded-circle border p-1 mb-3 d-inline-block" style="border-color: #4ade80 !important; border-width: 2px !important;">
+            <div class="rounded-circle d-flex align-items-center justify-content-center"
+                style="width: 76px; height: 76px; background: rgba(74, 222, 128, 0.1);">
+                <i class="bi bi-person-check-fill mb-0" style="font-size: 2.5rem; color: #4ade80;"></i>
             </div>
+        </div>
 
-            <div class="text-gold text-uppercase small fw-bold mb-2" style="letter-spacing: 0.18em;">Visitor Verified</div>
-            <h2 class="display-6 fw-bold text-success mb-2">Access Granted</h2>
-            <h3 class="h2 text-white mb-2">{{ visitor_welcome.name }}</h3>
-            <p class="text-white-50 mb-4">Welcome to Pamantasan ng Lungsod ng Pasig.</p>
-
-            <div class="card-glass px-4 py-3 mx-auto" style="max-width: 320px; background: rgba(255,255,255,0.05);">
-                <div class="text-white-50 text-uppercase small mb-1" style="letter-spacing: 0.14em;">Visitor ID</div>
-                <div class="h4 font-monospace text-white mb-0">{{ visitor_welcome.visitor_id }}</div>
+        <div id="welcome-role" class="text-uppercase small fw-bold mb-2" style="letter-spacing: 0.18em; color: #fbbf24;">
+            Visitor Verified
+        </div>
+        
+        <h2 id="welcome-action" class="display-6 fw-bold mb-3" style="color: #4ade80; letter-spacing: -0.5px;">
+            Access Granted
+        </h2>
+        
+        <h3 id="welcome-name" class="h2 text-white mb-3 fw-bold text-uppercase" style="letter-spacing: 0.5px;">
+            VISITOR NAME
+        </h3>
+    
+        <div class="px-4 py-3 mx-auto rounded-4" style="max-width: 280px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.04);">
+            <div id="welcome-id-label" class="text-uppercase small mb-1 fw-semibold" style="letter-spacing: 0.15em; color: #9ca3af; font-size: 0.75rem;">
+                Visitor ID
+            </div>
+            <div id="welcome-id-val" class="h4 font-monospace text-white fw-bold mb-0" style="letter-spacing: 1px;">
+                N/A
             </div>
         </div>
     </div>
+</div>
+
+<div class="container py-5 min-vh-100 d-flex flex-column justify-content-center">
+    {% if visitor_welcome %}
+    <!-- Visitor welcome overlay removed - now using dynamic overlay -->
     {% endif %}
 
     <!-- Header -->
@@ -112,19 +128,44 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{{ url_for('static', filename='js/kiosk.js') }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        const welcomeOverlay = document.getElementById('visitor-welcome-overlay');
-        const closeWelcomeButton = document.getElementById('close-visitor-welcome');
+        // --- OVERLAY & SUCCESS LOGIC ---
+        const welcomeOverlay = document.getElementById('welcome-overlay');
+        const closeWelcomeBtn = document.getElementById('close-welcome-overlay');
 
-        if (welcomeOverlay && closeWelcomeButton) {
-            const closeWelcomePanel = () => {
-                welcomeOverlay.classList.remove('d-flex');
-                welcomeOverlay.classList.add('d-none');
-            };
-
-            closeWelcomeButton.addEventListener('click', closeWelcomePanel);
+        if (closeWelcomeBtn && welcomeOverlay) {
+            closeWelcomeBtn.addEventListener('click', () => {
+                welcomeOverlay.classList.replace('d-flex', 'd-none');
+            });
         }
+
+        // Global Overlay Trigger
+        window.showSuccessOverlay = function(logType, data) {
+            document.getElementById('welcome-role').textContent = 'VISITOR VERIFIED';
+            document.getElementById('welcome-action').textContent = 'Access Granted';
+            document.getElementById('welcome-action').style.color = '#4ade80'; 
+            
+            document.getElementById('welcome-name').textContent = data.name || 'UNKNOWN';
+            
+            document.getElementById('welcome-id-label').textContent = 'VISITOR ID';
+            document.getElementById('welcome-id-val').textContent = data.id || 'N/A';
+
+            welcomeOverlay.classList.replace('d-none', 'd-flex');
+
+            setTimeout(() => {
+                welcomeOverlay.classList.replace('d-flex', 'd-none');
+            }, 4500);
+        };
+
+        // Re-route visitor welcome panel to new UI
+        window.showVisitorWelcomePanel = (visitor) => {
+            window.showSuccessOverlay('entry', {
+                id: visitor.visitor_id || 'Pending ID',
+                name: visitor.name || 'Visitor'
+            });
+        };
 
         document.querySelectorAll('form').forEach(form => {
             const purposeSelect = form.querySelector('.visitor-purpose-select');
@@ -145,6 +186,48 @@
             purposeSelect.addEventListener('change', syncVisitorDetails);
             syncVisitorDetails();
         });
+
+        // Handle visitor checkin form submission
+        const visitorCheckinForm = document.querySelector('form[action*="visitor_checkin"]');
+        if (visitorCheckinForm) {
+            visitorCheckinForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const submitButton = visitorCheckinForm.querySelector('button[type="submit"]');
+                const formData = new FormData(visitorCheckinForm);
+
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.textContent = 'Checking In...';
+                }
+
+                try {
+                    const response = await fetch(visitorCheckinForm.action, {
+                        method: 'POST',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                        body: formData
+                    });
+                    const payload = await response.json();
+
+                    if (!response.ok || !payload.success) {
+                        throw new Error(payload.message || 'Check-in failed.');
+                    }
+
+                    visitorCheckinForm.reset();
+                    visitorCheckinForm.querySelectorAll('.visitor-details-group').forEach(group => group.classList.add('d-none'));
+                    
+                    if (typeof window.showVisitorWelcomePanel === 'function') {
+                        window.showVisitorWelcomePanel(payload.visitor || {});
+                    }
+                } catch (error) {
+                    window.showSystemFeedback(error.message || 'Visitor check-in failed.', 'error');
+                } finally {
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.textContent = 'Confirm Check In';
+                    }
+                }
+            });
+        }
     });
 </script>
 {% endblock %}
