@@ -134,6 +134,18 @@
     let barcodeBuffer = "";
     let scanTimeout = null;
 
+    function extractEmployeeQrId(rawText) {
+        const scannedText = String(rawText || '').trim();
+        const bracketMatch = scannedText.match(/(.*?)\[(.*?)\](.*)/s);
+
+        if (bracketMatch) {
+            const employeeId = bracketMatch[2].trim();
+            return /^[0-9]{5}$/.test(employeeId) ? employeeId : "";
+        }
+
+        return /^[0-9]{5}$/.test(scannedText) ? scannedText : "";
+    }
+
     document.addEventListener('keydown', function (e) {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
             return;
@@ -141,15 +153,40 @@
 
         if (e.key === 'Enter') {
             if (barcodeBuffer.length > 3) {
+                const scannedText = barcodeBuffer;
+                const employeeId = extractEmployeeQrId(scannedText);
                 const feedText = document.getElementById('scanner-text');
                 const frame = document.querySelector('.scanner-frame');
+
+                if (!employeeId) {
+                    frame.style.borderColor = '#ef4444';
+                    frame.style.boxShadow = '0 0 30px rgba(239, 68, 68, 0.3)';
+                    feedText.innerText = "INVALID QR FORMAT";
+                    feedText.className = "position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-danger font-monospace fw-bold scanning-text";
+
+                    if (typeof showScanBanner === 'function') {
+                        showScanBanner('error', { id: scannedText });
+                    }
+
+                    setTimeout(() => {
+                        frame.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                        frame.style.boxShadow = 'none';
+                        feedText.innerText = "[QR CAMERA FEED]";
+                        feedText.className = "position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-gold-50 small font-monospace";
+                    }, 2500);
+
+                    barcodeBuffer = "";
+                    if (scanTimeout) clearTimeout(scanTimeout);
+                    return;
+                }
+
                 frame.style.borderColor = '#F5DD00';
                 frame.style.boxShadow = '0 0 30px rgba(245, 221, 0, 0.3)';
                 feedText.innerText = "VERIFYING EMPLOYEE ID...";
                 feedText.className = "position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-gold font-monospace fw-bold scanning-text";
 
                 setTimeout(() => {
-                    submitManualEntry('employee', barcodeBuffer);
+                    submitManualEntry('employee', employeeId);
                     frame.style.borderColor = 'rgba(255, 255, 255, 0.2)';
                     frame.style.boxShadow = 'none';
                     feedText.innerText = "[QR CAMERA FEED]";

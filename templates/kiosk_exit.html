@@ -130,14 +130,11 @@
             <div class="modal-body">
                 <div class="mb-3">
                     <label for="manual-student-id" class="form-label text-white-50">Student or Visitor ID</label>
-                    <input type="text" class="form-control text-black border-secondary"
+                    <input type="text" class="form-control text-white border-secondary"
                         id="manual-student-id" 
-                        placeholder=""
-                        title="Enter a student ID like 23-00312 or a visitor ID like VT-00001"
-                        style="text-transform: uppercase;">
-                    <div class="form-text text-white-50">
-                        You can use either a student ID or a visitor ID for time out.
-                    </div>
+                        pattern="(?:[0-9]{2}-[0-9]{5}|VT-[0-9]{5})"
+                        autocomplete="off" autocapitalize="characters" spellcheck="false"
+                        style="background: rgba(0,0,0,0.5); text-transform: uppercase;">
                 </div>
                 <div class="d-grid gap-2">
                     <button type="button" class="btn btn-secondary" onclick="submitManualEntry('student')">Time
@@ -234,13 +231,6 @@
     window.GENERAL_KIOSK_ACTION = 'Exit';
 
     document.addEventListener('DOMContentLoaded', function () {
-        const manualExitInput = document.getElementById('manual-student-id');
-        if (manualExitInput) {
-            manualExitInput.addEventListener('input', () => {
-                manualExitInput.value = manualExitInput.value.toUpperCase();
-            });
-        }
-
         document.querySelectorAll('form').forEach(form => {
             const purposeSelect = form.querySelector('.visitor-purpose-select');
             const detailsGroup = form.querySelector('.visitor-details-group');
@@ -306,25 +296,40 @@
 
             if (e.key === 'Enter') {
                 if (barcodeBuffer.length > 3) {
-                    const match = barcodeBuffer.match(/(.*?)\[(.*?)\](.*)/s);
+                    e.preventDefault();
+                    e.stopPropagation();
 
-                    if (!match) {
-                        console.warn("Invalid QR format scanned:", barcodeBuffer);
+                    const scannedText = barcodeBuffer;
+                    const extractedId = extractGeneralKioskQrId(scannedText);
+                    const feedText = document.getElementById('scanner-text');
+                    const frame = document.querySelector('.scanner-frame');
+
+                    if (!extractedId) {
+                        console.warn("Invalid QR format scanned:", scannedText);
+                        frame.style.borderColor = '#ef4444';
+                        frame.style.boxShadow = '0 0 30px rgba(239, 68, 68, 0.3)';
+                        feedText.innerText = "INVALID QR FORMAT";
+                        feedText.className = "position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-danger font-monospace fw-bold scanning-text";
+
+                        if (typeof showScanBanner === 'function') {
+                            showScanBanner('error', { id: scannedText });
+                        }
+
+                        setTimeout(() => {
+                            frame.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                            frame.style.boxShadow = 'none';
+                            feedText.innerText = "[CAMERA FEED]";
+                            feedText.className = "position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-white-50 small font-monospace";
+                        }, 2500);
+
                         barcodeBuffer = "";
-                        return; 
+                        if (scanTimeout) clearTimeout(scanTimeout);
+                        return;
                     }
-
-                    const extractedName = match[1].trim();   // e.g., "SALVADOR, JERICHO PAUL D."
-                    const extractedId = match[2].trim();     // e.g., "23-00312"
-                    const extractedCourse = match[3].trim(); // e.g., "BSCS"
 
                     // Start Cooldown
                     scanCooldown = true;
                     setTimeout(() => { scanCooldown = false; }, 3000);
-
-                    // Update UI feedback
-                    const feedText = document.getElementById('scanner-text');
-                    const frame = document.querySelector('.scanner-frame');
                     
                     frame.style.borderColor = '#10B981';
                     frame.style.boxShadow = '0 0 30px rgba(16, 185, 129, 0.3)';

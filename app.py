@@ -78,7 +78,7 @@ MOCK_DASHBOARD_STATS = {
     "avg_dwell_time": "0 hrs 0 mins",
     "peak_hour": "N/A",
     "peak_window": "N/A",
-    "traffic_chart": [0] * 12,
+    "traffic_chart": [0] * 24,
     "dept_distribution": [0] * 5,
     "alerts": [],
 }
@@ -112,7 +112,7 @@ MOCK_STUDENT_STATS = {
     "avg_stay": "0.0 Hrs",
     "curfew_trigger": "09:40:00 PM",
     "watchlist": [],
-    "hourly_traffic": [0] * 12,
+    "hourly_traffic": [0] * 24,
 }
 
 MOCK_KIOSK_DATA = {
@@ -837,10 +837,43 @@ def fetch_visitor_logs(status=None, search_term=None, visit_date=None, include_i
     return logs
 
 
-def fetch_live_student_logs():
+def serialize_kiosk_timestamp(value):
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return str(value) if value else None
+
+
+def parse_kiosk_sort_timestamp(value):
+    if isinstance(value, datetime):
+        return value
+    if not value:
+        return datetime.min
+
+    text = str(value).strip()
+    for candidate in (text, text.replace("Z", "+00:00")):
+        try:
+            parsed = datetime.fromisoformat(candidate)
+            return parsed.replace(tzinfo=None) if parsed.tzinfo else parsed
+        except ValueError:
+            continue
+
+    for fmt in ("%a, %d %b %Y %H:%M:%S %Z", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            return datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+
+    return datetime.min
+
+
+def clean_kiosk_feed_log(log):
+    return {key: value for key, value in log.items() if not key.startswith("_")}
+
+
+def fetch_live_student_logs(limit=6):
     current_kiosk_data = dict(MOCK_KIOSK_DATA)
     try:
-        response = backend_request("GET", "/kiosk/students/student-logs")
+        response = backend_request("GET", "/kiosk/students/student-logs", params={"limit": limit})
         if response.ok:
             payload = response.json()
             if payload.get("success"):
@@ -856,26 +889,36 @@ def build_recent_kiosk_feed(limit=6):
     for visitor in fetch_visitor_logs()[:limit]:
         is_checked_in = visitor.get("status") == "Checked In"
         visitor_label = visitor.get("details") if visitor.get("purpose") == "Other" and visitor.get("details") else visitor.get("purpose", "N/A")
+        last_activity = visitor.get("last_activity")
         visitor_feed.append(
             {
                 "type": "in" if is_checked_in else "out",
                 "name": visitor.get("name"),
                 "course": f"Visitor - {visitor_label}",
                 "time": visitor.get("time_in") if is_checked_in else (visitor.get("time_out") or visitor.get("time_in")),
+                "timestamp": serialize_kiosk_timestamp(last_activity),
+                "_sort_timestamp": serialize_kiosk_timestamp(last_activity),
+                "_sort_id": visitor.get("added_order") or 0,
             }
         )
     return visitor_feed
 
 
 def get_kiosk_live_feed(limit=6, kiosk_data=None):
-    kiosk_data = kiosk_data or fetch_live_student_logs()
-    return (
-        build_recent_kiosk_feed(limit=limit) + kiosk_data.get("recent_student_logs", [])
-    )[:limit]
+    kiosk_data = kiosk_data or fetch_live_student_logs(limit=limit)
+    combined_logs = build_recent_kiosk_feed(limit=limit) + kiosk_data.get("recent_student_logs", [])
+    combined_logs.sort(
+        key=lambda log: (
+            parse_kiosk_sort_timestamp(log.get("_sort_timestamp") or log.get("timestamp") or log.get("created_at")),
+            log.get("_sort_id") or 0,
+        ),
+        reverse=True,
+    )
+    return [clean_kiosk_feed_log(log) for log in combined_logs[:limit]]
 
 
 def get_kiosk_data_with_live_feed(limit=6, target_event=None):
-    kiosk_data = fetch_live_student_logs()
+    kiosk_data = fetch_live_student_logs(limit=limit)
 
     try:
         from announcement_models import AnnouncementModel

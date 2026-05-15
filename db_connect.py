@@ -1010,7 +1010,14 @@ class Database:
                     ei.event_date AS date,
                     TRIM(DATE_FORMAT(e.time_start, '%l:%i %p')) AS time_start,
                     TRIM(DATE_FORMAT(e.time_end, '%l:%i %p')) AS time_end,
-                    e.location AS location
+                    e.location AS location,
+                    ei.status AS status,
+                    CASE
+                        WHEN ei.status = 'Completed'
+                          OR (ei.event_date = CURDATE() AND e.time_end < CURTIME())
+                        THEN 1
+                        ELSE 0
+                    END AS is_ended
                 FROM event_instances ei
                 JOIN events e ON ei.event_id = e.event_id
                 WHERE ei.event_date = CURDATE()
@@ -1088,6 +1095,7 @@ class Database:
             cursor.execute(
                 """
                 SELECT
+                    gl.log_id,
                     gl.log_type,
                     s.student_name,
                     c.course_name,
@@ -1111,6 +1119,9 @@ class Database:
                         "name": row.get("student_name", "Unknown User"),
                         "course": row.get("course_name", "N/A"),
                         "time": row["timestamp"].strftime("%I:%M %p").lstrip("0"),
+                        "timestamp": row["timestamp"].isoformat() if row.get("timestamp") else None,
+                        "_sort_timestamp": row["timestamp"].isoformat() if row.get("timestamp") else None,
+                        "_sort_id": row.get("log_id") or 0,
                     }
                 )
             return logs
@@ -1671,7 +1682,7 @@ class Database:
                 (today,),
             )
             hourly = {row["hr"]: row["cnt"] for row in cursor.fetchall()}
-            traffic_chart = [hourly.get(hour, 0) for hour in range(6, 18)]
+            traffic_chart = [hourly.get(hour, 0) for hour in range(24)]
 
             cursor.execute(
                 """
@@ -1847,7 +1858,7 @@ class Database:
                 (today,),
             )
             hourly = {row["hr"]: row["cnt"] for row in cursor.fetchall()}
-            hourly_traffic = [hourly.get(hour, 0) for hour in range(6, 18)]
+            hourly_traffic = [hourly.get(hour, 0) for hour in range(24)]
 
             cursor.execute(
                 """
@@ -1867,6 +1878,58 @@ class Database:
             else:
                 trend = "N/A"
 
+            curfew_time = "21:40:00"
+            early_morning_cutoff = "06:00:00"
+            cursor.execute(
+                """
+                SELECT
+                    s.student_id AS id,
+                    COALESCE(NULLIF(TRIM(s.student_name), ''), 'Unknown Student') AS name,
+                    COALESCE(NULLIF(TRIM(c.course_name), ''), 'N/A') AS course,
+                    latest_entry.entry_time,
+                    TIMESTAMPDIFF(MINUTE, latest_entry.entry_time, NOW()) AS minutes_inside
+                FROM students s
+                JOIN users u ON s.user_id = u.user_id
+                LEFT JOIN courses c ON s.course_id = c.course_id
+                JOIN (
+                    SELECT user_id, MAX(timestamp) AS entry_time
+                    FROM general_log
+                    WHERE log_type = 'Entry'
+                    GROUP BY user_id
+                ) latest_entry ON latest_entry.user_id = s.user_id
+                LEFT JOIN (
+                    SELECT user_id, MAX(timestamp) AS exit_time
+                    FROM general_log
+                    WHERE log_type = 'Exit'
+                    GROUP BY user_id
+                ) latest_exit ON latest_exit.user_id = s.user_id
+                WHERE s.status = 'Inside'
+                  AND u.role = 'student'
+                  AND u.active = 1
+                  AND (latest_exit.exit_time IS NULL OR latest_entry.entry_time > latest_exit.exit_time)
+                  AND (
+                      NOW() >= TIMESTAMP(DATE(latest_entry.entry_time), %s)
+                      OR TIME(latest_entry.entry_time) >= %s
+                      OR TIME(latest_entry.entry_time) < %s
+                  )
+                ORDER BY latest_entry.entry_time ASC
+                LIMIT 10
+                """,
+                (curfew_time, curfew_time, early_morning_cutoff),
+            )
+            watchlist = []
+            for row in cursor.fetchall():
+                entry_time = row.get("entry_time")
+                watchlist.append(
+                    {
+                        "id": row.get("id", ""),
+                        "name": row.get("name", "Unknown Student"),
+                        "course": row.get("course", "N/A"),
+                        "entry_time": entry_time.strftime("%I:%M %p").lstrip("0") if entry_time else "--:--",
+                        "minutes_inside": int(row.get("minutes_inside") or 0),
+                    }
+                )
+
             return {
                 "total_entries": f"{total_entries:,}",
                 "entries_trend": trend,
@@ -1875,7 +1938,7 @@ class Database:
                 "currently_inside": f"{currently_inside:,}",
                 "avg_stay": avg_stay,
                 "hourly_traffic": hourly_traffic,
-                "watchlist": [],
+                "watchlist": watchlist,
                 "curfew_trigger": "09:40:00 PM",
             }
         except connector.Error as err:

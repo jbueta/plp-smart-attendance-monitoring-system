@@ -47,6 +47,76 @@ function getKioskAuthErrorMessage(data, fallback = 'ID not found!') {
     return data.message || data.Invalid || fallback;
 }
 
+function normalizeManualKioskId(value, type) {
+    const normalized = String(value || '').trim();
+    return type === 'employee' ? normalized : normalized.toUpperCase();
+}
+
+function isGeneralKioskScanId(value) {
+    return /^(?:[0-9]{2}-[0-9]{5}|VT-[0-9]{5})$/.test(normalizeManualKioskId(value, 'student'));
+}
+
+function extractGeneralKioskQrId(rawText) {
+    const scannedText = String(rawText || '').trim();
+    const bracketMatch = scannedText.match(/(.*?)\[(.*?)\](.*)/s);
+    const candidateId = bracketMatch ? bracketMatch[2].trim() : scannedText;
+    const normalizedId = normalizeManualKioskId(candidateId, 'student');
+
+    return isGeneralKioskScanId(normalizedId) ? normalizedId : "";
+}
+
+function clearManualEntryInput(idField) {
+    const input = document.getElementById(idField);
+    if (input) {
+        input.value = "";
+        input.setCustomValidity("");
+    }
+}
+
+function initGeneralManualIdFormatting() {
+    document.querySelectorAll('#manual-student-id').forEach(input => {
+        input.addEventListener('input', () => {
+            const cursorStart = input.selectionStart;
+            const cursorEnd = input.selectionEnd;
+            input.value = normalizeManualKioskId(input.value, 'student');
+
+            if (cursorStart !== null && cursorEnd !== null) {
+                input.setSelectionRange(cursorStart, cursorEnd);
+            }
+        });
+
+        input.addEventListener('keydown', event => {
+            if (event.key !== 'Enter') return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            submitManualEntry('student');
+        });
+    });
+
+    const manualEntryModal = document.getElementById('manualEntryModal');
+    if (manualEntryModal) {
+        manualEntryModal.addEventListener('shown.bs.modal', () => {
+            const input = document.getElementById('manual-student-id');
+            if (input) {
+                input.focus({ preventScroll: true });
+                input.select();
+            }
+        });
+
+        manualEntryModal.addEventListener('hidden.bs.modal', () => {
+            clearManualEntryInput('manual-student-id');
+            clearManualEntryInput('manual-employee-id');
+
+            document.querySelectorAll('[data-bs-target="#manualEntryModal"]').forEach(trigger => {
+                if (typeof trigger.blur === 'function') {
+                    trigger.blur();
+                }
+            });
+        });
+    }
+}
+
 /**
  * Parse a fetch response without losing backend validation messages on non-2xx replies.
  */
@@ -112,6 +182,7 @@ function addNewLog(log, logType) {
 const liveFeedLimit = 6;
 let liveFeedRefreshTimer = null;
 let liveFeedRefreshInFlight = false;
+let liveFeedLastLocalAppendAt = 0;
 
 function normalizeLiveFeedType(type) {
     const normalized = String(type || '').toLowerCase();
@@ -176,6 +247,7 @@ async function refreshLiveFeed() {
     const feedContainer = document.getElementById('live-feed-list');
     if (!feedContainer || liveFeedRefreshInFlight) return;
 
+    const requestStartedAt = Date.now();
     liveFeedRefreshInFlight = true;
     try {
         const response = await fetch(`/api/kiosk/live-feed?limit=${liveFeedLimit}`, {
@@ -184,6 +256,10 @@ async function refreshLiveFeed() {
         });
         const payload = await parseJsonResponse(response, 'Unable to refresh live feed');
         if (payload.success) {
+            if (requestStartedAt < liveFeedLastLocalAppendAt) {
+                window.setTimeout(refreshLiveFeed, 300);
+                return;
+            }
             renderLiveFeed(payload.logs || []);
         }
     } catch (error) {
@@ -210,6 +286,7 @@ function appendToLiveFeed(name, affiliation, logType) {
     const feedContainer = document.getElementById('live-feed-list');
     if (!feedContainer) return;
 
+    liveFeedLastLocalAppendAt = Date.now();
     feedContainer.insertAdjacentHTML('afterbegin', buildLiveFeedItem({
         type: normalizeLiveFeedType(logType),
         name,
@@ -230,9 +307,13 @@ window.refreshLiveFeed = refreshLiveFeed;
 window.renderLiveFeed = renderLiveFeed;
 
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initLiveFeedRefresh);
+    document.addEventListener('DOMContentLoaded', () => {
+        initLiveFeedRefresh();
+        initGeneralManualIdFormatting();
+    });
 } else {
     initLiveFeedRefresh();
+    initGeneralManualIdFormatting();
 }
 
 /**
@@ -269,7 +350,14 @@ function loadEventAttendance(instanceId) {
 function submitManualEntry(type, manualId = null) {
     const idField = type === 'employee' ? 'manual-employee-id' : 'manual-student-id';
     const inputElement = manualId === null ? document.getElementById(idField) : null;
-    const id = manualId !== null ? manualId : inputElement.value.trim();
+    const rawId = manualId !== null ? manualId : (inputElement ? inputElement.value : "");
+    const id = type === 'employee'
+        ? normalizeManualKioskId(rawId, type)
+        : (extractGeneralKioskQrId(rawId) || normalizeManualKioskId(rawId, type));
+
+    if (inputElement) {
+        inputElement.value = id;
+    }
     
     if (!id) {
         window.showSystemFeedback("Please enter an ID", 'error');
@@ -285,6 +373,9 @@ function submitManualEntry(type, manualId = null) {
     const modalEl = document.getElementById('manualEntryModal');
     const modal = bootstrap.Modal.getInstance(modalEl);
     if (modal) modal.hide();
+    if (manualId === null) {
+        clearManualEntryInput(idField);
+    }
     
     // Determine if this is an event kiosk (employee event page has currentEventId)
     const isEventKiosk = type === 'employee' && window.currentEventId && window.currentEventId !== null;
@@ -314,10 +405,6 @@ function submitManualEntry(type, manualId = null) {
                         affiliation: data.log.dept
                     });
                 }
-                if (manualId === null) {
-                    document.getElementById(idField).value = '';
-                }
-
                 // [ANNOUNCEMENT FEATURE] - Update context for targeted/departmental bulletins
                 window.lastScannedId = id;
                 window.currentDept = data.log ? data.log.dept : null;
@@ -368,10 +455,6 @@ function submitManualEntry(type, manualId = null) {
                         affiliation: data.affiliation
                     });
                 }
-                if (manualId === null) {
-                    document.getElementById(idField).value = '';
-                }
-
                 // [ANNOUNCEMENT FEATURE] - Update context for targeted/departmental bulletins
                 window.lastScannedId = id;
                 window.currentDept = data.affiliation;

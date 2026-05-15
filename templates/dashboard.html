@@ -294,6 +294,7 @@
                                         <div>
                                             <div class="fw-bold small">{{ student.name }}</div>
                                             <div class="text-white-50" style="font-size: 0.7rem;">{{ student.course }}</div>
+                                            <div class="text-danger" style="font-size: 0.7rem;">Since {{ student.entry_time }}</div>
                                         </div>
                                     </div>
                                     <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-10">Alert</span>
@@ -622,6 +623,13 @@
                 'students': document.getElementById('students-view'),
                 'employees': document.getElementById('employees-view')
             };
+            const dashboardCharts = [];
+
+            function refreshVisibleCharts() {
+                window.requestAnimationFrame(() => {
+                    dashboardCharts.forEach(chart => chart.resize());
+                });
+            }
 
             viewRadios.forEach(radio => {
                 radio.addEventListener('change', function (e) {
@@ -631,6 +639,7 @@
                         targetView.classList.add('active-view');
                         // Update URL hash without jumping
                         history.replaceState(null, null, '#' + e.target.value);
+                        refreshVisibleCharts();
                     }
                 });
             });
@@ -673,6 +682,13 @@
                 });
             }, 3500);
 
+            const hourlyLabels = Array.from({ length: 24 }, (_, hour) => {
+                if (hour === 0) return '12am';
+                if (hour < 12) return `${hour}am`;
+                if (hour === 12) return '12pm';
+                return `${hour - 12}pm`;
+            });
+
             // Traffic Chart (Executive View)
             const trafficCanvas = document.getElementById('trafficChart');
             if (trafficCanvas) {
@@ -683,10 +699,10 @@
 
                 const trafficData = {{ overall_stats.traffic_chart | tojson | safe }};
 
-                new Chart(ctx, {
+                dashboardCharts.push(new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: ['6am', '7am', '8am', '9am', '10am', '11am', '12pm', '1pm', '2pm', '3pm', '4pm', '5pm'],
+                        labels: hourlyLabels,
                         datasets: [{
                             label: 'Entries',
                             data: trafficData,
@@ -708,7 +724,7 @@
                             y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: 'rgba(255, 255, 255, 0.5)' } }
                         }
                     }
-                });
+                }));
             }
 
             // Student Hourly Traffic Chart
@@ -721,10 +737,10 @@
 
                 const studentData = {{ student_stats.hourly_traffic | tojson | safe }};
 
-                new Chart(ctx, {
+                dashboardCharts.push(new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: ['6am', '7am', '8am', '9am', '10am', '11am', '12pm', '1pm', '2pm', '3pm', '4pm', '5pm'],
+                        labels: hourlyLabels,
                         datasets: [{
                             label: 'Student Entries',
                             data: studentData,
@@ -744,7 +760,7 @@
                             y: { grid: { color: 'rgba(255,255,255,0.05)' }, border: { dash: [5, 5] }, ticks: { color: 'rgba(255,255,255,0.5)' } }
                         }
                     }
-                });
+                }));
             }
 
             // Participation Doughnut (Employee View)
@@ -753,20 +769,21 @@
                 const deptData = {{ employee_stats.dept_participation | tojson | safe }};
                 const labels = deptData.map(d => d.name);
                 const values = deptData.map(d => d.value);
+                const hasDeptValues = values.some(value => Number(value) > 0);
 
-                new Chart(attendanceCanvas, {
+                dashboardCharts.push(new Chart(attendanceCanvas, {
                     type: 'doughnut',
                     data: {
-                        labels: labels.length > 0 ? labels : ['No Data'],
+                        labels: hasDeptValues ? labels : ['No Attendance'],
                         datasets: [{
-                            data: values.length > 0 ? values : [100],
-                            backgroundColor: [
+                            data: hasDeptValues ? values : [100],
+                            backgroundColor: hasDeptValues ? [
                                 'rgba(11, 125, 63, 0.8)',
                                 'rgba(212, 175, 55, 0.8)',
                                 'rgba(0, 123, 255, 0.8)',
                                 'rgba(111, 66, 193, 0.8)',
                                 'rgba(255, 193, 7, 0.8)'
-                            ],
+                            ] : ['rgba(255, 255, 255, 0.16)'],
                             borderColor: 'transparent',
                             hoverOffset: 15
                         }]
@@ -779,7 +796,7 @@
                             legend: { position: 'bottom', labels: { color: '#fff', usePointStyle: true, padding: 10, font: { size: 10 } } }
                         }
                     }
-                });
+                }));
             }
 
             // Peak Check-in Time (Employee View)
@@ -793,7 +810,7 @@
                 gradient.addColorStop(0, 'rgba(25, 135, 84, 0.5)');
                 gradient.addColorStop(1, 'rgba(25, 135, 84, 0.0)');
 
-                new Chart(peakCheckinCanvas, {
+                dashboardCharts.push(new Chart(peakCheckinCanvas, {
                     type: 'line',
                     data: {
                         labels: peakLabels,
@@ -819,8 +836,10 @@
                             x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.5)' } }
                         }
                     }
-                });
+                }));
             }
+
+            refreshVisibleCharts();
         });
     </script>
     {% endblock %}
