@@ -1732,6 +1732,46 @@ class Database:
             while len(dept_distribution) < 5:
                 dept_distribution.append(0)
 
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM employees e
+                JOIN users u ON e.user_id = u.user_id
+                WHERE u.active = 1
+                """
+            )
+            total_employees = cursor.fetchone()["total"] or 0
+
+            cursor.execute(
+                """
+                SELECT e.employee_name, d.department_name, COUNT(*) as absent_count
+                FROM (
+                    SELECT ea.user_id, ea.status,
+                           ROW_NUMBER() OVER (PARTITION BY ea.user_id ORDER BY ea.event_date DESC, ea.instance_id DESC) as rn
+                    FROM event_attendance ea
+                    JOIN employees emp ON ea.user_id = emp.user_id
+                    JOIN users u ON emp.user_id = u.user_id
+                    WHERE u.active = 1
+                ) t
+                JOIN employees e ON t.user_id = e.user_id
+                JOIN departments d ON e.department_id = d.department_id
+                WHERE t.rn <= 3 AND t.status = 'Absent'
+                GROUP BY t.user_id, e.employee_name, d.department_name
+                HAVING absent_count = 3
+                LIMIT 4
+                """
+            )
+            consecutive_absences = cursor.fetchall()
+            alerts = []
+            for row in consecutive_absences:
+                alerts.append({
+                    "type": "danger",
+                    "icon": "exclamation-triangle-fill",
+                    "title": "Consecutive Absence Alert",
+                    "message": f"{row['employee_name']} ({row['department_name']}) has missed 3 consecutive events.",
+                    "time": "Attendance Red Flag"
+                })
+
             return {
                 "total_entries": f"{total_entries:,}",
                 "entries_trend": trend,
@@ -1742,8 +1782,9 @@ class Database:
                 "traffic_chart": traffic_chart,
                 "event_attendance_rate": attendance_rate,
                 "event_attendance_raw": attendance_raw,
+                "total_employees": f"{total_employees:,}",
                 "dept_distribution": dept_distribution,
-                "alerts": [],
+                "alerts": alerts,
             }
         except connector.Error as err:
             print(f"Error fetching overall dashboard stats: {err}")
@@ -2158,7 +2199,7 @@ class Database:
                 "on_time_rate": on_time_rate,
                 "on_time_percentage": on_time_percentage,
                 "participation_level": participation_level,
-                "target_date": str(target_date),
+                "target_date": target_date.strftime("%b %d, %Y") if target_date else "N/A",
                 "upcoming_events": upcoming_events,
                 "recent_activity": recent_activity,
                 "leaderboard": leaderboard,
