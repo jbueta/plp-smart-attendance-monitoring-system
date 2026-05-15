@@ -413,34 +413,67 @@
 
                 <div class="row g-4 mb-4">
                     <div class="col-md-12">
-                        <div class="card-glass p-4" style="height: 400px; overflow-y: auto;">
-                            <h5 class="text-white mb-4"><i class="bi bi-table me-2 text-info"></i>Departmental Participation Details</h5>
+                        <div class="p-4 rounded-4" style="background: transparent; border: 1px solid rgba(255,255,255,0.08);">
+                            <h5 class="text-white mb-4 fw-bold"><i class="bi bi-diagram-3 me-2 text-info"></i>Departmental Participation Details</h5>
                             <div class="table-responsive">
-                                <table class="table table-dark table-hover bg-transparent mb-0" style="border-collapse: separate; border-spacing: 0 8px;">
+                                <table class="table mb-0" style="border-collapse: collapse; background-color: transparent !important; --bs-table-bg: transparent; --bs-table-accent-bg: transparent; --bs-table-hover-bg: transparent;">
                                     <thead>
-                                        <tr class="text-white-50 x-small border-secondary text-uppercase tracking-wider">
-                                            <th class="border-0">Department</th>
-                                            <th class="text-center border-0">Invited</th>
-                                            <th class="text-center border-0">Attended</th>
-                                            <th class="text-end border-0">Rate</th>
+                                        <tr class="border-bottom border-white border-opacity-10 text-uppercase tracking-wider">
+                                            <th class="text-white small fw-bold pb-3 ps-3 border-0 opacity-50">Department</th>
+                                            <th class="text-center text-white small fw-bold pb-3 border-0 opacity-50">Invited</th>
+                                            <th class="text-center text-white small fw-bold pb-3 border-0 opacity-50">Attended</th>
+                                            <th class="text-end text-white small fw-bold pb-3 pe-3 border-0 opacity-50">Participation Rate</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
+                                    <tbody class="border-top-0">
+                                        {% set dept_colors = {
+                                            'College of Arts & Sciences': '#6f42c1',
+                                            'College of Business and Accountancy': '#ffc107',
+                                            'College of Education': '#0d6efd',
+                                            'College of International Hospitality Management': '#800000',
+                                            'College of Computer Studies': '#adb5bd',
+                                            'College of Nursing': '#d63384',
+                                            'College of Engineering': '#fd7e14'
+                                        } %}
                                         {% for row in employee_stats.dept_comparison %}
-                                        <tr class="border-0 card-glass bg-opacity-10" style="background-color: rgba(255,255,255,0.02);">
-                                            <td class="text-white py-3 border-0 rounded-start small">{{ row.dept }}</td>
-                                            <td class="text-center text-white-50 border-0 small">{{ row.invited }}</td>
-                                            <td class="text-center text-white-50 border-0 small">{{ row.attended }}</td>
-                                            <td class="text-end border-0 rounded-end">
-                                                <span class="badge bg-{{ 'success' if (row.rate | int) >= 80 else 'warning' if (row.rate | int) >= 50 else 'danger' }} bg-opacity-10 text-{{ 'success' if (row.rate | int) >= 80 else 'warning' if (row.rate | int) >= 50 else 'danger' }} border border-{{ 'success' if (row.rate | int) >= 80 else 'warning' if (row.rate | int) >= 50 else 'danger' }} border-opacity-25" style="font-size: 0.7rem;">
-                                                    {{ row.rate }}%
-                                                </span>
+                                        {% set dept_color = dept_colors.get(row.dept, '#ffffff') %}
+                                        <tr class="border-bottom border-white border-opacity-5">
+                                            <td class="py-3 ps-3 border-0 bg-transparent">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="rounded-circle p-2 me-3 d-none d-md-flex" 
+                                                         style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background-color: {{ dept_color }}26; border: 1px solid {{ dept_color }}40;">
+                                                        <i class="bi bi-building small" style="color: {{ dept_color }};"></i>
+                                                    </div>
+                                                    <span class="text-white fw-medium">{{ row.dept }}</span>
+                                                </div>
+                                            </td>
+                                            <td class="text-center text-white border-0 align-middle opacity-75 bg-transparent">
+                                                <span>{{ row.invited }}</span>
+                                            </td>
+                                            <td class="text-center border-0 align-middle bg-transparent">
+                                                <span class="text-info fw-bold">{{ row.attended }}</span>
+                                            </td>
+                                            <td class="text-end border-0 align-middle pe-3 bg-transparent">
+                                                <div class="d-flex align-items-center justify-content-end gap-3">
+                                                    <div class="progress d-none d-lg-flex" style="height: 3px; width: 60px; background-color: rgba(255,255,255,0.05); border-radius: 2px;">
+                                                        <div class="progress-bar bg-{{ 'success' if (row.rate | int) >= 80 else 'warning' if (row.rate | int) >= 50 else 'danger' }}" 
+                                                             style="width: {{ row.rate }}%"></div>
+                                                    </div>
+                                                    <span class="text-{{ 'success' if (row.rate | int) >= 80 else 'warning' if (row.rate | int) >= 50 else 'danger' }} fw-bold" style="font-size: 0.85rem; min-width: 45px;">
+                                                        {{ row.rate }}%
+                                                    </span>
+                                                </div>
                                             </td>
                                         </tr>
                                         {% endfor %}
                                         {% if not employee_stats.dept_comparison %}
                                         <tr>
-                                            <td colspan="4" class="text-center py-5 text-white-50 border-0">No data available for this date.</td>
+                                            <td colspan="4" class="text-center py-5 text-white-50 border-0">
+                                                <div class="opacity-50">
+                                                    <i class="bi bi-inbox display-4 d-block mb-2"></i>
+                                                    No data available for this date.
+                                                </div>
+                                            </td>
                                         </tr>
                                         {% endif %}
                                     </tbody>
@@ -451,7 +484,7 @@
                 </div>
 
                 <div class="row g-4 mb-4">
-                    <div class="col-md-4">
+                    <div class="col-md-6">
                         <div class="card-glass p-4" style="height: 400px; display: flex; flex-direction: column;">
                             <h5 class="text-white mb-4"><i class="bi bi-trophy me-2 text-gold"></i>Punctuality Leaders</h5>
                             <div class="list-group list-group-flush bg-transparent overflow-auto flex-grow-1" style="scrollbar-width: thin;">
@@ -471,37 +504,7 @@
                         </div>
                     </div>
 
-                    <div class="col-md-4">
-                        <div class="card-glass p-4" style="height: 400px;">
-                            <h5 class="text-white mb-4"><i class="bi bi-calendar-check me-2 text-primary"></i>Upcoming Employee Events</h5>
-                            <div class="list-group list-group-flush bg-transparent">
-                                {% for event in employee_stats.upcoming_events %}
-                                <div class="list-group-item bg-transparent border-0 border-bottom border-secondary border-opacity-25 px-0 py-3">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <div class="fw-bold text-white">{{ event.event_name }}</div>
-                                            <div class="text-white-50 small"><i class="bi bi-geo-alt me-1"></i>{{ event.location }}</div>
-                                        </div>
-                                        <div class="text-end">
-                                            <div class="badge bg-primary bg-opacity-10 text-primary mb-1">{{ event.date }}</div>
-                                            <div class="text-white-50 small">{{ event.time }}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                                {% endfor %}
-                                {% if not employee_stats.upcoming_events %}
-                                <div class="text-center py-5">
-                                    <div class="rounded-circle bg-white bg-opacity-10 p-3 d-inline-block mb-3">
-                                        <i class="bi bi-calendar-x text-white-50 fs-2"></i>
-                                    </div>
-                                    <p class="text-white-50">No upcoming events scheduled.</p>
-                                </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-md-4">
+                    <div class="col-md-6">
                         <div class="card-glass p-4" style="height: 400px; display: flex; flex-direction: column;">
                             <h5 class="text-white mb-4"><i class="bi bi-exclamation-triangle me-2 text-danger"></i>Attendance Alerts</h5>
                             <div class="list-group list-group-flush bg-transparent overflow-auto flex-grow-1" style="scrollbar-width: thin;">
@@ -754,19 +757,25 @@
                 const labels = deptData.map(d => d.name);
                 const values = deptData.map(d => d.value);
 
+                const deptColorMap = {
+                    'College of Arts & Sciences': '#6f42c1',
+                    'College of Business and Accountancy': '#ffc107',
+                    'College of Education': '#0d6efd',
+                    'College of International Hospitality Management': '#800000',
+                    'College of Computer Studies': '#adb5bd',
+                    'College of Nursing': '#d63384',
+                    'College of Engineering': '#fd7e14'
+                };
+
+                const backgroundColors = labels.map(label => deptColorMap[label] || 'rgba(255, 255, 255, 0.2)');
+
                 new Chart(attendanceCanvas, {
                     type: 'doughnut',
                     data: {
                         labels: labels.length > 0 ? labels : ['No Data'],
                         datasets: [{
                             data: values.length > 0 ? values : [100],
-                            backgroundColor: [
-                                'rgba(11, 125, 63, 0.8)',
-                                'rgba(212, 175, 55, 0.8)',
-                                'rgba(0, 123, 255, 0.8)',
-                                'rgba(111, 66, 193, 0.8)',
-                                'rgba(255, 193, 7, 0.8)'
-                            ],
+                            backgroundColor: backgroundColors,
                             borderColor: 'transparent',
                             hoverOffset: 15
                         }]

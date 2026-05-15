@@ -2059,7 +2059,7 @@ class Database:
                   AND u.active = 1
                 GROUP BY d.department_name
                 ORDER BY value DESC, d.department_name ASC
-                LIMIT 5
+                LIMIT 7
                 """,
                 (target_instance_id,),
             )
