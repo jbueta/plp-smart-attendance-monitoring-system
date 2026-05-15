@@ -130,6 +130,7 @@ body::after {
     border: 1px solid var(--glass-border) !important;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     padding: 0.5rem 0;
+    z-index: 1060 !important; /* Increased from 1040 to ensure it appears above table cards */
 }
 
 .dropdown-item {
