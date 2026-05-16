@@ -10,7 +10,7 @@ from flask_cors import CORS
 
 from config import get_config
 from database import close_db, connect_db, init_db_pool, release_db_connection
-from db_connect import Database
+from db_connect import Database, ensure_visitor_valid_until_schema, expire_expired_visitor_accounts
 
 
 app = Flask(__name__)
@@ -326,8 +326,24 @@ def start_instance_generation_scheduler():
 
 with app.app_context():
     init_db_pool()
+    conn = connect_db()
+    if conn:
+        ensure_visitor_valid_until_schema(conn, logger=app.logger)
+        release_db_connection(conn)
 
 app.teardown_appcontext(close_db)
+
+
+@app.before_request
+def disable_expired_visitor_accounts():
+    if request.endpoint == "static":
+        return
+
+    conn = connect_db()
+    if not conn:
+        return
+
+    expire_expired_visitor_accounts(conn, logger=app.logger)
 
 
 # ==============================================================================

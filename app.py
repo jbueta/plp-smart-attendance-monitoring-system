@@ -19,9 +19,22 @@ from werkzeug.routing import BuildError
 from werkzeug.utils import secure_filename
 
 from app_tasks import fetch_report_data
+from announcement_bulletin_routes import bulletin_bp
+from announcement_paging_routes import paging_bp
 from config import get_config
 from database import close_db, connect_db, init_db_pool, release_db_connection
-from db_connect import Database, EmployeeModel, StudentModel, VISITOR_PURPOSES, normalize_visitor_purpose
+from db_connect import (
+    Database,
+    EmployeeModel,
+    StudentModel,
+    VISITOR_PURPOSES,
+    ensure_visitor_valid_until_schema,
+    expire_expired_visitor_accounts,
+    format_visitor_valid_until,
+    normalize_visitor_purpose,
+    parse_visitor_valid_until,
+    visitor_valid_until_end_of_day,
+)
 from extensions import cache
 from utils.employee_schema import (
     build_person_name_match_keys,
@@ -45,6 +58,8 @@ from utils.student_schema import (
 app = Flask(__name__)
 app.config.from_object(get_config())
 app.permanent_session_lifetime = timedelta(minutes=3)
+app.register_blueprint(bulletin_bp)
+app.register_blueprint(paging_bp)
 
 os.makedirs(os.path.dirname(app.config["LOG_FILE"]) or ".", exist_ok=True)
 REPORT_ARCHIVE_DIR = os.path.join(app.static_folder, "reports")
@@ -56,6 +71,10 @@ cache.init_app(app)
 
 with app.app_context():
     init_db_pool()
+    conn = connect_db()
+    if conn:
+        ensure_visitor_valid_until_schema(conn, logger=app.logger)
+        release_db_connection(conn)
 
 app.teardown_appcontext(close_db)
 
@@ -882,6 +901,27 @@ def login_required(view_func):
     return wrapped_view
 
 
+def validate_visitor_valid_until(value, default_to_today=False):
+    valid_until = parse_visitor_valid_until(value, default_to_today=default_to_today)
+    if not valid_until:
+        return None, "Select a valid account expiration date."
+    if valid_until < datetime.now().replace(microsecond=0):
+        return None, "Account expiration must be today or a future date."
+    return valid_until, None
+
+
+@app.before_request
+def disable_expired_visitor_accounts():
+    if request.endpoint == "static":
+        return
+
+    conn = connect_db()
+    if not conn:
+        return
+
+    expire_expired_visitor_accounts(conn, logger=app.logger)
+
+
 @app.errorhandler(Exception)
 def handle_app_exception(err):
     if request.path.startswith("/upload_employees"):
@@ -1047,12 +1087,6 @@ def normalize_visitor_upload_purpose_and_details(raw_purpose, raw_details):
     if purpose:
         return purpose, details
 
-    if purpose_or_office:
-        combined_details = purpose_or_office
-        if details and details.lower() != purpose_or_office.lower():
-            combined_details = f"{purpose_or_office} - {details}"
-        return "Other", combined_details
-
     return None, details
 
 
@@ -1084,11 +1118,11 @@ def validate_visitor_upload_rows(parsed_rows):
             continue
 
         if not purpose:
-            errors.append(f"Row {row_number}: Invalid purpose/office: {raw_purpose}")
+            errors.append(f"Row {row_number}: Invalid purpose. Must be one of: {', '.join(VISITOR_PURPOSES)}")
             continue
 
         if purpose == "Other" and not details:
-            errors.append(f"Row {row_number}: Details is required when Purpose is Other.")
+            errors.append(f"Row {row_number}: Details is required when Purpose is 'Other'.")
             continue
 
         name_key = visitor_name.upper()
@@ -1460,7 +1494,8 @@ def visitor_checkin():
         flash("Check-in failed. Visitor database is unavailable.", "danger")
         return redirect(url_for(source))
 
-    result = Database(conn, (name, purpose, details, "Gate 1")).add_visitor_log()
+    valid_until = visitor_valid_until_end_of_day()
+    result = Database(conn, (name, purpose, details, "Gate 1", valid_until)).add_visitor_log()
     if result.get("success"):
         session["visitor_welcome"] = {
             "name": name,
@@ -1475,6 +1510,7 @@ def visitor_checkin():
                         "name": name,
                         "visitor_id": result.get("visitor_id") or "Pending ID",
                         "purpose": details if purpose.lower() == "other" and details else purpose,
+                        "valid_until": result.get("valid_until"),
                     },
                 }
             ), 200
@@ -1496,6 +1532,7 @@ def add_visitor():
     name = (data.get("visitor_name") or data.get("name") or "").strip()
     purpose = normalize_visitor_purpose(data.get("purpose"))
     details = (data.get("details") or "").strip()
+    valid_until, valid_until_error = validate_visitor_valid_until(data.get("valid_until"))
 
     if not name:
         return jsonify({"success": False, "error": "Visitor name is required."}), 400
@@ -1503,12 +1540,14 @@ def add_visitor():
         return jsonify({"success": False, "error": "Select a valid visitor purpose."}), 400
     if purpose == "Other" and not details:
         return jsonify({"success": False, "error": "Visit description is required when purpose is Other."}), 400
+    if valid_until_error:
+        return jsonify({"success": False, "error": valid_until_error}), 400
 
     conn = connect_db()
     if not conn:
         return jsonify({"success": False, "error": "Database offline"}), 500
 
-    result = Database(conn, (name, purpose, details, "Gate 1")).add_visitor_log()
+    result = Database(conn, (name, purpose, details, "Gate 1", valid_until)).add_visitor_log()
     status_code = 200 if result.get("success") else 400
     return jsonify(result), status_code
 
@@ -1524,6 +1563,7 @@ def send_visitor_qr_email():
     details = (data.get("details") or "").strip()
     qr_data = (data.get("qr_data") or "").strip()
     qr_url = (data.get("qr_url") or "").strip()
+    valid_until = parse_visitor_valid_until(data.get("valid_until"))
 
     if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", recipient):
         return jsonify({"success": False, "message": "Enter a valid visitor email address."}), 400
@@ -1551,6 +1591,8 @@ def send_visitor_qr_email():
     )
     if purpose == "Other":
         email_body += f"Details: {details}\n"
+    if valid_until:
+        email_body += f"Valid Until: {format_visitor_valid_until(valid_until)}\n"
     if not attachment_data:
         email_body += f"\nQR Code Link: {qr_url}\n"
 
@@ -1583,9 +1625,16 @@ def commit_visitors_upload_payload(rows):
         row_number = row.get("row_number") or "Unknown"
         visitor_name = clean_upload_text(row.get("name"))
         purpose, details = normalize_visitor_upload_purpose_and_details(row.get("purpose"), row.get("details"))
+        valid_until, valid_until_error = validate_visitor_valid_until(
+            row.get("valid_until"),
+            default_to_today=True,
+        )
 
         if not visitor_name or not purpose:
             errors.append(f"Row {row_number}: Missing Name or Purpose/Office.")
+            continue
+        if valid_until_error:
+            errors.append(f"Row {row_number}: {valid_until_error}")
             continue
         if purpose != "Other":
             details = ""
@@ -1599,7 +1648,7 @@ def commit_visitors_upload_payload(rows):
             continue
 
         try:
-            result = Database(conn, (visitor_name, purpose, details, "Gate 1")).add_visitor_log()
+            result = Database(conn, (visitor_name, purpose, details, "Gate 1", valid_until)).add_visitor_log()
             if result.get("success"):
                 inserted += 1
                 if result.get("visitor_id"):
@@ -1607,10 +1656,16 @@ def commit_visitors_upload_payload(rows):
             else:
                 errors.append(f"Row {row_number}: {result.get('message', 'Failed to add visitor.')}")
         except Exception as err:
+            app.logger.warning("Failed to add visitor from upload. row=%s error=%s", row_number, err)
             errors.append(f"Row {row_number}: {err}")
         finally:
             release_db_connection(conn)
 
+    app.logger.info(
+        "Visitor upload completed. inserted=%s errors=%s",
+        inserted,
+        len(errors),
+    )
     return jsonify(
         {
             "success": inserted > 0,
@@ -1621,19 +1676,53 @@ def commit_visitors_upload_payload(rows):
     ), (200 if inserted > 0 else 400)
 
 
+@app.route("/upload_visitors/template.csv", methods=["GET"])
+@login_required
+def download_visitor_upload_template():
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(VISITOR_UPLOAD_REQUIRED_COLUMNS + VISITOR_UPLOAD_OPTIONAL_COLUMNS)
+    writer.writerow(["Maria Santos", "Official Business", ""])
+    writer.writerow(["Juan Dela Cruz", "Document Submission", ""])
+    writer.writerow(["Anna Rivera", "Other", "Campus inspection and audit"])
+
+    csv_content = output.getvalue()
+    output.close()
+
+    return Response(
+        csv_content,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=visitor_upload_template.csv"},
+    )
+
+
 @app.route("/upload_visitors/preview", methods=["POST"])
 @login_required
 def preview_visitors_upload():
     try:
         file = request.files.get("file")
+        app.logger.info(
+            "Visitor upload preview requested. filename=%s",
+            getattr(file, "filename", None),
+        )
         parsed = parse_visitor_upload_file(file)
         if not parsed.get("success"):
+            app.logger.warning(
+                "Visitor upload parsing rejected. filename=%s error=%s",
+                getattr(file, "filename", None),
+                parsed.get("error"),
+            )
             return jsonify(parsed), 400
     except Exception as err:
         app.logger.exception("Unexpected visitor upload parsing failure.")
         return jsonify({"success": False, "error": f"Upload parsing failed: {err}"}), 500
 
     validation = validate_visitor_upload_rows(parsed.get("parsed_rows", []))
+    app.logger.info(
+        "Visitor upload preview validated. valid_rows=%s errors=%s",
+        len(validation.get("valid_rows", [])),
+        len(validation.get("errors", [])),
+    )
     return jsonify(
         {
             "success": True,
@@ -1682,6 +1771,17 @@ def dashboard():
         employee_stats=fetch_dashboard_stats("/admin/dashboard/analytics/employees", dict(MOCK_EMPLOYEE_STATS)),
         logs=fetch_employee_attendance(),
         user=session.get("admin_username", "Admin"),
+    )
+
+
+@app.route("/announcement_manager")
+@login_required
+def announcement_manager():
+    return render_template(
+        "announcement_manager.html",
+        user=session.get("admin_username", "Admin"),
+        departments=fetch_departments(),
+        events=fetch_backend_events(),
     )
 
 
@@ -1754,6 +1854,7 @@ def update_visitor(visitor_id):
     name = (data.get("name") or "").strip()
     purpose = normalize_visitor_purpose(data.get("purpose"))
     details = (data.get("details") or "").strip()
+    valid_until, valid_until_error = validate_visitor_valid_until(data.get("valid_until"))
 
     if not name:
         return jsonify({"success": False, "message": "Visitor name is required."}), 400
@@ -1761,12 +1862,14 @@ def update_visitor(visitor_id):
         return jsonify({"success": False, "message": "Select a valid visitor purpose."}), 400
     if purpose == "Other" and not details:
         return jsonify({"success": False, "message": "Visit description is required when purpose is Other."}), 400
+    if valid_until_error:
+        return jsonify({"success": False, "message": valid_until_error}), 400
 
     conn = connect_db()
     if not conn:
         return jsonify({"success": False, "message": "Database offline"}), 500
 
-    result = Database(conn, (visitor_id, name, purpose, details)).update_visitor_record()
+    result = Database(conn, (visitor_id, name, purpose, details, valid_until)).update_visitor_record()
     return jsonify(result), (200 if result.get("success") else 400)
 
 

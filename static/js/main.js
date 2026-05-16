@@ -1,5 +1,36 @@
 /* Main.js - PLP Smart System Interactions */
 
+// Global interval manager to prevent duplicates and memory leaks
+const intervalManager = {
+    intervals: new Map(),
+    
+    set(key, intervalId) {
+        if (this.intervals.has(key)) {
+            clearInterval(this.intervals.get(key));
+        }
+        this.intervals.set(key, intervalId);
+    },
+    
+    clear(key) {
+        if (this.intervals.has(key)) {
+            clearInterval(this.intervals.get(key));
+            this.intervals.delete(key);
+        }
+    },
+    
+    clearAll() {
+        for (let intervalId of this.intervals.values()) {
+            clearInterval(intervalId);
+        }
+        this.intervals.clear();
+    }
+};
+
+// Cleanup intervals when leaving the page
+window.addEventListener('beforeunload', () => {
+    intervalManager.clearAll();
+});
+
 document.addEventListener('DOMContentLoaded', () => {
     initClock();
     initAnimations();
@@ -189,7 +220,8 @@ function initInstanceGeneratorToast() {
     }
 
     pollStatus();
-    setInterval(pollStatus, 8000);
+    const pollIntervalId = setInterval(pollStatus, 8000);
+    intervalManager.set('instanceGeneratorPoll', pollIntervalId);
 }
 
 // --- Real-time Clock ---
@@ -218,7 +250,8 @@ function initClock() {
     }
 
     updateTime();
-    setInterval(updateTime, 1000);
+    const clockIntervalId = setInterval(updateTime, 1000);
+    intervalManager.set('liveClockUpdate', clockIntervalId);
 }
 
 // --- Kiosk Logic (State Machine) ---
