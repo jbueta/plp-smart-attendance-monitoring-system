@@ -3127,7 +3127,7 @@ def update_employee():
             (department_id,),
         )
         department = cursor.fetchone()
-
+        print(department)
         if not department:
             conn.rollback()
             return jsonify({"success": False, "error": "Selected department does not exist."}), 400

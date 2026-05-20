@@ -382,12 +382,52 @@ class Database:
 
     def insert_general_log(self):
         try:
+            user_id, timestamp_value, log_type, gate = self.parameter
+            if isinstance(timestamp_value, str):
+                timestamp_value = datetime.strptime(timestamp_value, "%Y-%m-%d %H:%M:%S")
+
+            self.cursor.execute(
+                """
+                SELECT log_id, timestamp, log_type
+                FROM general_log
+                WHERE user_id = %s
+                ORDER BY timestamp DESC, log_id DESC
+                LIMIT 1
+                """,
+                (user_id,),
+            )
+            last_log = self.cursor.fetchone()
+
+            if last_log and last_log["log_type"] == log_type:
+                if log_type == "Entry" and last_log["timestamp"].date() < timestamp_value.date():
+                    synthetic_exit = datetime.combine(last_log["timestamp"].date(), datetime_time(23, 59, 59))
+                    self.cursor.execute(
+                        """
+                        INSERT INTO general_log (user_id, timestamp, log_type, gate)
+                        VALUES (%s, %s, %s, %s)
+                        """,
+                        (user_id, synthetic_exit, "Exit", "Gate 2"),
+                    )
+                else:
+                    self.conn.rollback()
+                    return {
+                        "success": False,
+                        "message": f"Rejected duplicate {log_type} log. The last log is already {log_type}.",
+                    }
+
+            if log_type == "Exit" and (not last_log or last_log["log_type"] != "Entry"):
+                self.conn.rollback()
+                return {
+                    "success": False,
+                    "message": "Rejected exit log. No matching entry log is open.",
+                }
+
             self.cursor.execute(
                 """
                 INSERT INTO general_log (user_id, timestamp, log_type, gate)
                 VALUES (%s, %s, %s, %s)
                 """,
-                self.parameter,
+                (user_id, timestamp_value, log_type, gate),
             )
             self.conn.commit()
 
@@ -1855,6 +1895,9 @@ class Database:
 
                 query = f"""
                     SELECT
+                        gl.log_id AS log_id,
+                        gl.user_id AS user_id,
+                        gl.timestamp AS timestamp,
                         COALESCE(s.student_name, 'Unknown Student') AS name,
                         COALESCE(c.course_name, 'N/A') AS detail,
                         TIME_FORMAT(gl.timestamp, '%h:%i %p') AS time,
@@ -1867,7 +1910,7 @@ class Database:
                     WHERE DATE(gl.timestamp) BETWEEN %s AND %s
                       AND u.role = 'student'
                       {course_condition}
-                    ORDER BY gl.timestamp DESC
+                    ORDER BY gl.timestamp ASC, gl.log_id ASC
                 """
                 cursor.execute(query, [start_date, end_date] + course_params)
                 raw_logs = cursor.fetchall()
