@@ -1434,7 +1434,12 @@ def kiosk_exit():
 @app.route("/kiosk/employee/select-event")
 def kiosk_employee_select_event():
     session.clear()
-    return render_template("kiosk_event_select.html", events=fetch_kiosk_live_events())
+    employee_stats = fetch_dashboard_stats("/admin/dashboard/analytics/employees", dict(MOCK_EMPLOYEE_STATS))
+    return render_template(
+        "kiosk_event_select.html", 
+        events=fetch_kiosk_live_events(),
+        upcoming_events=employee_stats.get("upcoming_events", [])
+    )
 
 
 @app.route("/kiosk/employee")

@@ -15,13 +15,20 @@
     </a>
     <hr>
     <ul class="nav nav-pills flex-column mb-auto">
-        <li><a href="{{ url_for('dashboard') }}" class="nav-link active"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
-        <li><a href="{{ url_for('announcement_manager') }}" class="nav-link"><i class="bi bi-megaphone"></i> Announcements</a></li>
-        <li><a href="{{ url_for('manage_events') }}" class="nav-link"><i class="bi bi-calendar-event"></i> Events</a></li>
-        <li><a href="{{ url_for('admin_visitors') }}" class="nav-link"><i class="bi bi-person-lines-fill"></i> Visitors</a></li>
-        <li><a href="{{ url_for('admin_employees') }}" class="nav-link" id="nav-employees"><i class="bi bi-person-badge"></i> Employees</a></li>
-        <li><a href="{{ url_for('admin_students') }}" class="nav-link" id="nav-students"><i class="bi bi-mortarboard"></i> Students</a></li>
-        <li><a href="{{ url_for('reports') }}" class="nav-link"><i class="bi bi-file-earmark-bar-graph"></i> Reports</a></li>
+        <li><a href="{{ url_for('dashboard') }}" class="nav-link active"><i class="bi bi-speedometer2"></i>
+                Dashboard</a></li>
+        <li><a href="{{ url_for('announcement_manager') }}" class="nav-link"><i class="bi bi-megaphone"></i>
+                Announcements</a></li>
+        <li><a href="{{ url_for('manage_events') }}" class="nav-link"><i class="bi bi-calendar-event"></i> Events</a>
+        </li>
+        <li><a href="{{ url_for('admin_visitors') }}" class="nav-link"><i class="bi bi-person-lines-fill"></i>
+                Visitors</a></li>
+        <li><a href="{{ url_for('admin_employees') }}" class="nav-link" id="nav-employees"><i
+                    class="bi bi-person-badge"></i> Employees</a></li>
+        <li><a href="{{ url_for('admin_students') }}" class="nav-link" id="nav-students"><i
+                    class="bi bi-mortarboard"></i> Students</a></li>
+        <li><a href="{{ url_for('reports') }}" class="nav-link"><i class="bi bi-file-earmark-bar-graph"></i> Reports</a>
+        </li>
     </ul>
     <hr>
     <div>
@@ -77,64 +84,83 @@
              ============================================== -->
         <div id="executive-view" class="dashboard-view active-view">
             <!-- 4-Column Stats -->
-                <div class="row g-4 mb-4">
-                    <div class="col-md-3">
-                        <div class="card-glass border-primary border-opacity-25 transition-hover">
-                            <div class="card-body p-4">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <div class="rounded-3 bg-primary bg-opacity-10 p-2">
-                                        <i class="bi bi-people-fill text-primary fs-4"></i>
-                                    </div>
-                                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">{{ overall_stats.entries_trend }}</span>
+            <div class="row g-4 mb-4">
+                <div class="col-md">
+                    <div class="card-glass border-primary border-opacity-25 transition-hover">
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div class="rounded-3 bg-primary bg-opacity-10 p-2">
+                                    <i class="bi bi-people-fill text-primary fs-4"></i>
                                 </div>
-                                <h6 class="text-white-50 small text-uppercase tracking-wider mb-1">Total Daily Traffic</h6>
-                                <h2 class="display-6 fw-bold text-white mb-0">{{ overall_stats.total_entries }}</h2>
+                                <span
+                                    class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">{{
+                                    overall_stats.entries_trend }}</span>
                             </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card-glass border-info border-opacity-25 transition-hover">
-                            <div class="card-body p-4">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <div class="rounded-3 bg-info bg-opacity-10 p-2">
-                                        <i class="bi bi-geo-alt-fill text-info fs-4"></i>
-                                    </div>
-                                    <span class="text-white-50 small">Live</span>
-                                </div>
-                                <h6 class="text-white-50 small text-uppercase tracking-wider mb-1">Currently Inside</h6>
-                                <h2 class="display-6 fw-bold text-white mb-0">{{ overall_stats.currently_inside }}</h2>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card-glass border-warning border-opacity-25 transition-hover">
-                            <div class="card-body p-4">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <div class="rounded-3 bg-warning bg-opacity-10 p-2">
-                                        <i class="bi bi-clock-history text-warning fs-4"></i>
-                                    </div>
-                                    <span class="text-white-50 small">Avg</span>
-                                </div>
-                                <h6 class="text-white-50 small text-uppercase tracking-wider mb-1">Average Dwell Time</h6>
-                                <h2 class="fs-1.1 fw-bold text-white mb-0">{{ overall_stats.avg_dwell_time }}</h2>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card-glass border-gold border-opacity-25 transition-hover">
-                            <div class="card-body p-4">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <div class="rounded-3 bg-gold bg-opacity-10 p-2">
-                                        <i class="bi bi-calendar-check-fill text-gold fs-4"></i>
-                                    </div>
-                                    <span class="badge bg-gold bg-opacity-10 text-gold border border-gold border-opacity-25">{{ overall_stats.event_attendance_rate }}</span>
-                                </div>
-                                <h6 class="text-white-50 small text-uppercase tracking-wider mb-1">Event Participation</h6>
-                                <h2 class="display-6 fw-bold text-white mb-0">{{ overall_stats.event_attendance_raw.split('/')[0] | trim }}</h2>
-                            </div>
+                            <h6 class="text-white-50 small text-uppercase tracking-wider mb-1">Total Daily Traffic</h6>
+                            <h2 class="display-6 fw-bold text-white mb-0">{{ overall_stats.total_entries }}</h2>
                         </div>
                     </div>
                 </div>
+                <div class="col-md">
+                    <div class="card-glass border-info border-opacity-25 transition-hover">
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div class="rounded-3 bg-info bg-opacity-10 p-2">
+                                    <i class="bi bi-geo-alt-fill text-info fs-4"></i>
+                                </div>
+                                <span class="text-white-50 small">Live</span>
+                            </div>
+                            <h6 class="text-white-50 small text-uppercase tracking-wider mb-1">Currently Inside</h6>
+                            <h2 class="display-6 fw-bold text-white mb-0">{{ overall_stats.currently_inside }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md">
+                    <div class="card-glass border-warning border-opacity-25 transition-hover">
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div class="rounded-3 bg-warning bg-opacity-10 p-2">
+                                    <i class="bi bi-clock-history text-warning fs-4"></i>
+                                </div>
+                                <span class="text-white-50 small">Avg</span>
+                            </div>
+                            <h6 class="text-white-50 small text-uppercase tracking-wider mb-1">Average Dwell Time</h6>
+                            <h2 class="fs-1.1 fw-bold text-white mb-0">{{ overall_stats.avg_dwell_time }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md">
+                    <div class="card-glass border-gold border-opacity-25 transition-hover">
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div class="rounded-3 bg-gold bg-opacity-10 p-2">
+                                    <i class="bi bi-calendar-check-fill text-gold fs-4"></i>
+                                </div>
+                                <span
+                                    class="badge bg-gold bg-opacity-10 text-gold border border-gold border-opacity-25">{{
+                                    overall_stats.event_attendance_rate }}</span>
+                            </div>
+                            <h6 class="text-white-50 small text-uppercase tracking-wider mb-1">Event Participation</h6>
+                            <h2 class="display-6 fw-bold text-white mb-0">{{
+                                overall_stats.event_attendance_raw.split('/')[0] | trim }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md">
+                    <div class="card-glass border-info border-opacity-25 transition-hover">
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div class="rounded-3 bg-info bg-opacity-10 p-2">
+                                    <i class="bi bi-person-badge-fill text-info fs-4"></i>
+                                </div>
+                                <span class="text-white-50 small">Active</span>
+                            </div>
+                            <h6 class="text-white-50 small text-uppercase tracking-wider mb-1">Total Employees</h6>
+                            <h2 class="display-6 fw-bold text-white mb-0">{{ overall_stats.total_employees }}</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <div class="row g-4">
                 <!-- Main Chart Placeholder -->
@@ -144,7 +170,8 @@
                         <div class="d-flex justify-content-between align-items-center mb-4">
                             <h5 class="card-title text-white mb-0">Hourly Traffic Volume</h5>
                             <div class="badge bg-primary-gold text-dark">
-                                <i class="bi bi-graph-up-arrow me-1"></i> Peak: {{ overall_stats.peak_window if overall_stats.peak_window != 'N/A' else overall_stats.peak_hour }}
+                                <i class="bi bi-graph-up-arrow me-1"></i> Peak: {{ overall_stats.peak_window if
+                                overall_stats.peak_window != 'N/A' else overall_stats.peak_hour }}
                             </div>
                         </div>
 
@@ -225,621 +252,724 @@
             </div> <!-- Close Row (Hourly Traffic & Alerts) -->
         </div> <!-- Close executive view wrapper -->
 
-            <!-- ==============================================
+        <!-- ==============================================
              STUDENTS VIEW
              ============================================== -->
-            <div id="students-view" class="dashboard-view">
-                <!-- KPI Cards for Students -->
-                <div class="row g-4 mb-4">
-                    <div class="col-md-3">
-                        <div class="card-glass p-3 text-center h-100 transition-hover border-primary border-opacity-25">
-                            <span class="text-white-50 small text-uppercase fw-bold">Total Student Entries</span>
-                            <h3 class="my-2 fw-bold text-white">{{ student_stats.total_entries }}</h3>
-                            <small class="text-success"><i class="bi bi-arrow-up"></i> {{ student_stats.entries_trend }}</small>
-                        </div>
+        <div id="students-view" class="dashboard-view">
+            <!-- KPI Cards for Students -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-3">
+                    <div class="card-glass p-3 text-center h-100 transition-hover border-primary border-opacity-25">
+                        <span class="text-white-50 small text-uppercase fw-bold">Total Student Entries</span>
+                        <h3 class="my-2 fw-bold text-white">{{ student_stats.total_entries }}</h3>
+                        <small class="text-success"><i class="bi bi-arrow-up"></i> {{ student_stats.entries_trend
+                            }}</small>
                     </div>
-                    <div class="col-md-3">
-                        <div class="card-glass p-3 text-center h-100 transition-hover border-info border-opacity-25">
-                            <span class="text-white-50 small text-uppercase fw-bold">Currently Inside</span>
-                            <h3 class="my-2 fw-bold text-white">{{ student_stats.currently_inside }}</h3>
-                            <small class="text-info">Live Tracking</small>
-                        </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card-glass p-3 text-center h-100 transition-hover border-info border-opacity-25">
+                        <span class="text-white-50 small text-uppercase fw-bold">Currently Inside</span>
+                        <h3 class="my-2 fw-bold text-white">{{ student_stats.currently_inside }}</h3>
+                        <small class="text-info">Live Tracking</small>
                     </div>
-                    <div class="col-md-3">
-                        <div class="card-glass p-3 text-center h-100 transition-hover border-warning border-opacity-25">
-                            <span class="text-white-50 small text-uppercase fw-bold">Avg Stay Duration</span>
-                            <h3 class="my-2 fw-bold text-white">{{ student_stats.avg_stay }}</h3>
-                            <small class="text-warning">Daily Average</small>
-                        </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card-glass p-3 text-center h-100 transition-hover border-warning border-opacity-25">
+                        <span class="text-white-50 small text-uppercase fw-bold">Avg Stay Duration</span>
+                        <h3 class="my-2 fw-bold text-white">{{ student_stats.avg_stay }}</h3>
+                        <small class="text-warning">Daily Average</small>
                     </div>
-                    <div class="col-md-3">
-                        <div class="card-glass p-3 text-center h-100 transition-hover border-gold border-opacity-25">
-                            <span class="text-white-50 small text-uppercase fw-bold">Peak Entry Hour</span>
-                            <h3 class="my-2 fw-bold text-white">{{ student_stats.peak_hour }}</h3>
-                            <small class="text-gold">Traffic Load {{ student_stats.peak_load }}</small>
+                </div>
+                <div class="col-md-3">
+                    <div class="card-glass p-3 text-center h-100 transition-hover border-gold border-opacity-25">
+                        <span class="text-white-50 small text-uppercase fw-bold">Peak Entry Hour</span>
+                        <h3 class="my-2 fw-bold text-white">{{ student_stats.peak_hour }}</h3>
+                        <small class="text-gold">Traffic Load {{ student_stats.peak_load }}</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <!-- Student Hourly Traffic Chart -->
+                <div class="col-md-8">
+                    <div class="card-glass p-4" style="height: 400px;">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h5 class="mb-0 text-white"><i class="bi bi-graph-up me-2 text-primary"></i>Student Hourly
+                                Entry Volume</h5>
+                            <div
+                                class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">
+                                Real-time Data</div>
+                        </div>
+                        <div style="height: 300px; width: 100%;">
+                            <canvas id="studentTrafficChart"></canvas>
                         </div>
                     </div>
                 </div>
-
-                <div class="row g-4 mb-4">
-                    <!-- Student Hourly Traffic Chart -->
-                    <div class="col-md-8">
-                        <div class="card-glass p-4" style="height: 400px;">
-                            <div class="d-flex justify-content-between align-items-center mb-4">
-                                <h5 class="mb-0 text-white"><i class="bi bi-graph-up me-2 text-primary"></i>Student Hourly Entry Volume</h5>
-                                <div class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">Real-time Data</div>
-                            </div>
-                            <div style="height: 300px; width: 100%;">
-                                <canvas id="studentTrafficChart"></canvas>
-                            </div>
+                <!-- Curfew Watchlist -->
+                <div class="col-md-4">
+                    <div class="card-glass p-4 border-danger border-opacity-25"
+                        style="height: 400px; overflow-y: auto;">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0 text-white"><i class="bi bi-shield-exclamation me-2 text-danger"></i>Curfew
+                                Watchlist</h5>
+                            <span
+                                class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 pulse-animation"
+                                style="font-size: 0.6rem;">LIVE</span>
                         </div>
-                    </div>
-                    <!-- Curfew Watchlist -->
-                    <div class="col-md-4">
-                        <div class="card-glass p-4 border-danger border-opacity-25" style="height: 400px; overflow-y: auto;">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h5 class="mb-0 text-white"><i class="bi bi-shield-exclamation me-2 text-danger"></i>Curfew Watchlist</h5>
-                                <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 pulse-animation" style="font-size: 0.6rem;">LIVE</span>
-                            </div>
-                            <p class="text-white-50 small mb-4">Students remaining past {{ student_stats.curfew_trigger }}</p>
+                        <p class="text-white-50 small mb-4">Students remaining past {{ student_stats.curfew_trigger }}
+                        </p>
 
-                            {% if student_stats.watchlist|length > 0 %}
-                            <div class="list-group list-group-flush rounded bg-transparent">
-                                {% for student in student_stats.watchlist %}
-                                <div class="list-group-item bg-transparent text-white border-0 d-flex justify-content-between align-items-center p-2 mb-2 card-glass bg-opacity-10">
-                                    <div class="d-flex align-items-center">
-                                        <div class="rounded-circle bg-danger bg-opacity-10 p-2 me-3">
-                                            <i class="bi bi-person-fill text-danger"></i>
-                                        </div>
-                                        <div>
-                                            <div class="fw-bold small">{{ student.name }}</div>
-                                            <div class="text-white-50" style="font-size: 0.7rem;">{{ student.course }}</div>
-                                            <div class="text-danger" style="font-size: 0.7rem;">Since {{ student.entry_time }}</div>
-                                        </div>
+                        {% if student_stats.watchlist|length > 0 %}
+                        <div class="list-group list-group-flush rounded bg-transparent">
+                            {% for student in student_stats.watchlist %}
+                            <div
+                                class="list-group-item bg-transparent text-white border-0 d-flex justify-content-between align-items-center p-2 mb-2 card-glass bg-opacity-10">
+                                <div class="d-flex align-items-center">
+                                    <div class="rounded-circle bg-danger bg-opacity-10 p-2 me-3">
+                                        <i class="bi bi-person-fill text-danger"></i>
                                     </div>
-                                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-10">Alert</span>
+                                    <div>
+                                        <div class="fw-bold small">{{ student.name }}</div>
+                                        <div class="text-white-50" style="font-size: 0.7rem;">{{ student.course }}</div>
+                                    </div>
                                 </div>
-                                {% endfor %}
+                                <span
+                                    class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-10">Alert</span>
                             </div>
-                            {% else %}
-                            <div class="text-center py-5">
-                                <div class="rounded-circle bg-success bg-opacity-10 p-4 d-inline-block mb-3">
-                                    <i class="bi bi-check-circle-fill text-success fs-1"></i>
-                                </div>
-                                <h6 class="text-white mb-1">Campus Clear</h6>
-                                <p class="text-white-50 small">No students are overstaying.</p>
-                            </div>
-                            {% endif %}
+                            {% endfor %}
                         </div>
+                        {% else %}
+                        <div class="text-center py-5">
+                            <div class="rounded-circle bg-success bg-opacity-10 p-4 d-inline-block mb-3">
+                                <i class="bi bi-check-circle-fill text-success fs-1"></i>
+                            </div>
+                            <h6 class="text-white mb-1">Campus Clear</h6>
+                            <p class="text-white-50 small">No students are overstaying.</p>
+                        </div>
+                        {% endif %}
                     </div>
-                </div> <!-- Close Row (Student Charts & Watchlist) -->
-                
-                <div class="text-end mb-4">
-                    <a href="{{ url_for('admin_students') }}" class="btn btn-outline-info btn-sm">
-                        <i class="bi bi-arrow-right-circle me-2"></i>View Detailed Student Activity Logs
-                    </a>
                 </div>
-            </div> <!-- Close students view -->
+            </div> <!-- Close Row (Student Charts & Watchlist) -->
 
-            <!-- ==============================================
+            <div class="text-end mb-4">
+                <a href="{{ url_for('admin_students') }}" class="btn btn-outline-info btn-sm">
+                    <i class="bi bi-arrow-right-circle me-2"></i>View Detailed Student Activity Logs
+                </a>
+            </div>
+        </div> <!-- Close students view -->
+
+        <!-- ==============================================
              EMPLOYEES VIEW
              ============================================== -->
-            <div id="employees-view" class="dashboard-view">
-                <div class="d-flex justify-content-end mb-3 mt-2">
-                    <div class="d-flex align-items-center gap-2">
-                        <label for="eventFilter" class="text-white-50 text-nowrap mb-0"><i class="bi bi-funnel"></i> Event:</label>
-                        <select id="eventFilter" class="form-select form-select-sm bg-dark text-white border-secondary" style="min-width: 250px;" onchange="window.location.href='?instance_id=' + this.value + '#employees'">
-                            {% for inst in employee_stats.event_instances_list %}
-                                <option value="{{ inst.instance_id }}" {% if employee_stats.selected_instance_id|string == inst.instance_id|string %}selected{% endif %}>{{ inst.event_name }} ({{ inst.date_str }})</option>
-                            {% endfor %}
-                            {% if not employee_stats.event_instances_list %}
-                                <option value="">No Events Found</option>
-                            {% endif %}
-                        </select>
-                    </div>
+        <div id="employees-view" class="dashboard-view">
+            <div class="d-flex justify-content-end mb-3 mt-2">
+                <div class="d-flex align-items-center gap-2">
+                    <label for="eventFilter" class="text-white-50 text-nowrap mb-0"><i class="bi bi-funnel"></i>
+                        Event:</label>
+                    <select id="eventFilter" class="form-select form-select-sm bg-dark text-white border-secondary"
+                        style="min-width: 250px;"
+                        onchange="window.location.href='?instance_id=' + this.value + '#employees'">
+                        {% for inst in employee_stats.event_instances_list %}
+                        <option value="{{ inst.instance_id }}" {% if
+                            employee_stats.selected_instance_id|string==inst.instance_id|string %}selected{% endif %}>{{
+                            inst.event_name }} ({{ inst.date_str }})</option>
+                        {% endfor %}
+                        {% if not employee_stats.event_instances_list %}
+                        <option value="">No Events Found</option>
+                        {% endif %}
+                    </select>
                 </div>
+            </div>
 
-                <div class="row g-4 mb-4">
-                    <div class="col-md-4">
-                        <div class="card-glass p-4 border-primary border-opacity-25 transition-hover h-100">
-                            <div class="d-flex align-items-center mb-3">
-                                <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
-                                    <i class="bi bi-person-check-fill text-primary fs-3"></i>
-                                </div>
-                                <div>
-                                     <h6 class="text-white-50 small text-uppercase mb-0">Daily On-Time Rate</h6>
-                                     <h3 class="text-white fw-bold mb-0">{{ employee_stats.on_time_rate }}</h3>
-                                 </div>
-                             </div>
-                             <div class="progress" style="height: 4px; background-color: rgba(255,255,255,0.05);">
-                                 <div class="progress-bar bg-primary" style="width: {{ employee_stats.on_time_percentage }}%;"></div>
-                             </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card-glass p-4 border-danger border-opacity-25 transition-hover h-100">
-                            <div class="d-flex align-items-center mb-3">
-                                <div class="rounded-circle bg-danger bg-opacity-10 p-3 me-3">
-                                    <i class="bi bi-alarm-fill text-danger fs-3"></i>
-                                </div>
-                                <div>
-                                    <h6 class="text-white-50 small text-uppercase mb-0">Average Tardiness</h6>
-                                    <h3 class="text-white fw-bold mb-0">{{ employee_stats.avg_tardiness }}</h3>
-                                </div>
+            <div class="row g-4 mb-4">
+                <div class="col-md-4">
+                    <div class="card-glass p-4 border-primary border-opacity-25 transition-hover h-100">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
+                                <i class="bi bi-person-check-fill text-primary fs-3"></i>
                             </div>
-                            <p class="text-white-50 small mb-0">Target: < 5 mins</p>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card-glass p-4 border-info border-opacity-25 transition-hover h-100">
-                            <div class="d-flex align-items-center mb-3">
-                                <div class="rounded-circle bg-info bg-opacity-10 p-3 me-3">
-                                    <i class="bi bi-building-fill-check text-info fs-3"></i>
-                                </div>
-                                <div>
-                                    <h6 class="text-white-50 small text-uppercase mb-0">Participation Level</h6>
-                                    <h3 class="text-white fw-bold mb-0">{{ employee_stats.participation_level }}</h3>
-                                </div>
+                            <div>
+                                <h6 class="text-white-50 small text-uppercase mb-0">Daily On-Time Rate</h6>
+                                <h3 class="text-white fw-bold mb-0">{{ employee_stats.on_time_rate }}</h3>
                             </div>
-                            <p class="text-white-50 small mb-0">Based on active events ({{ employee_stats.target_date }})</p>
+                        </div>
+                        <div class="progress" style="height: 4px; background-color: rgba(255,255,255,0.05);">
+                            <div class="progress-bar bg-primary"
+                                style="width: {{ employee_stats.on_time_percentage }}%;"></div>
                         </div>
                     </div>
                 </div>
-
-                <div class="row g-4 mb-4">
-                    <div class="col-md-7">
-                        <div class="card-glass p-4" style="height: 350px;">
-                            <div class="d-flex justify-content-between align-items-center mb-4">
-                                <h5 class="mb-0 text-white"><i class="bi bi-pie-chart-fill me-2 text-primary-gold"></i>Participation by Department</h5>
-                                <div class="badge bg-gold bg-opacity-10 text-gold border border-gold border-opacity-25">Event Data</div>
+                <div class="col-md-4">
+                    <div class="card-glass p-4 border-danger border-opacity-25 transition-hover h-100">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="rounded-circle bg-danger bg-opacity-10 p-3 me-3">
+                                <i class="bi bi-alarm-fill text-danger fs-3"></i>
                             </div>
-                            <div style="height: 250px; width: 100%;">
-                                <canvas id="attendanceChart"></canvas>
+                            <div>
+                                <h6 class="text-white-50 small text-uppercase mb-0">Average Tardiness</h6>
+                                <h3 class="text-white fw-bold mb-0">{{ employee_stats.avg_tardiness }}</h3>
                             </div>
                         </div>
+                        <p class="text-white-50 small mb-0">Target: < 5 mins</p>
                     </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card-glass p-4 border-info border-opacity-25 transition-hover h-100">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="rounded-circle bg-info bg-opacity-10 p-3 me-3">
+                                <i class="bi bi-building-fill-check text-info fs-3"></i>
+                            </div>
+                            <div>
+                                <h6 class="text-white-50 small text-uppercase mb-0">Participation Level</h6>
+                                <h3 class="text-white fw-bold mb-0">{{ employee_stats.participation_level }}</h3>
+                            </div>
+                        </div>
+                        <p class="text-white-50 small mb-0">Based on active events ({{ employee_stats.target_date }})
+                        </p>
+                    </div>
+                </div>
+            </div>
 
-                    <div class="col-md-5">
-                        <div class="card-glass p-4" style="height: 350px;">
-                            <div class="d-flex justify-content-between align-items-center mb-4">
-                                <h5 class="mb-0 text-white"><i class="bi bi-activity me-2 text-success"></i>Peak Check-in Time</h5>
-                                <div class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">Time Distribution</div>
-                            </div>
-                            <div style="height: 250px; width: 100%;">
-                                <canvas id="peakCheckinChart"></canvas>
-                            </div>
+            <div class="row g-4 mb-4">
+                <div class="col-md-7">
+                    <div class="card-glass p-4" style="height: 350px;">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h5 class="mb-0 text-white"><i
+                                    class="bi bi-pie-chart-fill me-2 text-primary-gold"></i>Participation by Department
+                            </h5>
+                            <div class="badge bg-gold bg-opacity-10 text-gold border border-gold border-opacity-25">
+                                Event Data</div>
+                        </div>
+                        <div style="height: 250px; width: 100%;">
+                            <canvas id="attendanceChart"></canvas>
                         </div>
                     </div>
                 </div>
 
-                <div class="row g-4 mb-4">
-                    <div class="col-md-12">
-                        <div class="card-glass p-4" style="height: 400px; overflow-y: auto;">
-                            <h5 class="text-white mb-4"><i class="bi bi-table me-2 text-info"></i>Departmental Participation Details</h5>
-                            <div class="table-responsive">
-                                <table class="table table-dark table-hover bg-transparent mb-0" style="border-collapse: separate; border-spacing: 0 8px;">
-                                    <thead>
-                                        <tr class="text-white-50 x-small border-secondary text-uppercase tracking-wider">
-                                            <th class="border-0">Department</th>
-                                            <th class="text-center border-0">Invited</th>
-                                            <th class="text-center border-0">Attended</th>
-                                            <th class="text-end border-0">Rate</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for row in employee_stats.dept_comparison %}
-                                        <tr class="border-0 card-glass bg-opacity-10" style="background-color: rgba(255,255,255,0.02);">
-                                            <td class="text-white py-3 border-0 rounded-start small">{{ row.dept }}</td>
-                                            <td class="text-center text-white-50 border-0 small">{{ row.invited }}</td>
-                                            <td class="text-center text-white-50 border-0 small">{{ row.attended }}</td>
-                                            <td class="text-end border-0 rounded-end">
-                                                <span class="badge bg-{{ 'success' if (row.rate | int) >= 80 else 'warning' if (row.rate | int) >= 50 else 'danger' }} bg-opacity-10 text-{{ 'success' if (row.rate | int) >= 80 else 'warning' if (row.rate | int) >= 50 else 'danger' }} border border-{{ 'success' if (row.rate | int) >= 80 else 'warning' if (row.rate | int) >= 50 else 'danger' }} border-opacity-25" style="font-size: 0.7rem;">
+                <div class="col-md-5">
+                    <div class="card-glass p-4" style="height: 350px;">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h5 class="mb-0 text-white"><i class="bi bi-activity me-2 text-success"></i>Peak Check-in
+                                Time</h5>
+                            <div
+                                class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">
+                                Time Distribution</div>
+                        </div>
+                        <div style="height: 250px; width: 100%;">
+                            <canvas id="peakCheckinChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-md-12">
+                    <div class="p-4 rounded-4"
+                        style="background: transparent; border: 1px solid rgba(255,255,255,0.08);">
+                        <h5 class="text-white mb-4 fw-bold"><i class="bi bi-diagram-3 me-2 text-info"></i>Departmental
+                            Participation Details</h5>
+                        <div class="table-responsive">
+                            <table class="table mb-0"
+                                style="border-collapse: collapse; background-color: transparent !important; --bs-table-bg: transparent; --bs-table-accent-bg: transparent; --bs-table-hover-bg: transparent;">
+                                <thead>
+                                    <tr
+                                        class="border-bottom border-white border-opacity-10 text-uppercase tracking-wider">
+                                        <th class="text-white small fw-bold pb-3 ps-3 border-0 opacity-50">Department
+                                        </th>
+                                        <th class="text-center text-white small fw-bold pb-3 border-0 opacity-50">
+                                            Invited</th>
+                                        <th class="text-center text-white small fw-bold pb-3 border-0 opacity-50">
+                                            Attended</th>
+                                        <th class="text-end text-white small fw-bold pb-3 pe-3 border-0 opacity-50">
+                                            Participation Rate</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="border-top-0">
+                                    {% set dept_colors = {
+                                    'College of Arts & Sciences': '#6f42c1',
+                                    'College of Business and Accountancy': '#ffc107',
+                                    'College of Education': '#0d6efd',
+                                    'College of International Hospitality Management': '#800000',
+                                    'College of Computer Studies': '#adb5bd',
+                                    'College of Nursing': '#d63384',
+                                    'College of Engineering': '#fd7e14'
+                                    } %}
+                                    {% for row in employee_stats.dept_comparison %}
+                                    {% set dept_color = dept_colors.get(row.dept, '#ffffff') %}
+                                    <tr class="border-bottom border-white border-opacity-5">
+                                        <td class="py-3 ps-3 border-0 bg-transparent">
+                                            <div class="d-flex align-items-center">
+                                                <div class="rounded-circle p-2 me-3 d-none d-md-flex"
+                                                    style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background-color: {{ dept_color }}26; border: 1px solid {{ dept_color }}40;">
+                                                    <i class="bi bi-building small"
+                                                        style="color: {{ dept_color }};"></i>
+                                                </div>
+                                                <span class="text-white fw-medium">{{ row.dept }}</span>
+                                            </div>
+                                        </td>
+                                        <td
+                                            class="text-center text-white border-0 align-middle opacity-75 bg-transparent">
+                                            <span>{{ row.invited }}</span>
+                                        </td>
+                                        <td class="text-center border-0 align-middle bg-transparent">
+                                            <span class="text-info fw-bold">{{ row.attended }}</span>
+                                        </td>
+                                        <td class="text-end border-0 align-middle pe-3 bg-transparent">
+                                            <div class="d-flex align-items-center justify-content-end gap-3">
+                                                <div class="progress d-none d-lg-flex"
+                                                    style="height: 3px; width: 60px; background-color: rgba(255,255,255,0.05); border-radius: 2px;">
+                                                    <div class="progress-bar bg-{{ 'success' if (row.rate | int) >= 80 else 'warning' if (row.rate | int) >= 50 else 'danger' }}"
+                                                        style="width: {{ row.rate }}%"></div>
+                                                </div>
+                                                <span
+                                                    class="text-{{ 'success' if (row.rate | int) >= 80 else 'warning' if (row.rate | int) >= 50 else 'danger' }} fw-bold"
+                                                    style="font-size: 0.85rem; min-width: 45px;">
                                                     {{ row.rate }}%
                                                 </span>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                        {% if not employee_stats.dept_comparison %}
-                                        <tr>
-                                            <td colspan="4" class="text-center py-5 text-white-50 border-0">No data available for this date.</td>
-                                        </tr>
-                                        {% endif %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="row g-4 mb-4">
-                    <div class="col-md-4">
-                        <div class="card-glass p-4" style="height: 400px; display: flex; flex-direction: column;">
-                            <h5 class="text-white mb-4"><i class="bi bi-trophy me-2 text-gold"></i>Punctuality Leaders</h5>
-                            <div class="list-group list-group-flush bg-transparent overflow-auto flex-grow-1" style="scrollbar-width: thin;">
-                                {% for entry in employee_stats.leaderboard %}
-                                <div class="list-group-item bg-transparent border-0 d-flex justify-content-between align-items-center px-0 py-2">
-                                    <div class="d-flex align-items-center">
-                                        <span class="badge bg-gold bg-opacity-25 text-gold me-3 rounded-circle" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">{{ loop.index }}</span>
-                                        <span class="text-white">{{ entry.employee_name }}</span>
-                                    </div>
-                                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-10">{{ entry.present_count }} Present</span>
-                                </div>
-                                {% endfor %}
-                                {% if not employee_stats.leaderboard %}
-                                <div class="text-center py-5"><p class="text-white-50 small mb-0">No data available.</p></div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-md-4">
-                        <div class="card-glass p-4" style="height: 400px;">
-                            <h5 class="text-white mb-4"><i class="bi bi-calendar-check me-2 text-primary"></i>Upcoming Employee Events</h5>
-                            <div class="list-group list-group-flush bg-transparent">
-                                {% for event in employee_stats.upcoming_events %}
-                                <div class="list-group-item bg-transparent border-0 border-bottom border-secondary border-opacity-25 px-0 py-3">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <div class="fw-bold text-white">{{ event.event_name }}</div>
-                                            <div class="text-white-50 small"><i class="bi bi-geo-alt me-1"></i>{{ event.location }}</div>
-                                        </div>
-                                        <div class="text-end">
-                                            <div class="badge bg-primary bg-opacity-10 text-primary mb-1">{{ event.date }}</div>
-                                            <div class="text-white-50 small">{{ event.time }}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                                {% endfor %}
-                                {% if not employee_stats.upcoming_events %}
-                                <div class="text-center py-5">
-                                    <div class="rounded-circle bg-white bg-opacity-10 p-3 d-inline-block mb-3">
-                                        <i class="bi bi-calendar-x text-white-50 fs-2"></i>
-                                    </div>
-                                    <p class="text-white-50">No upcoming events scheduled.</p>
-                                </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-md-4">
-                        <div class="card-glass p-4" style="height: 400px; display: flex; flex-direction: column;">
-                            <h5 class="text-white mb-4"><i class="bi bi-exclamation-triangle me-2 text-danger"></i>Attendance Alerts</h5>
-                            <div class="list-group list-group-flush bg-transparent overflow-auto flex-grow-1" style="scrollbar-width: thin;">
-                                {% set alerts = [] %}
-                                {% for row in employee_stats.dept_comparison %}
-                                    {% if (row.rate | int) < 50 %}
-                                        {% set _ = alerts.append(row) %}
-                                        <div class="list-group-item bg-transparent border-0 d-flex justify-content-between align-items-center px-0 py-2">
-                                            <span class="text-white text-truncate" style="max-width: 180px;">{{ row.dept }}</span>
-                                            <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25">{{ row.rate }}% Rate</span>
-                                        </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% if not employee_stats.dept_comparison %}
+                                    <tr>
+                                        <td colspan="4" class="text-center py-5 text-white-50 border-0">
+                                            <div class="opacity-50">
+                                                <i class="bi bi-inbox display-4 d-block mb-2"></i>
+                                                No data available for this date.
+                                            </div>
+                                        </td>
+                                    </tr>
                                     {% endif %}
-                                {% endfor %}
-                                {% if alerts|length == 0 %}
-                                <div class="text-center py-5">
-                                    <div class="rounded-circle bg-success bg-opacity-10 p-3 d-inline-block mb-3">
-                                        <i class="bi bi-check-circle text-success fs-2"></i>
-                                    </div>
-                                    <p class="text-white-50 mb-0">All departments > 50%!</p>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-md-6">
+                    <div class="card-glass p-4" style="height: 400px; display: flex; flex-direction: column;">
+                        <h5 class="text-white mb-4"><i class="bi bi-trophy me-2 text-gold"></i>Punctuality Leaders</h5>
+                        <div class="list-group list-group-flush bg-transparent overflow-auto flex-grow-1"
+                            style="scrollbar-width: thin;">
+                            {% for entry in employee_stats.leaderboard %}
+                            <div
+                                class="list-group-item bg-transparent border-0 d-flex justify-content-between align-items-center px-0 py-2">
+                                <div class="d-flex align-items-center">
+                                    <span class="badge bg-gold bg-opacity-25 text-gold me-3 rounded-circle"
+                                        style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">{{
+                                        loop.index }}</span>
+                                    <span class="text-white">{{ entry.employee_name }}</span>
                                 </div>
-                                {% endif %}
+                                <span
+                                    class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-10">{{
+                                    entry.present_count }} Present</span>
+                            </div>
+                            {% endfor %}
+                            {% if not employee_stats.leaderboard %}
+                            <div class="text-center py-5">
+                                <p class="text-white-50 small mb-0">No data available.</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card-glass p-4" style="height: 400px; display: flex; flex-direction: column;">
+                        <h5 class="text-white mb-4"><i
+                                class="bi bi-exclamation-triangle me-2 text-danger"></i>Attendance Alerts</h5>
+                        <div class="list-group list-group-flush bg-transparent overflow-auto flex-grow-1"
+                            style="scrollbar-width: thin;">
+                            {% set alerts = [] %}
+                            {% for row in employee_stats.dept_comparison %}
+                            {% if (row.rate | int) < 50 %} {% set _=alerts.append(row) %} <div
+                                class="list-group-item bg-transparent border-0 d-flex justify-content-between align-items-center px-0 py-2">
+                                <span class="text-white text-truncate" style="max-width: 180px;">{{ row.dept }}</span>
+                                <span
+                                    class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25">{{
+                                    row.rate }}% Rate</span>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                        {% if alerts|length == 0 %}
+                        <div class="text-center py-5">
+                            <div class="rounded-circle bg-success bg-opacity-10 p-3 d-inline-block mb-3">
+                                <i class="bi bi-check-circle text-success fs-2"></i>
+                            </div>
+                            <p class="text-white-50 mb-0">All departments > 50%!</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-end mt-4">
+            <a href="{{ url_for('admin_employees') }}" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-arrow-right-circle me-2"></i>View Detailed Employee Attendance Logs
+            </a>
+        </div>
+    </div> <!-- Close employees view -->
+
+    <!-- Global Attendance Red Flags (Always Visible) -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card-glass p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="card-title text-white mb-0">
+                        <i class="bi bi-exclamation-octagon-fill text-danger me-2"></i>Consecutive Absence Alerts
+                    </h5>
+                    <span
+                        class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25">Global
+                        System Alert</span>
+                </div>
+                <div class="row g-3">
+                    {% for alert in overall_stats.alerts %}
+                    <div class="col-lg-3 col-md-6">
+                        <div
+                            class="p-3 rounded-4 bg-danger bg-opacity-10 border border-danger border-opacity-25 h-100 transition-hover">
+                            <div class="d-flex align-items-start">
+                                <div class="bg-danger bg-opacity-20 p-2 rounded-3 me-3">
+                                    <i class="bi bi-person-x-fill text-danger fs-4"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <h6 class="text-white mb-1 fw-bold">{{ alert.message.split(' (')[0] }}</h6>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <p class="text-white-50 small mb-0">{{ alert.message.split(') ')[1] }}</p>
+                                        <span class="badge bg-danger bg-opacity-20 text-danger"
+                                            style="font-size: 0.65rem;">3 DAYS</span>
+                                    </div>
+                                    <div class="mt-2 pt-2 border-top border-danger border-opacity-10">
+                                        <small class="text-white-50" style="font-size: 0.75rem;">
+                                            <i class="bi bi-building me-1"></i>{{
+                                            alert.message.split('(')[1].split(')')[0] }}
+                                        </small>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <div class="text-end mt-4">
-                    <a href="{{ url_for('admin_employees') }}" class="btn btn-outline-primary btn-sm">
-                        <i class="bi bi-arrow-right-circle me-2"></i>View Detailed Employee Attendance Logs
-                    </a>
-                </div>
-            </div> <!-- Close employees view -->
-
-        </div> <!-- Close global dashboard-content-area wrapper -->
-    </div>
-
-    <style>
-        /* Dashboard View Toggle Styles */
-        .dashboard-view {
-            display: none;
-            animation: fadeInView 0.4s ease forwards;
-        }
-
-        .dashboard-view.active-view {
-            display: block;
-        }
-        
-        /* Active Toggle Styling */
-        .view-toggle:checked + label {
-            background-color: #d4af37 !important;
-            color: #ffffff !important;
-        }
-
-        @keyframes fadeInView {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-    </style>
-
-    <!-- Add Event Modal Removed (Moved to events.html) -->
-
-    <!-- Profile Modal -->
-    <div class="modal fade" id="profileModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content card-glass border-secondary">
-                <div class="modal-header border-secondary">
-                    <h5 class="modal-title text-white">Profile Settings</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
-                        aria-label="Close"></button>
-                </div>
-                <form action="{{ url_for('update_profile') }}" method="POST">
-                    <div class="modal-body">
-                        <div class="text-center mb-4">
-                            <div class="rounded-circle bg-white bg-opacity-10 p-3 mx-auto mb-2"
-                                style="width: 80px; height: 80px; display:grid; place-items:center;">
-                                <i class="bi bi-person-fill display-4 text-white"></i>
-                            </div>
-                            <h5 class="text-white">Admin User</h5>
-                            <p class="text-white-50 small">System Administrator</p>
+                    {% endfor %}
+                    {% if not overall_stats.alerts %}
+                    <div class="col-12 text-center py-4">
+                        <div class="rounded-circle bg-success bg-opacity-10 p-3 d-inline-block mb-2">
+                            <i class="bi bi-shield-check text-success fs-2"></i>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label text-white-50">Display Name</label>
-                            <input type="text" name="display_name"
-                                class="form-control bg-dark text-white border-secondary" value="Admin User">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label text-white-50">New Password</label>
-                            <input type="password" name="new_password"
-                                class="form-control bg-dark text-white border-secondary"
-                                placeholder="Leave blank to keep current">
-                        </div>
+                        <p class="text-white-50 small mb-0">No consecutive absence alerts detected.</p>
                     </div>
-                    <div class="modal-footer border-secondary">
-                        <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary-gold">Save Changes</button>
-                    </div>
-                </form>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
 
-    {% endblock %}
+</div> <!-- Close global dashboard-content-area wrapper -->
+</div>
 
-    {% block extra_js %}
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            // --- View Toggler Logic ---
-            const viewRadios = document.querySelectorAll('.view-toggle');
-            const views = {
-                'executive': document.getElementById('executive-view'),
-                'students': document.getElementById('students-view'),
-                'employees': document.getElementById('employees-view')
-            };
-            const dashboardCharts = [];
+<style>
+    /* Dashboard View Toggle Styles */
+    .dashboard-view {
+        display: none;
+        animation: fadeInView 0.4s ease forwards;
+    }
 
-            function refreshVisibleCharts() {
-                window.requestAnimationFrame(() => {
-                    dashboardCharts.forEach(chart => chart.resize());
-                });
-            }
+    .dashboard-view.active-view {
+        display: block;
+    }
 
-            viewRadios.forEach(radio => {
-                radio.addEventListener('change', function (e) {
-                    Object.values(views).forEach(v => v?.classList.remove('active-view'));
-                    const targetView = views[e.target.value];
-                    if (targetView) {
-                        targetView.classList.add('active-view');
-                        // Update URL hash without jumping
-                        history.replaceState(null, null, '#' + e.target.value);
-                        refreshVisibleCharts();
-                    }
-                });
+    /* Active Toggle Styling */
+    .view-toggle:checked+label {
+        background-color: #d4af37 !important;
+        color: #ffffff !important;
+    }
+
+    @keyframes fadeInView {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+
+<!-- Add Event Modal Removed (Moved to events.html) -->
+
+<!-- Profile Modal -->
+<div class="modal fade" id="profileModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content card-glass border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title text-white">Profile Settings</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('update_profile') }}" method="POST">
+                <div class="modal-body">
+                    <div class="text-center mb-4">
+                        <div class="rounded-circle bg-white bg-opacity-10 p-3 mx-auto mb-2"
+                            style="width: 80px; height: 80px; display:grid; place-items:center;">
+                            <i class="bi bi-person-fill display-4 text-white"></i>
+                        </div>
+                        <h5 class="text-white">Admin User</h5>
+                        <p class="text-white-50 small">System Administrator</p>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-white-50">Display Name</label>
+                        <input type="text" name="display_name" class="form-control bg-dark text-white border-secondary"
+                            value="Admin User">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-white-50">New Password</label>
+                        <input type="password" name="new_password"
+                            class="form-control bg-dark text-white border-secondary"
+                            placeholder="Leave blank to keep current">
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-gold">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // --- View Toggler Logic ---
+        const viewRadios = document.querySelectorAll('.view-toggle');
+        const views = {
+            'executive': document.getElementById('executive-view'),
+            'students': document.getElementById('students-view'),
+            'employees': document.getElementById('employees-view')
+        };
+        const employeeCharts = [];
+
+        function refreshEmployeeCharts() {
+            window.requestAnimationFrame(() => {
+                employeeCharts.forEach(chart => chart.resize());
             });
+        }
 
-            // Handle URL Hash on Load
-            function handleHash() {
-                const hash = window.location.hash.replace('#', '');
-                if (hash && views[hash]) {
-                    const radio = document.getElementById('view' + hash.charAt(0).toUpperCase() + hash.slice(1));
-                    if (radio) {
-                        radio.checked = true;
-                        radio.dispatchEvent(new Event('change'));
+        viewRadios.forEach(radio => {
+            radio.addEventListener('change', function (e) {
+                Object.values(views).forEach(v => v?.classList.remove('active-view'));
+                const targetView = views[e.target.value];
+                if (targetView) {
+                    targetView.classList.add('active-view');
+                    // Update URL hash without jumping
+                    history.replaceState(null, null, '#' + e.target.value);
+                    if (e.target.value === 'employees') {
+                        refreshEmployeeCharts();
                     }
                 }
-            }
-            window.addEventListener('hashchange', handleHash);
-            handleHash();
-
-            // Live Clock
-            function updateClock() {
-                const now = new Date();
-                const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                const dateString = now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-                document.querySelectorAll('.live-clock').forEach(el => {
-                    el.innerHTML = `<i class="bi bi-clock me-2"></i>${timeString} <span class="ms-2 opacity-50">| ${dateString}</span>`;
-                });
-            }
-            setInterval(updateClock, 1000);
-            updateClock();
-
-            // Live Counter fluctuation
-            setInterval(() => {
-                document.querySelectorAll('.live-counter').forEach(counter => {
-                    let current = parseInt(counter.innerText.replace(/,/g, ''));
-                    let change = Math.floor(Math.random() * 6) - 2;
-                    counter.innerText = (current + change).toLocaleString();
-                    counter.classList.add('text-white');
-                    counter.classList.remove('text-gold', 'text-info');
-                    setTimeout(() => counter.classList.remove('text-white'), 300);
-                });
-            }, 3500);
-
-            const hourlyLabels = Array.from({ length: 24 }, (_, hour) => {
-                if (hour === 0) return '12am';
-                if (hour < 12) return `${hour}am`;
-                if (hour === 12) return '12pm';
-                return `${hour - 12}pm`;
             });
-
-            // Traffic Chart (Executive View)
-            const trafficCanvas = document.getElementById('trafficChart');
-            if (trafficCanvas) {
-                const ctx = trafficCanvas.getContext('2d');
-                const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-                gradient.addColorStop(0, 'rgba(11, 125, 63, 0.5)');
-                gradient.addColorStop(1, 'rgba(11, 125, 63, 0.0)');
-
-                const trafficData = {{ overall_stats.traffic_chart | tojson | safe }};
-
-                dashboardCharts.push(new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: hourlyLabels,
-                        datasets: [{
-                            label: 'Entries',
-                            data: trafficData,
-                            backgroundColor: gradient,
-                            borderColor: '#0b7d3f',
-                            borderWidth: 2,
-                            pointBackgroundColor: '#d4af37',
-                            pointBorderColor: '#fff',
-                            fill: true,
-                            tension: 0.4
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            x: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: 'rgba(255, 255, 255, 0.5)' } },
-                            y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: 'rgba(255, 255, 255, 0.5)' } }
-                        }
-                    }
-                }));
-            }
-
-            // Student Hourly Traffic Chart
-            const studentTrafficCanvas = document.getElementById('studentTrafficChart');
-            if (studentTrafficCanvas) {
-                const ctx = studentTrafficCanvas.getContext('2d');
-                const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-                gradient.addColorStop(0, 'rgba(0, 123, 255, 0.5)');
-                gradient.addColorStop(1, 'rgba(0, 123, 255, 0.0)');
-
-                const studentData = {{ student_stats.hourly_traffic | tojson | safe }};
-
-                dashboardCharts.push(new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: hourlyLabels,
-                        datasets: [{
-                            label: 'Student Entries',
-                            data: studentData,
-                            backgroundColor: gradient,
-                            borderColor: '#0d6efd',
-                            borderWidth: 3,
-                            fill: true,
-                            tension: 0.4
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.5)' } },
-                            y: { grid: { color: 'rgba(255,255,255,0.05)' }, border: { dash: [5, 5] }, ticks: { color: 'rgba(255,255,255,0.5)' } }
-                        }
-                    }
-                }));
-            }
-
-            // Participation Doughnut (Employee View)
-            const attendanceCanvas = document.getElementById('attendanceChart');
-            if (attendanceCanvas) {
-                const deptData = {{ employee_stats.dept_participation | tojson | safe }};
-                const labels = deptData.map(d => d.name);
-                const values = deptData.map(d => d.value);
-                const hasDeptValues = values.some(value => Number(value) > 0);
-
-                dashboardCharts.push(new Chart(attendanceCanvas, {
-                    type: 'doughnut',
-                    data: {
-                        labels: hasDeptValues ? labels : ['No Attendance'],
-                        datasets: [{
-                            data: hasDeptValues ? values : [100],
-                            backgroundColor: hasDeptValues ? [
-                                'rgba(11, 125, 63, 0.8)',
-                                'rgba(212, 175, 55, 0.8)',
-                                'rgba(0, 123, 255, 0.8)',
-                                'rgba(111, 66, 193, 0.8)',
-                                'rgba(255, 193, 7, 0.8)'
-                            ] : ['rgba(255, 255, 255, 0.16)'],
-                            borderColor: 'transparent',
-                            hoverOffset: 15
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        cutout: '75%',
-                        plugins: {
-                            legend: { position: 'bottom', labels: { color: '#fff', usePointStyle: true, padding: 10, font: { size: 10 } } }
-                        }
-                    }
-                }));
-            }
-
-            // Peak Check-in Time (Employee View)
-            const peakCheckinCanvas = document.getElementById('peakCheckinChart');
-            if (peakCheckinCanvas) {
-                const peakData = {{ employee_stats.peak_checkin_data | tojson | safe }};
-                const peakLabels = {{ employee_stats.peak_checkin_labels | tojson | safe }};
-
-                const ctx = peakCheckinCanvas.getContext('2d');
-                const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-                gradient.addColorStop(0, 'rgba(25, 135, 84, 0.5)');
-                gradient.addColorStop(1, 'rgba(25, 135, 84, 0.0)');
-
-                dashboardCharts.push(new Chart(peakCheckinCanvas, {
-                    type: 'line',
-                    data: {
-                        labels: peakLabels,
-                        datasets: [{
-                            label: 'Arrivals',
-                            data: peakData,
-                            backgroundColor: gradient,
-                            borderColor: '#198754',
-                            borderWidth: 3,
-                            pointBackgroundColor: '#fff',
-                            pointBorderColor: '#198754',
-                            pointRadius: 4,
-                            fill: true,
-                            tension: 0.3
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.5)', stepSize: 1 } },
-                            x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.5)' } }
-                        }
-                    }
-                }));
-            }
-
-            refreshVisibleCharts();
         });
-    </script>
-    {% endblock %}
+
+        // Handle URL Hash on Load
+        function handleHash() {
+            const hash = window.location.hash.replace('#', '');
+            if (hash && views[hash]) {
+                const radio = document.getElementById('view' + hash.charAt(0).toUpperCase() + hash.slice(1));
+                if (radio) {
+                    radio.checked = true;
+                    radio.dispatchEvent(new Event('change'));
+                }
+            }
+        }
+        window.addEventListener('hashchange', handleHash);
+        handleHash();
+
+        // Live Clock
+        function updateClock() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const dateString = now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+            document.querySelectorAll('.live-clock').forEach(el => {
+                el.innerHTML = `<i class="bi bi-clock me-2"></i>${timeString} <span class="ms-2 opacity-50">| ${dateString}</span>`;
+            });
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Live Counter fluctuation
+        setInterval(() => {
+            document.querySelectorAll('.live-counter').forEach(counter => {
+                let current = parseInt(counter.innerText.replace(/,/g, ''));
+                let change = Math.floor(Math.random() * 6) - 2;
+                counter.innerText = (current + change).toLocaleString();
+                counter.classList.add('text-white');
+                counter.classList.remove('text-gold', 'text-info');
+                setTimeout(() => counter.classList.remove('text-white'), 300);
+            });
+        }, 3500);
+
+        // Traffic Chart (Executive View)
+        const trafficCanvas = document.getElementById('trafficChart');
+        if (trafficCanvas) {
+            const ctx = trafficCanvas.getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(11, 125, 63, 0.5)');
+            gradient.addColorStop(1, 'rgba(11, 125, 63, 0.0)');
+
+            const trafficData = {{ overall_stats.traffic_chart | tojson | safe }};
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['6am', '7am', '8am', '9am', '10am', '11am', '12pm', '1pm', '2pm', '3pm', '4pm', '5pm'],
+                    datasets: [{
+                        label: 'Entries',
+                        data: trafficData,
+                        backgroundColor: gradient,
+                        borderColor: '#0b7d3f',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#d4af37',
+                        pointBorderColor: '#fff',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: 'rgba(255, 255, 255, 0.5)' } },
+                        y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: 'rgba(255, 255, 255, 0.5)' } }
+                    }
+                }
+            });
+        }
+
+        // Student Hourly Traffic Chart
+        const studentTrafficCanvas = document.getElementById('studentTrafficChart');
+        if (studentTrafficCanvas) {
+            const ctx = studentTrafficCanvas.getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(0, 123, 255, 0.5)');
+            gradient.addColorStop(1, 'rgba(0, 123, 255, 0.0)');
+
+            const studentData = {{ student_stats.hourly_traffic | tojson | safe }};
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['6am', '7am', '8am', '9am', '10am', '11am', '12pm', '1pm', '2pm', '3pm', '4pm', '5pm'],
+                    datasets: [{
+                        label: 'Student Entries',
+                        data: studentData,
+                        backgroundColor: gradient,
+                        borderColor: '#0d6efd',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.5)' } },
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, border: { dash: [5, 5] }, ticks: { color: 'rgba(255,255,255,0.5)' } }
+                    }
+                }
+            });
+        }
+
+        // Participation Doughnut (Employee View)
+        const attendanceCanvas = document.getElementById('attendanceChart');
+        if (attendanceCanvas) {
+            const deptData = {{ employee_stats.dept_participation | tojson | safe }};
+            const labels = deptData.map(d => d.name);
+            const values = deptData.map(d => d.value);
+            const hasDeptValues = values.some(value => Number(value) > 0);
+
+            const deptColorMap = {
+                'College of Arts & Sciences': '#6f42c1',
+                'College of Business and Accountancy': '#ffc107',
+                'College of Education': '#0d6efd',
+                'College of International Hospitality Management': '#800000',
+                'College of Computer Studies': '#adb5bd',
+                'College of Nursing': '#d63384',
+                'College of Engineering': '#fd7e14'
+            };
+
+            const backgroundColors = labels.map(label => deptColorMap[label] || 'rgba(255, 255, 255, 0.2)');
+
+            employeeCharts.push(new Chart(attendanceCanvas, {
+                type: 'doughnut',
+                data: {
+                    labels: hasDeptValues ? labels : ['No Attendance'],
+                    datasets: [{
+                        data: hasDeptValues ? values : [100],
+                        backgroundColor: hasDeptValues ? backgroundColors : ['rgba(255, 255, 255, 0.16)'],
+                        borderColor: 'transparent',
+                        hoverOffset: 15
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '75%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#fff', usePointStyle: true, padding: 10, font: { size: 10 } } }
+                    }
+                }
+            }));
+        }
+
+        // Peak Check-in Time (Employee View)
+        const peakCheckinCanvas = document.getElementById('peakCheckinChart');
+        if (peakCheckinCanvas) {
+            const peakData = {{ employee_stats.peak_checkin_data | tojson | safe }};
+            const peakLabels = {{ employee_stats.peak_checkin_labels | tojson | safe }};
+
+            const ctx = peakCheckinCanvas.getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(25, 135, 84, 0.5)');
+            gradient.addColorStop(1, 'rgba(25, 135, 84, 0.0)');
+
+            employeeCharts.push(new Chart(peakCheckinCanvas, {
+                type: 'line',
+                data: {
+                    labels: peakLabels,
+                    datasets: [{
+                        label: 'Arrivals',
+                        data: peakData,
+                        backgroundColor: gradient,
+                        borderColor: '#198754',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#198754',
+                        pointRadius: 4,
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.5)', stepSize: 1 } },
+                        x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.5)' } }
+                    }
+                }
+            }));
+        }
+
+        refreshEmployeeCharts();
+    });
+</script>
+{% endblock %}

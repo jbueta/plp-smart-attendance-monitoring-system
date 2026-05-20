@@ -66,6 +66,51 @@
         {% endfor %}
     </div>
 
+    <!-- Upcoming Events Section -->
+    <div class="mt-5 pt-5 border-top border-secondary border-opacity-25">
+        <div class="text-center mb-4">
+            <h2 class="h3 text-white fw-bold"><i class="bi bi-calendar-check me-2 text-primary"></i>Upcoming Employee Events</h2>
+            <p class="text-white-50">Schedule of future campus events and departmental activities</p>
+        </div>
+        
+        <div class="row g-4 justify-content-center">
+            <div class="col-lg-10">
+                <div class="card-glass p-0 overflow-hidden">
+                    <div class="list-group list-group-flush bg-transparent">
+                        {% for event in upcoming_events %}
+                        <div class="list-group-item bg-transparent border-0 border-bottom border-secondary border-opacity-10 p-4 transition-hover">
+                            <div class="row align-items-center">
+                                <div class="col-md-7">
+                                    <h5 class="text-white fw-bold mb-1">{{ event.event_name }}</h5>
+                                    <div class="text-white-50 small"><i class="bi bi-geo-alt me-2 text-primary"></i>{{ event.location }}</div>
+                                </div>
+                                <div class="col-md-5 text-md-end mt-3 mt-md-0">
+                                    <div class="d-inline-block text-start text-md-end">
+                                        <div class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-3 py-2 mb-1">
+                                            <i class="bi bi-calendar-event me-2"></i>{{ event.date }}
+                                        </div>
+                                        <div class="text-white-50 small"><i class="bi bi-clock me-2"></i>{{ event.time }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        
+                        {% if not upcoming_events %}
+                        <div class="text-center py-5">
+                            <div class="rounded-circle bg-white bg-opacity-10 p-4 d-inline-block mb-3">
+                                <i class="bi bi-calendar-x text-white-50 display-6"></i>
+                            </div>
+                            <h6 class="text-white mb-1">No upcoming events found</h6>
+                            <p class="text-white-50 small mb-0">Check back later for new event schedules.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="text-center mt-5">
         <a href="{{ url_for('index') }}" class="btn btn-outline-light rounded-pill px-4 hover-text-dark">
             <i class="bi bi-arrow-left me-2"></i>Back to Main Menu
