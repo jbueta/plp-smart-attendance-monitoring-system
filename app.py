@@ -103,6 +103,8 @@ MOCK_EMPLOYEE_STATS = {
     "attendance_data": [0, 0, 0],
     "tardiness_data": [0] * 7,
     "tardiness_labels": ["N/A"] * 7,
+    "attendance_trend_data": [0] * 5,
+    "attendance_trend_labels": ["N/A"] * 5,
     "dept_participation": [],
     "avg_tardiness": "0 mins",
     "on_time_rate": "N/A",
@@ -1763,12 +1765,14 @@ def visitor_checkout(visitor_id):
 @app.route("/dashboard")
 @login_required
 def dashboard():
+    instance_id = request.args.get('instance_id')
+    emp_stats_url = f"/admin/dashboard/analytics/employees?instance_id={instance_id}" if instance_id else "/admin/dashboard/analytics/employees"
     return render_template(
         "dashboard.html",
         events=fetch_backend_events(),
         overall_stats=fetch_dashboard_stats("/admin/dashboard/analytics/overall", dict(MOCK_DASHBOARD_STATS)),
         student_stats=fetch_dashboard_stats("/admin/dashboard/analytics/students", dict(MOCK_STUDENT_STATS)),
-        employee_stats=fetch_dashboard_stats("/admin/dashboard/analytics/employees", dict(MOCK_EMPLOYEE_STATS)),
+        employee_stats=fetch_dashboard_stats(emp_stats_url, dict(MOCK_EMPLOYEE_STATS)),
         logs=fetch_employee_attendance(),
         user=session.get("admin_username", "Admin"),
     )

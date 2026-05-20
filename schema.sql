@@ -675,7 +675,7 @@ INSERT INTO `users` (`user_id`, `role`, `active`) VALUES
 (25, 'employee', 1),
 (26, 'employee', 1),
 (27, 'employee', 1),
-(28, 'visitor', 0),
+(28, 'visitor', 1),
 (29, 'employee', 1),
 (30, 'employee', 1),
 (31, 'employee', 1),
@@ -683,8 +683,8 @@ INSERT INTO `users` (`user_id`, `role`, `active`) VALUES
 (33, 'employee', 1),
 (34, 'employee', 1),
 (35, 'employee', 1),
-(36, 'visitor', 0),
-(37, 'visitor', 0),
+(36, 'visitor', 1),
+(37, 'visitor', 1),
 (38, 'employee', 1),
 (39, 'student', 1),
 (40, 'student', 1),
@@ -734,7 +734,6 @@ CREATE TABLE `visitors` (
   `purpose` enum('Official Business','Document Submission','Inquiry','Meeting','Delivery','Other') NOT NULL,
   `details` varchar(200) DEFAULT NULL,
   `status` enum('Inside','Outside') DEFAULT 'Outside',
-  `valid_until` timestamp NULL DEFAULT NULL,
   `visitor_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -747,10 +746,10 @@ TRUNCATE TABLE `visitors`;
 -- Dumping data for table `visitors`
 --
 
-INSERT INTO `visitors` (`seq`, `user_id`, `visitor_id`, `visitor_name`, `purpose`, `details`, `status`, `valid_until`, `visitor_last_updated`) VALUES
-(1, 28, 'VT-00001', 'Vico Sotto', 'Other', 'Monitor Campus facilities and staff', 'Outside', '2026-04-26 23:59:59', '2026-04-26 15:44:03'),
-(2, 36, 'VT-00002', 'Ron Alexander Inocencio', 'Official Business', NULL, 'Outside', '2026-04-30 23:59:59', '2026-04-30 11:31:57'),
-(3, 37, 'VT-00003', 'Ron Alexander Inocencio', 'Official Business', NULL, 'Outside', '2026-04-30 23:59:59', '2026-04-30 11:32:07');
+INSERT INTO `visitors` (`seq`, `user_id`, `visitor_id`, `visitor_name`, `purpose`, `details`, `status`, `visitor_last_updated`) VALUES
+(1, 28, 'VT-00001', 'Vico Sotto', 'Other', 'Monitor Campus facilities and staff', 'Inside', '2026-04-26 15:44:03'),
+(2, 36, 'VT-00002', 'Ron Alexander Inocencio', 'Official Business', NULL, 'Inside', '2026-04-30 11:31:57'),
+(3, 37, 'VT-00003', 'Ron Alexander Inocencio', 'Official Business', NULL, 'Inside', '2026-04-30 11:32:07');
 
 --
 -- Triggers `visitors`
