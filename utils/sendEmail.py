@@ -1,4 +1,5 @@
 import importlib
+import mimetypes
 import os
 import smtplib
 from email.message import EmailMessage
@@ -46,10 +47,12 @@ def send_email(
     message.set_content(body)
 
     if attachment_data:
+        content_type, _ = mimetypes.guess_type(filename)
+        maintype, subtype = (content_type or "application/pdf").split("/", 1)
         message.add_attachment(
             attachment_data,
-            maintype="application",
-            subtype="pdf",
+            maintype=maintype,
+            subtype=subtype,
             filename=filename,
         )
 

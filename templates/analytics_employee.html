@@ -15,6 +15,8 @@
     <hr>
     <ul class="nav nav-pills flex-column mb-auto">
         <li><a href="{{ url_for('dashboard') }}" class="nav-link"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+        <li><a href="{{ url_for('announcement_manager') }}" class="nav-link"><i class="bi bi-megaphone"></i>
+                Announcements</a></li>
         <li><a href="{{ url_for('manage_events') }}" class="nav-link"><i class="bi bi-calendar-event"></i> Events</a>
         </li>
         <li><a href="{{ url_for('admin_visitors') }}" class="nav-link"><i class="bi bi-person-lines-fill"></i>
@@ -42,14 +44,14 @@
             <div class="d-flex gap-2 align-items-center mb-2">
                 <select class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
                     {% for event in events %}
-                    <option value="{{ event.event_id }}">{{ event.name }}</option>
+                    <option value="{{ event.id }}">{{ event.name }}</option>
                     {% endfor %}
                 </select>
                 <button class="btn btn-sm btn-outline-light"><i class="bi bi-filter"></i></button>
             </div>
             <div class="d-flex gap-2">
                 <span class="badge bg-light bg-opacity-10 text-white font-monospace">
-                    <i class="bi bi-calendar3 me-1"></i> {{ today }}
+                    <i class="bi bi-calendar3 me-1"></i> Feb 03, 2026
                 </span>
                 <span class="badge bg-light bg-opacity-10 text-white">
                     <i class="bi bi-building me-1"></i> All Departments
@@ -125,6 +127,8 @@
         </div>
     </div>
 </div>
+</div>
+</div>
 {% endblock %}
    
 {% block extra_js %}
@@ -133,13 +137,13 @@
         // Attendance Status (Doughnut)
         const ctxAttendance = document.getElementById('attendanceChart').getContext('2d');
         const dataAttendance = {
-            labels: ['Present', 'Late', 'Absent'],
+            labels: ['Present', 'Late', 'Absent', 'On Leave'],
             datasets: [{
                 data: {{ stats.attendance_data | tojson | safe }},
-                backgroundColor: ['#198754', '#ffc107', '#dc3545'],
-                borderColor: 'rgba(255, 255, 255, 0.1)',
-                borderWidth: 1
-            }]
+            backgroundColor: ['#198754', '#ffc107', '#dc3545', '#0dcaf0'],
+            borderColor: 'rgba(255, 255, 255, 0.1)',
+            borderWidth: 1
+    }]
         };
 
     new Chart(ctxAttendance, {
@@ -155,18 +159,18 @@
         }
     });
 
-    // Tardiness Heatmap (Horizontal Bar) — labels are dynamic from DB
+    // Tardiness Heatmap (Horizontal Bar)
     const ctxTardiness = document.getElementById('tardinessChart').getContext('2d');
     const tardinessRaw = {{ stats.tardiness_data | tojson | safe }};
     const tardinessDepts = {{ stats.tardiness_labels | tojson | safe }};
     const allColors = ['#808080', '#800080', '#0000FF', '#FFA500', '#FFC0CB', '#800000', '#FFFF00'];
     const dataTardiness = {
-        labels: tardinessDepts.length ? tardinessDepts : tardinessRaw.map((_, i) => `Dept ${i + 1}`),
+        labels: ['Computer Studies', 'Arts & Sciences', 'Education', 'Engineering', 'Nursing', 'Intl Hospitality Mgmt', 'Business & Accountancy'],
         datasets: [{
             label: 'Avg Minutes Late',
-            data: tardinessRaw,
-            backgroundColor: allColors.slice(0, tardinessRaw.length),
-            borderRadius: 4
+            data: {{ stats.tardiness_data | tojson | safe }},
+        backgroundColor: ['#808080', '#800080', '#0000FF', '#FFA500', '#FFC0CB', '#800000', '#FFFF00'],
+        borderRadius: 4
         }]
     };
 

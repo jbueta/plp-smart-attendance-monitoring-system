@@ -1,5 +1,5 @@
 from database import connect_db, release_db_connection
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time as datetime_time, timedelta
 
 import mysql.connector as connector
 from werkzeug.security import check_password_hash
@@ -36,6 +36,123 @@ VISITOR_PURPOSES = (
     "Delivery",
     "Other",
 )
+
+
+def visitor_valid_until_end_of_day(target_date=None):
+    if isinstance(target_date, datetime):
+        target_date = target_date.date()
+    if target_date is None:
+        target_date = date.today()
+    return datetime.combine(target_date, datetime_time(23, 59, 59))
+
+
+def parse_visitor_valid_until(value, default_to_today=False):
+    if isinstance(value, datetime):
+        return value.replace(microsecond=0)
+    if isinstance(value, date):
+        return visitor_valid_until_end_of_day(value)
+
+    raw_value = str(value or "").strip()
+    if not raw_value:
+        return visitor_valid_until_end_of_day() if default_to_today else None
+
+    normalized = raw_value.replace("T", " ")
+    for date_format in ("%Y-%m-%d", "%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"):
+        try:
+            parsed = datetime.strptime(normalized, date_format)
+            if date_format == "%Y-%m-%d":
+                return visitor_valid_until_end_of_day(parsed.date())
+            return parsed.replace(microsecond=0)
+        except ValueError:
+            continue
+
+    return None
+
+
+def format_visitor_valid_until(value):
+    valid_until = parse_visitor_valid_until(value)
+    return valid_until.strftime("%Y-%m-%d %H:%M:%S") if valid_until else None
+
+
+def expire_expired_visitor_accounts(conn, logger=None):
+    cursor = None
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE users u
+            JOIN visitors v ON u.user_id = v.user_id
+            SET u.active = 0,
+                v.status = 'Outside'
+            WHERE u.role = 'visitor'
+              AND COALESCE(u.active, 1) = 1
+              AND v.valid_until IS NOT NULL
+              AND v.valid_until < NOW()
+            """
+        )
+        affected = cursor.rowcount or 0
+        conn.commit()
+        return affected
+    except connector.Error as err:
+        try:
+            conn.rollback()
+        except connector.Error:
+            pass
+        if logger:
+            logger.warning("Could not expire visitor accounts: %s", err)
+        return 0
+    finally:
+        if cursor:
+            cursor.close()
+
+
+def ensure_visitor_valid_until_schema(conn, logger=None):
+    cursor = None
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'visitors'
+              AND COLUMN_NAME = 'valid_until'
+            """
+        )
+        row = cursor.fetchone()
+        column_count = row[0] if row else 0
+
+        if not column_count:
+            cursor.execute(
+                """
+                ALTER TABLE visitors
+                ADD COLUMN valid_until timestamp NULL DEFAULT NULL AFTER status
+                """
+            )
+            if logger:
+                logger.info("Added visitors.valid_until column.")
+
+        cursor.execute(
+            """
+            UPDATE visitors
+            SET valid_until = CAST(CONCAT(DATE(COALESCE(visitor_last_updated, NOW())), ' 23:59:59') AS DATETIME)
+            WHERE valid_until IS NULL
+            """
+        )
+        conn.commit()
+        expire_expired_visitor_accounts(conn, logger=logger)
+        return True
+    except connector.Error as err:
+        try:
+            conn.rollback()
+        except connector.Error:
+            pass
+        if logger:
+            logger.warning("Could not ensure visitors.valid_until schema: %s", err)
+        return False
+    finally:
+        if cursor:
+            cursor.close()
 
 
 def normalize_visitor_purpose(value):
@@ -156,6 +273,7 @@ class Database:
 
     def authenticate_user(self):
         try:
+            expire_expired_visitor_accounts(self.conn)
             query = """
                 SELECT
                     u.user_id,
@@ -163,6 +281,7 @@ class Database:
                     u.active,
                     COALESCE(s.student_id, e.employee_id, v.visitor_id) AS scan_id,
                     COALESCE(s.status, e.status, v.status, 'Outside') AS current_status,
+                    v.valid_until AS visitor_valid_until,
                     COALESCE(s.student_name, e.employee_name, v.visitor_name, a.username, 'Unknown User') AS full_name,
                     CASE
                         WHEN u.role = 'student' THEN COALESCE(c.course_name, 'N/A')
@@ -185,6 +304,11 @@ class Database:
                 LEFT JOIN visitors v ON u.user_id = v.user_id
                 LEFT JOIN admin a ON u.user_id = a.user_id
                 WHERE u.active = 1
+                  AND (
+                      u.role <> 'visitor'
+                      OR v.valid_until IS NULL
+                      OR v.valid_until >= NOW()
+                  )
                   AND (
                       s.student_id = %s
                       OR e.employee_id = %s
@@ -282,6 +406,10 @@ class Database:
             purpose = normalize_visitor_purpose(self.parameter[1])
             details = (self.parameter[2] or "").strip() if len(self.parameter) > 2 else ""
             gate = self.parameter[3] if len(self.parameter) > 3 else "Gate 1"
+            valid_until = parse_visitor_valid_until(
+                self.parameter[4] if len(self.parameter) > 4 else None,
+                default_to_today=True,
+            )
 
             if not visitor_name:
                 return {"success": False, "message": "Visitor name is required."}
@@ -289,6 +417,10 @@ class Database:
                 return {"success": False, "message": "Select a valid visitor purpose."}
             if purpose == "Other" and not details:
                 return {"success": False, "message": "Visit description is required when purpose is Other."}
+            if not valid_until:
+                return {"success": False, "message": "Select a valid account expiration date."}
+            if valid_until < datetime.now().replace(microsecond=0):
+                return {"success": False, "message": "Account expiration must be today or a future date."}
 
             normalized_details = details if purpose == "Other" else None
 
@@ -300,15 +432,15 @@ class Database:
 
             self.cursor.execute(
                 """
-                INSERT INTO visitors (user_id, visitor_name, purpose, details, status)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO visitors (user_id, visitor_name, purpose, details, status, valid_until)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """,
-                (user_id, visitor_name, purpose, normalized_details, "Inside"),
+                (user_id, visitor_name, purpose, normalized_details, "Inside", valid_until),
             )
 
             self.cursor.execute(
                 """
-                SELECT visitor_id
+                SELECT visitor_id, valid_until
                 FROM visitors
                 WHERE user_id = %s
                 LIMIT 1
@@ -330,6 +462,7 @@ class Database:
                 "success": True,
                 "visitor_id": visitor["visitor_id"] if visitor else None,
                 "user_id": user_id,
+                "valid_until": format_visitor_valid_until(visitor["valid_until"] if visitor else valid_until),
                 "message": "Visitor logged successfully.",
             }
         except connector.Error as err:
@@ -339,6 +472,7 @@ class Database:
 
     def checkout_visitor_log(self):
         try:
+            expire_expired_visitor_accounts(self.conn)
             visitor_id = self.parameter[0]
             gate = self.parameter[1] if len(self.parameter) > 1 else "Gate 2"
 
@@ -347,7 +481,9 @@ class Database:
                 SELECT visitor_id, user_id, visitor_name, status
                 FROM visitors v
                 JOIN users u ON v.user_id = u.user_id
-                WHERE v.visitor_id = %s AND u.active = 1
+                WHERE v.visitor_id = %s
+                  AND u.active = 1
+                  AND (v.valid_until IS NULL OR v.valid_until >= NOW())
                 LIMIT 1
                 """,
                 (visitor_id,),
@@ -355,7 +491,7 @@ class Database:
             visitor = self.cursor.fetchone()
 
             if not visitor:
-                return {"success": False, "message": "Visitor not found."}
+                return {"success": False, "message": "Visitor not found or account has expired."}
 
             if visitor["status"] == "Outside":
                 return {"success": False, "message": "Visitor is already checked out."}
@@ -385,6 +521,7 @@ class Database:
 
     def get_visitor_logs(self, search_term=None, visit_date=None, include_inactive=False):
         try:
+            expire_expired_visitor_accounts(self.conn)
             where_clauses = []
             params = []
 
@@ -428,7 +565,11 @@ class Database:
                     DATE_FORMAT(MIN(CASE WHEN gl.log_type = 'Entry' THEN gl.timestamp END), '%Y-%m-%d') AS date,
                     TRIM(DATE_FORMAT(MIN(CASE WHEN gl.log_type = 'Entry' THEN gl.timestamp END), '%l:%i %p')) AS time_in,
                     TRIM(DATE_FORMAT(MAX(CASE WHEN gl.log_type = 'Exit' THEN gl.timestamp END), '%l:%i %p')) AS time_out,
+                    DATE_FORMAT(v.valid_until, '%Y-%m-%d') AS valid_until_date,
+                    DATE_FORMAT(v.valid_until, '%Y-%m-%d %H:%i:%s') AS valid_until,
                     CASE
+                        WHEN COALESCE(u.active, 1) = 0 THEN 'Expired'
+                        WHEN v.valid_until IS NOT NULL AND v.valid_until < NOW() THEN 'Expired'
                         WHEN v.status = 'Inside' THEN 'Checked In'
                         ELSE 'Checked Out'
                     END AS status,
@@ -440,7 +581,7 @@ class Database:
                 {where_sql}
                 GROUP BY
                     v.seq, v.visitor_id, v.visitor_name, v.purpose, v.details,
-                    v.status, u.active, v.visitor_last_updated
+                    v.status, v.valid_until, u.active, v.visitor_last_updated
                 {having_sql}
                 ORDER BY last_activity DESC, v.seq DESC
             """
@@ -457,6 +598,7 @@ class Database:
             visitor_name = self.parameter[1]
             purpose = normalize_visitor_purpose(self.parameter[2])
             details = self.parameter[3] if len(self.parameter) > 3 else ""
+            valid_until = parse_visitor_valid_until(self.parameter[4] if len(self.parameter) > 4 else None)
             visitor_name = (visitor_name or "").strip()
             details = (details or "").strip()
 
@@ -466,6 +608,10 @@ class Database:
                 return {"success": False, "message": "Select a valid visitor purpose."}
             if purpose == "Other" and not details:
                 return {"success": False, "message": "Visit description is required when purpose is Other."}
+            if not valid_until:
+                return {"success": False, "message": "Select a valid account expiration date."}
+            if valid_until < datetime.now().replace(microsecond=0):
+                return {"success": False, "message": "Account expiration must be today or a future date."}
 
             normalized_details = details if purpose == "Other" else None
 
@@ -485,14 +631,18 @@ class Database:
             self.cursor.execute(
                 """
                 UPDATE visitors
-                SET visitor_name = %s, purpose = %s, details = %s
+                SET visitor_name = %s, purpose = %s, details = %s, valid_until = %s
                 WHERE visitor_id = %s
                 """,
-                (visitor_name, purpose, normalized_details, visitor_id),
+                (visitor_name, purpose, normalized_details, valid_until, visitor_id),
             )
             self.conn.commit()
 
-            return {"success": True, "message": "Visitor updated successfully."}
+            return {
+                "success": True,
+                "message": "Visitor updated successfully.",
+                "valid_until": format_visitor_valid_until(valid_until),
+            }
         except connector.Error as err:
             self.conn.rollback()
             print(f"Error updating visitor: {err}")
@@ -560,6 +710,11 @@ class Database:
             LEFT JOIN employees e ON u.user_id = e.user_id
             LEFT JOIN visitors v ON u.user_id = v.user_id
             WHERE u.active = 1
+              AND (
+                    u.role <> 'visitor'
+                    OR v.valid_until IS NULL
+                    OR v.valid_until >= NOW()
+              )
               AND (
                     s.student_id IN ({placeholders})
                     OR e.employee_id IN ({placeholders})
@@ -1010,7 +1165,14 @@ class Database:
                     ei.event_date AS date,
                     TRIM(DATE_FORMAT(e.time_start, '%l:%i %p')) AS time_start,
                     TRIM(DATE_FORMAT(e.time_end, '%l:%i %p')) AS time_end,
-                    e.location AS location
+                    e.location AS location,
+                    ei.status AS status,
+                    CASE
+                        WHEN ei.status = 'Completed'
+                          OR (ei.event_date = CURDATE() AND e.time_end < CURTIME())
+                        THEN 1
+                        ELSE 0
+                    END AS is_ended
                 FROM event_instances ei
                 JOIN events e ON ei.event_id = e.event_id
                 WHERE ei.event_date = CURDATE()
@@ -1088,6 +1250,7 @@ class Database:
             cursor.execute(
                 """
                 SELECT
+                    gl.log_id,
                     gl.log_type,
                     s.student_name,
                     c.course_name,
@@ -1111,6 +1274,9 @@ class Database:
                         "name": row.get("student_name", "Unknown User"),
                         "course": row.get("course_name", "N/A"),
                         "time": row["timestamp"].strftime("%I:%M %p").lstrip("0"),
+                        "timestamp": row["timestamp"].isoformat() if row.get("timestamp") else None,
+                        "_sort_timestamp": row["timestamp"].isoformat() if row.get("timestamp") else None,
+                        "_sort_id": row.get("log_id") or 0,
                     }
                 )
             return logs
@@ -1331,6 +1497,131 @@ class Database:
             return []
         finally:
             cursor.close()
+
+    def get_visitor_logs(self, search_term=None, visit_date=None, include_inactive=False):
+        conn = self.conn if hasattr(self, "conn") else self
+        try:
+            expire_expired_visitor_accounts(conn)
+            cursor = conn.cursor(dictionary=True)
+            filters = []
+            params = []
+
+            if not include_inactive:
+                filters.append("u.active = 1")
+
+            if search_term:
+                search_value = f"%{str(search_term).strip().lower()}%"
+                filters.append(
+                    """
+                    (
+                        LOWER(v.visitor_id) LIKE %s
+                        OR LOWER(v.visitor_name) LIKE %s
+                        OR LOWER(v.purpose) LIKE %s
+                        OR LOWER(COALESCE(v.details, '')) LIKE %s
+                    )
+                    """
+                )
+                params.extend([search_value] * 4)
+
+            if visit_date:
+                filters.append("DATE(COALESCE(gl.timestamp, v.visitor_last_updated)) = %s")
+                params.append(visit_date)
+
+            where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
+            query = """
+                SELECT 
+                    v.visitor_id AS id,
+                    v.visitor_name AS name,
+                    v.purpose AS purpose,
+                    COALESCE(v.details, 'N/A') AS details,
+                    DATE_FORMAT(COALESCE(MAX(gl.timestamp), v.visitor_last_updated), '%Y-%m-%d') AS date,
+                    TIME_FORMAT(MIN(CASE WHEN gl.log_type = 'Entry' AND DATE(gl.timestamp) = CURDATE() THEN gl.timestamp END), '%h:%i %p') AS time_in,
+                    TIME_FORMAT(MAX(CASE WHEN gl.log_type = 'Exit' AND DATE(gl.timestamp) = CURDATE() THEN gl.timestamp END), '%h:%i %p') AS time_out,
+                    DATE_FORMAT(v.valid_until, '%Y-%m-%d') AS valid_until_date,
+                    DATE_FORMAT(v.valid_until, '%Y-%m-%d %H:%i:%s') AS valid_until,
+                    CASE
+                        WHEN COALESCE(u.active, 1) = 0 THEN 'Expired'
+                        WHEN v.valid_until IS NOT NULL AND v.valid_until < NOW() THEN 'Expired'
+                        WHEN v.status = 'Inside' THEN 'Checked In'
+                        ELSE 'Checked Out'
+                    END AS status
+                FROM visitors v
+                JOIN users u ON v.user_id = u.user_id
+                LEFT JOIN general_log gl ON u.user_id = gl.user_id
+                {where_clause}
+                GROUP BY v.visitor_id, v.visitor_name, v.purpose, v.details, v.status, v.valid_until, u.active, v.visitor_last_updated
+                ORDER BY v.visitor_id DESC
+            """.format(where_clause=where_clause)
+            cursor.execute(query, tuple(params))
+            return cursor.fetchall()
+        except Exception as err:
+            print(f"Error fetching visitor logs: {err}")
+            return []
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+
+    @staticmethod
+    def get_student_logs_full(conn):
+        try:
+            cursor = conn.cursor(dictionary=True)
+            query = """
+                SELECT 
+                    s.student_id AS id,
+                    s.student_name AS name,
+                    c.course_name AS course,
+                    DATE_FORMAT(COALESCE(MAX(gl.timestamp), s.stud_last_updated), '%Y-%m-%d') AS date,
+                    TIME_FORMAT(MIN(CASE WHEN gl.log_type = 'Entry' AND DATE(gl.timestamp) = CURDATE() THEN gl.timestamp END), '%h:%i %p') AS time_in,
+                    TIME_FORMAT(MAX(CASE WHEN gl.log_type = 'Exit' AND DATE(gl.timestamp) = CURDATE() THEN gl.timestamp END), '%h:%i %p') AS time_out,
+                    IF(s.status = 'Inside', 'Inside', 'Out') AS status,
+                    IF(s.status = 'Inside', 'success', 'secondary') AS status_class
+                FROM students s
+                JOIN users u ON s.user_id = u.user_id
+                LEFT JOIN courses c ON s.course_id = c.course_id
+                LEFT JOIN general_log gl ON u.user_id = gl.user_id
+                GROUP BY s.student_id, s.student_name, c.course_name, s.status, s.stud_last_updated
+                ORDER BY s.student_name ASC
+            """
+            cursor.execute(query)
+            return cursor.fetchall()
+        except Exception as err:
+            print(f"Error fetching student logs: {err}")
+            return []
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+
+    @staticmethod
+    def get_employee_logs_full(conn):
+        try:
+            cursor = conn.cursor(dictionary=True)
+            query = """
+                SELECT 
+                    e.employee_id AS id,
+                    e.employee_name AS name,
+                    LEFT(e.employee_name, 2) AS initials,
+                    d.department_name AS dept,
+                    e.position AS position,
+                    DATE_FORMAT(COALESCE(MAX(gl.timestamp), e.emp_last_updated), '%Y-%m-%d') AS date,
+                    TIME_FORMAT(MIN(CASE WHEN gl.log_type = 'Entry' AND DATE(gl.timestamp) = CURDATE() THEN gl.timestamp END), '%h:%i %p') AS `in`,
+                    TIME_FORMAT(MAX(CASE WHEN gl.log_type = 'Exit' AND DATE(gl.timestamp) = CURDATE() THEN gl.timestamp END), '%h:%i %p') AS `out`,
+                    IF(e.status = 'Inside', 'Inside', 'Out') AS status,
+                    IF(e.status = 'Inside', 'success', 'secondary') AS status_class
+                FROM employees e
+                JOIN users u ON e.user_id = u.user_id
+                LEFT JOIN departments d ON e.department_id = d.department_id
+                LEFT JOIN general_log gl ON u.user_id = gl.user_id
+                GROUP BY e.employee_id, e.employee_name, d.department_name, e.position, e.status, e.emp_last_updated
+                ORDER BY e.employee_name ASC
+            """
+            cursor.execute(query)
+            return cursor.fetchall()
+        except Exception as err:
+            print(f"Error fetching employee logs: {err}")
+            return []
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
 
     @staticmethod
     def get_event_instances(conn, event_id):
@@ -1655,6 +1946,11 @@ class Database:
             )
             peak_row = cursor.fetchone()
             peak_hour = _format_hour_label(peak_row["hr"]) if peak_row else "N/A"
+            peak_window = (
+                f"{_format_hour_label(peak_row['hr'])} - {_format_hour_label((peak_row['hr'] + 1) % 24)}"
+                if peak_row
+                else "N/A"
+            )
 
             cursor.execute(
                 """
@@ -1666,7 +1962,7 @@ class Database:
                 (today,),
             )
             hourly = {row["hr"]: row["cnt"] for row in cursor.fetchall()}
-            traffic_chart = [hourly.get(hour, 0) for hour in range(6, 18)]
+            traffic_chart = [hourly.get(hour, 0) for hour in range(24)]
 
             cursor.execute(
                 """
@@ -1733,6 +2029,7 @@ class Database:
                 "currently_inside": f"{currently_inside:,}",
                 "avg_dwell_time": avg_dwell,
                 "peak_hour": peak_hour,
+                "peak_window": peak_window,
                 "traffic_chart": traffic_chart,
                 "event_attendance_rate": attendance_rate,
                 "event_attendance_raw": attendance_raw,
@@ -1841,7 +2138,7 @@ class Database:
                 (today,),
             )
             hourly = {row["hr"]: row["cnt"] for row in cursor.fetchall()}
-            hourly_traffic = [hourly.get(hour, 0) for hour in range(6, 18)]
+            hourly_traffic = [hourly.get(hour, 0) for hour in range(24)]
 
             cursor.execute(
                 """
@@ -1861,6 +2158,58 @@ class Database:
             else:
                 trend = "N/A"
 
+            curfew_time = "21:40:00"
+            early_morning_cutoff = "06:00:00"
+            cursor.execute(
+                """
+                SELECT
+                    s.student_id AS id,
+                    COALESCE(NULLIF(TRIM(s.student_name), ''), 'Unknown Student') AS name,
+                    COALESCE(NULLIF(TRIM(c.course_name), ''), 'N/A') AS course,
+                    latest_entry.entry_time,
+                    TIMESTAMPDIFF(MINUTE, latest_entry.entry_time, NOW()) AS minutes_inside
+                FROM students s
+                JOIN users u ON s.user_id = u.user_id
+                LEFT JOIN courses c ON s.course_id = c.course_id
+                JOIN (
+                    SELECT user_id, MAX(timestamp) AS entry_time
+                    FROM general_log
+                    WHERE log_type = 'Entry'
+                    GROUP BY user_id
+                ) latest_entry ON latest_entry.user_id = s.user_id
+                LEFT JOIN (
+                    SELECT user_id, MAX(timestamp) AS exit_time
+                    FROM general_log
+                    WHERE log_type = 'Exit'
+                    GROUP BY user_id
+                ) latest_exit ON latest_exit.user_id = s.user_id
+                WHERE s.status = 'Inside'
+                  AND u.role = 'student'
+                  AND u.active = 1
+                  AND (latest_exit.exit_time IS NULL OR latest_entry.entry_time > latest_exit.exit_time)
+                  AND (
+                      NOW() >= TIMESTAMP(DATE(latest_entry.entry_time), %s)
+                      OR TIME(latest_entry.entry_time) >= %s
+                      OR TIME(latest_entry.entry_time) < %s
+                  )
+                ORDER BY latest_entry.entry_time ASC
+                LIMIT 10
+                """,
+                (curfew_time, curfew_time, early_morning_cutoff),
+            )
+            watchlist = []
+            for row in cursor.fetchall():
+                entry_time = row.get("entry_time")
+                watchlist.append(
+                    {
+                        "id": row.get("id", ""),
+                        "name": row.get("name", "Unknown Student"),
+                        "course": row.get("course", "N/A"),
+                        "entry_time": entry_time.strftime("%I:%M %p").lstrip("0") if entry_time else "--:--",
+                        "minutes_inside": int(row.get("minutes_inside") or 0),
+                    }
+                )
+
             return {
                 "total_entries": f"{total_entries:,}",
                 "entries_trend": trend,
@@ -1869,7 +2218,7 @@ class Database:
                 "currently_inside": f"{currently_inside:,}",
                 "avg_stay": avg_stay,
                 "hourly_traffic": hourly_traffic,
-                "watchlist": [],
+                "watchlist": watchlist,
                 "curfew_trigger": "09:40:00 PM",
             }
         except connector.Error as err:
@@ -1879,36 +2228,78 @@ class Database:
             cursor.close()
 
     @staticmethod
-    def get_employee_dashboard_stats(conn):
+    def get_employee_dashboard_stats(conn, instance_id=None):
         cursor = conn.cursor(dictionary=True)
         try:
             today = datetime.now().date()
 
             cursor.execute(
                 """
-                SELECT MAX(ea.event_date) AS latest
-                FROM event_attendance ea
-                JOIN employees emp ON ea.user_id = emp.user_id
-                JOIN users u ON emp.user_id = u.user_id
-                WHERE u.active = 1
-                """,
-            )
-            latest_row = cursor.fetchone()
-            latest_date = latest_row["latest"] if latest_row and latest_row["latest"] else today
-
-            cursor.execute(
+                SELECT
+                    ei.instance_id,
+                    e.event_name,
+                    ei.event_date,
+                    DATE_FORMAT(ei.event_date, '%b %d, %Y') AS date_str
+                FROM event_instances ei
+                JOIN events e ON ei.event_id = e.event_id
+                WHERE ei.event_date <= CURDATE()
+                  AND e.active = 1
+                ORDER BY ei.event_date DESC, ei.instance_id DESC
+                LIMIT 20
                 """
-                SELECT COUNT(*) AS cnt
-                FROM event_attendance ea
-                JOIN employees emp ON ea.user_id = emp.user_id
-                JOIN users u ON emp.user_id = u.user_id
-                WHERE ea.event_date = %s
-                  AND u.active = 1
-                """,
-                (today,),
             )
-            today_count = cursor.fetchone()["cnt"] or 0
-            target_date = today if today_count > 0 else latest_date
+            event_instances_list = cursor.fetchall()
+
+            target_instance_id = None
+            target_date = today
+            parsed_instance_id = None
+
+            if instance_id not in (None, ""):
+                try:
+                    parsed_instance_id = int(str(instance_id).strip())
+                except (TypeError, ValueError):
+                    parsed_instance_id = None
+
+            if parsed_instance_id is not None:
+                cursor.execute(
+                    """
+                    SELECT ei.instance_id, ei.event_date
+                    FROM event_instances ei
+                    JOIN events e ON ei.event_id = e.event_id
+                    WHERE ei.instance_id = %s
+                      AND e.active = 1
+                    LIMIT 1
+                    """,
+                    (parsed_instance_id,),
+                )
+                selected_row = cursor.fetchone()
+                if selected_row:
+                    target_instance_id = selected_row["instance_id"]
+                    target_date = selected_row["event_date"]
+
+            if target_instance_id is None:
+                cursor.execute(
+                    """
+                    SELECT ei.instance_id, ei.event_date
+                    FROM event_instances ei
+                    JOIN events e ON ei.event_id = e.event_id
+                    JOIN event_attendance ea ON ea.instance_id = ei.instance_id
+                    JOIN employees emp ON ea.user_id = emp.user_id
+                    JOIN users u ON emp.user_id = u.user_id
+                    WHERE u.active = 1
+                      AND e.active = 1
+                    GROUP BY ei.instance_id, ei.event_date
+                    ORDER BY ei.event_date DESC, ei.instance_id DESC
+                    LIMIT 1
+                    """
+                )
+                latest_row = cursor.fetchone()
+                if latest_row:
+                    target_instance_id = latest_row["instance_id"]
+                    target_date = latest_row["event_date"]
+                elif event_instances_list:
+                    target_instance_id = event_instances_list[0]["instance_id"]
+                    target_date = event_instances_list[0]["event_date"]
 
             cursor.execute(
                 """
@@ -1916,11 +2307,11 @@ class Database:
                 FROM event_attendance ea
                 JOIN employees emp ON ea.user_id = emp.user_id
                 JOIN users u ON emp.user_id = u.user_id
-                WHERE ea.event_date = %s
+                WHERE ea.instance_id = %s
                   AND u.active = 1
                 GROUP BY ea.status
                 """,
-                (target_date,),
+                (target_instance_id,),
             )
             attendance_map = {row["status"]: row["cnt"] for row in cursor.fetchall()}
             attendance_data = [
@@ -1956,7 +2347,7 @@ class Database:
                 SELECT AVG(
                     TIMESTAMPDIFF(
                         MINUTE,
-                        TIMESTAMP(ea.event_date, e.time_start),
+                        TIMESTAMP(ei.event_date, e.time_start),
                         ea.first_in
                     )
                 ) AS avg_late
@@ -1965,11 +2356,11 @@ class Database:
                 JOIN events e ON ei.event_id = e.event_id
                 JOIN employees emp ON ea.user_id = emp.user_id
                 JOIN users u ON emp.user_id = u.user_id
-                WHERE ea.event_date = %s
+                WHERE ea.instance_id = %s
                   AND ea.status = 'Late'
                   AND u.active = 1
                 """,
-                (target_date,),
+                (target_instance_id,),
             )
             avg_late = cursor.fetchone()["avg_late"] or 0
             avg_tardiness = f"{int(avg_late)} mins"
@@ -1977,32 +2368,26 @@ class Database:
             cursor.execute(
                 """
                 SELECT
-                    d.department_name AS dept,
-                    AVG(
-                        TIMESTAMPDIFF(
-                            MINUTE,
-                            TIMESTAMP(ea.event_date, e.time_start),
-                            ea.first_in
-                        )
-                    ) AS avg_late
+                    CONCAT(
+                        DATE_FORMAT(ea.first_in, '%h:'),
+                        LPAD(FLOOR(MINUTE(ea.first_in) / 15) * 15, 2, '0'),
+                        DATE_FORMAT(ea.first_in, ' %p')
+                    ) AS time_bucket,
+                    COUNT(*) AS checkins
                 FROM event_attendance ea
-                JOIN event_instances ei ON ea.instance_id = ei.instance_id
-                JOIN events e ON ei.event_id = e.event_id
                 JOIN employees emp ON ea.user_id = emp.user_id
                 JOIN users u ON emp.user_id = u.user_id
-                JOIN departments d ON emp.department_id = d.department_id
-                WHERE ea.event_date = %s
-                  AND ea.status = 'Late'
+                WHERE ea.instance_id = %s
+                  AND ea.first_in IS NOT NULL
                   AND u.active = 1
-                GROUP BY d.department_name
-                ORDER BY avg_late DESC
-                LIMIT 7
+                GROUP BY time_bucket
+                ORDER BY MIN(ea.first_in) ASC
                 """,
-                (target_date,),
+                (target_instance_id,),
             )
-            tardiness_rows = cursor.fetchall()
-            tardiness_data = [int(round(row["avg_late"] or 0)) for row in tardiness_rows]
-            tardiness_labels = [_format_department_label(row["dept"]) for row in tardiness_rows]
+            peak_rows = cursor.fetchall()
+            peak_checkin_data = [row["checkins"] for row in peak_rows]
+            peak_checkin_labels = [row["time_bucket"] for row in peak_rows]
 
             cursor.execute(
                 """
@@ -2013,13 +2398,13 @@ class Database:
                 JOIN employees emp ON ea.user_id = emp.user_id
                 JOIN users u ON emp.user_id = u.user_id
                 JOIN departments d ON emp.department_id = d.department_id
-                WHERE ea.event_date = %s
+                WHERE ea.instance_id = %s
                   AND u.active = 1
                 GROUP BY d.department_name
                 ORDER BY value DESC, d.department_name ASC
                 LIMIT 5
                 """,
-                (target_date,),
+                (target_instance_id,),
             )
             dept_participation = [
                 {"name": row["name"], "value": row["value"]}
@@ -2038,9 +2423,10 @@ class Database:
                 JOIN event_participants ep ON ei.event_id = ep.event_id
                 JOIN employees emp ON ep.user_id = emp.user_id
                 JOIN users u ON emp.user_id = u.user_id
-                WHERE ei.event_date >= CURDATE()
+                WHERE (ei.event_date > CURDATE() OR (ei.event_date = CURDATE() AND e.time_end >= CURTIME()))
                   AND ei.status = 'Scheduled'
                   AND u.active = 1
+                  AND e.active = 1
                 GROUP BY ei.instance_id, e.event_name, ei.event_date, e.time_start, e.location
                 ORDER BY ei.event_date ASC, e.time_start ASC
                 LIMIT 3
@@ -2095,19 +2481,21 @@ class Database:
                 JOIN employees emp ON ea.user_id = emp.user_id
                 JOIN users u ON emp.user_id = u.user_id
                 JOIN departments d ON emp.department_id = d.department_id
-                WHERE ea.event_date = %s
+                WHERE ea.instance_id = %s
                   AND u.active = 1
                 GROUP BY d.department_id, d.department_name
                 ORDER BY rate DESC, d.department_name ASC
                 """,
-                (target_date,),
+                (target_instance_id,),
             )
             dept_comparison = cursor.fetchall()
 
             return {
                 "attendance_data": attendance_data,
-                "tardiness_data": tardiness_data if tardiness_data else [0] * 7,
-                "tardiness_labels": tardiness_labels if tardiness_labels else ["N/A"] * 7,
+                "tardiness_data": [0] * 7,
+                "tardiness_labels": ["N/A"] * 7,
+                "peak_checkin_data": peak_checkin_data if peak_checkin_data else [0] * 5,
+                "peak_checkin_labels": peak_checkin_labels if peak_checkin_labels else ["N/A"] * 5,
                 "dept_participation": dept_participation,
                 "avg_tardiness": avg_tardiness,
                 "on_time_rate": on_time_rate,
@@ -2118,6 +2506,8 @@ class Database:
                 "recent_activity": recent_activity,
                 "leaderboard": leaderboard,
                 "dept_comparison": dept_comparison,
+                "event_instances_list": event_instances_list,
+                "selected_instance_id": target_instance_id,
             }
         except connector.Error as err:
             print(f"Error fetching employee dashboard stats: {err}")

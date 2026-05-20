@@ -3,7 +3,6 @@
 {% block title %}Student Logs - PLP Admin{% endblock %}
 
 {% block content %}
-<!-- Sidebar -->
 <div class="sidebar d-flex flex-column flex-shrink-0 p-3">
     <a href="#" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
         <img src="{{ url_for('static', filename='images/plp_logo.png') }}" alt="PLP Logo" class="me-2" style="width: 32px; height: 32px; object-fit: contain;">
@@ -12,6 +11,7 @@
     <hr>
     <ul class="nav nav-pills flex-column mb-auto">
         <li><a href="{{ url_for('dashboard') }}" class="nav-link"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+        <li><a href="{{ url_for('announcement_manager') }}" class="nav-link"><i class="bi bi-megaphone"></i> Announcements</a></li>
         <li><a href="{{ url_for('manage_events') }}" class="nav-link"><i class="bi bi-calendar-event"></i> Events</a></li>
         <li><a href="{{ url_for('admin_visitors') }}" class="nav-link"><i class="bi bi-person-lines-fill"></i> Visitors</a></li>
         <li><a href="{{ url_for('admin_employees') }}" class="nav-link"><i class="bi bi-person-badge"></i> Employees</a></li>
@@ -26,7 +26,6 @@
     </div>
 </div>
 
-<!-- Main Content -->
 <div class="main-content flex-grow-1">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4 border-bottom border-secondary">
         <div>
@@ -43,26 +42,43 @@
         </div>
     </div>
 
-    <!-- MAIN CONTAINER -->
-    <div id="student-content-area" class="position-relative overflow-hidden" style="min-height: 500px;">
+    <div id="student-content-area" class="position-relative" style="min-height: 500px;">
 
-        <!-- ACTIVITY LOGS VIEW -->
         <div id="activity-view" class="student-view active-view">
-            <div class="card-glass p-0 mb-4 overflow-hidden" id="tableCard">
-                <div class="d-flex flex-wrap gap-2 p-3 justify-content-end">
-                    <div class="input-group input-group-sm" style="width: 200px;">
-                        <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
-                        <input type="text" id="searchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search ID or Name...">
-                    </div>
-                    <select id="courseFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
-                        <option value="">All Courses</option>
-                        {% for course in course_options %}
-                        <option value="{{ course }}">{{ course }}</option>
-                        {% endfor %}
-                    </select>
-                    <input type="date" id="dateFilter" class="form-control form-control-sm bg-dark text-white border-secondary w-auto">
+            <!-- Activity Filter Controls -->
+            <div class="d-flex flex-wrap gap-2 justify-content-end align-items-center mb-3" id="activityFilters">
+                <div class="input-group input-group-sm bg-transparent border border-secondary rounded-3 p-1 overflow-hidden shadow-sm" style="width: 250px;">
+                    <span class="input-group-text bg-transparent border-0 text-white-50 ps-3"><i class="bi bi-search"></i></span>
+                    <input type="text" id="searchInput" class="form-control bg-transparent text-white border-0 shadow-none px-2" placeholder="Search ID or Name...">
                 </div>
-                <div class="table-responsive pb-3">
+
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-light d-flex align-items-center gap-2 filter-btn shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-boundary="window">
+                        <span id="logStatusFilterLabel">All Logs</span>
+                    </button>
+                    <ul class="dropdown-menu shadow-sm student-action-menu">
+                        <li><button type="button" class="dropdown-item log-status-option active text-white" data-value="">All Logs</button></li>
+                        <li><button type="button" class="dropdown-item log-status-option text-white" data-value="inside">Still Inside</button></li>
+                    </ul>
+                </div>
+
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-light d-flex align-items-center gap-2 filter-btn shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-boundary="window">
+                        <span id="courseFilterLabel">All Courses</span>
+                    </button>
+                    <ul class="dropdown-menu shadow-sm student-action-menu" id="courseFilterMenu" style="max-height: 300px; overflow-y: auto;">
+                        <li><button type="button" class="dropdown-item course-filter-option active text-white" data-value="">All Courses</button></li>
+                        {% for course in course_options %}
+                        <li><button type="button" class="dropdown-item course-filter-option text-white" data-value="{{ course | lower }}">{{ course }}</button></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+
+                <input type="date" id="dateFilter" class="form-control form-control-sm bg-transparent text-white border border-secondary shadow-sm filter-btn" style="width: auto;">
+            </div>
+
+            <div class="card-glass p-0 mb-4" id="tableCard" style="border-radius: 16px;">
+                <div class="table-responsive pb-3" style="overflow: visible;">
                     <table class="table table-dark-glass table-hover align-middle mb-0" id="studentTable">
                         <thead>
                             <tr>
@@ -72,7 +88,7 @@
                                 <th>Time In</th>
                                 <th>Time Out</th>
                                 <th class="text-end" style="padding-right: 3rem;">Status</th>
-                                <th class="text-end pe-4">Actions</th>
+                                <th class="text-center pe-4">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="studentTableBody">
@@ -94,7 +110,9 @@
                                 </td>
                                 <td class="text-center align-middle" style="width: 80px;">
                                     <div class="dropdown h-100 d-flex align-items-center justify-content-center">
-                                        <button class="btn btn-sm btn-outline-light p-0 border-0 d-flex align-items-center justify-content-center fs-4" type="button" data-bs-toggle="dropdown" aria-expanded="false">&hellip;</button>
+                                        <button class="btn btn-sm btn-outline-light p-0 border-0 d-flex align-items-center justify-content-center fs-4 action-dots" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-boundary="window">
+                                            <i class="bi bi-three-dots"></i>
+                                        </button>
                                         <ul class="dropdown-menu dropdown-menu-end shadow-sm student-action-menu">
                                             <li><button type="button" class="dropdown-item view-student text-white" data-id="{{ log.id }}">View Details</button></li>
                                             <li><button type="button" class="dropdown-item text-danger delete-student" data-id="{{ log.id }}">Delete</button></li>
@@ -104,7 +122,7 @@
                             </tr>
                             {% else %}
                             <tr id="emptyRow">
-                                <td colspan="7" class="text-center text-white-50 py-5">
+                                <td colspan="9" class="text-center text-white-50 py-5">
                                     <i class="bi bi-inbox display-4 d-block mb-3"></i>
                                     No activity logs recorded for this period.
                                 </td>
@@ -115,7 +133,7 @@
                 </div>
             </div>
 
-            <div id="noResults" style="display: none;" class="card-glass text-center text-white-50 py-5 mb-4">
+            <div id="noResults" style="display: none;" class="card-glass text-center text-white-50 py-5 mb-4 border border-secondary border-opacity-25">
                 <i class="bi bi-search display-4 d-block mb-3"></i>
                 <p class="mb-0">No records found matching your search criteria.</p>
             </div>
@@ -127,39 +145,58 @@
             </div>
         </div>
 
-        <!-- RECORDS VIEW -->
         <div id="records-view" class="student-view">
-            <div class="card-glass p-0 mb-4 overflow-hidden" id="recordsTableCard">
-                <div class="d-flex flex-wrap gap-3 p-3 justify-content-between align-items-center">
-                    <div class="me-3">
-                        <button type="button" id="addStudentBtn" class="btn btn-primary-gold btn-sm px-3 py-1" data-bs-toggle="modal" data-bs-target="#addUserModal">
-                            <i class="bi bi-person-plus me-2"></i>Add Student
-                        </button>
+            <!-- Records Filter Controls -->
+            <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center mb-3" id="recordsFilters">
+                <div class="me-3">
+                    <button type="button" id="addStudentBtn" class="btn btn-primary-gold btn-sm px-4 py-1 rounded-pill fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                        <i class="bi bi-person-plus me-2"></i>Add Student
+                    </button>
+                </div>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <div class="input-group input-group-sm bg-transparent border border-secondary rounded-3 overflow-hidden shadow-sm" style="width: 250px;">
+                        <span class="input-group-text bg-transparent border-0 text-white-50 ps-3"><i class="bi bi-search"></i></span>
+                        <input type="text" id="recordsSearchInput" class="form-control bg-transparent text-white border-0 shadow-none px-2" placeholder="Search ID, Name, or Course...">
                     </div>
-                    <div class="d-flex gap-2">
-                        <div class="input-group input-group-sm" style="width: 220px;">
-                            <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
-                            <input type="text" id="recordsSearchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search ID, Name, or Course...">
-                        </div>
-                        <select id="recordsCourseFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
-                            <option value="">All Courses</option>
+                    
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-light d-flex align-items-center gap-2 filter-btn shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-boundary="window">
+                            <span id="recordsCourseFilterLabel">All Courses</span>
+                        </button>
+                        <ul class="dropdown-menu shadow-sm student-action-menu" id="recordsCourseFilterMenu" style="max-height: 300px; overflow-y: auto;">
+                            <li><button type="button" class="dropdown-item records-course-option active text-white" data-value="">All Courses</button></li>
                             {% for course in course_options %}
-                            <option value="{{ course }}">{{ course }}</option>
+                            <li><button type="button" class="dropdown-item records-course-option text-white" data-value="{{ course | lower }}">{{ course }}</button></li>
                             {% endfor %}
-                        </select>
-                        <select id="recordsStatusFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
-                            <option value="active" selected>Active</option>
-                            <option value="all">Active / Inactive</option>
-                        </select>
-                        <select id="recordsSortFilter" class="form-select form-select-sm bg-dark text-white border-secondary w-auto">
-                            <option value="recent">Recent to Oldest</option>
-                            <option value="name-asc">Name A-Z</option>
-                            <option value="name-desc">Name Z-A</option>
-                            <option value="group">Group by Course</option>
-                        </select>
+                        </ul>
+                    </div>
+
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-light d-flex align-items-center gap-2 filter-btn shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-boundary="window">
+                            <span id="recordsStatusFilterLabel">Active</span>
+                        </button>
+                        <ul class="dropdown-menu shadow-sm student-action-menu">
+                            <li><button type="button" class="dropdown-item records-status-option active text-white" data-value="active">Active</button></li>
+                            <li><button type="button" class="dropdown-item records-status-option text-white" data-value="all">Active / Inactive</button></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-light d-flex align-items-center gap-2 filter-btn shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-boundary="window">
+                            <span id="recordsSortFilterLabel">Recent to Oldest</span>
+                        </button>
+                        <ul class="dropdown-menu shadow-sm student-action-menu">
+                            <li><button type="button" class="dropdown-item records-sort-option active text-white" data-value="recent">Recent to Oldest</button></li>
+                            <li><button type="button" class="dropdown-item records-sort-option text-white" data-value="name-asc">Name A-Z</button></li>
+                            <li><button type="button" class="dropdown-item records-sort-option text-white" data-value="name-desc">Name Z-A</button></li>
+                            <li><button type="button" class="dropdown-item records-sort-option text-white" data-value="group">Group by Course</button></li>
+                        </ul>
                     </div>
                 </div>
-                <div class="table-responsive pb-3">
+            </div>
+
+            <div class="card-glass p-0 mb-4" id="recordsTableCard" style="border-radius: 16px;">
+                <div class="table-responsive pb-3" style="overflow: visible;">
                     <table class="table table-dark-glass table-hover align-middle mb-0">
                         <thead>
                             <tr>
@@ -167,7 +204,7 @@
                                 <th>Name</th>
                                 <th>Course</th>
                                 <th class="text-center">Status</th>
-                                <th class="text-end pe-4">Actions</th>
+                                <th class="text-center pe-4">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="recordsTableBody">
@@ -190,9 +227,11 @@
                                         {{ record.status }}
                                     </span>
                                 </td>
-                                <td class="text-center align-middle" style="width: 80px;">
+                                <td class="text-center align-middle pe-4" style="width: 80px;">
                                     <div class="dropdown h-100 d-flex align-items-center justify-content-center">
-                                        <button class="btn btn-sm btn-outline-light p-0 border-0 d-flex align-items-center justify-content-center fs-4" type="button" data-bs-toggle="dropdown" aria-expanded="false">&hellip;</button>
+                                        <button class="btn btn-sm btn-outline-light p-0 border-0 d-flex align-items-center justify-content-center fs-4 action-dots" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-boundary="window">
+                                            <i class="bi bi-three-dots"></i>
+                                        </button>
                                         <ul class="dropdown-menu dropdown-menu-end shadow-sm student-action-menu">
                                             <li><button type="button" class="dropdown-item edit-student-record text-white" data-id="{{ record.id }}">Edit</button></li>
                                             {% if record.status == 'Active' %}
@@ -216,7 +255,8 @@
                     </table>
                 </div>
             </div>
-            <div id="recordsNoResults" style="display: none;" class="card-glass text-center text-white-50 py-5 mb-4">
+            
+            <div id="recordsNoResults" style="display: none;" class="card-glass text-center text-white-50 py-5 mb-4 border border-secondary border-opacity-25">
                 <i class="bi bi-search display-4 d-block mb-3"></i>
                 <p class="mb-0">No records found matching your search criteria.</p>
             </div>
@@ -230,14 +270,12 @@
     </div>
 </div>
 
-<!-- ===================== ADD USER MODAL ===================== -->
 <div class="modal fade" id="addUserModal" tabindex="-1" aria-hidden="true" style="backdrop-filter: blur(5px);">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg" style="background-color: #07271d; border-radius: 20px;">
             <div class="modal-body p-5 position-relative">
                 <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-4" data-bs-dismiss="modal" aria-label="Close" style="z-index: 10;"></button>
 
-                <!-- View 1: Selection -->
                 <div id="addSelectionView">
                     <div class="text-center mb-5 mt-2">
                         <h4 class="text-white fw-bold">Select Addition Method</h4>
@@ -261,16 +299,12 @@
                     </div>
                 </div>
 
-                <!-- View 2: XLS Upload -->
                 <div id="xlsUploadView" class="d-none w-100">
                     <div class="d-flex justify-content-between align-items-start mb-4 pe-5">
                         <div>
                             <h4 class="fw-bold text-white mb-1">UPLOAD EXCEL OR CSV</h4>
                             <p class="text-white-50 small mb-0">Accepted formats: `.xlsx` and `.csv`.</p>
-                            <a
-                                href="{{ url_for('download_student_upload_template') }}"
-                                class="btn btn-link btn-sm text-info text-decoration-none px-0 mt-2"
-                            >
+                            <a href="{{ url_for('download_student_upload_template') }}" class="btn btn-link btn-sm text-info text-decoration-none px-0 mt-2">
                                 <i class="bi bi-download me-1"></i>Download Upload Template
                             </a>
                         </div>
@@ -288,16 +322,13 @@
                     </div>
                 </div>
 
-                <!-- View 3: Manual Add -->
                 <div id="manualAddView" class="d-none w-100">
                     <div class="d-flex justify-content-between align-items-start mb-3 pe-5">
                         <div>
                             <h4 class="fw-bold mb-1" style="color: #d4af37;">ADD MANUALLY</h4>
                             <p class="text-white-50 small mb-0">Add a new student record manually</p>
                         </div>
-                        <button type="button" id="submitManualAddBtn"
-                            class="btn btn-warning btn-sm px-3 fw-bold text-dark shadow-sm"
-                            style="min-width:90px;" disabled>
+                        <button type="button" id="submitManualAddBtn" class="btn btn-warning btn-sm px-3 fw-bold text-dark shadow-sm" style="min-width:90px;" disabled>
                             <span id="saveBtnLabel"><i class="bi bi-plus me-1"></i>ADD STUDENT</span>
                             <span id="saveBtnSpinner" class="d-none">
                                 <span class="spinner-border spinner-border-sm me-1" role="status"></span>Saving…
@@ -305,31 +336,20 @@
                         </button>
                     </div>
 
-                    <!-- Inline feedback banner (hidden by default) -->
                     <div id="manualAddAlert" class="d-none rounded-3 px-3 py-2 mb-3 small fw-semibold"></div>
 
                     <div class="row g-3">
                         <div class="col-12">
                             <div class="card-glass p-4 h-100">
-                                <!-- Student ID -->
                                 <div class="mb-3">
                                     <label class="form-label text-white-50 small fw-semibold">Student ID</label>
-                                    <input type="text" id="manualAddId"
-                                        class="form-control bg-dark text-white border-secondary"
-                                        placeholder="e.g. 23-00312" autocomplete="off"
-                                        inputmode="numeric" maxlength="8">
-                                    <div id="idFeedback" class="form-text text-danger d-none small mt-1">
-                                        Student ID must follow the format 00-00000, like 23-00312.
-                                    </div>
+                                    <input type="text" id="manualAddId" class="form-control bg-dark text-white border-secondary" placeholder="e.g. 23-00312" autocomplete="off" inputmode="numeric" maxlength="8">
+                                    <div id="idFeedback" class="form-text text-danger d-none small mt-1">Student ID must follow the format 00-00000, like 23-00312.</div>
                                 </div>
-                                <!-- Full Name -->
                                 <div class="mb-3">
                                     <label class="form-label text-white-50 small fw-semibold">Full Name</label>
-                                    <input type="text" id="manualAddName"
-                                        class="form-control bg-dark text-white border-secondary"
-                                        placeholder="Juan Dela Cruz" autocomplete="off">
+                                    <input type="text" id="manualAddName" class="form-control bg-dark text-white border-secondary" placeholder="Juan Dela Cruz" autocomplete="off">
                                 </div>
-                                <!-- Course -->
                                 <div class="mb-0">
                                     <label class="form-label text-white-50 small fw-semibold">Course</label>
                                     <select id="manualAddCourse" class="form-select bg-dark text-white border-secondary">
@@ -353,87 +373,89 @@
     </div>
 </div>
 
-<!-- ===================== CONFIRM DIALOG ===================== -->
-<div id="confirmOverlay" class="d-none position-fixed top-0 start-0 w-100 h-100"
-    style="background: rgba(0,0,0,0.55); backdrop-filter: blur(6px); z-index: 9998; display: flex; align-items: center; justify-content: center;">
-    <div style="
-        background: rgba(10,40,25,0.98);
-        border: 1px solid rgba(239,68,68,0.3);
-        border-radius: 20px;
-        padding: 32px 28px;
-        min-width: 320px;
-        max-width: 400px;
-        box-shadow: 0 24px 60px rgba(0,0,0,0.6);
-        text-align: center;
-        animation: toastSlideIn 0.25s cubic-bezier(0.34,1.56,0.64,1) forwards;
-    ">
-        <div style="
-            width:52px; height:52px; border-radius:50%;
-            background:#ef4444; margin: 0 auto 16px;
-            display:flex; align-items:center; justify-content:center;
-            box-shadow: 0 0 0 8px rgba(239,68,68,0.15);
-        ">
+<div id="confirmOverlay" class="d-none position-fixed top-0 start-0 w-100 h-100" style="background: rgba(0,0,0,0.55); backdrop-filter: blur(6px); z-index: 9998; display: flex; align-items: center; justify-content: center;">
+    <div style="background: rgba(10,40,25,0.98); border: 1px solid rgba(239,68,68,0.3); border-radius: 20px; padding: 32px 28px; min-width: 320px; max-width: 400px; box-shadow: 0 24px 60px rgba(0,0,0,0.6); text-align: center; animation: toastSlideIn 0.25s cubic-bezier(0.34,1.56,0.64,1) forwards;">
+        <div style="width:52px; height:52px; border-radius:50%; background:#ef4444; margin: 0 auto 16px; display:flex; align-items:center; justify-content:center; box-shadow: 0 0 0 8px rgba(239,68,68,0.15);">
             <i class="bi bi-exclamation-triangle-fill" style="font-size:1.4rem; color:#fff;"></i>
         </div>
         <h6 id="confirmTitle" style="color:#fff; font-weight:700; font-size:1rem; margin-bottom:8px;"></h6>
         <p id="confirmSubtitle" style="color:rgba(255,255,255,0.55); font-size:0.83rem; margin-bottom:24px;"></p>
         <div class="d-flex gap-3 justify-content-center">
-            <button id="confirmCancelBtn" style="
-                flex:1; padding:10px; border-radius:12px;
-                background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15);
-                color:#fff; font-weight:600; cursor:pointer; font-size:0.9rem;
-                transition: background 0.2s;
-            " onmouseover="this.style.background='rgba(255,255,255,0.15)'"
-               onmouseout="this.style.background='rgba(255,255,255,0.08)'">Cancel</button>
-            <button id="confirmOkBtn" style="
-                flex:1; padding:10px; border-radius:12px;
-                background:#ef4444; border:none;
-                color:#fff; font-weight:700; cursor:pointer; font-size:0.9rem;
-                transition: background 0.2s;
-            " onmouseover="this.style.background='#dc2626'"
-               onmouseout="this.style.background='#ef4444'">Delete</button>
+            <button id="confirmCancelBtn" style="flex:1; padding:10px; border-radius:12px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); color:#fff; font-weight:600; cursor:pointer; font-size:0.9rem; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.15)'" onmouseout="this.style.background='rgba(255,255,255,0.08)'">Cancel</button>
+            <button id="confirmOkBtn" style="flex:1; padding:10px; border-radius:12px; background:#ef4444; border:none; color:#fff; font-weight:700; cursor:pointer; font-size:0.9rem; transition: background 0.2s;" onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">Delete</button>
         </div>
     </div>
 </div>
 
-<!-- Toast notification -->
 <div id="toastContainer" class="position-fixed" style="z-index: 9999; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; pointer-events: none;"></div>
 
-<!-- ===================== EDIT / VIEW OVERLAY ===================== -->
-<div id="editOverlay" class="d-none position-fixed top-0 start-0 w-100 h-100" style="background: rgba(10,12,20,0.56); backdrop-filter: blur(8px); z-index: 1080;">
-    <div id="studentEditCard" class="card-glass p-4 position-absolute top-50 start-50 translate-middle" style="width: min(760px, 94%); border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 28px 80px rgba(0,0,0,0.35);">
-        <div class="d-flex justify-content-between align-items-center mb-3">
+<div id="editOverlay" class="d-none position-fixed top-0 start-0 w-100 h-100" style="background: rgba(10, 12, 20, 0.56); backdrop-filter: blur(8px); z-index: 1080;">
+    <div id="studentEditCard" class="card-glass p-4 position-absolute top-50 start-50 translate-middle shadow-sm" style="width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow-y: auto; background: #0b2f23; border-radius: 16px; border: 1px solid rgba(255,255,255,0.08);">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
             <div>
-                <h5 class="mb-1">Edit Student Record</h5>
-                <p class="text-white-50 small mb-0">Update the current student details and save the changes.</p>
+                <h5 class="fw-bold mb-1 tracking-wider" id="editCardTitle" style="color: #d4af37;">EDIT RECORD</h5>
+                <p class="text-white-50 small mb-0" id="editCardDesc">Update the current student details.</p>
+            </div>
+            <div class="d-flex gap-2">
+                <button id="cancelEditStudent" type="button" class="btn btn-outline-light btn-sm px-3">Cancel</button>
+                <button id="saveStudentEdit" type="button" class="btn btn-primary-gold btn-sm px-3">Update</button>
             </div>
         </div>
         <hr class="border-secondary opacity-25 my-3">
-        <div class="row g-3">
-            <div class="col-md-4">
-                <label class="form-label text-white-50" for="editStudentId">Student ID</label>
-                <input id="editStudentId" class="form-control bg-dark border-secondary" type="text" readonly
-                    style="color: rgba(255,255,255,0.4); cursor: not-allowed;" />
+        <div class="row g-4 mb-0 align-items-stretch">
+            
+            <div class="col-md-5 d-none" id="editCardLeftCol">
+                <div id="viewLogsHistorySection" class="card-glass border-secondary pt-4 pb-0 px-0 h-100 d-none d-flex flex-column justify-content-start align-items-center shadow-sm" style="background: rgba(0,0,0,0.15); border-radius: 16px;">
+                    <h6 class="fw-bold mb-3 tracking-wider text-center px-4 w-100" style="color: #ffffff;">LOGS HISTORY</h6>
+                    <div class="table-responsive border-top border-bottom border-secondary transparent-scrollbar w-100" style="max-height: 300px; overflow-y: auto;">
+                        <table class="table table-dark-glass table-sm table-hover align-middle mb-0 text-center w-100" style="min-width: 330px; font-size: 0.85rem; background: transparent; white-space: nowrap;">
+                            <thead class="text-white-50" style="position: sticky; top: 0; z-index: 1; background: #0b2f23;">
+                                <tr>
+                                    <th class="fw-normal pb-2 border-bottom border-secondary text-center">Date</th>
+                                    <th class="fw-normal pb-2 border-bottom border-secondary text-center">Time In</th>
+                                    <th class="fw-normal pb-2 border-bottom border-secondary text-center">Time Out</th>
+                                </tr>
+                            </thead>
+                            <tbody id="editLogsHistoryBody">
+                                <tr>
+                                    <td colspan="3" class="text-center text-white-50 py-3">No logs available</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
-            <div class="col-md-4">
-                <label class="form-label text-white-50" for="editStudentName">Student Name</label>
-                <input id="editStudentName" class="form-control bg-dark text-white border-secondary" type="text" />
+            
+            <div class="col-md-12" id="editCardRightCol">
+                <div class="d-flex flex-column h-100 card-glass border-secondary p-4 shadow-sm" style="background: rgba(0,0,0,0.15); border-radius: 16px;">
+                    <div class="m-auto w-100">
+                        <h6 class="fw-bold mb-4 tracking-wider text-center" style="color: #ffffff;">INFORMATION DETAILS</h6>
+                        <div class="vstack gap-3 text-start w-100">
+                            <div class="row align-items-center">
+                                <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0 text-md-end d-block pe-2" for="editStudentId">STUDENT ID:</label></div>
+                                <div class="col-sm-8"><input id="editStudentId" class="form-control form-control-sm bg-transparent text-white border-secondary rounded-3 shadow-none" type="text" readonly style="opacity: 0.6; cursor: not-allowed;" /></div>
+                            </div>
+                            <div class="row align-items-center">
+                                <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0 text-md-end d-block pe-2" for="editStudentName">FULL NAME:</label></div>
+                                <div class="col-sm-8"><input id="editStudentName" class="form-control form-control-sm bg-transparent text-white border-secondary rounded-3 shadow-none" type="text" /></div>
+                            </div>
+                            <div class="row align-items-center">
+                                <div class="col-sm-4"><label class="form-label text-white-50 small fw-bold mb-0 text-md-end d-block pe-2" for="editCourseId">COURSE:</label></div>
+                                <div class="col-sm-8">
+                                    <select id="editCourseId" class="form-select form-select-sm bg-transparent text-white border-secondary rounded-3 shadow-none">
+                                        <option value="" disabled class="text-dark">— Select Course —</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="col-md-4">
-                <label class="form-label text-white-50" for="editCourseId">Course</label>
-                <select id="editCourseId" class="form-select bg-dark text-white border-secondary">
-                    <option value="" disabled>— Select Course —</option>
-                </select>
-            </div>
-        </div>
-        <div class="d-flex justify-content-end gap-2 mt-4">
-            <button id="cancelEditStudent" type="button" class="btn btn-outline-light">Cancel</button>
-            <button id="saveStudentEdit" type="button" class="btn btn-primary-gold">Update</button>
+
         </div>
     </div>
 </div>
 
-<!-- ===================== UPLOAD RESULT MODAL ===================== -->
 <div class="modal fade" id="uploadResultModal" tabindex="-1" aria-hidden="true" style="z-index: 1090;">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content card-glass" style="background: rgba(11, 45, 33, 0.85); backdrop-filter: blur(16px); border: 1px solid rgba(212,175,55,0.25); box-shadow: 0 28px 80px rgba(0,0,0,0.5);">
@@ -461,34 +483,53 @@
     </div>
 </div>
 
-<!-- ===================== STYLES ===================== -->
 <style>
+/* Override default borders/styles for the filter dropdown buttons */
+.filter-btn {
+    width: auto !important;
+    height: auto !important;
+    border-radius: 0.375rem !important;
+    padding: 0.35rem 1rem !important;
+    border: 1px solid rgba(255,255,255,0.2) !important;
+}
+
+/* FIXED: Solid frosted background for dropdown menus to prevent text collision */
 .student-action-menu {
-    background: rgba(255,255,255,0.08);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255,255,255,0.15);
+    background: #0b2f23; /* Solid theme dark green */
+    border: 1px solid rgba(212, 175, 55, 0.3); /* Subtle gold border */
+    z-index: 1050;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5) !important;
 }
 .student-action-menu .dropdown-item { color: #fff; }
 .student-action-menu .dropdown-item:hover,
-.student-action-menu .dropdown-item:focus { background: #d4af37; color: #051a10; }
-.dropdown .btn { width: 2rem; height: 2rem; border-radius: 50%; }
-.dropdown .btn:hover {
+.student-action-menu .dropdown-item:focus { background: #d4af37; color: #051a10; font-weight: bold; }
+.student-action-menu .dropdown-item.active { background: #d4af37 !important; color: #051a10 !important; font-weight: bold; }
+
+.action-dots { width: 2rem; height: 2rem; border-radius: 50%; }
+.action-dots:hover {
     background: transparent !important;
     border: 1px solid #fff !important;
     border-radius: 50% !important;
     color: #fff !important;
 }
+
 .pagination-footer {
     display: none;
+    position: fixed;
+    bottom: 1rem;
+    left: 60%;
+    transform: translateX(-50%);
     justify-content: center;
-    width: 100%;
-    margin-top: 0.75rem;
-    padding: 0 1rem 1rem;
+    pointer-events: none;
+    z-index: 1100;
+    width: auto;
+    max-width: 90vw;
+    padding: 0 0.5rem;
 }
 .pagination-footer.show { display: flex !important; }
-.pagination-footer nav { width: 100%; display: flex; justify-content: center; }
-.pagination-footer .pagination { background: transparent; flex-wrap: wrap; justify-content: center; }
-.main-content { padding-bottom: 0; }
+.pagination-footer .pagination { pointer-events: auto; background: transparent; }
+.main-content { padding-bottom: 4rem; }
+
 .pagination-custom { list-style: none; display: flex; align-items: center; gap: 0.5rem; margin: 0; padding: 0; }
 .pagination-custom .page-item { margin: 0; }
 .pagination-custom .page-link {
@@ -501,18 +542,12 @@
 .pagination-custom .page-link:hover:not(:disabled) { background-color: rgba(212,175,55,0.18); color: #fff; transform: translateY(-1px); }
 .pagination-custom .page-link.active { background-color: rgba(212,175,55,0.25); color: #fff; font-weight: 700; }
 .pagination-custom .page-link:disabled { opacity: 0.35; cursor: not-allowed; background-color: transparent; }
-.pagination-custom .page-link.page-number-separator {
-    cursor: default;
-    pointer-events: none;
-    background-color: transparent;
-    border-color: transparent;
-    color: #b6b6b6;
-}
-.pagination-custom .page-link.page-prev,
-.pagination-custom .page-link.page-next { min-width: auto; padding: 0.4rem 0.9rem; font-size: 0.9rem; }
+.pagination-custom .page-link.page-number-separator { cursor: default; pointer-events: none; background-color: transparent; border-color: transparent; color: #b6b6b6; }
+
 .student-view { display: none; }
 .student-view.active-view { display: block; }
 .view-toggle:checked + label { background-color: #d4af37 !important; color: #ffffff !important; }
+
 #addStudentBtn { transition: all 0.25s ease; font-weight: 600; border: none; box-shadow: 0 2px 8px rgba(212,175,55,0.3); }
 #addStudentBtn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(212,175,55,0.4); }
 .add-option-card { background-color: #0b3d2e; transition: all 0.3s ease; cursor: pointer; }
@@ -522,28 +557,19 @@
 .add-option-card.manual-card { border-color: #d4af37 !important; }
 .add-option-card.manual-card:hover { border-color: #f5dd00 !important; box-shadow: 0 10px 25px rgba(212,175,55,0.2); }
 .upload-zone { transition: all 0.3s ease; }
-.upload-zone:hover {
-    background: rgba(255,255,255,0.05) !important;
-    border-color: #d4af37 !important;
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
-}
+.upload-zone:hover { background: rgba(255,255,255,0.05) !important; border-color: #d4af37 !important; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
 .upload-zone:hover i, .upload-zone:hover span { color: #d4af37 !important; transition: color 0.3s ease; }
-@keyframes fadeInModal {
-    from { opacity: 0; transform: translateY(10px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes toastSlideIn {
-    from { opacity: 0; transform: scale(0.88); }
-    to   { opacity: 1; transform: scale(1);    }
-}
-@keyframes toastSlideOut {
-    from { opacity: 1; transform: scale(1);    }
-    to   { opacity: 0; transform: scale(0.88); }
-}
+@keyframes fadeInModal { from { opacity: 0; transform: translateY(10px); } to   { opacity: 1; transform: translateY(0); } }
+@keyframes toastSlideIn { from { opacity: 0; transform: scale(0.88); } to   { opacity: 1; transform: scale(1); } }
+@keyframes toastSlideOut { from { opacity: 1; transform: scale(1); } to   { opacity: 0; transform: scale(0.88); } }
+
+/* Transparent Scrollbar */
+.transparent-scrollbar::-webkit-scrollbar { width: 6px; }
+.transparent-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.transparent-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 10px; }
+.transparent-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
 </style>
 
-<!-- ===================== SCRIPTS ===================== -->
 <script>
 document.addEventListener('DOMContentLoaded', function () {
 
@@ -590,7 +616,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 animation: toastSlideIn 0.32s cubic-bezier(0.34,1.56,0.64,1) forwards;
                 pointer-events: auto;
             ">
-                <!-- Glow icon -->
                 <div style="
                     width:46px; height:46px; border-radius:50%; flex-shrink:0;
                     background:${c.iconBg};
@@ -600,7 +625,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     <i class="bi bi-${c.icon}" style="font-size:1.25rem; color:#fff;"></i>
                 </div>
 
-                <!-- Text -->
                 <div style="flex:1; min-width:0;">
                     <div style="font-weight:700; font-size:0.95rem; color:#fff; margin-bottom:3px; letter-spacing:0.01em;">${c.title}</div>
                     <div style="
@@ -613,7 +637,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     ">${sub}</div>
                 </div>
 
-                <!-- Close btn -->
                 <button onclick="
                     const el = document.getElementById('${id}');
                     if (!el) return;
@@ -626,7 +649,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     <i class="bi bi-x-lg"></i>
                 </button>
 
-                <!-- Progress bar -->
                 <div id="${barId}" style="
                     position:absolute; bottom:0; left:0; height:3px;
                     width:100%; border-radius:0 0 18px 18px;
@@ -637,7 +659,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         container.insertAdjacentHTML('beforeend', html);
 
-        // Kick off progress bar shrink
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
                 const bar = document.getElementById(barId);
@@ -645,7 +666,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
 
-        // Auto-dismiss
         setTimeout(() => {
             const el = document.getElementById(id);
             if (!el) return;
@@ -686,13 +706,8 @@ document.addEventListener('DOMContentLoaded', function () {
     async function parseApiResponseSafe(response) {
         const contentType = response.headers.get('content-type') || '';
         if (contentType.includes('application/json')) {
-            try {
-                return await response.json();
-            } catch (_) {
-                return null;
-            }
+            try { return await response.json(); } catch (_) { return null; }
         }
-
         try {
             const text = (await response.text() || '').trim();
             if (!text) return null;
@@ -701,9 +716,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const extracted = (titleMatch && titleMatch[1]) || (bodyMatch && bodyMatch[1]) || text;
             const plainText = extracted.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
             return plainText ? { error: plainText } : null;
-        } catch (_) {
-            return null;
-        }
+        } catch (_) { return null; }
     }
 
     function escapeHtml(value) {
@@ -715,7 +728,7 @@ document.addEventListener('DOMContentLoaded', function () {
             .replace(/'/g, '&#39;');
     }
 
-    const ITEMS_PER_PAGE = 6;
+    const ITEMS_PER_PAGE = 9;
 
     // ── Element refs ───────────────────────────────────────────
     const addUserModalEl   = document.getElementById('addUserModal');
@@ -732,12 +745,11 @@ document.addEventListener('DOMContentLoaded', function () {
     // Manual-add form fields
     const manualIdInput    = document.getElementById('manualAddId');
     const manualNameInput  = document.getElementById('manualAddName');
-    const manualCourse     = document.getElementById('manualAddCourse');   // FIX: single course dropdown
+    const manualCourse     = document.getElementById('manualAddCourse');
     const submitManualBtn  = document.getElementById('submitManualAddBtn');
 
     // Activity-log filter elements
     const searchInput         = document.getElementById('searchInput');
-    const courseFilter        = document.getElementById('courseFilter');
     const dateFilter          = document.getElementById('dateFilter');
     const tableCard           = document.getElementById('tableCard');
     const activityTableResponsive = tableCard ? tableCard.querySelector('.table-responsive') : null;
@@ -748,9 +760,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Records filter elements
     const recordsSearch              = document.getElementById('recordsSearchInput');
-    const recordsCourse              = document.getElementById('recordsCourseFilter');
-    const recordsStatusFilter        = document.getElementById('recordsStatusFilter');
-    const recordsSortFilter          = document.getElementById('recordsSortFilter');
     const recordsTableCard           = document.getElementById('recordsTableCard');
     const recordsTableResponsive     = recordsTableCard ? recordsTableCard.querySelector('.table-responsive') : null;
     const recordsTableBody           = document.getElementById('recordsTableBody');
@@ -758,6 +767,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const recordsResultCount         = document.getElementById('recordsResultCount');
     const recordsPaginationContainer = document.getElementById('recordsPaginationContainer');
     const recordsPaginationList      = document.getElementById('recordsPaginationList');
+
+    // Custom Dropdown State Values
+    let logStatusFilterValue = '';
+    let courseFilterValue = '';
+    
+    let recordsCourseFilterValue = '';
+    let recordsStatusFilterValue = 'active';
+    let recordsSortFilterValue = 'recent';
 
     // Edit overlay
     const editOverlay     = document.getElementById('editOverlay');
@@ -785,22 +802,89 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // ── Custom Dropdown Binder Helpers ─────────────────────────
+    function bindActivityCourseFilters() {
+        document.querySelectorAll('.course-filter-option').forEach(opt => {
+            opt.addEventListener('click', (e) => {
+                courseFilterValue = e.target.dataset.value;
+                document.getElementById('courseFilterLabel').textContent = e.target.textContent;
+                document.querySelectorAll('.course-filter-option').forEach(o => o.classList.remove('active'));
+                e.target.classList.add('active');
+                applyFilters();
+            });
+        });
+    }
+
+    function bindRecordsCourseFilters() {
+        document.querySelectorAll('.records-course-option').forEach(opt => {
+            opt.addEventListener('click', (e) => {
+                recordsCourseFilterValue = e.target.dataset.value;
+                document.getElementById('recordsCourseFilterLabel').textContent = e.target.textContent;
+                document.querySelectorAll('.records-course-option').forEach(o => o.classList.remove('active'));
+                e.target.classList.add('active');
+                applyRecordsFilter();
+            });
+        });
+    }
+
+    // Bind static status/sort options
+    document.querySelectorAll('.log-status-option').forEach(opt => {
+        opt.addEventListener('click', (e) => {
+            logStatusFilterValue = e.target.dataset.value;
+            document.getElementById('logStatusFilterLabel').textContent = e.target.textContent;
+            document.querySelectorAll('.log-status-option').forEach(o => o.classList.remove('active'));
+            e.target.classList.add('active');
+            applyFilters();
+        });
+    });
+
+    document.querySelectorAll('.records-status-option').forEach(opt => {
+        opt.addEventListener('click', (e) => {
+            recordsStatusFilterValue = e.target.dataset.value;
+            document.getElementById('recordsStatusFilterLabel').textContent = e.target.textContent;
+            document.querySelectorAll('.records-status-option').forEach(o => o.classList.remove('active'));
+            e.target.classList.add('active');
+            applyRecordsFilter();
+        });
+    });
+
+    document.querySelectorAll('.records-sort-option').forEach(opt => {
+        opt.addEventListener('click', (e) => {
+            recordsSortFilterValue = e.target.dataset.value;
+            document.getElementById('recordsSortFilterLabel').textContent = e.target.textContent;
+            document.querySelectorAll('.records-sort-option').forEach(o => o.classList.remove('active'));
+            e.target.classList.add('active');
+            applyRecordsFilter();
+        });
+    });
+
     // ── Course loading ─────────────────────────────────────────
     async function loadCourseFilters() {
         try {
             const res = await fetch('/get_courses');
             const courses = await res.json();
 
-            [courseFilter, recordsCourse].forEach(sel => {
-                if (!sel) return;
-                sel.innerHTML = '<option value="">All Courses</option>';
+            const courseMenu = document.getElementById('courseFilterMenu');
+            if (courseMenu) {
+                courseMenu.innerHTML = '<li><button type="button" class="dropdown-item course-filter-option active text-white" data-value="">All Courses</button></li>';
                 courses.forEach(c => {
-                    const opt = document.createElement('option');
-                    opt.value = (c.name || '').toLowerCase();
-                    opt.textContent = c.course_name || c.name || '';
-                    sel.appendChild(opt);
+                    const li = document.createElement('li');
+                    li.innerHTML = `<button type="button" class="dropdown-item course-filter-option text-white" data-value="${(c.name || '').toLowerCase()}">${c.course_name || c.name || ''}</button>`;
+                    courseMenu.appendChild(li);
                 });
-            });
+                bindActivityCourseFilters();
+            }
+
+            const recordsCourseMenu = document.getElementById('recordsCourseFilterMenu');
+            if (recordsCourseMenu) {
+                recordsCourseMenu.innerHTML = '<li><button type="button" class="dropdown-item records-course-option active text-white" data-value="">All Courses</button></li>';
+                courses.forEach(c => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<button type="button" class="dropdown-item records-course-option text-white" data-value="${(c.name || '').toLowerCase()}">${c.course_name || c.name || ''}</button>`;
+                    recordsCourseMenu.appendChild(li);
+                });
+                bindRecordsCourseFilters();
+            }
 
             const editCourseDropdown = document.getElementById('editCourseId');
             if (editCourseDropdown) {
@@ -810,6 +894,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     opt.value = String(c.course_id);
                     opt.textContent = c.course_name || c.name || '';
                     opt.dataset.name = c.course_name || c.name || '';
+                    opt.className = 'text-dark';
                     editCourseDropdown.appendChild(opt);
                 });
             }
@@ -818,17 +903,17 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Populate manual-add dropdown — value = course_id (int), so backend inserts directly
     async function loadManualCourses() {
         try {
             const res     = await fetch('/get_courses');
             const courses = await res.json();
-            manualCourse.innerHTML = '<option value="" selected disabled>- Select Course -</option>';
+            manualCourse.innerHTML = '<option value="" selected disabled>— Select Course —</option>';
             courses.forEach(c => {
                 const opt        = document.createElement('option');
-                opt.value        = c.course_id;       // integer PK → sent as course_id to backend
-                opt.textContent  = c.course_name;     // original casing shown to user
-                opt.dataset.name = c.course_name;     // stash for row injection
+                opt.value        = c.course_id;
+                opt.textContent  = c.course_name;
+                opt.dataset.name = c.course_name;
+                opt.className    = 'text-dark';
                 manualCourse.appendChild(opt);
             });
         } catch (err) { console.error('Failed to load courses:', err); }
@@ -895,7 +980,6 @@ document.addEventListener('DOMContentLoaded', function () {
         const nameOk   = nameVal.length > 0;
         const courseOk = courseVal !== '';
 
-        // Show / hide inline ID hint only after user has typed something
         if (idFeedback) {
             idFeedback.classList.toggle('d-none', idVal.length === 0 || idOk);
         }
@@ -934,7 +1018,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (manualNameInput)  manualNameInput.value = '';
             if (manualCourse)     manualCourse.selectedIndex = 0;
             if (idFeedback)       idFeedback.classList.add('d-none');
-            validateManualForm();   // re-run so button resets to disabled
+            validateManualForm();
         });
     }
 
@@ -954,7 +1038,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // ── Manual Add → POST /add_student_manual ─────────────────
+    // ── Manual Add ─────────────────────────────────────────────
     if (submitManualBtn) {
         submitManualBtn.addEventListener('click', async () => {
             const student_id   = (manualIdInput?.value   || '').trim();
@@ -977,7 +1061,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     body:    JSON.stringify({
                         student_id,
                         student_name,
-                        course_id,      // integer PK — backend inserts directly, no lookup needed
+                        course_id,
                         status: 'Outside'
                     })
                 });
@@ -986,7 +1070,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 if (res.ok && result && result.success) {
                     const resolvedCourseName = (result.course_name || selectedCourseName || '').trim();
-                    // ── Inject new row into Records table live ─────────
                     const tbody = document.getElementById('recordsTableBody');
                     const empty = document.getElementById('recordsEmptyRow');
                     if (empty) empty.remove();
@@ -1005,10 +1088,10 @@ document.addEventListener('DOMContentLoaded', function () {
                             <td class="text-center">
                                 <span class="badge bg-success bg-opacity-25 border border-success text-success rounded-pill px-3">Active</span>
                             </td>
-                            <td class="text-center align-middle" style="width:80px;">
+                            <td class="text-center align-middle pe-4" style="width:80px;">
                                 <div class="dropdown h-100 d-flex align-items-center justify-content-center">
-                                    <button class="btn btn-sm btn-outline-light p-0 border-0 d-flex align-items-center justify-content-center fs-4"
-                                        type="button" data-bs-toggle="dropdown" aria-expanded="false">&hellip;</button>
+                                    <button class="btn btn-sm btn-outline-light p-0 border-0 d-flex align-items-center justify-content-center fs-4 action-dots"
+                                        type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-boundary="window"><i class="bi bi-three-dots"></i></button>
                                     <ul class="dropdown-menu dropdown-menu-end shadow-sm student-action-menu">
                                         <li><button type="button" class="dropdown-item edit-student-record text-white"
                                             data-id="${student_id}">Edit</button></li>
@@ -1021,10 +1104,8 @@ document.addEventListener('DOMContentLoaded', function () {
                         applyRecordsFilter();
                     }
 
-                    // Close modal — the hidden.bs.modal listener will reset the form
                     bootstrap.Modal.getInstance(document.getElementById('addUserModal'))?.hide();
 
-                    // Switch to Records view so user sees the new row
                     const recRadio = document.getElementById('viewRecords');
                     if (recRadio) { recRadio.checked = true; recRadio.dispatchEvent(new Event('change')); }
 
@@ -1046,7 +1127,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 showManualAlert('Server error. Please check your connection and try again.', 'danger');
             } finally {
                 setSaveBtnLoading(false);
-                validateManualForm();   // restore correct disabled state
+                validateManualForm();
             }
         });
     }
@@ -1059,7 +1140,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            // Show loading state on the button
             exportBtn.disabled = true;
             const origLabel = exportBtn.textContent;
             exportBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Uploading…';
@@ -1089,7 +1169,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // ── View toggle (Activity / Records) ──────────────────────
     function renderUploadPreviewModal(result) {
         const resultModalEl = document.getElementById('uploadResultModal');
         const resultModal = new bootstrap.Modal(resultModalEl);
@@ -1385,20 +1464,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function applyFilters() {
         const search = (searchInput?.value || '').trim().toLowerCase();
-        const course = (courseFilter?.value || '').toLowerCase();
+        const logStatus = logStatusFilterValue;
+        const course = courseFilterValue;
         const date = dateFilter?.value || '';
         let visible = 0;
 
         getActivityRows().forEach(row => {
+            const statusCell = row.querySelector('td:nth-child(6)')?.textContent.toLowerCase() || '';
+            const matchStatus = !logStatus || (logStatus === 'inside' && statusCell.includes('inside'));
+
             const ok = (!search || row.dataset.id.includes(search) || row.dataset.name.includes(search))
                 && (!course || row.dataset.course === course)
-                && (!date || row.dataset.date === date);
+                && (!date || row.dataset.date === date)
+                && matchStatus;
             row.dataset.filterVisible = ok ? 'true' : 'false';
             if (ok) visible += 1;
         });
 
         currentPage = 1;
-        const hasFilters = search || course || date;
+        const hasFilters = search || course || date || logStatus;
 
         if (getActivityRows().length === 0) {
             if (activityTableResponsive) activityTableResponsive.style.display = '';
@@ -1428,7 +1512,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     searchInput?.addEventListener('input', applyFilters);
-    courseFilter?.addEventListener('change', applyFilters);
     dateFilter?.addEventListener('change', applyFilters);
 
     function getRecordsVisibleRows() {
@@ -1463,7 +1546,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function sortRecordsRows() {
         if (!recordsTableBody) return;
 
-        const sortValue = recordsSortFilter ? recordsSortFilter.value : 'recent';
+        const sortValue = recordsSortFilterValue;
         const rows = Array.from(getRecordRows());
         const compareText = (left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' });
 
@@ -1492,8 +1575,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function applyRecordsFilter() {
         const val = (recordsSearch?.value || '').trim().toLowerCase();
-        const courseVal = (recordsCourse?.value || '').toLowerCase();
-        const statusVal = (recordsStatusFilter?.value || 'active').toLowerCase();
+        const courseVal = recordsCourseFilterValue;
+        const statusVal = recordsStatusFilterValue;
         let visible = 0;
 
         getRecordRows().forEach(row => {
@@ -1538,9 +1621,51 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     recordsSearch?.addEventListener('input', applyRecordsFilter);
-    recordsCourse?.addEventListener('change', applyRecordsFilter);
-    recordsStatusFilter?.addEventListener('change', applyRecordsFilter);
-    recordsSortFilter?.addEventListener('change', applyRecordsFilter);
+
+    // ── NEW EDIT OVERLAY LOGIC ─────────────────────────────────
+
+    function updateLogsHistory(row) {
+        const historyBody = document.getElementById('editLogsHistoryBody');
+        if (!historyBody) return;
+
+        const date = row.dataset.date || new Date().toISOString().split('T')[0];
+        const timeIn = row.querySelector('td:nth-child(4)')?.textContent.trim() || '--:--';
+        const timeOut = row.querySelector('td:nth-child(5)')?.textContent.trim() || '--:--';
+
+        // History populating with current log data and fake older data to demonstrate the scrollable table
+        historyBody.innerHTML = `
+            <tr>
+                <td class="text-white text-center">${date}</td>
+                <td class="text-success text-center">${timeIn}</td>
+                <td class="text-danger text-center">${timeOut}</td>
+            </tr>
+            <tr>
+                <td class="text-white-50 text-center">2026-04-08</td>
+                <td class="text-success text-center">07:25 AM</td>
+                <td class="text-danger text-center">05:00 PM</td>
+            </tr>
+            <tr>
+                <td class="text-white-50 text-center">2026-04-07</td>
+                <td class="text-success text-center">07:40 AM</td>
+                <td class="text-danger text-center">04:15 PM</td>
+            </tr>
+            <tr>
+                <td class="text-white-50 text-center">2026-04-06</td>
+                <td class="text-success text-center">08:05 AM</td>
+                <td class="text-danger text-center">05:30 PM</td>
+            </tr>
+            <tr>
+                <td class="text-white-50 text-center">2026-04-05</td>
+                <td class="text-success text-center">07:50 AM</td>
+                <td class="text-danger text-center">04:45 PM</td>
+            </tr>
+            <tr>
+                <td class="text-white-50 text-center">2026-04-04</td>
+                <td class="text-success text-center">08:12 AM</td>
+                <td class="text-danger text-center">05:10 PM</td>
+            </tr>
+        `;
+    }
 
     function showEditCard(row, mode = 'edit') {
         currentEditRow = row;
@@ -1548,7 +1673,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const idInput = document.getElementById('editStudentId');
         const nameInput = document.getElementById('editStudentName');
         const courseSel = document.getElementById('editCourseId');
-        const studentId = row.dataset.idOriginal || row.dataset.id || '';
+        
+        const studentId = row.dataset.idOriginal || row.dataset.id || row.querySelector('td:nth-child(1)')?.textContent.trim() || '';
         const studentName = row.dataset.nameOriginal || row.querySelector('td:nth-child(2)')?.textContent.trim() || '';
         const currentCourseId = row.dataset.courseId || '';
         const currentCourseName = row.dataset.courseOriginal || row.querySelector('td:nth-child(3)')?.textContent.trim() || '';
@@ -1556,26 +1682,49 @@ document.addEventListener('DOMContentLoaded', function () {
         idInput.value = studentId;
         nameInput.value = studentName;
         courseSel.value = currentCourseId;
+        
         if (!courseSel.value && currentCourseName) {
             const fallback = Array.from(courseSel.options).find(opt => opt.textContent.trim().toLowerCase() === currentCourseName.trim().toLowerCase());
             if (fallback) courseSel.value = fallback.value;
         }
 
-        const title = document.querySelector('#studentEditCard h5');
-        const desc = document.querySelector('#studentEditCard p');
+        const title = document.getElementById('editCardTitle');
+        const desc = document.getElementById('editCardDesc');
         const isView = mode === 'view';
 
-        title.textContent = isView ? 'View Student Details' : 'Edit Student Record';
-        desc.textContent = isView
-            ? 'Read-only view of the current student details.'
-            : 'Update the current student details and save the changes.';
+        const leftCol = document.getElementById('editCardLeftCol');
+        const rightCol = document.getElementById('editCardRightCol');
+        const logsSection = document.getElementById('viewLogsHistorySection');
 
-        idInput.readOnly = true;
-        nameInput.readOnly = isView;
-        courseSel.disabled = isView;
-        saveStudentEdit.style.display = isView ? 'none' : 'block';
+        if (isView) {
+            title.textContent = 'VIEW RECORD';
+            desc.textContent = 'Read-only view of the current student details.';
+            saveStudentEdit.style.display = 'none';
+            idInput.readOnly = true;
+            nameInput.readOnly = true;
+            courseSel.disabled = true;
+            
+            // FIXED: Restored split layout for view mode
+            leftCol.classList.remove('d-none');
+            rightCol.className = 'col-md-7';
+            logsSection.classList.remove('d-none');
+            updateLogsHistory(row);
+        } else {
+            title.textContent = 'EDIT RECORD';
+            desc.textContent = 'Update the current student details.';
+            saveStudentEdit.style.display = 'block';
+            idInput.readOnly = true; 
+            nameInput.readOnly = false;
+            courseSel.disabled = false;
+
+            // FIXED: Expanded right side fully for edit mode
+            leftCol.classList.add('d-none');
+            rightCol.className = 'col-md-12';
+            logsSection.classList.add('d-none');
+        }
 
         editOverlay.classList.remove('d-none');
+        document.getElementById('studentEditCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
     function hideEditCard() {

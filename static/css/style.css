@@ -101,6 +101,81 @@ body::after {
     /* Deep outer shadow, subtle inner glow for intensity */
 }
 
+/* Global Form Controls - Ensured readability and consistent branding */
+.form-control,
+.form-select,
+.input-group-text {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: var(--text-light) !important;
+    font-weight: 500;
+}
+
+.form-control:focus,
+.form-select:focus {
+    background: rgba(255, 255, 255, 0.12) !important;
+    border-color: var(--plp-gold) !important;
+    box-shadow: 0 0 0 0.25rem rgba(255, 222, 33, 0.25) !important;
+    color: var(--text-light) !important;
+}
+
+.form-control::placeholder {
+    color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Dropdown Menus and Options Styling */
+.dropdown-menu {
+    background-color: rgba(13, 46, 21, 0.95) !important;
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    padding: 0.5rem 0;
+    z-index: 1060 !important; /* Increased from 1040 to ensure it appears above table cards */
+}
+
+.dropdown-item {
+    color: var(--text-light) !important;
+    transition: background-color 0.2s ease;
+    border-left: 3px solid transparent;
+    /* Prepare for active state to prevent jump */
+}
+
+.dropdown-item.active,
+.dropdown-item:active {
+    background-color: #0d2e15 !important;
+    color: var(--text-light) !important;
+    border-left: 3px solid var(--plp-gold) !important;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+    background-color: #235d3a !important;
+    color: var(--text-light) !important;
+}
+
+/* Native Select Options Styling */
+option {
+    background-color: #0d2e15 !important;
+    color: var(--text-light) !important;
+}
+
+option:hover,
+option:focus,
+option:active,
+option:checked {
+    background-color: #235d3a !important;
+    color: #ffffff !important;
+}
+
+/* Fix for date/time/search/dropdown darkened inputs */
+input[type="date"],
+input[type="time"],
+input[type="search"],
+select,
+.form-select {
+    color-scheme: dark;
+}
+
 /* Portal Card Hover Effects (for index and modal cards) */
 .portal-card {
     transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
@@ -325,19 +400,7 @@ h6 {
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
 }
 
-.login-card .form-control {
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: var(--text-light);
-    font-weight: 500;
-}
-
-.login-card .form-control:focus {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: var(--plp-gold);
-    box-shadow: 0 0 0 0.25rem rgba(255, 222, 33, 0.25);
-    color: var(--text-light);
-}
+/* Login Card overrides removed as they are now global */
 
 /* ==========================================================================
    UTILITY COLOR ADJUSTMENTS FOR GLASS UI
@@ -383,33 +446,62 @@ h6 {
     border: 1.5px solid transparent;
     border-radius: 8px;
     white-space: nowrap;
-    
+
     /* --- NEW ANIMATION PROPERTIES --- */
-    max-width: 300px; /* Must be larger than your longest department name */
+    max-width: 300px;
+    /* Must be larger than your longest department name */
     opacity: 1;
-    overflow: hidden; /* Keeps text from spilling out while shrinking */
+    overflow: hidden;
+    /* Keeps text from spilling out while shrinking */
     vertical-align: middle;
     transition: max-width 0.4s ease, padding 0.4s ease, margin 0.4s ease, opacity 0.4s ease, border-width 0.4s ease;
 }
 
-.dept-badge[data-dept="Arts & Sciences"] { border-color: #ef4444; color: #fff; } 
-.dept-badge[data-dept="Information Technology"] { border-color: #3b82f6; color: #fff; } 
-.dept-badge[data-dept="Nursing"] { border-color: #10b981; color: #fff; } 
-.dept-badge[data-dept="Electrical Engineering"] { border-color: #f59e0b; color: #fff; } 
-.dept-badge[data-dept="Business and Accountancy"] { border-color: #8b5cf6; color: #fff; }
-.dept-badge[data-dept="International Hospitality Management"] { border-color: #ec4899; color: #fff; }
-.dept-badge[data-dept="Education"] { border-color: #06b6d4; color: #fff; } 
+.dept-badge[data-dept="Arts & Sciences"] {
+    border-color: #ef4444;
+    color: #fff;
+}
+
+.dept-badge[data-dept="Information Technology"] {
+    border-color: #3b82f6;
+    color: #fff;
+}
+
+.dept-badge[data-dept="Nursing"] {
+    border-color: #10b981;
+    color: #fff;
+}
+
+.dept-badge[data-dept="Electrical Engineering"] {
+    border-color: #f59e0b;
+    color: #fff;
+}
+
+.dept-badge[data-dept="Business and Accountancy"] {
+    border-color: #8b5cf6;
+    color: #fff;
+}
+
+.dept-badge[data-dept="International Hospitality Management"] {
+    border-color: #ec4899;
+    color: #fff;
+}
+
+.dept-badge[data-dept="Education"] {
+    border-color: #06b6d4;
+    color: #fff;
+}
 
 .dept-badge.badge-all {
-    border-color: #fff; 
+    border-color: #fff;
     color: #fff;
     font-style: bold;
 }
 
 .dept-badge.badge-more {
-    border-color: #6b7280; 
+    border-color: #6b7280;
     color: #6b7280;
-    border-style: dashed; 
+    border-style: dashed;
     padding: 0.35em 0.5em;
 }
 
@@ -424,11 +516,11 @@ h6 {
 }
 
 .dept-badge.badge-more {
-    border-color: #6b7280; 
+    border-color: #6b7280;
     color: #6b7280;
-    border-style: dashed; 
+    border-style: dashed;
     padding: 0.35em 0.5em;
-    cursor: pointer; 
+    cursor: pointer;
     user-select: none;
 }
 
@@ -438,11 +530,13 @@ h6 {
 
 /* Dynamic font reduction for expanded department rows */
 .shrink-font {
-    font-size: 0.9em !important;  /* 10% reduction */
+    font-size: 0.9em !important;
+    /* 10% reduction */
 }
 
 .shrink-font-date {
-    font-size: 0.7em !important;  /* 30% reduction */
+    font-size: 0.7em !important;
+    /* 30% reduction */
 }
 
 /* Background job notification */
@@ -483,4 +577,141 @@ h6 {
     color: rgba(255, 255, 255, 0.68);
     font-size: 0.78rem;
     line-height: 1.35;
+}
+
+/* ==========================================================================
+   FEEDBACK INDICATOR COMPONENT
+   ========================================================================== */
+.feedback-indicator {
+    font-family: 'Outfit', sans-serif;
+    min-width: 340px;
+    max-width: 480px;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: start;
+    border-radius: 12px;
+    box-shadow: 0 15px 45px rgba(0, 0, 0, 0.7);
+    background: rgba(7, 34, 15, 0.96); /* Deep PLP Green */
+    backdrop-filter: blur(15px);
+    transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+    position: fixed;
+    top: 40px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-30px);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 10000;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.feedback-indicator.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+    pointer-events: all;
+}
+
+.feedback-indicator.success {
+    border-color: #10B981;
+    box-shadow: 0 15px 45px rgba(16, 185, 129, 0.15);
+}
+
+.feedback-indicator.error {
+    border-color: #EF4444;
+    box-shadow: 0 15px 45px rgba(239, 68, 68, 0.15);
+}
+
+.feedback-indicator__icon {
+    font-size: 1.5rem;
+    margin-right: 14px;
+    display: flex;
+    align-items: center;
+    line-height: 1;
+}
+
+.feedback-indicator.success .feedback-indicator__icon {
+    color: #10B981;
+}
+
+.feedback-indicator.error .feedback-indicator__icon {
+    color: #EF4444;
+}
+
+.feedback-indicator__title {
+    font-weight: 500;
+    font-size: 15px;
+    color: #ffffff;
+    line-height: 1.4;
+    letter-spacing: 0.2px;
+}
+
+/* ==========================================================================
+   GLOBAL CONFIRMATION MODAL
+   ========================================================================== */
+.global-confirm-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(0, 0, 0, 0.58);
+    backdrop-filter: blur(6px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 10001;
+}
+
+.global-confirm-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.global-confirm-modal {
+    width: min(440px, 100%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    background: rgba(14, 19, 24, 0.98);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+    color: #ffffff;
+    padding: 24px;
+    transform: translateY(10px) scale(0.98);
+    transition: transform 0.2s ease;
+}
+
+.global-confirm-overlay.show .global-confirm-modal {
+    transform: translateY(0) scale(1);
+}
+
+.global-confirm-modal__icon {
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(220, 53, 69, 0.14);
+    color: #ff6b7a;
+    font-size: 1.25rem;
+    margin-bottom: 16px;
+}
+
+.global-confirm-modal__title {
+    margin-bottom: 8px;
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.global-confirm-modal__message {
+    color: rgba(255, 255, 255, 0.68);
+    font-size: 0.92rem;
+    line-height: 1.45;
+}
+
+.global-confirm-modal__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 24px;
 }

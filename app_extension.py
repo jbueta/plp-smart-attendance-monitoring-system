@@ -10,7 +10,7 @@ from flask_cors import CORS
 
 from config import get_config
 from database import close_db, connect_db, init_db_pool, release_db_connection
-from db_connect import Database
+from db_connect import Database, ensure_visitor_valid_until_schema, expire_expired_visitor_accounts
 
 
 app = Flask(__name__)
@@ -66,12 +66,28 @@ def normalize_requested_log_type(value):
     return None
 
 
+def get_kiosk_actor_label(role):
+    actor = clean_text(role).lower()
+    if actor in {"student", "employee", "visitor"}:
+        return actor
+    return "user"
+
+
+def build_kiosk_block_message(requested_log_type, current_status, role):
+    action = "Entry" if requested_log_type == "Entry" else "Exit"
+    status = "inside" if clean_text(current_status).lower() == "inside" else "outside"
+    actor = get_kiosk_actor_label(role)
+    return f"{action} denied: {actor} is already {status}."
+
+
 def validation_error(errors):
     message = " ".join(errors)
     return jsonify({"success": False, "message": message, "error": message, "errors": errors}), 400
 
 
 INSTANCE_GENERATOR_CHECK_SECONDS = int(os.getenv("INSTANCE_GENERATOR_CHECK_SECONDS", "60"))
+INSTANCE_GENERATOR_RUN_INTERVAL_SECONDS = int(os.getenv("INSTANCE_GENERATOR_RUN_INTERVAL_SECONDS", "3600"))
+INSTANCE_GENERATOR_LOOKAHEAD_DAYS = int(os.getenv("INSTANCE_GENERATOR_LOOKAHEAD_DAYS", "7"))
 INSTANCE_GENERATOR_STATE = {
     "running": False,
     "last_started_at": None,
@@ -81,10 +97,13 @@ INSTANCE_GENERATOR_STATE = {
     "last_result": None,
     "last_trigger": None,
     "next_check_at": None,
+    "next_run_at": None,
+    "run_interval_seconds": INSTANCE_GENERATOR_RUN_INTERVAL_SECONDS,
+    "lookahead_days": INSTANCE_GENERATOR_LOOKAHEAD_DAYS,
 }
 _instance_generator_lock = threading.Lock()
 _instance_generator_thread_started = False
-_last_scheduled_generation_date = None
+_last_scheduled_generation_at = None
 
 
 def _iso_timestamp(value):
@@ -110,13 +129,14 @@ def generate_event_instances_for_range(start_date=None, days=7, trigger="manual"
         }
 
     start_date = start_date or date.today()
-    upcoming_week = [start_date + timedelta(days=i) for i in range(days)]
+    days = max(1, int(days or 1))
+    target_dates = [start_date + timedelta(days=i) for i in range(days)]
     created_count = 0
     existing_count = 0
     matched_count = 0
     failed_count = 0
 
-    for target_date in upcoming_week:
+    for target_date in target_dates:
         day_name = target_date.strftime("%A")
         cursor = conn.cursor(dictionary=True)
         try:
@@ -171,18 +191,19 @@ def generate_event_instances_for_range(start_date=None, days=7, trigger="manual"
 
     return {
         "success": failed_count == 0,
-        "message": "Event instances generated for the upcoming week.",
+        "message": f"Event instances generated for the next {days} day(s).",
         "created": created_count,
         "existing": existing_count,
         "matched": matched_count,
         "failed": failed_count,
-        "date_range": f"{upcoming_week[0]} to {upcoming_week[-1]}",
+        "date_range": f"{target_dates[0]} to {target_dates[-1]}",
         "trigger": trigger,
     }
 
 
-def run_instance_generation_job(trigger="manual"):
+def run_instance_generation_job(trigger="manual", start_date=None, days=None):
     now = datetime.now()
+    generation_days = days or INSTANCE_GENERATOR_LOOKAHEAD_DAYS
     with _instance_generator_lock:
         if INSTANCE_GENERATOR_STATE["running"]:
             return {
@@ -201,7 +222,11 @@ def run_instance_generation_job(trigger="manual"):
         )
 
     try:
-        result = generate_event_instances_for_range(trigger=trigger)
+        result = generate_event_instances_for_range(
+            start_date=start_date,
+            days=generation_days,
+            trigger=trigger,
+        )
         finished_at = datetime.now()
         with _instance_generator_lock:
             INSTANCE_GENERATOR_STATE.update(
@@ -246,27 +271,34 @@ def run_instance_generation_job(trigger="manual"):
 
 
 def _instance_generation_scheduler_loop():
-    global _last_scheduled_generation_date
+    global _last_scheduled_generation_at
 
     while True:
         now = datetime.now()
         next_check = now + timedelta(seconds=INSTANCE_GENERATOR_CHECK_SECONDS)
+        next_run = (
+            now
+            if _last_scheduled_generation_at is None
+            else _last_scheduled_generation_at + timedelta(seconds=INSTANCE_GENERATOR_RUN_INTERVAL_SECONDS)
+        )
         with _instance_generator_lock:
             INSTANCE_GENERATOR_STATE["next_check_at"] = _iso_timestamp(next_check)
+            INSTANCE_GENERATOR_STATE["next_run_at"] = _iso_timestamp(next_run)
 
         should_run = (
-            now.weekday() == 6
-            and _last_scheduled_generation_date != now.date()
+            now >= next_run
             and not _copy_instance_generator_state().get("running")
         )
 
         if should_run:
-            app.logger.info("Sunday event instance scheduler starting.")
+            app.logger.info(
+                "Hourly event instance scheduler starting for %s day(s).",
+                INSTANCE_GENERATOR_LOOKAHEAD_DAYS,
+            )
             with app.app_context():
                 result = run_instance_generation_job(trigger="scheduler")
                 close_db(None)
-            if result.get("success"):
-                _last_scheduled_generation_date = now.date()
+            _last_scheduled_generation_at = datetime.now()
 
         time.sleep(INSTANCE_GENERATOR_CHECK_SECONDS)
 
@@ -294,8 +326,24 @@ def start_instance_generation_scheduler():
 
 with app.app_context():
     init_db_pool()
+    conn = connect_db()
+    if conn:
+        ensure_visitor_valid_until_schema(conn, logger=app.logger)
+        release_db_connection(conn)
 
 app.teardown_appcontext(close_db)
+
+
+@app.before_request
+def disable_expired_visitor_accounts():
+    if request.endpoint == "static":
+        return
+
+    conn = connect_db()
+    if not conn:
+        return
+
+    expire_expired_visitor_accounts(conn, logger=app.logger)
 
 
 # ==============================================================================
@@ -563,13 +611,13 @@ def add_events():
 
 
 # ==========================================
-# ENDPOINT 1: The Weekly Instance Generator (Triggered by Cron Every Sunday)
+# ENDPOINT 1: Event Instance Generator (manual, scheduler, or external cron)
 
 @app.route("/admin/generate-daily-instances", methods=["POST"])
 def generate_daily_instances():
     """
     Triggered by the background scheduler or an external cron/Task Scheduler.
-    Generates instances for the upcoming 7 days including:
+    Generates instances for the configured lookahead window including:
     - WEEKLY events for their scheduled days
     - DAILY events for every day
     - ONCE events on their scheduled date
@@ -867,7 +915,9 @@ def live_student_logs():
         if not conn:
             return jsonify({"success": False, "message": "Database offline"}), 500
 
-        logs = Database.get_student_logs(conn)
+        limit = request.args.get("limit", default=6, type=int) or 6
+        limit = min(max(limit, 1), 20)
+        logs = Database.get_student_logs(conn, limit=limit)
 
         if logs is None:
             return jsonify({"success": False, "message": "Error fetching student_logs"}), 500
@@ -1007,11 +1057,12 @@ def dashboard_student_stats():
 def dashboard_employee_stats():
     conn = None
     try:
+        instance_id = (request.args.get("instance_id") or "").strip() or None
         conn = connect_db()
         if not conn:
             return jsonify({"success": False, "message": "Database offline"}), 500
 
-        stats = Database.get_employee_dashboard_stats(conn)
+        stats = Database.get_employee_dashboard_stats(conn, instance_id=instance_id)
         if stats is None:
             return jsonify({"success": False, "message": "Error fetching employee stats"}), 500
 

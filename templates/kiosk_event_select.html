@@ -22,7 +22,9 @@
 
         {% for event in events %}
         <div class="col-md-6 col-lg-4">
-            <a href="{{ url_for('kiosk_employee', instance_id=event.instance_id) }}" class="text-decoration-none">
+            <a href="{{ url_for('kiosk_employee', instance_id=event.instance_id) }}"
+                class="text-decoration-none event-select-link"
+                data-event-ended="{{ 'true' if event.is_ended else 'false' }}">
                 <div class="card-glass p-4 h-100 transition-hover border-gold-subtle text-center">
                     <div class="mb-3">
                         {% if 'flag' in event.name|lower or 'ceremony' in event.name|lower or 'retreat' in event.name|lower %}
@@ -71,10 +73,36 @@
     </div>
 
 </div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
+    function isEventEnded(event) {
+        return event && (
+            event.is_ended === true ||
+            event.is_ended === 1 ||
+            event.is_ended === '1' ||
+            String(event.is_ended || '').toLowerCase() === 'true'
+        );
+    }
+
+    function showEventEndedAlert() {
+        if (typeof window.showSystemFeedback === 'function') {
+            window.showSystemFeedback('event already ended', 'error');
+        }
+    }
+
+    document.addEventListener('click', function (event) {
+        const link = event.target.closest('.event-select-link');
+        if (!link) return;
+
+        if (link.dataset.eventEnded === 'true') {
+            event.preventDefault();
+            showEventEndedAlert();
+        }
+    });
+
     function fetchLiveEvents() {
         fetch('/api/kiosk/live-events')
             .then(response => response.json())
@@ -129,10 +157,11 @@
             const deptHtml = (event.location && event.location !== 'Facade') ? `<span class="d-block mb-1 text-info">${event.dept}</span>` : '';
 
             const eventUrl = `/kiosk/employee?instance_id=${event.instance_id}`;
+            const eventEnded = isEventEnded(event);
 
             htmlContent += `
                 <div class="col-md-6 col-lg-4">
-                    <a href="${eventUrl}" class="text-decoration-none">
+                    <a href="${eventUrl}" class="text-decoration-none event-select-link" data-event-ended="${eventEnded ? 'true' : 'false'}">
                         <div class="card-glass p-4 h-100 transition-hover border-gold-subtle text-center">
                             <div class="mb-3">
                                 <i class="bi ${iconClass} display-4"></i>

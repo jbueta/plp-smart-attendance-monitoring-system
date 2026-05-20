@@ -50,6 +50,34 @@ INSERT INTO `admin` (`user_id`, `username`, `password`) VALUES
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `bulletins`
+--
+
+DROP TABLE IF EXISTS `bulletins`;
+CREATE TABLE `bulletins` (
+  `bulletin_id` int(11) NOT NULL,
+  `from_source` varchar(120) NOT NULL,
+  `category` varchar(80) DEFAULT NULL,
+  `content` text NOT NULL,
+  `visibility_scope` enum('global','targeted','departmental','event_specific') NOT NULL DEFAULT 'global',
+  `target_id` varchar(64) DEFAULT NULL,
+  `target_department` varchar(150) DEFAULT NULL,
+  `target_event` varchar(255) DEFAULT NULL,
+  `scheduled_date` date DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Truncate table before insert `bulletins`
+--
+
+TRUNCATE TABLE `bulletins`;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `courses`
 --
 
@@ -518,6 +546,33 @@ INSERT INTO `general_log` (`log_id`, `user_id`, `timestamp`, `log_type`, `gate`)
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `paging_alerts`
+--
+
+DROP TABLE IF EXISTS `paging_alerts`;
+CREATE TABLE `paging_alerts` (
+  `alert_id` int(11) NOT NULL,
+  `from_source` varchar(120) NOT NULL,
+  `message` text NOT NULL,
+  `visibility_scope` enum('global','targeted','departmental','event_specific') NOT NULL DEFAULT 'global',
+  `target_id` varchar(64) DEFAULT NULL,
+  `target_department` varchar(150) DEFAULT NULL,
+  `target_event` varchar(255) DEFAULT NULL,
+  `expires_at` datetime DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Truncate table before insert `paging_alerts`
+--
+
+TRUNCATE TABLE `paging_alerts`;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `reports`
 --
 
@@ -729,6 +784,17 @@ ALTER TABLE `admin`
   ADD KEY `user_id` (`user_id`);
 
 --
+-- Indexes for table `bulletins`
+--
+ALTER TABLE `bulletins`
+  ADD PRIMARY KEY (`bulletin_id`),
+  ADD KEY `idx_bulletins_active_scope` (`is_active`,`visibility_scope`),
+  ADD KEY `idx_bulletins_target_id` (`target_id`),
+  ADD KEY `idx_bulletins_target_department` (`target_department`),
+  ADD KEY `idx_bulletins_target_event` (`target_event`),
+  ADD KEY `idx_bulletins_scheduled_date` (`scheduled_date`);
+
+--
 -- Indexes for table `courses`
 --
 ALTER TABLE `courses`
@@ -792,6 +858,17 @@ ALTER TABLE `general_log`
   ADD KEY `user_id` (`user_id`);
 
 --
+-- Indexes for table `paging_alerts`
+--
+ALTER TABLE `paging_alerts`
+  ADD PRIMARY KEY (`alert_id`),
+  ADD KEY `idx_paging_alerts_active_scope` (`is_active`,`visibility_scope`),
+  ADD KEY `idx_paging_alerts_target_id` (`target_id`),
+  ADD KEY `idx_paging_alerts_target_department` (`target_department`),
+  ADD KEY `idx_paging_alerts_target_event` (`target_event`),
+  ADD KEY `idx_paging_alerts_expires_at` (`expires_at`);
+
+--
 -- Indexes for table `reports`
 --
 ALTER TABLE `reports`
@@ -830,6 +907,12 @@ ALTER TABLE `visitors`
 --
 -- AUTO_INCREMENT for dumped tables
 --
+
+--
+-- AUTO_INCREMENT for table `bulletins`
+--
+ALTER TABLE `bulletins`
+  MODIFY `bulletin_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `departments`
@@ -872,6 +955,12 @@ ALTER TABLE `event_log`
 --
 ALTER TABLE `general_log`
   MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=82;
+
+--
+-- AUTO_INCREMENT for table `paging_alerts`
+--
+ALTER TABLE `paging_alerts`
+  MODIFY `alert_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `users`

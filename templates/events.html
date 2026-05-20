@@ -15,6 +15,7 @@
     <hr>
     <ul class="nav nav-pills flex-column mb-auto">
         <li><a href="{{ url_for('dashboard') }}" class="nav-link"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+        <li><a href="{{ url_for('announcement_manager') }}" class="nav-link"><i class="bi bi-megaphone"></i> Announcements</a></li>
         <li><a href="{{ url_for('manage_events') }}" class="nav-link active"><i class="bi bi-calendar-event"></i> Events</a></li>
         <li><a href="{{ url_for('admin_visitors') }}" class="nav-link"><i class="bi bi-person-lines-fill"></i> Visitors</a></li>
         <li><a href="{{ url_for('admin_employees') }}" class="nav-link"><i class="bi bi-person-badge"></i> Employees</a></li>
@@ -82,8 +83,7 @@
     <!-- Event List -->
     <div class="card-glass p-0 mb-4 overflow-hidden">
         <div class="table-responsive">
-            <form id="bulk-delete-form" action="{{ url_for('bulk_delete_events') }}" method="POST"
-                onsubmit="return confirm('Are you sure you want to delete these events? This action cannot be undone.');">
+            <form id="bulk-delete-form" action="{{ url_for('bulk_delete_events') }}" method="POST">
                 <table class="table table-dark-glass table-hover align-middle mb-0 event-table">
                     <thead>
                         <tr>
