@@ -901,7 +901,6 @@ def login_required(view_func):
     @wraps(view_func)
     def wrapped_view(*args, **kwargs):
         if not session.get("logged_in"):
-            flash("Please log in to access this page.", "danger")
             return redirect(url_for("login"))
         return view_func(*args, **kwargs)
 
