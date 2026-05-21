@@ -20,3 +20,8 @@ logs/
 /report_*.pdf
 /static/reports/*
 !/static/reports/.gitkeep
+
+logs/app.log
+server.log
+server_debug.log
+server_debug_trace.log
