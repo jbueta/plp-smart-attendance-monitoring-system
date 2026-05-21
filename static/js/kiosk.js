@@ -452,7 +452,9 @@ function submitManualEntry(type, manualId = null) {
                     showSuccessOverlay(logType, {
                         id: id,
                         name: data.name,
-                        affiliation: data.affiliation
+                        affiliation: data.affiliation,
+                        // pass through student_type when available so overlay can display Regular/Irregular
+                        student_type: data.student_type || data.status
                     });
                 }
                 // [ANNOUNCEMENT FEATURE] - Update context for targeted/departmental bulletins

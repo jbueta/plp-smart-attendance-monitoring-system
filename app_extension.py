@@ -432,6 +432,7 @@ def user_authenticate():
                 "requested_log_type": requested_log_type,
                 "name": full_name,
                 "affiliation": affiliation,
+                "student_type": user_data.get('student_type') if user_data else None,
             }), 409
 
         if requested_log_type == "Exit" and current_status_normalized != "inside":
@@ -444,6 +445,7 @@ def user_authenticate():
                 "requested_log_type": requested_log_type,
                 "name": full_name,
                 "affiliation": affiliation,
+                "student_type": user_data.get('student_type') if user_data else None,
             }), 409
 
         # 3. CHANGE STATUS
@@ -484,6 +486,7 @@ def user_authenticate():
             "attendance_status": log_type,
             "name": full_name,
             "affiliation": affiliation,
+            "student_type": user_data.get('student_type') if user_data else None,
         }), 200
 
     except Exception as e:

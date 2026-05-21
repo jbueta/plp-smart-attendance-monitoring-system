@@ -283,6 +283,8 @@ class Database:
                     COALESCE(s.status, e.status, v.status, 'Outside') AS current_status,
                     v.valid_until AS visitor_valid_until,
                     COALESCE(s.student_name, e.employee_name, v.visitor_name, a.username, 'Unknown User') AS full_name,
+                    -- Include student_type so calling code (kiosk UI) can display Regular/Irregular
+                    s.student_type AS student_type,
                     CASE
                         WHEN u.role = 'student' THEN COALESCE(c.course_name, 'N/A')
                         WHEN u.role = 'employee' THEN COALESCE(d.department_name, 'N/A')
