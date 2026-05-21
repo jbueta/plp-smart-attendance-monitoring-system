@@ -21,3 +21,4 @@ SQLAlchemy==2.0.47
 typing_extensions==4.15
 requests
 xlrd==2.0.1
+pdfkit

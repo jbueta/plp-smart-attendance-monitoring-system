@@ -283,6 +283,8 @@ class Database:
                     COALESCE(s.status, e.status, v.status, 'Outside') AS current_status,
                     v.valid_until AS visitor_valid_until,
                     COALESCE(s.student_name, e.employee_name, v.visitor_name, a.username, 'Unknown User') AS full_name,
+                    -- Include student_type so calling code (kiosk UI) can display Regular/Irregular
+                    s.student_type AS student_type,
                     CASE
                         WHEN u.role = 'student' THEN COALESCE(c.course_name, 'N/A')
                         WHEN u.role = 'employee' THEN COALESCE(d.department_name, 'N/A')
@@ -382,12 +384,52 @@ class Database:
 
     def insert_general_log(self):
         try:
+            user_id, timestamp_value, log_type, gate = self.parameter
+            if isinstance(timestamp_value, str):
+                timestamp_value = datetime.strptime(timestamp_value, "%Y-%m-%d %H:%M:%S")
+
+            self.cursor.execute(
+                """
+                SELECT log_id, timestamp, log_type
+                FROM general_log
+                WHERE user_id = %s
+                ORDER BY timestamp DESC, log_id DESC
+                LIMIT 1
+                """,
+                (user_id,),
+            )
+            last_log = self.cursor.fetchone()
+
+            if last_log and last_log["log_type"] == log_type:
+                if log_type == "Entry" and last_log["timestamp"].date() < timestamp_value.date():
+                    synthetic_exit = datetime.combine(last_log["timestamp"].date(), datetime_time(23, 59, 59))
+                    self.cursor.execute(
+                        """
+                        INSERT INTO general_log (user_id, timestamp, log_type, gate)
+                        VALUES (%s, %s, %s, %s)
+                        """,
+                        (user_id, synthetic_exit, "Exit", "Gate 2"),
+                    )
+                else:
+                    self.conn.rollback()
+                    return {
+                        "success": False,
+                        "message": f"Rejected duplicate {log_type} log. The last log is already {log_type}.",
+                    }
+
+            if log_type == "Exit" and (not last_log or last_log["log_type"] != "Entry"):
+                self.conn.rollback()
+                return {
+                    "success": False,
+                    "message": "Rejected exit log. No matching entry log is open.",
+                }
+
             self.cursor.execute(
                 """
                 INSERT INTO general_log (user_id, timestamp, log_type, gate)
                 VALUES (%s, %s, %s, %s)
                 """,
-                self.parameter,
+                (user_id, timestamp_value, log_type, gate),
             )
             self.conn.commit()
 
@@ -1369,7 +1411,7 @@ class Database:
                         "name": row["student_name"],
                         "course_id": row["course_id"],
                         "course": row["course_name"],
-                        "status": "Active" if is_active else "Inactive",
+                        "status": "Regular" if is_active else "Irregular",
                         "status_class": "success" if is_active else "secondary",
                     }
                 )
@@ -1855,6 +1897,9 @@ class Database:
 
                 query = f"""
                     SELECT
+                        gl.log_id AS log_id,
+                        gl.user_id AS user_id,
+                        gl.timestamp AS timestamp,
                         COALESCE(s.student_name, 'Unknown Student') AS name,
                         COALESCE(c.course_name, 'N/A') AS detail,
                         TIME_FORMAT(gl.timestamp, '%h:%i %p') AS time,
@@ -1867,7 +1912,7 @@ class Database:
                     WHERE DATE(gl.timestamp) BETWEEN %s AND %s
                       AND u.role = 'student'
                       {course_condition}
-                    ORDER BY gl.timestamp DESC
+                    ORDER BY gl.timestamp ASC, gl.log_id ASC
                 """
                 cursor.execute(query, [start_date, end_date] + course_params)
                 raw_logs = cursor.fetchall()
@@ -2023,6 +2068,46 @@ class Database:
             while len(dept_distribution) < 5:
                 dept_distribution.append(0)
 
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM employees e
+                JOIN users u ON e.user_id = u.user_id
+                WHERE u.active = 1
+                """
+            )
+            total_employees = cursor.fetchone()["total"] or 0
+
+            cursor.execute(
+                """
+                SELECT e.employee_name, d.department_name, COUNT(*) as absent_count
+                FROM (
+                    SELECT ea.user_id, ea.status,
+                           ROW_NUMBER() OVER (PARTITION BY ea.user_id ORDER BY ea.event_date DESC, ea.instance_id DESC) as rn
+                    FROM event_attendance ea
+                    JOIN employees emp ON ea.user_id = emp.user_id
+                    JOIN users u ON emp.user_id = u.user_id
+                    WHERE u.active = 1
+                ) t
+                JOIN employees e ON t.user_id = e.user_id
+                JOIN departments d ON e.department_id = d.department_id
+                WHERE t.rn <= 3 AND t.status = 'Absent'
+                GROUP BY t.user_id, e.employee_name, d.department_name
+                HAVING absent_count = 3
+                LIMIT 4
+                """
+            )
+            consecutive_absences = cursor.fetchall()
+            alerts = []
+            for row in consecutive_absences:
+                alerts.append({
+                    "type": "danger",
+                    "icon": "exclamation-triangle-fill",
+                    "title": "Consecutive Absence Alert",
+                    "message": f"{row['employee_name']} ({row['department_name']}) has missed 3 consecutive events.",
+                    "time": "Attendance Red Flag"
+                })
+
             return {
                 "total_entries": f"{total_entries:,}",
                 "entries_trend": trend,
@@ -2033,8 +2118,9 @@ class Database:
                 "traffic_chart": traffic_chart,
                 "event_attendance_rate": attendance_rate,
                 "event_attendance_raw": attendance_raw,
+                "total_employees": f"{total_employees:,}",
                 "dept_distribution": dept_distribution,
-                "alerts": [],
+                "alerts": alerts,
             }
         except connector.Error as err:
             print(f"Error fetching overall dashboard stats: {err}")
@@ -2402,7 +2488,7 @@ class Database:
                   AND u.active = 1
                 GROUP BY d.department_name
                 ORDER BY value DESC, d.department_name ASC
-                LIMIT 5
+                LIMIT 7
                 """,
                 (target_instance_id,),
             )
@@ -2501,7 +2587,7 @@ class Database:
                 "on_time_rate": on_time_rate,
                 "on_time_percentage": on_time_percentage,
                 "participation_level": participation_level,
-                "target_date": str(target_date),
+                "target_date": target_date.strftime("%b %d, %Y") if target_date else "N/A",
                 "upcoming_events": upcoming_events,
                 "recent_activity": recent_activity,
                 "leaderboard": leaderboard,

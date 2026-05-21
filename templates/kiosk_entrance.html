@@ -37,11 +37,23 @@
         </h3>
     
         <div class="px-4 py-3 mx-auto rounded-4" style="max-width: 280px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.04);">
-            <div id="welcome-id-label" class="text-uppercase small mb-1 fw-semibold" style="letter-spacing: 0.15em; color: #9ca3af; font-size: 0.75rem;">
-                Student ID
-            </div>
-            <div id="welcome-id-val" class="h4 font-monospace text-white fw-bold mb-0" style="letter-spacing: 1px;">
-                00-00000
+            <div class="row g-2">
+                <div class="col-6">
+                    <div id="welcome-id-label" class="text-uppercase small mb-1 fw-semibold" style="letter-spacing: 0.15em; color: #9ca3af; font-size: 0.75rem;">
+                        Student ID
+                    </div>
+                    <div id="welcome-id-val" class="h5 font-monospace text-white fw-bold mb-0" style="letter-spacing: 1px;">
+                        00-00000
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="text-uppercase small mb-1 fw-semibold" style="letter-spacing: 0.15em; color: #9ca3af; font-size: 0.75rem;">
+                        Student Type
+                    </div>
+                    <div id="welcome-student-type" class="h5 text-white fw-bold mb-0 text-uppercase" style="font-size: 0.95rem; letter-spacing: 0.5px;">
+                        —
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -280,12 +292,27 @@
             
             document.getElementById('welcome-id-label').textContent = isVisitor ? 'VISITOR ID' : 'STUDENT ID';
             document.getElementById('welcome-id-val').textContent = data.id || 'N/A';
+            
+            // Display student type if available (Regular or Irregular)
+            const studentTypeEl = document.getElementById('welcome-student-type');
+            if (studentTypeEl && !isVisitor) {
+                const studentType = data.student_type || data.status || '—';
+                studentTypeEl.textContent = studentType ? studentType.toUpperCase() : '—';
+                // Color code: Green for Regular, Orange/Amber for Irregular
+                if (studentType && studentType.toLowerCase() === 'irregular') {
+                    studentTypeEl.style.color = '#fbbf24';
+                } else if (studentType && studentType.toLowerCase() === 'regular') {
+                    studentTypeEl.style.color = '#4ade80';
+                } else {
+                    studentTypeEl.style.color = '#9ca3af';
+                }
+            }
 
             welcomeOverlay.classList.replace('d-none', 'd-flex');
 
             setTimeout(() => {
                 welcomeOverlay.classList.replace('d-flex', 'd-none');
-            }, 4500);
+            }, 2500);
         };
 
         // Re-route visitor welcome panel to new UI
@@ -475,9 +502,10 @@
                             }
 
                             showSuccessOverlay(logType, {
-                                id: extractedId,
-                                name: data.name,
-                                affiliation: data.affiliation
+                                 id: extractedId,
+                                 name: data.name,
+                                 affiliation: data.affiliation,
+                                 student_type: data.student_type || data.status
                             });
 
                             appendToLiveFeed(data.name, data.affiliation, logType);

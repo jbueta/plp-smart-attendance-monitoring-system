@@ -54,6 +54,11 @@ from utils.student_schema import (
     validate_student_fields,
 )
 
+try:
+    import pdfkit
+except Exception:
+    pdfkit = None
+
 
 app = Flask(__name__)
 app.config.from_object(get_config())
@@ -103,6 +108,8 @@ MOCK_EMPLOYEE_STATS = {
     "attendance_data": [0, 0, 0],
     "tardiness_data": [0] * 7,
     "tardiness_labels": ["N/A"] * 7,
+    "attendance_trend_data": [0] * 5,
+    "attendance_trend_labels": ["N/A"] * 5,
     "dept_participation": [],
     "avg_tardiness": "0 mins",
     "on_time_rate": "N/A",
@@ -1432,7 +1439,12 @@ def kiosk_exit():
 @app.route("/kiosk/employee/select-event")
 def kiosk_employee_select_event():
     session.clear()
-    return render_template("kiosk_event_select.html", events=fetch_kiosk_live_events())
+    employee_stats = fetch_dashboard_stats("/admin/dashboard/analytics/employees", dict(MOCK_EMPLOYEE_STATS))
+    return render_template(
+        "kiosk_event_select.html", 
+        events=fetch_kiosk_live_events(),
+        upcoming_events=employee_stats.get("upcoming_events", [])
+    )
 
 
 @app.route("/kiosk/employee")
@@ -1763,12 +1775,14 @@ def visitor_checkout(visitor_id):
 @app.route("/dashboard")
 @login_required
 def dashboard():
+    instance_id = request.args.get('instance_id')
+    emp_stats_url = f"/admin/dashboard/analytics/employees?instance_id={instance_id}" if instance_id else "/admin/dashboard/analytics/employees"
     return render_template(
         "dashboard.html",
         events=fetch_backend_events(),
         overall_stats=fetch_dashboard_stats("/admin/dashboard/analytics/overall", dict(MOCK_DASHBOARD_STATS)),
         student_stats=fetch_dashboard_stats("/admin/dashboard/analytics/students", dict(MOCK_STUDENT_STATS)),
-        employee_stats=fetch_dashboard_stats("/admin/dashboard/analytics/employees", dict(MOCK_EMPLOYEE_STATS)),
+        employee_stats=fetch_dashboard_stats(emp_stats_url, dict(MOCK_EMPLOYEE_STATS)),
         logs=fetch_employee_attendance(),
         user=session.get("admin_username", "Admin"),
     )
@@ -2248,8 +2262,11 @@ def archive_report():
         return jsonify({"success": False, "message": "Missing report file."}), 400
 
     incoming_name = requested_filename or report_file.filename
-    if not str(incoming_name).lower().endswith(".pdf"):
+    if not str(incoming_name).lower().endswith((".pdf", ".csv")):
         return jsonify({"success": False, "message": "Only PDF report files can be archived."}), 400
+
+    if report_file.content_type not in ('application/pdf', 'text/csv'):
+        return jsonify({"success": False, "message": "Invalid file type."}), 400
 
     archive_path, archive_name = get_unique_report_archive_path(incoming_name)
     report_file.save(archive_path)
@@ -2291,20 +2308,67 @@ def send_report_email():
         attachment_data = uploaded_report.read()
         attachment_filename = sanitize_report_archive_filename(requested_filename or uploaded_report.filename)
     else:
-        attachment_data, resolved_report_data, error = load_archived_report_attachment(
-            category,
-            report_type,
-            filter_value,
-            start_date,
-            end_date,
-        )
-        if error:
-            return jsonify({"success": False, "message": error}), 400
+        # Attempt server-side PDF generation (preferred) when possible for deterministic pagination
+        server_pdf = None
+        server_filename = None
+        report_data = None
+        if pdfkit is not None:
+            try:
+                report_results = fetch_report_data(category, report_type, filter_value, start_date, end_date)
+                if "error" not in report_results:
+                    report_data = dict(report_results["report_data"])
+                    report_data["archive_filename"] = build_report_archive_filename(category, report_data)
+                    html = render_template(
+                        "sample_report.html",
+                        current_date=datetime.now().strftime("%B %d, %Y - %I:%M %p"),
+                        report=report_data,
+                        metrics=report_results.get("metrics_data", {}),
+                        logs=report_results.get("logs", []),
+                        archive_report_url=resolve_archive_report_url(),
+                    )
+                    options = {
+                        "enable-local-file-access": None,
+                        "print-media-type": None,
+                        "zoom": "1",
+                        "margin-top": "0.4in",
+                        "margin-bottom": "0.4in",
+                        "margin-left": "0.4in",
+                        "margin-right": "0.4in",
+                    }
+                    try:
+                        pdf_bytes = pdfkit.from_string(html, False, options=options)
+                        if pdf_bytes:
+                            server_pdf = pdf_bytes
+                            server_filename = sanitize_report_archive_filename(report_data.get("archive_filename") or requested_filename or "report.pdf")
+                    except Exception:
+                        app.logger.exception("pdfkit failed to render the report HTML to PDF")
+            except Exception:
+                app.logger.exception("Failed to fetch report data for server-side PDF generation")
 
-        attachment_filename = resolved_report_data["archive_filename"]
-        report_title = (resolved_report_data.get("event_name") or resolved_report_data.get("title") or report_title).strip()
-        report_scope = (resolved_report_data.get("department") or report_scope).strip()
-        report_date_range = (resolved_report_data.get("date_range") or report_date_range).strip()
+        if server_pdf:
+            attachment_data = server_pdf
+            attachment_filename = server_filename
+            # update metadata from generated report if available
+            if report_data:
+                report_title = (report_data.get("event_name") or report_data.get("title") or report_title).strip()
+                report_scope = (report_data.get("department") or report_scope).strip()
+                report_date_range = (report_data.get("date_range") or report_date_range).strip()
+        else:
+            # fallback to attaching an archived report if server-side generation is unavailable
+            attachment_data, resolved_report_data, error = load_archived_report_attachment(
+                category,
+                report_type,
+                filter_value,
+                start_date,
+                end_date,
+            )
+            if error:
+                return jsonify({"success": False, "message": error}), 400
+
+            attachment_filename = resolved_report_data["archive_filename"]
+            report_title = (resolved_report_data.get("event_name") or resolved_report_data.get("title") or report_title).strip()
+            report_scope = (resolved_report_data.get("department") or report_scope).strip()
+            report_date_range = (resolved_report_data.get("date_range") or report_date_range).strip()
 
     if not attachment_data:
         return jsonify({"success": False, "message": "No report PDF is available to attach."}), 400
@@ -2936,8 +3000,8 @@ def download_employee_upload_template():
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(EMPLOYEE_UPLOAD_REQUIRED_COLUMNS + EMPLOYEE_UPLOAD_OPTIONAL_COLUMNS)
-    writer.writerow(["00001", "Juan Dela Cruz", "College of Information Technology", "Instructor I"])
-    writer.writerow(["00002", "Maria Santos", "Registrar's Office", "Admin Officer"])
+    writer.writerow(["00005", "Juan Dela Cruz", "College of Information Technology", "Instructor I"])
+    writer.writerow(["00010", "Maria Santos", "Registrar's Office", "Admin Officer"])
 
     csv_content = output.getvalue()
     output.close()
@@ -3118,7 +3182,7 @@ def update_employee():
             (department_id,),
         )
         department = cursor.fetchone()
-
+        print(department)
         if not department:
             conn.rollback()
             return jsonify({"success": False, "error": "Selected department does not exist."}), 400

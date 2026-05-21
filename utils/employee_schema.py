@@ -122,9 +122,9 @@ def validate_employee_fields(
     elif raw_employee_id:
         if not raw_employee_id.isdigit():
             errors.append("Employee ID must contain digits only.")
-        elif len(raw_employee_id) > EMPLOYEE_ID_PAD_WIDTH:
+        elif len(raw_employee_id) != EMPLOYEE_ID_PAD_WIDTH:
             errors.append(
-                f"Employee ID must be {EMPLOYEE_ID_PAD_WIDTH} digits or fewer."
+                f"Employee ID must be exactly {EMPLOYEE_ID_PAD_WIDTH} digits."
             )
         elif parse_employee_id(employee_id) is None:
             errors.append(

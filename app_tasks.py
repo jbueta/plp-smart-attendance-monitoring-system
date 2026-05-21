@@ -12,15 +12,22 @@ def pair_entry_exit_records(raw_logs):
     
     user_logs = defaultdict(list)
     for log in raw_logs:
-        user_name = log.get('name', 'Unknown')
-        user_logs[user_name].append(log)
+        timestamp = log.get('timestamp')
+        log_date = timestamp.date() if hasattr(timestamp, 'date') else None
+        user_key = log.get('user_id') or log.get('name', 'Unknown')
+        user_logs[(user_key, log_date)].append(log)
     
     paired_records = []
     
-    # For each user, pair entry and exit records
-    for user_name, logs in user_logs.items():
-        # Sort by time to ensure entries come before exits
-        sorted_logs = sorted(logs, key=lambda x: x.get('time', ''))
+    # Pair only chronological logs from the same user and day.
+    for _group_key, logs in user_logs.items():
+        sorted_logs = sorted(
+            logs,
+            key=lambda x: (
+                x.get('timestamp') or '',
+                x.get('log_id') or 0,
+            ),
+        )
         
         entry_record = None
         for log in sorted_logs:
@@ -31,6 +38,14 @@ def pair_entry_exit_records(raw_logs):
                 entry_record['time_in'] = log.get('time', '')
                 entry_record['time_out'] = None
                 
+            elif status == 'entry' and entry_record is not None:
+                entry_record['time_out'] = 'N/A'
+                entry_record['status'] = 'In Progress'
+                paired_records.append(entry_record)
+                entry_record = log.copy()
+                entry_record['time_in'] = log.get('time', '')
+                entry_record['time_out'] = None
+
             elif (status == 'exit' or status == 'absent') and entry_record is not None:
                 entry_record['time_out'] = log.get('time', '')
                 entry_record['status'] = 'Present' if status == 'exit' else 'Absent'
@@ -42,7 +57,14 @@ def pair_entry_exit_records(raw_logs):
             entry_record['status'] = 'In Progress'
             paired_records.append(entry_record)
     
-    return paired_records
+    return sorted(
+        paired_records,
+        key=lambda x: (
+            x.get('timestamp') or '',
+            x.get('log_id') or 0,
+        ),
+        reverse=True,
+    )
 
 def calculate_general_logs_metrics(paired_logs):
     """
