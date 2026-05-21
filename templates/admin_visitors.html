@@ -355,6 +355,29 @@
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
     }
+
+    /* ── Visitor log table readability fixes ───────────────────────── */
+    /* Purpose column — was unstyled/inherited dark text */
+    td.vl-purpose {
+        color: rgba(255, 255, 255, 0.88) !important;
+        font-weight: 500;
+    }
+    /* Time In — vivid green on dark green background */
+    td.vl-time-in {
+        color: #4ade80 !important;
+        font-weight: 500;
+    }
+    /* Time Out — bright coral red, readable on dark green */
+    td.vl-time-out {
+        color: #fca5a5 !important;
+        font-weight: 500;
+    }
+    /* Active toggle pill — white, consistent with other admin pages */
+    .view-toggle:checked + label {
+        background-color: #ffffff !important;
+        color: #0b1a0f !important;
+        box-shadow: 0 2px 12px rgba(255,255,255,0.18) !important;
+    }
     </style>
 
     <style>
@@ -494,11 +517,11 @@
                         data-date="{{ visitor.date }}">
                         <td class="font-monospace text-white-50 ps-4">{{ visitor.id }}</td>
                         <td class="fw-bold text-white"><span>{{ visitor.name }}</span></td>
-                        <td>{{ visitor.purpose }}</td>
+                        <td class="vl-purpose">{{ visitor.purpose }}</td>
                         <td class="text-white-50 small">{{ visitor.details }}</td>
                         <td class="text-white-50 small">{{ visitor.valid_until_date or 'N/A' }}</td>
-                        <td class="text-success font-monospace small">{{ visitor.time_in }}</td>
-                        <td class="text-danger font-monospace small">{{ visitor.time_out or '--:--' }}</td>
+                        <td class="vl-time-in font-monospace small">{{ visitor.time_in }}</td>
+                        <td class="vl-time-out font-monospace small">{{ visitor.time_out or '--:--' }}</td>
                         <td class="text-end" style="padding-right: 3rem;">
                             {% if visitor.status == 'Checked In' %}
                             <span
