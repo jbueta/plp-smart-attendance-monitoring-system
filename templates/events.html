@@ -39,8 +39,7 @@
             <p class="text-white-50 mb-0">Schedule and manage campus events for employee attendance.</p>
         </div>
         <div class="d-flex gap-2 mb-2 mb-md-0">
-            <button type="button" id="select-mode-btn" class="btn btn-outline-light btn-sm"
-                onclick="toggleSelectionMode()">
+            <button type="button" id="select-mode-btn" class="btn btn-sm ev-btn-select" onclick="toggleSelectionMode()">
                 <i class="bi bi-check2-square me-2"></i>Select Rows
             </button>
             <button type="button" class="btn btn-primary-gold btn-sm" data-bs-toggle="modal" data-bs-target="#addEventModal">
@@ -51,21 +50,20 @@
 
     <!-- Filter Toolbar Row -->
     <div class="d-flex justify-content-start align-items-center gap-2 mb-4">
-        <div class="input-group input-group-sm shadow-sm" style="width: 250px;">
-            <span class="input-group-text border-secondary text-white-50"><i class="bi bi-search"></i></span>
-            <input type="text" id="searchInput" class="form-control text-white border-secondary" placeholder="Search events..." onkeyup="filterEvents()">
+        <div class="input-group input-group-sm shadow-sm ev-input-group" style="width: 250px;">
+            <span class="input-group-text ev-input-addon"><i class="bi bi-search"></i></span>
+            <input type="text" id="searchInput" class="form-control ev-input" placeholder="Search events..." onkeyup="filterEvents()">
         </div>
-        <div class="input-group input-group-sm shadow-sm date-filter-wrapper" style="width: 180px;">
-            <span class="input-group-text border-secondary text-white-50"><i class="bi bi-calendar-event"></i></span>
-            <input type="date" id="dateFilter" class="form-control text-white border-secondary" onchange="filterEvents()">
+        <div class="input-group input-group-sm shadow-sm ev-input-group" style="width: 180px;">
+            <span class="input-group-text ev-input-addon"><i class="bi bi-calendar-event"></i></span>
+            <input type="date" id="dateFilter" class="form-control ev-input" onchange="filterEvents()">
         </div>
 
-        <!-- OPTIONAL FILTER BUTTON -->
         <button type="button" class="btn btn-sm btn-primary-gold px-4 shadow-sm" onclick="filterEvents()">
             <i class="bi bi-filter me-1"></i>Apply Filters
         </button>
 
-        <div class="ms-auto text-white-50 small">
+        <div class="ms-auto ev-info-text">
             <i class="bi bi-info-circle me-1"></i> Viewing all scheduled events
         </div>
     </div>
@@ -91,12 +89,12 @@
                                 <input type="checkbox" class="form-check-input bg-dark border-secondary" id="select-all"
                                     onclick="toggleSelectAll()">
                             </th>
-                            <th class="ps-4">Event Name</th>
-                            <th>Type</th>
-                            <th>Target Dept</th>
-                            <th>Date</th>
-                            <th>Schedule</th>
-                            <th class="text-end pe-4">Actions</th>
+                            <th class="ps-4 ev-th">Event Name</th>
+                            <th class="ev-th">Type</th>
+                            <th class="ev-th">Target Dept</th>
+                            <th class="ev-th">Date</th>
+                            <th class="ev-th">Schedule</th>
+                            <th class="text-end pe-4 ev-th">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -110,24 +108,19 @@
                                 {% endif %}
                             </td>
                             <td class="fw-bold text-white ps-4">{{ event.name }}</td>
-                            <td><span class="badge bg-secondary bg-opacity-25 border border-secondary">{{ event.type
-                                    }}</span></td>
+                            <td><span class="ev-type-badge">{{ event.type }}</span></td>
                             <td class="small">
                                 {% if event.all_departments %}
                                     <span class="dept-badge badge-all" data-dept="All">All Departments</span>
                                 {% else %}
                                     {% set dept_list = event.dept.split(', ') %}
                                     {% set total_depts = dept_list | length %}
-                                    
-                                    {# Loop through ALL departments #}
                                     {% for dept in dept_list %}
                                         {% set clean_dept = dept | replace('College of ', '') | trim %}
-                                        
                                         <span class="dept-badge {% if loop.index0 >= 3 %}hidden-dept{% endif %}" data-dept="{{ clean_dept }}">
                                             {{ clean_dept }}
                                         </span>
                                     {% endfor %}
-                                    
                                     {% if total_depts > 3 %}
                                         <span class="dept-badge badge-more" onclick="toggleDepts(this, {{ total_depts - 3 }})">
                                             +{{ total_depts - 3 }}
@@ -135,24 +128,24 @@
                                     {% endif %}
                                 {% endif %}
                             </td>
-                            <td class="text-white-50 font-monospace small" data-date="{{ event.date }}">{{ event.formatted_date }}</td>
-                            <td class="text-white-50 font-monospace small">{{ event.time_start + ' - ' + event.time_end }}</td>
+                            <td class="ev-mono-cell" data-date="{{ event.date }}">{{ event.formatted_date }}</td>
+                            <td class="ev-mono-cell">{{ event.time_start + ' - ' + event.time_end }}</td>
                             <td class="text-end pe-4">
-                                <button type="button" 
-                                        class="btn btn-sm btn-info text-white me-1" 
-                                        title="View Event Info" 
-                                        data-bs-toggle="modal" 
-                                        data-bs-target="#viewEventModal" 
+                                <button type="button"
+                                        class="btn btn-sm ev-btn-view me-1"
+                                        title="View Event Info"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#viewEventModal"
                                         onclick="openViewModal('{{ event.event_id }}', '{{ event.name }}', '{{ event.type }}', '{{ event.formatted_date }}', '{{ event.time_start }} - {{ event.time_end }}', '{{ event.dept }}');">
                                     <i class="bi bi-eye me-1"></i> View
                                 </button>
                                 {% if event.event_id > 2 %}
-                                <button type="button" class="btn btn-sm btn-danger" title="Delete Event"
+                                <button type="button" class="btn btn-sm ev-btn-delete" title="Delete Event"
                                     onclick="deleteSingleEvent('{{ event.event_id }}')">
                                     <i class="bi bi-trash"></i>
                                 </button>
                                 {% else %}
-                                <span class="text-white-50 small fst-italic ms-2">Default</span>
+                                <span class="ev-default-label">Default</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -409,6 +402,150 @@
         </div>
     </div>
 </div>
+
+
+<style>
+/* ═══════════════════════════════════════════════════════════
+   /events — Page-scoped readability overrides
+   ═══════════════════════════════════════════════════════════ */
+
+/* Table headers ─────────────────────────────────────────── */
+.event-table th.ev-th {
+    color: rgba(255, 255, 255, 0.80) !important;
+    font-size: 0.72rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.08em !important;
+    font-weight: 700 !important;
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
+}
+
+/* Date & Schedule cells ─────────────────────────────────── */
+.ev-mono-cell {
+    font-family: 'Outfit', monospace !important;
+    font-size: 0.83rem !important;
+    color: rgba(255, 255, 255, 0.88) !important;
+}
+
+/* Type badge — glass pill ────────────────────────────────── */
+.ev-type-badge {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.10) !important;
+    border: 1px solid rgba(255, 255, 255, 0.28) !important;
+    color: #ffffff !important;
+    font-size: 0.72rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.04em !important;
+    padding: 3px 10px !important;
+    border-radius: 20px !important;
+    white-space: nowrap;
+}
+
+/* Dept badges — force white text and readable background ─── */
+.dept-badge {
+    color: #ffffff !important;
+    border-width: 1.5px !important;
+}
+
+.badge-more {
+    background: rgba(255, 255, 255, 0.14) !important;
+    border: 1.5px solid rgba(255, 255, 255, 0.30) !important;
+    color: rgba(255, 255, 255, 0.85) !important;
+    font-weight: 700 !important;
+    cursor: pointer;
+}
+
+/* "Default" protected event label ───────────────────────── */
+.ev-default-label {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+    color: rgba(255, 255, 255, 0.65) !important;
+    font-size: 0.70rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.06em !important;
+    text-transform: uppercase !important;
+    padding: 3px 9px !important;
+    border-radius: 20px !important;
+    margin-left: 4px;
+}
+
+/* Action buttons ─────────────────────────────────────────── */
+.ev-btn-view {
+    background: rgba(6, 182, 212, 0.18) !important;
+    border: 1px solid rgba(6, 182, 212, 0.45) !important;
+    color: #67e8f9 !important;
+    font-size: 0.80rem !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease !important;
+}
+.ev-btn-view:hover {
+    background: rgba(6, 182, 212, 0.30) !important;
+    border-color: rgba(6, 182, 212, 0.70) !important;
+    color: #ffffff !important;
+    transform: translateY(-1px);
+}
+
+.ev-btn-delete {
+    background: rgba(220, 38, 38, 0.18) !important;
+    border: 1px solid rgba(220, 38, 38, 0.45) !important;
+    color: #fca5a5 !important;
+    font-size: 0.80rem !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease !important;
+}
+.ev-btn-delete:hover {
+    background: rgba(220, 38, 38, 0.32) !important;
+    border-color: rgba(220, 38, 38, 0.70) !important;
+    color: #ffffff !important;
+    transform: translateY(-1px);
+}
+
+/* Select Rows button ─────────────────────────────────────── */
+.ev-btn-select {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.35) !important;
+    color: rgba(255, 255, 255, 0.90) !important;
+    font-size: 0.80rem !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease !important;
+}
+.ev-btn-select:hover, .ev-btn-select.active {
+    background: rgba(255, 255, 255, 0.16) !important;
+    border-color: rgba(255, 255, 255, 0.55) !important;
+    color: #ffffff !important;
+}
+
+/* Filter toolbar inputs ──────────────────────────────────── */
+.ev-input-group .ev-input-addon {
+    background: rgba(0, 0, 0, 0.30) !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    color: rgba(255, 255, 255, 0.70) !important;
+}
+.ev-input-group .ev-input {
+    background: rgba(0, 0, 0, 0.25) !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    color: rgba(255, 255, 255, 0.92) !important;
+    font-size: 0.83rem !important;
+}
+.ev-input-group .ev-input::placeholder {
+    color: rgba(255, 255, 255, 0.38) !important;
+}
+.ev-input-group .ev-input:focus {
+    background: rgba(0, 0, 0, 0.35) !important;
+    border-color: rgba(255, 255, 255, 0.38) !important;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08) !important;
+    color: #ffffff !important;
+}
+
+/* Info text ─────────────────────────────────────────────── */
+.ev-info-text {
+    color: rgba(255, 255, 255, 0.70) !important;
+    font-size: 0.82rem !important;
+}
+</style>
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/events.js') }}"></script>

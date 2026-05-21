@@ -35,73 +35,71 @@
             <p class="text-white-50 mb-0">Manage bulletins and active paging alerts across kiosks.</p>
         </div>
 
-        <!-- Tabs for Bulletin vs Paging - Moved to header for better layout -->
-        <div class="btn-group border border-secondary rounded-pill p-1 bg-dark bg-opacity-50 shadow-sm" role="group" aria-label="Announcement View Toggle">
-            <input type="radio" class="btn-check" name="announcementView" id="viewBulletins" autocomplete="off" checked data-bs-toggle="tab" data-bs-target="#bulletin-pane">
+        <!-- Pill Toggle — JS-driven show/hide -->
+        <div class="btn-group border border-secondary rounded-pill p-1 shadow-sm" style="background: rgba(0,0,0,0.35);" role="group" aria-label="Announcement View Toggle">
+            <input type="radio" class="btn-check" name="announcementView" id="viewBulletins" autocomplete="off" checked>
             <label class="btn btn-outline-light rounded-pill border-0 px-4 fw-bold" for="viewBulletins">
                 <i class="bi bi-journal-text me-2"></i>General Bulletins
             </label>
 
-            <input type="radio" class="btn-check" name="announcementView" id="viewPaging" autocomplete="off" data-bs-toggle="tab" data-bs-target="#paging-pane">
+            <input type="radio" class="btn-check" name="announcementView" id="viewPaging" autocomplete="off">
             <label class="btn btn-outline-light rounded-pill border-0 px-4 fw-bold" for="viewPaging">
                 <i class="bi bi-broadcast me-2"></i>Active Alerts / Paging
             </label>
         </div>
     </div>
 
-    <div class="tab-content">
-        <!-- Bulletin Pane -->
-        <div class="tab-pane fade show active" id="bulletin-pane">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="h5 mb-0 text-gold">Current Bulletins</h4>
-                <button class="btn btn-primary-gold btn-sm" data-bs-toggle="modal" data-bs-target="#addBulletinModal">
-                    <i class="bi bi-plus-lg me-2"></i>Create Bulletin
-                </button>
-            </div>
-            <div class="card-glass p-0 overflow-hidden">
-                <table class="table table-dark-glass table-hover align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th class="ps-4">From</th>
-                            <th>Category</th>
-                            <th>Target</th>
-                            <th>Scheduled Date</th>
-                            <th>Status</th>
-                            <th class="text-end pe-4">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="bulletin-table-body">
-                        <!-- Loaded via JS -->
-                    </tbody>
-                </table>
-            </div>
+    <!-- Bulletin Pane -->
+    <div id="bulletin-pane" class="am-pane">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="h5 mb-0 text-gold"><i class="bi bi-journal-text me-2"></i>Current Bulletins</h4>
+            <button class="btn btn-primary-gold btn-sm" data-bs-toggle="modal" data-bs-target="#addBulletinModal">
+                <i class="bi bi-plus-lg me-2"></i>Create Bulletin
+            </button>
         </div>
+        <div class="card-glass p-0 overflow-hidden">
+            <table class="table table-dark-glass table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-4" style="opacity:0.75;">From</th>
+                        <th style="opacity:0.75;">Category</th>
+                        <th style="opacity:0.75;">Target</th>
+                        <th style="opacity:0.75;">Scheduled Date</th>
+                        <th style="opacity:0.75;">Status</th>
+                        <th class="text-end pe-4" style="opacity:0.75;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="bulletin-table-body">
+                    <tr class="am-empty-row"><td colspan="6"><i class="bi bi-hourglass-split me-2"></i>Loading bulletins…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
 
-        <!-- Paging Pane -->
-        <div class="tab-pane fade" id="paging-pane">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="h5 mb-0 text-info">Active Paging Alerts</h4>
-                <button class="btn btn-info btn-sm text-white" data-bs-toggle="modal" data-bs-target="#addPagingModal">
-                    <i class="bi bi-broadcast me-2"></i>Issue Paging Alert
-                </button>
-            </div>
-            <div class="card-glass p-0 overflow-hidden">
-                <table class="table table-dark-glass table-hover align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th class="ps-4">From</th>
-                            <th>Message</th>
-                            <th>Target</th>
-                            <th>Expires At</th>
-                            <th>Status</th>
-                            <th class="text-end pe-4">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="paging-table-body">
-                        <!-- Loaded via JS -->
-                    </tbody>
-                </table>
-            </div>
+    <!-- Paging Pane (hidden by default) -->
+    <div id="paging-pane" class="am-pane d-none">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="h5 mb-0 text-info"><i class="bi bi-broadcast me-2"></i>Active Paging Alerts</h4>
+            <button class="btn btn-info btn-sm text-white" data-bs-toggle="modal" data-bs-target="#addPagingModal">
+                <i class="bi bi-broadcast me-2"></i>Issue Paging Alert
+            </button>
+        </div>
+        <div class="card-glass p-0 overflow-hidden">
+            <table class="table table-dark-glass table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-4" style="opacity:0.75;">From</th>
+                        <th style="opacity:0.75;">Message</th>
+                        <th style="opacity:0.75;">Target</th>
+                        <th style="opacity:0.75;">Expires At</th>
+                        <th style="opacity:0.75;">Status</th>
+                        <th class="text-end pe-4" style="opacity:0.75;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="paging-table-body">
+                    <tr class="am-empty-row"><td colspan="6"><i class="bi bi-hourglass-split me-2"></i>Loading alerts…</td></tr>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
@@ -247,11 +245,109 @@
         </div>
     </div>
 </div>
+
+<style>
+/* ── Pill toggle active highlight — white ─────────────────────────────────── */
+#viewBulletins:checked + label,
+#viewPaging:checked + label {
+    background-color: #ffffff !important;
+    color: #0b1a0f !important;
+    box-shadow: 0 2px 12px rgba(255, 255, 255, 0.20);
+}
+
+/* ── Table header readability ─────────────────────────────────────────────── */
+.table-dark-glass th {
+    color: rgba(255, 255, 255, 0.80) !important;
+    font-size: 0.75rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.07em !important;
+    font-weight: 700 !important;
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
+}
+
+/* ── Table cell readability ───────────────────────────────────────────────── */
+#bulletin-table-body td,
+#paging-table-body td {
+    color: rgba(255, 255, 255, 0.92) !important;
+    font-size: 0.88rem !important;
+}
+
+.am-source {
+    font-weight: 600 !important;
+    color: #ffffff !important;
+}
+
+.am-meta {
+    color: rgba(255, 255, 255, 0.90) !important;  /* Bumped from 0.72 — message & target now clearly readable */
+    font-size: 0.84rem !important;
+}
+
+.am-date {
+    font-family: 'Outfit', monospace !important;
+    font-size: 0.83rem !important;
+    color: rgba(255, 255, 255, 0.88) !important;  /* Bumped from 0.78 — dates now clearly visible */
+}
+
+.am-category-badge {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.12) !important;
+    border: 1px solid rgba(255, 255, 255, 0.28) !important;
+    color: #ffffff !important;
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.05em !important;
+    text-transform: uppercase !important;
+    padding: 3px 10px !important;
+    border-radius: 20px !important;
+}
+
+.am-empty-row td {
+    color: rgba(255, 255, 255, 0.45) !important;
+    font-size: 0.85rem !important;
+    text-align: center !important;
+    padding: 2.5rem 1rem !important;
+}
+
+/* Status badge colours ───────────────────────────────────────────────────── */
+.am-status-active {
+    background: rgba(52, 211, 153, 0.18) !important;
+    border: 1px solid rgba(52, 211, 153, 0.45) !important;
+    color: #6ee7b7 !important;
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    padding: 4px 10px !important;
+    border-radius: 20px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+}
+
+.am-status-cleared {
+    background: rgba(255, 255, 255, 0.10) !important;  /* Slightly more visible background */
+    border: 1px solid rgba(255, 255, 255, 0.30) !important;  /* Brighter border */
+    color: rgba(255, 255, 255, 0.75) !important;  /* Bumped from 0.50 — clearly readable */
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    padding: 4px 10px !important;
+    border-radius: 20px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+}
+</style>
 {% endblock %}
 
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Toggle Logic
+        document.querySelectorAll('input[name="announcementView"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                document.querySelectorAll('.am-pane').forEach(p => p.classList.add('d-none'));
+                if (e.target.id === 'viewBulletins') document.getElementById('bulletin-pane').classList.remove('d-none');
+                else document.getElementById('paging-pane').classList.remove('d-none');
+            });
+        });
+
         loadBulletins();
         loadAlerts();
 
@@ -322,24 +418,29 @@
             const tbody = document.getElementById('bulletin-table-body');
             if (!tbody) return;
             tbody.innerHTML = '';
+            if (!res.bulletins || res.bulletins.length === 0) {
+                tbody.innerHTML = `<tr class="am-empty-row"><td colspan="6"><i class="bi bi-inbox me-2"></i>No bulletins found. Create one to get started.</td></tr>`;
+                return;
+            }
             res.bulletins.forEach(b => {
-                const targetText = b.visibility_scope === 'global' ? 'Global' :
-                                 b.visibility_scope === 'targeted' ? `ID: ${b.target_id}` :
-                                 b.visibility_scope === 'departmental' ? b.target_department : b.target_event;
+                const targetText = b.visibility_scope === 'global' ? '<span class="am-meta"><i class="bi bi-globe2 me-1"></i>Global</span>' :
+                                 b.visibility_scope === 'targeted' ? `<span class="am-meta"><i class="bi bi-person me-1"></i>ID: ${b.target_id}</span>` :
+                                 b.visibility_scope === 'departmental' ? `<span class="am-meta"><i class="bi bi-building me-1"></i>${b.target_department}</span>` :
+                                 `<span class="am-meta"><i class="bi bi-calendar-event me-1"></i>${b.target_event}</span>`;
 
                 tbody.innerHTML += `
                     <tr>
-                        <td class="ps-4">${b.from_source}</td>
-                        <td><span class="badge bg-secondary border border-secondary">${b.category}</span></td>
-                        <td class="small text-white-50">${targetText}</td>
-                        <td class="font-monospace small">${b.scheduled_date}</td>
+                        <td class="ps-4"><span class="am-source">${b.from_source}</span></td>
+                        <td><span class="am-category-badge">${b.category}</span></td>
+                        <td>${targetText}</td>
+                        <td><span class="am-date">${b.scheduled_date}</span></td>
                         <td>
-                            <div class="form-check form-switch">
+                            <div class="form-check form-switch mb-0">
                                 <input class="form-check-input" type="checkbox" ${b.is_active ? 'checked' : ''} onchange="toggleBulletin(${b.bulletin_id}, this.checked)">
                             </div>
                         </td>
                         <td class="text-end pe-4">
-                            <button class="btn btn-sm btn-danger" onclick="deleteBulletin(${b.bulletin_id})"><i class="bi bi-trash"></i></button>
+                            <button class="btn btn-sm" style="background:rgba(220,38,38,0.18);border:1px solid rgba(220,38,38,0.4);color:#fca5a5;border-radius:8px;" onclick="deleteBulletin(${b.bulletin_id})"><i class="bi bi-trash"></i></button>
                         </td>
                     </tr>
                 `;
@@ -354,22 +455,25 @@
             const tbody = document.getElementById('paging-table-body');
             if (!tbody) return;
             tbody.innerHTML = '';
+            if (!res.alerts || res.alerts.length === 0) {
+                tbody.innerHTML = `<tr class="am-empty-row"><td colspan="6"><i class="bi bi-broadcast me-2"></i>No active alerts. Issue one to broadcast to kiosks.</td></tr>`;
+                return;
+            }
             res.alerts.forEach(a => {
-                const targetText = a.visibility_scope === 'global' ? 'Global' :
-                                 a.visibility_scope === 'targeted' ? `ID: ${a.target_id}` :
-                                 a.visibility_scope === 'departmental' ? a.target_department : a.target_event;
+                const targetText = a.visibility_scope === 'global' ? '<span class="am-meta"><i class="bi bi-globe2 me-1"></i>Global</span>' :
+                                 a.visibility_scope === 'targeted' ? `<span class="am-meta"><i class="bi bi-person me-1"></i>ID: ${a.target_id}</span>` :
+                                 a.visibility_scope === 'departmental' ? `<span class="am-meta"><i class="bi bi-building me-1"></i>${a.target_department}</span>` :
+                                 `<span class="am-meta"><i class="bi bi-calendar-event me-1"></i>${a.target_event}</span>`;
 
                 tbody.innerHTML += `
                     <tr>
-                        <td class="ps-4">${a.from_source}</td>
-                        <td class="small text-white-50">${a.message.substring(0, 50)}${a.message.length > 50 ? '...' : ''}</td>
-                        <td class="small text-white-50">${targetText}</td>
-                        <td class="font-monospace small">${a.expires_at || 'Never'}</td>
-                        <td>
-                            <span class="badge ${a.is_active ? 'bg-success' : 'bg-secondary'}">${a.is_active ? 'Active' : 'Cleared'}</span>
-                        </td>
+                        <td class="ps-4"><span class="am-source">${a.from_source}</span></td>
+                        <td><span class="am-meta">${a.message.substring(0, 60)}${a.message.length > 60 ? '…' : ''}</span></td>
+                        <td>${targetText}</td>
+                        <td><span class="am-date">${a.expires_at || '<span style="opacity:0.45;">Never</span>'}</span></td>
+                        <td><span class="${a.is_active ? 'am-status-active' : 'am-status-cleared'}">${a.is_active ? 'Active' : 'Cleared'}</span></td>
                         <td class="text-end pe-4">
-                            ${a.is_active ? `<button class="btn btn-sm btn-outline-warning" onclick="toggleAlert(${a.alert_id}, false)">Clear</button>` : ''}
+                            ${a.is_active ? `<button class="btn btn-sm" style="background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.35);color:#fcd34d;border-radius:8px;font-size:0.78rem;" onclick="toggleAlert(${a.alert_id}, false)"><i class="bi bi-x-circle me-1"></i>Clear</button>` : ''}
                         </td>
                     </tr>
                 `;
