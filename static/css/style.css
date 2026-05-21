@@ -411,8 +411,124 @@ h6 {
 
 /* Vibrant readable green */
 .text-danger {
-    color: #ff6b81 !important;
+    color: #ff3b30 !important;
 }
+
+/* Gold Theme Utilities */
+.bg-gold {
+    background-color: var(--plp-gold) !important;
+}
+.border-gold {
+    border-color: var(--plp-gold) !important;
+}
+
+/* Modern High-Contrast Premium Glassmorphic Red Alerts */
+.alert.alert-danger, .alert-danger, .plp-alert-card-danger {
+    background: rgba(28, 8, 8, 0.82) !important; /* Deep dark crimson-black to prevent green background muddying */
+    border: 1px solid rgba(255, 69, 58, 0.35) !important; /* Vibrant system red border */
+    border-left: 5px solid #ff453a !important; /* Luminous vibrant iOS-style system red accent */
+    border-radius: 12px !important;
+    color: #ffffff !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(255, 59, 48, 0.12);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.plp-alert-card-danger:hover {
+    transform: translateY(-3px);
+    background: rgba(36, 10, 10, 0.88) !important;
+    border-color: rgba(255, 69, 58, 0.55) !important;
+    box-shadow: 0 14px 40px rgba(255, 59, 48, 0.3), inset 0 0 15px rgba(255, 59, 48, 0.2);
+}
+
+.plp-alert-icon-box-danger {
+    background: rgba(255, 59, 48, 0.22) !important;
+    color: #ff453a !important;
+    border-radius: 8px;
+    padding: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 59, 48, 0.15);
+}
+
+.plp-alert-badge-danger {
+    background: rgba(255, 59, 48, 0.3) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 59, 48, 0.4) !important;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+}
+
+.plp-alert-text-muted {
+    color: rgba(255, 235, 235, 0.85) !important;
+    font-size: 0.85rem;
+    font-weight: 400;
+}
+
+.plp-alert-text-dimmed {
+    color: rgba(255, 205, 205, 0.6) !important;
+    font-size: 0.72rem;
+    font-weight: 500;
+}
+
+/* Consecutive Absence Cards and standard bootstrap danger container override */
+.bg-danger.bg-opacity-10.border.border-danger,
+.bg-danger.bg-opacity-10.border.border-danger-subtle {
+    background: rgba(28, 8, 8, 0.82) !important;
+    border: 1px solid rgba(255, 69, 58, 0.35) !important;
+    border-left: 4px solid #ff3b30 !important;
+    border-radius: 1rem !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), inset 0 0 12px rgba(255, 59, 48, 0.05) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.bg-danger.bg-opacity-10.border.border-danger:hover,
+.bg-danger.bg-opacity-10.border.border-danger-subtle:hover {
+    transform: translateY(-4px);
+    background: rgba(36, 10, 10, 0.88) !important;
+    border-color: rgba(255, 69, 58, 0.55) !important;
+    box-shadow: 0 12px 30px rgba(255, 59, 48, 0.2), inset 0 0 12px rgba(255, 59, 48, 0.1) !important;
+}
+.bg-danger.bg-opacity-20 {
+    background-color: rgba(255, 59, 48, 0.18) !important;
+}
+
+/* Primary/Secondary KPI Metrics - Distinct visual hierarchy */
+.plp-primary-metric-card {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    border-radius: 1.25rem !important;
+    box-shadow: 0 10px 35px rgba(0, 0, 0, 0.45), inset 0 0 25px rgba(255, 255, 255, 0.06);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.plp-primary-metric-card:hover {
+    transform: translateY(-4px);
+    background: rgba(255, 255, 255, 0.09) !important;
+    border-color: rgba(255, 255, 255, 0.35) !important;
+    box-shadow: 0 15px 45px rgba(0, 0, 0, 0.6), inset 0 0 25px rgba(255, 255, 255, 0.1);
+}
+
+.plp-secondary-metric-card {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border-radius: 1rem !important;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35), inset 0 0 15px rgba(255, 255, 255, 0.04);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.plp-secondary-metric-card:hover {
+    transform: translateY(-3px);
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: rgba(255, 255, 255, 0.25) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(255, 255, 255, 0.08);
+}
+
 
 /* Bright red */
 .text-warning {
