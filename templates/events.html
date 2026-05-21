@@ -52,12 +52,12 @@
     <!-- Filter Toolbar Row -->
     <div class="d-flex justify-content-start align-items-center gap-2 mb-4">
         <div class="input-group input-group-sm shadow-sm" style="width: 250px;">
-            <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
-            <input type="text" id="searchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search events..." onkeyup="filterEvents()">
+            <span class="input-group-text border-secondary text-white-50"><i class="bi bi-search"></i></span>
+            <input type="text" id="searchInput" class="form-control text-white border-secondary" placeholder="Search events..." onkeyup="filterEvents()">
         </div>
         <div class="input-group input-group-sm shadow-sm date-filter-wrapper" style="width: 180px;">
-            <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-calendar-event"></i></span>
-            <input type="date" id="dateFilter" class="form-control bg-dark text-white border-secondary" onchange="filterEvents()">
+            <span class="input-group-text border-secondary text-white-50"><i class="bi bi-calendar-event"></i></span>
+            <input type="date" id="dateFilter" class="form-control text-white border-secondary" onchange="filterEvents()">
         </div>
 
         <!-- OPTIONAL FILTER BUTTON -->
@@ -135,7 +135,7 @@
                                     {% endif %}
                                 {% endif %}
                             </td>
-                            <td class="text-white-50 font-monospace small">{{ event.date }}</td>
+                            <td class="text-white-50 font-monospace small" data-date="{{ event.date }}">{{ event.formatted_date }}</td>
                             <td class="text-white-50 font-monospace small">{{ event.time_start + ' - ' + event.time_end }}</td>
                             <td class="text-end pe-4">
                                 <button type="button" 
@@ -143,7 +143,7 @@
                                         title="View Event Info" 
                                         data-bs-toggle="modal" 
                                         data-bs-target="#viewEventModal" 
-                                        onclick="openViewModal('{{ event.event_id }}', '{{ event.name }}', '{{ event.type }}', '{{ event.date }}', '{{ event.time_start }} - {{ event.time_end }}', '{{ event.dept }}');">
+                                        onclick="openViewModal('{{ event.event_id }}', '{{ event.name }}', '{{ event.type }}', '{{ event.formatted_date }}', '{{ event.time_start }} - {{ event.time_end }}', '{{ event.dept }}');">
                                     <i class="bi bi-eye me-1"></i> View
                                 </button>
                                 {% if event.event_id > 2 %}

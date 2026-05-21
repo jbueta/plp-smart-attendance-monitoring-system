@@ -31,6 +31,7 @@ if not any(
     app.logger.addHandler(logging.FileHandler(log_file))
 
 CORS(app, origins=app.config["ALLOWED_ORIGINS"])
+app.teardown_appcontext(close_db)
 
 EVENT_TYPES = {"Meeting", "Training", "Seminar", "Workshop", "Drill", "Activity", "Flag Ceremony", "Other"}
 EVENT_FREQUENCIES = {"ONCE", "DAILY", "WEEKLY"}
