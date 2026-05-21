@@ -1409,7 +1409,7 @@ class Database:
                         "name": row["student_name"],
                         "course_id": row["course_id"],
                         "course": row["course_name"],
-                        "status": "Active" if is_active else "Inactive",
+                        "status": "Regular" if is_active else "Irregular",
                         "status_class": "success" if is_active else "secondary",
                     }
                 )

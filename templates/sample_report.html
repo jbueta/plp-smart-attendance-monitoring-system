@@ -52,6 +52,26 @@
         table.report-table th, table.report-table td { border: 1px solid black !important; padding: 6px 10px; font-size: 13px; vertical-align: middle; }
         table.report-table th { background-color: #e9ecef !important; text-align: center; font-weight: bold; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
+        /* Prevent rows from being split across PDF pages/printouts */
+        thead { display: table-header-group; }
+        tfoot { display: table-footer-group; }
+        table.report-table tr, table.report-table td, table.report-table th {
+            page-break-inside: avoid;
+            break-inside: avoid;
+            -webkit-column-break-inside: avoid;
+            -webkit-region-break-inside: avoid;
+        }
+        /* allow long tables to flow but keep each row intact when printing */
+
+        /* More aggressive rules when creating PDFs to reduce splicing */
+        body.pdf-export-mode table.report-table {
+            font-size: 11px;
+        }
+        body.pdf-export-mode table.report-table th, body.pdf-export-mode table.report-table td {
+            padding: 4px 6px;
+        }
+        .avoid-break { page-break-inside: avoid !important; break-inside: avoid !important; }
+
         .footer-section { margin-top: 30px; font-size: 12px; }
         .signature-line { border-bottom: 1px solid black; width: 250px; margin-top: 40px; margin-bottom: 5px; }
 
@@ -98,19 +118,10 @@
         </div>
         <div class="feedback-indicator__title" id="feedback-message"></div>
     </div>
-
-
     <div class="container d-print-none mb-4" style="max-width: 950px;">
-        <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center">
-            <button onclick="window.print()" class="btn btn-primary">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-printer me-2" viewBox="0 0 16 16">
-            <path d="M2.5 8a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z" />
-            <path d="M5 1a2 2 0 0 0-2 2v2H2a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1v1a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1V3a2 2 0 0 0-2-2H5zM4 3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2H4V3zm1 5a2 2 0 0 0-2 2v1H2a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v-1a2 2 0 0 0-2-2H5zm7 2v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1z" />
-        </svg>
-        Print / Save as PDF
-    </button>
             <form id="sendReportEmailForm" action="/send_report_email" method="POST" class="d-flex flex-wrap gap-2 align-items-center">
-                <input type="email" name="email" class="form-control" style="max-width: 280px;" placeholder="Enter email" required>
+                <label for="send-email-input" class="visually-hidden">Recipient email</label>
+                <input id="send-email-input" type="email" name="email" class="form-control" style="max-width: 280px;" placeholder="Enter email" required>
                 <input type="hidden" name="category" value="{{ request.args.get('category') }}">
                 <input type="hidden" name="type" value="{{ request.args.get('type') }}">
                 <input type="hidden" name="filter" value="{{ request.args.get('filter') }}">
@@ -126,7 +137,6 @@
             </form>
             <div id="sendReportEmailStatus" class="small text-white-50"></div>
         </div>
-    </div>
 
 <div class="document-container" id="report-content">
 
@@ -284,19 +294,20 @@
         <div style="margin-top: 30px; font-size: 11px;">* All erasures / corrections shall be countersigned by the HRD Head</div>
     </div>
 
-    <div class="d-flex justify-content-end mt-5 d-print-none pb-4">
+            <div class="d-flex justify-content-end mt-5 d-print-none pb-4">
         <div class="btn-group">
-            <button type="button" class="btn btn-primary px-4 py-2" onclick="window.print()">
+            <button id="export-options-btn" type="button" class="btn btn-primary px-4 py-2">
                 <i class="bi bi-file-earmark-bar-graph me-2"></i> Export Options
             </button>
             <button type="button" class="btn btn-primary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
                 <span class="visually-hidden">Toggle Dropdown</span>
             </button>
             <ul class="dropdown-menu dropdown-menu-end shadow">
-                <li><a class="dropdown-item py-2 fw-bold" href="#" onclick="window.print()"><i class="bi bi-printer me-2 text-primary"></i> Print Document</a></li>
+                <li><a id="print-document" class="dropdown-item py-2 fw-bold" href="#"><i class="bi bi-printer me-2 text-primary"></i> Print Document</a></li>
                 <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item py-2 fw-bold" href="#" onclick="downloadPDF()"><i class="bi bi-file-pdf me-2 text-danger"></i> Download and Archive PDF</a></li>
-                <li><a class="dropdown-item py-2 fw-bold" href="#" onclick="exportTableToCSV('Report_{{ report.date_range | replace(' ', '_') }}.csv')"><i class="bi bi-filetype-csv me-2 text-success"></i> Download as CSV</a></li>
+                <li><a id="download-pdf" class="dropdown-item py-2 fw-bold" href="#"><i class="bi bi-file-pdf me-2 text-danger"></i> Download and Archive PDF</a></li>
+                {# Prepare a safe data-filename attribute so JS can read a valid string without relying on inline Jinja concatenation #}
+                <li><a id="download-csv" class="dropdown-item py-2 fw-bold" href="#" data-filename="{{ ('Report_' + (report.date_range | replace(' ', '_') | default('') ) + '.csv') | default('report.csv') }}"><i class="bi bi-filetype-csv me-2 text-success"></i> Download as CSV</a></li>
             </ul>
         </div>
     </div>
@@ -306,9 +317,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <script>
-        const archiveReportUrl = {{ archive_report_url | tojson }};
-        const sampleReportUrl = {{ url_for('sample_report') | tojson }};
-        const archiveFilename = {{ report.archive_filename | tojson }};
+        const archiveReportUrl = {{ archive_report_url | default(None) | tojson }};
+        const sampleReportUrl = {{ url_for('sample_report') | default('') | tojson }};
+        const archiveFilename = {{ report.archive_filename | default('report.pdf') | tojson }};
         const sendReportEmailForm = document.getElementById('sendReportEmailForm');
         const sendReportEmailStatus = document.getElementById('sendReportEmailStatus');
 
@@ -343,7 +354,25 @@
             window.URL.revokeObjectURL(downloadUrl);
         }
 
+        // Prepare table rows to avoid splitting across pages and apply compact print styles
+        function prepareTableForPdf() {
+            const table = document.querySelector('table.report-table');
+            if (!table) return {rows: [], applied: false};
+            const rows = Array.from(table.querySelectorAll('tr'));
+            rows.forEach(r => r.classList.add('avoid-break'));
+            // Add temporary class to body to reduce paddings/font for PDF
+            document.body.classList.add('pdf-export-mode');
+            return { rows: rows, applied: true };
+        }
+
+        function cleanupTableAfterPdf(prep) {
+            if (!prep || !prep.applied) return;
+            prep.rows.forEach(r => r.classList.remove('avoid-break'));
+            document.body.classList.remove('pdf-export-mode');
+        }
+
         async function createReportPdfBlob(filename) {
+            const prep = prepareTableForPdf();
             const printBlocks = Array.from(document.querySelectorAll('.d-print-none'));
             printBlocks.forEach((element) => {
                 element.dataset.previousDisplay = element.style.display || '';
@@ -352,17 +381,23 @@
 
             const opt = {
                 margin: 0.5,
-                filename: archiveFilename,
+                // prefer the explicit filename argument, otherwise fallback to archiveFilename
+                filename: filename || archiveFilename,
                 image: { type: 'jpeg', quality: 0.98 },
                 html2canvas: { scale: 2 },
-                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
+                // Prefer CSS page-break handling and avoid breaking inside table rows, specially-marked rows and images
+                pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', '.avoid-break', 'img'] }
             };
 
             try {
+                // html2pdf provides a worker-like chain. Call toPdf() then get the internal jsPDF
                 const worker = html2pdf().set(opt).from(document.getElementById('report-content')).toPdf();
                 const pdf = await worker.get('pdf');
+                const blob = pdf.output && typeof pdf.output === 'function' ? pdf.output('blob') : null;
+                if (!blob) throw new Error('Failed to generate PDF blob');
                 return {
-                    blob: pdf.output('blob'),
+                    blob: blob,
                     filename: opt.filename
                 };
             } catch (error) {
@@ -373,7 +408,8 @@
                     element.style.display = element.dataset.previousDisplay || '';
                     delete element.dataset.previousDisplay;
                 });
-            }
+                // cleanup any temporary classes we added to force avoid-break behavior
+                cleanupTableAfterPdf(prep);
             }
         }
 
@@ -453,7 +489,40 @@
             });
         }
 
+        // Attach event listeners for export actions (avoid inline onclicks to improve template parsing)
+        document.addEventListener('DOMContentLoaded', function () {
+            const printBtn = document.getElementById('export-options-btn');
+            const printDoc = document.getElementById('print-document');
+            const downloadPdf = document.getElementById('download-pdf');
+            const downloadCsv = document.getElementById('download-csv');
+
+            if (printBtn) {
+                printBtn.addEventListener('click', function () { window.print(); });
+            }
+            if (printDoc) {
+                printDoc.addEventListener('click', function (e) { e.preventDefault(); window.print(); });
+            }
+            if (downloadPdf) {
+                downloadPdf.addEventListener('click', function (e) { e.preventDefault(); downloadPDF(); });
+            }
+            if (downloadCsv) {
+                downloadCsv.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const filename = downloadCsv.dataset && downloadCsv.dataset.filename ? downloadCsv.dataset.filename : ('Report_' + (new Date()).toISOString().slice(0,10) + '.csv');
+                    exportTableToCSV(filename);
+                });
+            }
+        });
+
         function exportTableToCSV(filename) {
+            function sanitizeFilename(name) {
+                // accept either the explicit name or fallback to a generic 'report'
+                let clean = (name || '').toString().replace(/[^A-Za-z0-9_.-]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+                if (!clean || clean === '.') clean = 'report';
+                if (!clean.toLowerCase().endsWith('.csv')) clean += '.csv';
+                return clean;
+            }
+
             let csv = [];
             let rows = document.querySelectorAll("table.report-table tr");
 
@@ -472,13 +541,17 @@
             }
 
             let csvFile = new Blob([csv.join("\n")], {type: "text/csv"});
-            let downloadLink = document.createElement("a");
-            downloadLink.download = filename;
-            downloadLink.href = window.URL.createObjectURL(csvFile);
+            const finalFilename = sanitizeFilename(filename);
+            const url = window.URL.createObjectURL(csvFile);
+            const downloadLink = document.createElement("a");
+            downloadLink.download = finalFilename;
+            downloadLink.href = url;
             downloadLink.style.display = "none";
             document.body.appendChild(downloadLink);
             downloadLink.click();
             document.body.removeChild(downloadLink);
+            window.URL.revokeObjectURL(url);
+            showLocalFeedback('CSV Report downloaded successfully.', 'success');
         }
     </script>
 </body>
