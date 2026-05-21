@@ -1733,43 +1733,6 @@ ALTER TABLE `visitors`
   ADD CONSTRAINT `visitors_usersFK` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`);
 COMMIT;
 
-
--- ============================================
--- [ANNOUNCEMENT FEATURE] - Bulletin & Paging Tables
--- Description: Tables for dynamic bulletin announcements
--- and active alerts/paging system
--- ============================================
-
-CREATE TABLE IF NOT EXISTS `bulletins` (
-  `bulletin_id` int(11) NOT NULL AUTO_INCREMENT,
-  `from_source` varchar(255) NOT NULL,
-  `category` varchar(255) NOT NULL,
-  `content` text NOT NULL,
-  `visibility_scope` enum('global','targeted','departmental','event_specific') NOT NULL DEFAULT 'global',
-  `target_id` varchar(20) DEFAULT NULL,
-  `target_department` varchar(255) DEFAULT NULL,
-  `target_event` varchar(255) DEFAULT NULL,
-  `scheduled_date` date NOT NULL,
-  `is_active` tinyint(1) NOT NULL DEFAULT 1,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`bulletin_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS `paging_alerts` (
-  `alert_id` int(11) NOT NULL AUTO_INCREMENT,
-  `from_source` varchar(255) NOT NULL,
-  `message` text NOT NULL,
-  `visibility_scope` enum('global','targeted','departmental','event_specific') NOT NULL DEFAULT 'global',
-  `target_id` varchar(20) DEFAULT NULL,
-  `target_department` varchar(255) DEFAULT NULL,
-  `target_event` varchar(255) DEFAULT NULL,
-  `expires_at` datetime DEFAULT NULL,
-  `is_active` tinyint(1) NOT NULL DEFAULT 1,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`alert_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
