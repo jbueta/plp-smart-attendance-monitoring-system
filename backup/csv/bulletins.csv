@@ -1,0 +1,2 @@
+bulletin_id,from_source,category,content,visibility_scope,target_id,target_department,target_event,scheduled_date,is_active,created_at,updated_at
+1,HR Department,IMPORTANT NOTICE,This is a demo message,global,,Accounting Office,General Attendance,2026-05-11,0,2026-05-11 01:47:50,2026-05-16 01:27:06
