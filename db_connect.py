@@ -442,6 +442,111 @@ class Database:
             print(f"Error inserting log: {err}")
             return {"success": False, "message": f"Database Error: {err}"}
 
+    def insert_violation(self):
+        try:
+            user_id, description, created_at = self.parameter
+            if not description:
+                description = "Curfew violation"
+            if created_at is None:
+                created_at = datetime.now()
+            if isinstance(created_at, str):
+                created_at = datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S")
+
+            self.cursor.execute(
+                """
+                SELECT 1
+                FROM violations
+                WHERE user_id = %s
+                  AND DATE(created_at) = %s
+                  AND description = %s
+                LIMIT 1
+                """,
+                (user_id, created_at.date(), description),
+            )
+            if self.cursor.fetchone():
+                return {"success": True, "message": "Violation already recorded."}
+
+            self.cursor.execute(
+                "INSERT INTO violations (user_id, description, created_at) VALUES (%s, %s, %s)",
+                (user_id, description, created_at),
+            )
+            self.conn.commit()
+
+            return {"success": True, "message": "Violation recorded successfully."}
+        except connector.Error as err:
+            self.conn.rollback()
+            print(f"Error inserting violation: {err}")
+            return {"success": False, "message": f"Database Error: {err}"}
+
+    def enforce_curfew_violations(self, curfew_time="21:40:00", early_morning_cutoff="06:00:00", description="Curfew violation"):
+        try:
+            cursor = self.conn.cursor(dictionary=True)
+            cursor.execute(
+                """
+                SELECT
+                    s.user_id AS user_id
+                FROM students s
+                JOIN users u ON s.user_id = u.user_id
+                JOIN (
+                    SELECT user_id, MAX(timestamp) AS entry_time
+                    FROM general_log
+                    WHERE log_type = 'Entry'
+                    GROUP BY user_id
+                ) latest_entry ON latest_entry.user_id = s.user_id
+                LEFT JOIN (
+                    SELECT user_id, MAX(timestamp) AS exit_time
+                    FROM general_log
+                    WHERE log_type = 'Exit'
+                    GROUP BY user_id
+                ) latest_exit ON latest_exit.user_id = s.user_id
+                WHERE s.status = 'Inside'
+                  AND u.role = 'student'
+                  AND u.active = 1
+                  AND (latest_exit.exit_time IS NULL OR latest_entry.entry_time > latest_exit.exit_time)
+                  AND (
+                      NOW() >= TIMESTAMP(DATE(latest_entry.entry_time), %s)
+                      OR TIME(latest_entry.entry_time) >= %s
+                      OR TIME(latest_entry.entry_time) < %s
+                  )
+                """,
+                (curfew_time, curfew_time, early_morning_cutoff),
+            )
+            candidates = cursor.fetchall()
+            inserted = 0
+            skipped = 0
+            errors = []
+
+            for candidate in candidates:
+                user_id = candidate.get("user_id")
+                if not user_id:
+                    continue
+
+                violation_db = Database(self.conn, (user_id, description, datetime.now()))
+                violation_result = violation_db.insert_violation()
+                violation_db.cursor.close()
+
+                if violation_result.get("success"):
+                    if "already recorded" in violation_result.get("message", "").lower():
+                        skipped += 1
+                    else:
+                        inserted += 1
+                else:
+                    errors.append({"user_id": user_id, "message": violation_result.get("message")})
+
+            return {
+                "success": len(errors) == 0,
+                "inserted": inserted,
+                "skipped": skipped,
+                "candidates": len(candidates),
+                "errors": errors,
+            }
+        except connector.Error as err:
+            self.conn.rollback()
+            print(f"Error enforcing curfew violations: {err}")
+            return {"success": False, "message": f"Database Error: {err}"}
+        finally:
+            cursor.close()
+
     def add_visitor_log(self):
         try:
             visitor_name = (self.parameter[0] or "").strip()
@@ -1411,7 +1516,9 @@ class Database:
                         "name": row["student_name"],
                         "course_id": row["course_id"],
                         "course": row["course_name"],
-                        "status": "Regular" if is_active else "Irregular",
+                        "type": "Regular" if is_active else "Irregular",
+                        "type_class": "success" if is_active else "warning",
+                        "status": "Active" if is_active else "Inactive",
                         "status_class": "success" if is_active else "secondary",
                     }
                 )
@@ -1807,6 +1914,90 @@ class Database:
                 total_expected = expected_result["count"] if expected_result else 0
                 total_present = sum(1 for log in raw_logs if log["status"] in {"Present", "Late"})
 
+            elif normalized_category == "General Logs" and report_type == "daily_traffic":
+                report_title = "Daily Traffic Analysis Report"
+                event_name_display = "Daily Traffic Analysis"
+                col_headers = [
+                    "Date",
+                    "Entries",
+                    "Exits",
+                    "Peak Hour",
+                    "Avg. Time Spent",
+                    "Gate 1",
+                    "Gate 2",
+                    "Gate 3"
+                ]
+                course_condition = ""
+                course_params = []
+                if filter_value.lower() != "all":
+                    course_condition = "AND c.course_id = %s"
+                    course_params = [filter_value]
+                    cursor.execute(
+                        "SELECT course_name FROM courses WHERE course_id = %s",
+                        (filter_value,),
+                    )
+                    course_row = cursor.fetchone()
+                    filter_display = course_row["course_name"] if course_row else filter_value
+                else:
+                    filter_display = "All Programs"
+
+                query = f"""
+                    SELECT
+                        gl.log_id AS log_id,
+                        gl.user_id AS user_id,
+                        gl.timestamp AS timestamp,
+                        gl.log_type AS status,
+                        COALESCE(s.student_name, 'Unknown Student') AS name,
+                        COALESCE(c.course_name, 'N/A') AS detail,
+                        COALESCE(gl.gate, 'Gate 1') AS gate
+                    FROM general_log gl
+                    JOIN users u ON gl.user_id = u.user_id
+                    JOIN students s ON u.user_id = s.user_id
+                    LEFT JOIN courses c ON s.course_id = c.course_id
+                    WHERE DATE(gl.timestamp) BETWEEN %s AND %s
+                      AND u.role = 'student'
+                      AND COALESCE(u.active, 1) = 1
+                      {course_condition}
+                    ORDER BY gl.timestamp ASC, gl.log_id ASC
+                """
+                cursor.execute(query, [start_date, end_date] + course_params)
+                raw_logs = cursor.fetchall()
+                total_expected = len(raw_logs)
+                total_present = sum(1 for row in raw_logs if str(row.get("status")).lower() == "entry")
+
+            elif normalized_category == "Visitor Logs" and report_type == "visitor_purpose":
+                report_title = "Visitor Purpose Summary Report"
+                event_name_display = "Visitor Purpose Summary"
+                col_headers = ["Purpose", "Visitor Count", "Percentage"]
+                purpose_condition = ""
+                purpose_params = []
+                if filter_value.lower() != "all":
+                    purpose_condition = "AND COALESCE(NULLIF(TRIM(v.purpose), ''), 'N/A') = %s"
+                    purpose_params = [filter_value]
+                    filter_display = filter_value
+                else:
+                    filter_display = "All Visitor Purposes"
+
+                query = f"""
+                    SELECT
+                        COALESCE(NULLIF(TRIM(v.purpose), ''), 'N/A') AS purpose,
+                        COUNT(DISTINCT CONCAT(gl.user_id, '|', DATE(gl.timestamp))) AS visitor_count
+                    FROM general_log gl
+                    JOIN users u ON gl.user_id = u.user_id
+                    JOIN visitors v ON u.user_id = v.user_id
+                    WHERE COALESCE(u.active, 1) = 1
+                      AND u.role = 'visitor'
+                      AND gl.log_type = 'Entry'
+                      AND DATE(gl.timestamp) BETWEEN %s AND %s
+                      {purpose_condition}
+                    GROUP BY purpose
+                    ORDER BY visitor_count DESC
+                """
+                cursor.execute(query, [start_date, end_date] + purpose_params)
+                raw_logs = cursor.fetchall()
+                total_expected = sum(row['visitor_count'] for row in raw_logs)
+                total_present = total_expected
+
             elif normalized_category == "Visitor Logs":
                 report_title = "Visitor Logs Report"
                 event_name_display = "Visitor Activity"
@@ -1842,6 +2033,82 @@ class Database:
                 total_expected = len(raw_logs)
                 total_present = len(raw_logs)
 
+            elif normalized_category == "Violations" and report_type == "curfew_violations":
+                report_title = "Curfew Violations Summary"
+                event_name_display = "Curfew Violations"
+                col_headers = ["Department", "Violation Count"]
+                role_condition = ""
+                role_params = []
+                if filter_value.lower() in {"student", "visitor", "employee"}:
+                    role_condition = "AND u.role = %s"
+                    role_params = [filter_value.lower()]
+                    filter_display = f"{filter_value.capitalize()}s"
+                else:
+                    filter_display = "All Subjects"
+
+                query = f"""
+                    SELECT
+                        COALESCE(
+                            d.department_name,
+                            CASE
+                                WHEN u.role = 'student' THEN 'Students'
+                                WHEN u.role = 'visitor' THEN 'Visitors'
+                                ELSE UPPER(u.role)
+                            END,
+                            'Unknown'
+                        ) AS department,
+                        COUNT(*) AS violation_count
+                    FROM violations violation
+                    JOIN users u ON violation.user_id = u.user_id
+                    LEFT JOIN employees e ON u.user_id = e.user_id
+                    LEFT JOIN departments d ON e.department_id = d.department_id
+                    WHERE LOWER(violation.description) LIKE %s
+                      AND DATE(violation.created_at) BETWEEN %s AND %s
+                      {role_condition}
+                    GROUP BY department
+                    ORDER BY violation_count DESC
+                """
+                cursor.execute(query, ["%curfew%", start_date, end_date] + role_params)
+                raw_logs = cursor.fetchall()
+                total_expected = sum(row["violation_count"] for row in raw_logs)
+                total_present = total_expected
+
+                cursor.execute(
+                    f"""
+                    SELECT DATE(violation.created_at) AS violation_date, COUNT(*) AS violation_count
+                    FROM violations violation
+                    JOIN users u ON violation.user_id = u.user_id
+                    WHERE LOWER(violation.description) LIKE %s
+                      AND DATE(violation.created_at) BETWEEN %s AND %s
+                      {role_condition}
+                    GROUP BY violation_date
+                    ORDER BY violation_count DESC, violation_date DESC
+                    """,
+                    ["%curfew%", start_date, end_date] + role_params,
+                )
+                peak_day_stats = cursor.fetchall()
+
+                cursor.execute(
+                    f"""
+                    SELECT
+                        COALESCE(e.employee_name, s.student_name, vi.visitor_name, 'Unknown User') AS offender_name,
+                        COUNT(*) AS violation_count
+                    FROM violations violation
+                    JOIN users u ON violation.user_id = u.user_id
+                    LEFT JOIN employees e ON u.user_id = e.user_id
+                    LEFT JOIN students s ON u.user_id = s.user_id
+                    LEFT JOIN visitors vi ON u.user_id = vi.user_id
+                    WHERE LOWER(violation.description) LIKE %s
+                      AND DATE(violation.created_at) BETWEEN %s AND %s
+                      {role_condition}
+                    GROUP BY offender_name
+                    ORDER BY violation_count DESC, offender_name ASC
+                    LIMIT 3
+                    """,
+                    ["%curfew%", start_date, end_date] + role_params,
+                )
+                top_offenders = cursor.fetchall()
+            
             elif normalized_category == "Violations":
                 report_title = "Violations Report"
                 event_name_display = "Security Violations"
@@ -1927,6 +2194,8 @@ class Database:
                 "total_expected": total_expected,
                 "total_present": total_present,
                 "filter_display": filter_display,
+                "peak_day_stats": peak_day_stats if 'peak_day_stats' in locals() else [],
+                "top_offenders": top_offenders if 'top_offenders' in locals() else [],
             }
         except connector.Error as err:
             print(f"Error fetching report data: {err}")
@@ -2249,6 +2518,7 @@ class Database:
             cursor.execute(
                 """
                 SELECT
+                    s.user_id AS user_id,
                     s.student_id AS id,
                     COALESCE(NULLIF(TRIM(s.student_name), ''), 'Unknown Student') AS name,
                     COALESCE(NULLIF(TRIM(c.course_name), ''), 'N/A') AS course,
@@ -2279,12 +2549,13 @@ class Database:
                       OR TIME(latest_entry.entry_time) < %s
                   )
                 ORDER BY latest_entry.entry_time ASC
-                LIMIT 10
                 """,
                 (curfew_time, curfew_time, early_morning_cutoff),
             )
+            curfew_candidates = cursor.fetchall()
+
             watchlist = []
-            for row in cursor.fetchall():
+            for row in curfew_candidates[:10]:
                 entry_time = row.get("entry_time")
                 watchlist.append(
                     {

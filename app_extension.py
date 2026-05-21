@@ -89,6 +89,8 @@ def validation_error(errors):
 INSTANCE_GENERATOR_CHECK_SECONDS = int(os.getenv("INSTANCE_GENERATOR_CHECK_SECONDS", "60"))
 INSTANCE_GENERATOR_RUN_INTERVAL_SECONDS = int(os.getenv("INSTANCE_GENERATOR_RUN_INTERVAL_SECONDS", "3600"))
 INSTANCE_GENERATOR_LOOKAHEAD_DAYS = int(os.getenv("INSTANCE_GENERATOR_LOOKAHEAD_DAYS", "7"))
+CURFEW_ENFORCEMENT_CHECK_SECONDS = int(os.getenv("CURFEW_ENFORCEMENT_CHECK_SECONDS", "60"))
+CURFEW_ENFORCEMENT_RUN_INTERVAL_SECONDS = int(os.getenv("CURFEW_ENFORCEMENT_RUN_INTERVAL_SECONDS", "3600"))
 INSTANCE_GENERATOR_STATE = {
     "running": False,
     "last_started_at": None,
@@ -102,9 +104,24 @@ INSTANCE_GENERATOR_STATE = {
     "run_interval_seconds": INSTANCE_GENERATOR_RUN_INTERVAL_SECONDS,
     "lookahead_days": INSTANCE_GENERATOR_LOOKAHEAD_DAYS,
 }
+CURFEW_ENFORCEMENT_STATE = {
+    "running": False,
+    "last_started_at": None,
+    "last_finished_at": None,
+    "last_success_at": None,
+    "last_error": None,
+    "last_result": None,
+    "last_trigger": None,
+    "next_check_at": None,
+    "next_run_at": None,
+    "run_interval_seconds": CURFEW_ENFORCEMENT_RUN_INTERVAL_SECONDS,
+}
 _instance_generator_lock = threading.Lock()
+_curfew_enforcement_lock = threading.Lock()
 _instance_generator_thread_started = False
+_curfew_enforcement_thread_started = False
 _last_scheduled_generation_at = None
+_last_scheduled_curfew_enforcement_at = None
 
 
 def _iso_timestamp(value):
@@ -114,6 +131,11 @@ def _iso_timestamp(value):
 def _copy_instance_generator_state():
     with _instance_generator_lock:
         return dict(INSTANCE_GENERATOR_STATE)
+
+
+def _copy_curfew_enforcement_state():
+    with _curfew_enforcement_lock:
+        return dict(CURFEW_ENFORCEMENT_STATE)
 
 
 def generate_event_instances_for_range(start_date=None, days=7, trigger="manual"):
@@ -320,6 +342,83 @@ def start_instance_generation_scheduler():
     scheduler_thread.start()
     _instance_generator_thread_started = True
     app.logger.info("Event instance background scheduler started.")
+
+
+def _curfew_enforcement_scheduler_loop():
+    global _last_scheduled_curfew_enforcement_at
+
+    while True:
+        now = datetime.now()
+        next_check = now + timedelta(seconds=CURFEW_ENFORCEMENT_CHECK_SECONDS)
+        next_run = (
+            now
+            if _last_scheduled_curfew_enforcement_at is None
+            else _last_scheduled_curfew_enforcement_at + timedelta(seconds=CURFEW_ENFORCEMENT_RUN_INTERVAL_SECONDS)
+        )
+        with _curfew_enforcement_lock:
+            CURFEW_ENFORCEMENT_STATE["next_check_at"] = _iso_timestamp(next_check)
+            CURFEW_ENFORCEMENT_STATE["next_run_at"] = _iso_timestamp(next_run)
+
+        should_run = (
+            now >= next_run
+            and not _copy_curfew_enforcement_state().get("running")
+        )
+
+        if should_run:
+            app.logger.info("Curfew enforcement scheduler starting.")
+            with _curfew_enforcement_lock:
+                CURFEW_ENFORCEMENT_STATE.update(
+                    {
+                        "running": True,
+                        "last_started_at": _iso_timestamp(now),
+                        "last_trigger": "scheduler",
+                    }
+                )
+            try:
+                with app.app_context():
+                    conn = connect_db()
+                    if conn:
+                        db = Database(conn)
+                        result = db.enforce_curfew_violations()
+                        if result.get("success"):
+                            CURFEW_ENFORCEMENT_STATE["last_success_at"] = _iso_timestamp(datetime.now())
+                        CURFEW_ENFORCEMENT_STATE["last_result"] = result
+                        if conn:
+                            close_db(None)
+                    else:
+                        CURFEW_ENFORCEMENT_STATE["last_result"] = {"success": False, "message": "Database offline"}
+            except Exception as err:
+                CURFEW_ENFORCEMENT_STATE["last_error"] = str(err)
+                app.logger.exception("Curfew enforcement scheduler failed")
+            finally:
+                with _curfew_enforcement_lock:
+                    CURFEW_ENFORCEMENT_STATE.update(
+                        {
+                            "running": False,
+                            "last_finished_at": _iso_timestamp(datetime.now()),
+                        }
+                    )
+                _last_scheduled_curfew_enforcement_at = datetime.now()
+
+        time.sleep(CURFEW_ENFORCEMENT_CHECK_SECONDS)
+
+
+def start_curfew_enforcement_scheduler():
+    global _curfew_enforcement_thread_started
+
+    if _curfew_enforcement_thread_started:
+        return
+    if app.debug and os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+        return
+
+    scheduler_thread = threading.Thread(
+        target=_curfew_enforcement_scheduler_loop,
+        name="curfew-enforcement-scheduler",
+        daemon=True,
+    )
+    scheduler_thread.start()
+    _curfew_enforcement_thread_started = True
+    app.logger.info("Curfew enforcement background scheduler started.")
 
 # ==============================================================================
 # DATABASE INITIALIZATION
@@ -628,6 +727,34 @@ def generate_daily_instances():
     """
     result = run_instance_generation_job(trigger="manual")
     return jsonify(result), (200 if result.get("success") else 409)
+
+
+@app.route("/admin/enforce-curfew-violations", methods=["POST"])
+def enforce_curfew_violations():
+    """
+    Triggered by an external cron, scheduled job, or manual admin action.
+    Inserts curfew violation records for students who remain inside past curfew.
+    """
+    conn = None
+    try:
+        conn = connect_db()
+        if not conn:
+            return jsonify({"success": False, "message": "Database offline"}), 500
+
+        db = Database(conn)
+        result = db.enforce_curfew_violations()
+        status_code = 200 if result.get("success") else 500
+        app.logger.info(
+            "Curfew enforcement run: inserted=%s skipped=%s candidates=%s errors=%s",
+            result.get("inserted"),
+            result.get("skipped"),
+            result.get("candidates"),
+            len(result.get("errors", [])),
+        )
+        return jsonify(result), status_code
+    except Exception as e:
+        app.logger.exception("Curfew enforcement failed")
+        return jsonify({"success": False, "message": str(e)}), 500
 
 
 @app.route("/admin/generate-daily-instances/status", methods=["GET"])
@@ -1397,6 +1524,7 @@ def get_instance_logs(instance_id):
             release_db_connection(conn)
 
 start_instance_generation_scheduler()
+start_curfew_enforcement_scheduler()
 
 if __name__ == '__main__':
     app.run(debug=app.config["DEBUG"], host='0.0.0.0', port=5001)

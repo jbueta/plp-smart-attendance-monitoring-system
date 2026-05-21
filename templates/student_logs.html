@@ -173,11 +173,23 @@
 
                     <div class="dropdown">
                         <button class="btn btn-sm btn-outline-light d-flex align-items-center gap-2 filter-btn shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-boundary="window">
-                            <span id="recordsStatusFilterLabel">Active</span>
+                            <span id="recordsStatusFilterLabel">All</span>
                         </button>
                         <ul class="dropdown-menu shadow-sm student-action-menu">
-                            <li><button type="button" class="dropdown-item records-status-option active text-white" data-value="active">Active</button></li>
-                            <li><button type="button" class="dropdown-item records-status-option text-white" data-value="all">Active / Inactive</button></li>
+                            <li><button type="button" class="dropdown-item records-status-option active text-white" data-value="all">All</button></li>
+                            <li><button type="button" class="dropdown-item records-status-option text-white" data-value="active">Active</button></li>
+                            <li><button type="button" class="dropdown-item records-status-option text-white" data-value="inactive">Inactive</button></li>
+                        </ul>
+                    </div>
+
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-light d-flex align-items-center gap-2 filter-btn shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-boundary="window">
+                            <span id="recordsTypeFilterLabel">All</span>
+                        </button>
+                        <ul class="dropdown-menu shadow-sm student-action-menu">
+                            <li><button type="button" class="dropdown-item records-type-option active text-white" data-value="">All</button></li>
+                            <li><button type="button" class="dropdown-item records-type-option text-white" data-value="regular">Regular</button></li>
+                            <li><button type="button" class="dropdown-item records-type-option text-white" data-value="irregular">Irregular</button></li>
                         </ul>
                     </div>
                     
@@ -203,6 +215,7 @@
                                 <th class="ps-4">Student ID</th>
                                 <th>Name</th>
                                 <th>Course</th>
+                                <th class="text-center">Type</th>
                                 <th class="text-center">Status</th>
                                 <th class="text-center pe-4">Actions</th>
                             </tr>
@@ -218,10 +231,16 @@
                                 data-course="{{ record.course | lower }}"
                                 data-course-original="{{ record.course }}"
                                 data-course-id="{{ record.course_id or '' }}"
+                                data-type="{{ record.type | lower }}"
                                 data-status="{{ record.status | lower }}">
                                 <td class="font-monospace text-white-50 ps-4">{{ record.id }}</td>
                                 <td class="fw-bold text-white">{{ record.name }}</td>
                                 <td class="text-white-50">{{ record.course }}</td>
+                                <td class="text-center">
+                                    <span class="badge bg-{{ record.type_class }} bg-opacity-25 border border-{{ record.type_class }} text-{{ record.type_class }} rounded-pill px-3">
+                                        {{ record.type }}
+                                    </span>
+                                </td>
                                 <td class="text-center">
                                     <span class="badge bg-{{ record.status_class }} bg-opacity-25 border border-{{ record.status_class }} text-{{ record.status_class }} rounded-pill px-3">
                                         {{ record.status }}
@@ -245,7 +264,7 @@
                             </tr>
                             {% else %}
                             <tr id="recordsEmptyRow">
-                                <td colspan="5" class="text-center text-white-50 py-5">
+                                <td colspan="6" class="text-center text-white-50 py-5">
                                     <i class="bi bi-people display-4 d-block mb-3"></i>
                                     No student records found.
                                 </td>
@@ -773,7 +792,8 @@ document.addEventListener('DOMContentLoaded', function () {
     let courseFilterValue = '';
     
     let recordsCourseFilterValue = '';
-    let recordsStatusFilterValue = 'active';
+    let recordsStatusFilterValue = 'all';
+    let recordsTypeFilterValue = '';
     let recordsSortFilterValue = 'recent';
 
     // Edit overlay
@@ -843,6 +863,16 @@ document.addEventListener('DOMContentLoaded', function () {
             recordsStatusFilterValue = e.target.dataset.value;
             document.getElementById('recordsStatusFilterLabel').textContent = e.target.textContent;
             document.querySelectorAll('.records-status-option').forEach(o => o.classList.remove('active'));
+            e.target.classList.add('active');
+            applyRecordsFilter();
+        });
+    });
+
+    document.querySelectorAll('.records-type-option').forEach(opt => {
+        opt.addEventListener('click', (e) => {
+            recordsTypeFilterValue = e.target.dataset.value;
+            document.getElementById('recordsTypeFilterLabel').textContent = e.target.textContent;
+            document.querySelectorAll('.records-type-option').forEach(o => o.classList.remove('active'));
             e.target.classList.add('active');
             applyRecordsFilter();
         });
@@ -1577,14 +1607,18 @@ document.addEventListener('DOMContentLoaded', function () {
         const val = (recordsSearch?.value || '').trim().toLowerCase();
         const courseVal = recordsCourseFilterValue;
         const statusVal = recordsStatusFilterValue;
+        const typeVal = recordsTypeFilterValue;
         let visible = 0;
 
         getRecordRows().forEach(row => {
             const rowStatus = (row.dataset.status || '').toLowerCase();
-            const matchStatus = statusVal === 'all' || rowStatus === 'active';
+            const rowType = (row.dataset.type || '').toLowerCase();
+            const matchStatus = statusVal === 'all' || rowStatus === statusVal;
+            const matchType = !typeVal || rowType === typeVal;
             const ok = (row.dataset.id.includes(val) || row.dataset.name.includes(val) || row.dataset.course.includes(val))
                 && (!courseVal || row.dataset.course === courseVal)
-                && matchStatus;
+                && matchStatus
+                && matchType;
             row.dataset.filterVisible = ok ? 'true' : 'false';
             if (ok) visible += 1;
         });
