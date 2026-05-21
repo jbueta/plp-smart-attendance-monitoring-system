@@ -1,0 +1,23 @@
+seq,user_id,visitor_id,visitor_name,purpose,details,status,valid_until,visitor_last_updated
+1,28,VT-00001,Vico Sotto,Other,Monitor Campus facilities and staff,Outside,2026-04-26 23:59:59,2026-05-16 19:07:18
+2,36,VT-00002,Ron Alexander Inocencio,Official Business,,Outside,2026-04-30 23:59:59,2026-05-16 19:07:18
+3,37,VT-00003,Ron Alexander Inocencio,Official Business,,Outside,2026-05-01 23:59:59,2026-05-16 19:07:18
+4,87,VT-00004,Jason Jay Recto,Meeting,,Outside,2026-05-08 23:59:59,2026-05-16 19:07:18
+5,88,VT-00005,Carl Vincent Ventura,Other,Campus Visit,Outside,2026-05-08 23:59:59,2026-05-16 19:07:18
+6,89,VT-00006,Ron Alexander Incocencio,,,Outside,2026-05-08 23:59:59,2026-05-16 19:07:18
+7,90,VT-00007,Jericho Salvador,,,Outside,2026-05-08 23:59:59,2026-05-16 19:07:18
+8,91,VT-00008,"Recto, Jason Jay, M.",Official Business,,Outside,2026-05-11 23:59:59,2026-05-16 19:07:18
+9,92,VT-00009,"Recto, Jason Jay, M.",Official Business,,Outside,2026-05-11 23:59:59,2026-05-16 19:07:18
+10,93,VT-00010,Ron Alexander Inocencio,Other,Monitor Campus facilities and staff,Outside,2026-05-12 23:59:59,2026-05-16 19:07:18
+11,94,VT-00011,Bondat,Document Submission,,Outside,2026-05-16 23:59:59,2026-05-20 20:30:04
+12,95,VT-00012,Ronald Stone,Meeting,,Outside,2026-05-16 23:59:59,2026-05-20 20:30:04
+13,96,VT-00013,Robin Hood,Other,Campus Visit,Outside,2026-05-16 23:59:59,2026-05-20 20:30:04
+14,97,VT-00014,Alan Peter Griffin,Delivery,,Outside,2026-05-16 23:59:59,2026-05-20 20:30:04
+15,98,VT-00015,Ronald Stone,Meeting,,Outside,2026-05-16 23:59:59,2026-05-20 20:30:04
+16,99,VT-00016,Robin Hood,Other,Campus Visit,Outside,2026-05-16 23:59:59,2026-05-20 20:30:04
+17,100,VT-00017,Alan Peter Griffin,Delivery,,Outside,2026-05-16 23:59:59,2026-05-20 20:30:04
+18,101,VT-00018,Ronald Stone,Meeting,,Outside,2026-05-20 23:59:59,2026-05-21 00:00:01
+19,102,VT-00019,Robin Hood,Other,Campus Visit,Outside,2026-05-20 23:59:59,2026-05-21 00:00:01
+20,103,VT-00020,Alan Peter Griffin,Delivery,,Outside,2026-05-20 23:59:59,2026-05-21 00:00:01
+21,104,VT-00021,Ron Alexander Inocencio,Official Business,,Outside,2026-05-20 23:59:59,2026-05-20 21:25:57
+22,109,VT-00022,Bondat,Document Submission,,Inside,2026-05-28 23:59:59,2026-05-20 23:55:14

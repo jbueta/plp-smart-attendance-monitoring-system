@@ -60,6 +60,8 @@ class Config:
     RATE_LIMIT_LOGIN = os.getenv("RATE_LIMIT_LOGIN", "5/minute")
     RATE_LIMIT_API = os.getenv("RATE_LIMIT_API", "100/hour")
     RATELIMIT_STORAGE_URL = os.getenv("RATELIMIT_STORAGE_URL", "memory://")
+    # Admin API key for protected maintenance endpoints (set via env var)
+    ADMIN_API_KEY = os.getenv("ADMIN_API_KEY")
 
     # CORS / integration
     BACKEND_API_URL = os.getenv("BACKEND_API_URL", "http://127.0.0.1:5001")

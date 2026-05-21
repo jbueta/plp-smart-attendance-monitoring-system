@@ -1,0 +1,17 @@
+event_id,event_name,event_type,frequency,day,event_date,time_start,time_end,location,active
+1,Flag Ceremony,Flag Ceremony,WEEKLY,Monday,2026-04-20,8:00:00,8:40:00,Facade,1
+2,Flag Retreat,Other,WEEKLY,Monday,2026-04-20,9:00:00,9:40:00,Facade,1
+3,Wildrift Tournament,Activity,ONCE,,2026-04-15,22:00:00,23:30:00,COMSOC,0
+4,Wildrift Tournament,Activity,ONCE,,2026-04-15,23:00:00,12:30:00,COMSOC,1
+5,ML,Activity,ONCE,,2026-04-24,10:53:00,10:55:00,Auditorium,0
+6,test,Meeting,ONCE,,2026-05-09,10:00:00,14:00:00,COMSOC,1
+7,ML,Flag Ceremony,ONCE,,2026-04-30,6:22:00,22:27:00,COMSOC,0
+8,test2,Training,ONCE,,2026-05-01,23:00:00,23:50:00,Facade,1
+9,asdasdasda,Training,ONCE,,2026-05-02,16:16:00,16:20:00,dasdasd,1
+10,Testing,Meeting,ONCE,,2026-05-07,20:25:00,21:25:00,Auditorium,1
+11,Flag Ceremony,Flag Ceremony,ONCE,,2026-05-08,13:00:00,13:30:00,Quad,0
+12,Test Event 2,Meeting,ONCE,,2026-05-08,12:36:00,12:40:00,Audi,1
+13,Flag Ceremony Test,Flag Ceremony,ONCE,,2026-05-08,13:35:00,15:35:00,Quad,1
+14,Wildrift Tournament,Meeting,ONCE,,2026-05-16,20:15:00,20:20:00,Auditorium,0
+15,Wildrift Tournament,Meeting,ONCE,,2026-05-16,21:36:00,21:40:00,Auditorium,1
+16,Demo Event,Meeting,ONCE,,2026-05-21,14:30:00,17:30:00,Main Hall,1

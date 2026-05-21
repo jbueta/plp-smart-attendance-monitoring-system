@@ -20,8 +20,7 @@ let reportMapping = {
         { value: "2", text: "Employee Attendance (General Assembly)", constraint: "once", date: "" }
     ],
     violation: [
-        { value: "curfew_violations", text: "Curfew Violations Report" },
-        { value: "overstaying_vehicles", text: "Overstaying Vehicles" }
+        { value: "curfew_violations", text: "Curfew Violations Report" }
     ]
 };
 

@@ -837,3 +837,524 @@ Database connection pool created.
 Hourly event instance scheduler starting for 7 day(s).
 Event instance background scheduler started.
 Event instance generation finished: trigger=scheduler created=0 existing=3 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Backup sync scheduler failed
+Traceback (most recent call last):
+  File "C:\xampp\htdocs\dashboard\plp-smart-attendance-monitoring-system\app_extension.py", line 216, in _backup_sync_scheduler_loop
+    if result.get("success"):
+       ^^^^^^^^^^
+AttributeError: 'bool' object has no attribute 'get'
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Backup sync scheduler starting.
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Backup sync scheduler starting.
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Backup sync scheduler starting.
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Backup sync scheduler starting.
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Backup sync scheduler starting.
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Backup sync scheduler starting.
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Backup sync scheduler starting.
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Backup sync scheduler starting.
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Backup sync scheduler starting.
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Backup sync scheduler starting.
+Backup sync background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+CRITICAL ERROR: Could not connect to MySQL database. Details: 2003: Can't connect to MySQL server on 'localhost:3306' (Errno 10061: No connection could be made because the target machine actively refused it)
+Pool is offline. Attempting auto-reconnect...
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+CRITICAL ERROR: Could not connect to MySQL database. Details: 2003: Can't connect to MySQL server on 'localhost:3306' (Errno 10061: No connection could be made because the target machine actively refused it)
+Falling back to SQLite backup database for this request.
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+CRITICAL ERROR: Could not connect to MySQL database. Details: 2003: Can't connect to MySQL server on 'localhost:3306' (Errno 10061: No connection could be made because the target machine actively refused it)
+Pool is offline. Attempting auto-reconnect...
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+CRITICAL ERROR: Could not connect to MySQL database. Details: 2003: Can't connect to MySQL server on 'localhost:3306' (Errno 10061: No connection could be made because the target machine actively refused it)
+Falling back to SQLite backup database for this request.
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+CRITICAL ERROR: Could not connect to MySQL database. Details: 2003: Can't connect to MySQL server on 'localhost:3306' (Errno 10061: No connection could be made because the target machine actively refused it)
+Pool is offline. Attempting auto-reconnect...
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+CRITICAL ERROR: Could not connect to MySQL database. Details: 2003: Can't connect to MySQL server on 'localhost:3306' (Errno 10061: No connection could be made because the target machine actively refused it)
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
+Creating database connection pool for localhost:3306/smart_monitoring as root...
+Database connection pool created.
+Hourly event instance scheduler starting for 7 day(s).
+Event instance background scheduler started.
+Curfew enforcement scheduler starting.
+Curfew enforcement background scheduler started.
+Event instance generation finished: trigger=scheduler created=0 existing=2 failed=0
