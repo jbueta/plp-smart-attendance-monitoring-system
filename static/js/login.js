@@ -19,9 +19,39 @@ document.addEventListener('DOMContentLoaded', () => {
         flashContainer.innerHTML = "";
         timerDisplay.innerText = "";
 
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value;
+
+        if (!username && !password) {
+            flashContainer.innerHTML = `
+                <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger mb-4" role="alert">
+                    <i class="bi bi-exclamation-circle me-2"></i>Please enter a username and password.
+                </div>
+            `;
+            return;
+        }
+
+        if (!username) {
+            flashContainer.innerHTML = `
+                <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger mb-4" role="alert">
+                    <i class="bi bi-exclamation-circle me-2"></i>Please enter a username.
+                </div>
+            `;
+            return;
+        }
+
+        if (!password) {
+            flashContainer.innerHTML = `
+                <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger mb-4" role="alert">
+                    <i class="bi bi-exclamation-circle me-2"></i>Please enter a password.
+                </div>
+            `;
+            return;
+        }
+
         const payload = {
-            username: usernameInput.value,
-            password: passwordInput.value
+            username: username,
+            password: password
         };
 
         try {
