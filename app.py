@@ -156,7 +156,7 @@ EVENT_DAYS = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
 EMPLOYEE_UPLOAD_REQUIRED_COLUMNS = ["EMPLOYEE ID", "EMPLOYEE NAME", "DEPARTMENT"]
 EMPLOYEE_UPLOAD_OPTIONAL_COLUMNS = ["POSITION"]
 STUDENT_UPLOAD_REQUIRED_COLUMNS = ["STUDENT ID", "STUDENT NAME"]
-STUDENT_UPLOAD_OPTIONAL_COLUMNS = ["COURSE", "COURSE ID", "STATUS"]
+STUDENT_UPLOAD_OPTIONAL_COLUMNS = ["COURSE", "COURSE ID", "STATUS", "STUDENT TYPE"]
 VISITOR_UPLOAD_REQUIRED_COLUMNS = ["NAME", "PURPOSE/OFFICE"]
 VISITOR_UPLOAD_OPTIONAL_COLUMNS = ["DETAILS"]
 
@@ -2505,6 +2505,7 @@ def parse_student_upload_file(file):
                 "course_name": row_map.get("COURSE", ""),
                 "course_id": course_id,
                 "status": row_map.get("STATUS", ""),
+                "student_type": row_map.get("STUDENT TYPE", ""),
             }
         )
 
@@ -2576,7 +2577,15 @@ def validate_student_upload_rows(conn, parsed_rows):
             if course_id.endswith(".0"):
                 course_id = course_id[:-2]
             status = clean_upload_text(row.get("status"))
+            student_type = clean_upload_text(row.get("student_type") or "regular").lower()
             row_number = row.get("row_number")
+            
+            # Validate student_type
+            if student_type and student_type not in ("regular", "irregular"):
+                errors.append(f"Row {row_number}: Student Type must be 'regular' or 'irregular', got '{student_type}'")
+                continue
+            if not student_type:
+                student_type = "regular"
 
             missing_fields = []
             if not student_id:
@@ -2655,6 +2664,7 @@ def validate_student_upload_rows(conn, parsed_rows):
                     "course_id": resolved_course["course_id"],
                     "course_name": resolved_course["course_name"],
                     "status": status or "Outside",
+                    "student_type": student_type,
                     "action": "reactivate" if student_id in inactive_ids else "create",
                 }
             )
@@ -2673,10 +2683,13 @@ def add_student_manual():
     student_name = (data.get("student_name") or data.get("name") or "").strip()
     course_id = resolve_course_id(data.get("course_id") or data.get("course"))
     status = (data.get("status") or "Outside").strip()
+    student_type = (data.get("student_type") or "regular").strip().lower()
 
     validation_errors = validate_student_fields(student_id=student_id, student_name=student_name)
     if not course_id:
         return jsonify({"success": False, "error": "Course is required."}), 400
+    if student_type not in ("regular", "irregular"):
+        return jsonify({"success": False, "error": "Student Type must be 'regular' or 'irregular'."}), 400
     if validation_errors:
         return jsonify({"success": False, "error": validation_errors[0]}), 400
 
@@ -2685,6 +2698,7 @@ def add_student_manual():
         student_name=student_name,
         course_id=course_id,
         status=status,
+        student_type=student_type,
     )
     return jsonify(result), (200 if result.get("success") else 400)
 
@@ -2709,9 +2723,9 @@ def upload_students():
 def download_student_upload_template():
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["STUDENT ID", "STUDENT NAME", "COURSE"])
-    writer.writerow(["23-00312", "Juan Dela Cruz", "BS Information Technology"])
-    writer.writerow(["24-00101", "Maria Santos", "BS Nursing"])
+    writer.writerow(["STUDENT ID", "STUDENT NAME", "COURSE", "STUDENT TYPE"])
+    writer.writerow(["23-00312", "Juan Dela Cruz", "BS Information Technology", "regular"])
+    writer.writerow(["24-00101", "Maria Santos", "BS Nursing", "regular"])
     csv_content = output.getvalue()
     output.close()
 
@@ -2785,6 +2799,7 @@ def commit_students_upload_payload(rows):
             course_id = str(row.get("course_id") or "").strip()
             course_name = normalize_course_name(row.get("course_name"))
             status = clean_upload_text(row.get("status")) or "Outside"
+            student_type = row.get("student_type") or "regular"
             row_number = row.get("row_number") or "Unknown"
 
             if not student_id or not student_name or not course_id:
@@ -2798,6 +2813,7 @@ def commit_students_upload_payload(rows):
                 course_id=course_id,
                 course_name=course_name,
                 status=status,
+                student_type=student_type,
             )
             if result.get("success"):
                 if result.get("reactivated"):

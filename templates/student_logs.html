@@ -369,10 +369,17 @@
                                     <label class="form-label text-white-50 small fw-semibold">Full Name</label>
                                     <input type="text" id="manualAddName" class="form-control bg-dark text-white border-secondary" placeholder="Juan Dela Cruz" autocomplete="off">
                                 </div>
-                                <div class="mb-0">
+                                <div class="mb-3">
                                     <label class="form-label text-white-50 small fw-semibold">Course</label>
                                     <select id="manualAddCourse" class="form-select bg-dark text-white border-secondary">
                                         <option value="" selected disabled>— Select Course —</option>
+                                    </select>
+                                </div>
+                                <div class="mb-0">
+                                    <label class="form-label text-white-50 small fw-semibold">Student Type</label>
+                                    <select id="manualAddStudentType" class="form-select bg-dark text-white border-secondary">
+                                        <option value="regular" selected>Regular</option>
+                                        <option value="irregular">Irregular</option>
                                     </select>
                                 </div>
                             </div>
@@ -1074,6 +1081,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const student_id   = (manualIdInput?.value   || '').trim();
             const student_name = (manualNameInput?.value || '').trim();
             const course_id    = manualCourse?.value || '';
+            const student_type = (document.getElementById('manualAddStudentType')?.value || 'regular').trim();
             const selectedCourseName = manualCourse?.selectedOptions?.[0]?.textContent?.trim() || '';
 
             if (!student_id || !student_name || !course_id) {
@@ -1092,7 +1100,8 @@ document.addEventListener('DOMContentLoaded', function () {
                         student_id,
                         student_name,
                         course_id,
-                        status: 'Outside'
+                        status: 'Outside',
+                        student_type
                     })
                 });
 
@@ -1110,11 +1119,17 @@ document.addEventListener('DOMContentLoaded', function () {
                         tr.dataset.id       = student_id.toLowerCase();
                         tr.dataset.name     = student_name.toLowerCase();
                         tr.dataset.course   = resolvedCourseName.toLowerCase();
+                        tr.dataset.type     = student_type.toLowerCase();
                         tr.dataset.status   = 'active';
+                        const typeClass = student_type.toLowerCase() === 'regular' ? 'success' : 'warning';
+                        const typeDisplay = student_type.charAt(0).toUpperCase() + student_type.slice(1);
                         tr.innerHTML = `
                             <td class="font-monospace text-white-50 ps-4">${student_id}</td>
                             <td class="fw-bold text-white">${student_name.toUpperCase()}</td>
                             <td class="text-white-50">${resolvedCourseName}</td>
+                            <td class="text-center">
+                                <span class="badge bg-${typeClass} bg-opacity-25 border border-${typeClass} text-${typeClass} rounded-pill px-3">${typeDisplay}</span>
+                            </td>
                             <td class="text-center">
                                 <span class="badge bg-success bg-opacity-25 border border-success text-success rounded-pill px-3">Active</span>
                             </td>

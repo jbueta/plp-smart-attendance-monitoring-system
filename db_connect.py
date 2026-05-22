@@ -2395,19 +2395,12 @@ class Database:
                 """,
                 (curfew_time, curfew_time, early_morning_cutoff),
             )
-<<<<<<< HEAD
-            consecutive_absences = cursor.fetchall()
-            absence_alerts = []
-            for row in consecutive_absences:
-                absence_alerts.append({
-=======
             overstaying_students = cursor.fetchall()
             alerts = []
             for row in overstaying_students:
                 entry_time = row.get("entry_time")
                 entry_str = entry_time.strftime("%I:%M %p").lstrip("0") if entry_time else "--:--"
                 alerts.append({
->>>>>>> f39611b1b85917367305cf6b343271e66169060a
                     "type": "danger",
                     "icon": "person-fill-exclamation",
                     "title": row.get("name", "Unknown Student"),
@@ -2415,8 +2408,6 @@ class Database:
                     "time": f"Entered: {entry_str}",
                     "minutes_inside": int(row.get("minutes_inside") or 0),
                 })
-
-            alerts = []
             alert_time = datetime.now().strftime("%I:%M %p")
 
             cursor.execute(
@@ -3386,6 +3377,7 @@ class StudentModel:
         course_id=None,
         course_name=None,
         status="Outside",
+        student_type="regular",
     ):
         cursor = None
         lock_acquired = False
@@ -3393,6 +3385,9 @@ class StudentModel:
             student_id = normalize_student_id(student_id)
             student_name = normalize_student_name(student_name)
             status = normalize_student_status(status, default="Outside")
+            student_type = (student_type or "regular").lower().strip()
+            if student_type not in ("regular", "irregular"):
+                student_type = "regular"
 
             validation_errors = validate_student_fields(
                 student_id=student_id,
@@ -3462,13 +3457,15 @@ class StudentModel:
                     UPDATE students
                     SET student_name = %s,
                         course_id = %s,
-                        status = %s
+                        status = %s,
+                        student_type = %s
                     WHERE user_id = %s
                     """,
                     (
                         student_name,
                         resolved_course_id,
                         status,
+                        student_type,
                         existing_student["user_id"],
                     ),
                 )
@@ -3501,8 +3498,8 @@ class StudentModel:
             cursor.execute(
                 """
                 INSERT INTO students
-                    (user_id, student_id, student_name, course_id, status)
-                VALUES (%s, %s, %s, %s, %s)
+                    (user_id, student_id, student_name, course_id, status, student_type)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 (
                     user_id,
@@ -3510,6 +3507,7 @@ class StudentModel:
                     student_name,
                     resolved_course_id,
                     status,
+                    student_type,
                 ),
             )
             conn.commit()
@@ -3530,7 +3528,7 @@ class StudentModel:
             if cursor:
                 cursor.close()
 
-    def add_student(self, student_id, student_name, course_id, status="Outside"):
+    def add_student(self, student_id, student_name, course_id, status="Outside", student_type="regular"):
         conn = connect_db()
         if conn is None:
             return {"success": False, "error": "Database connection failed"}
@@ -3542,6 +3540,7 @@ class StudentModel:
                 student_name=student_name,
                 course_id=course_id,
                 status=status,
+                student_type=student_type,
             )
         finally:
             release_db_connection(conn)
@@ -3554,6 +3553,7 @@ class StudentModel:
         course_name=None,
         course_id=None,
         status="Outside",
+        student_type="regular",
     ):
         return self._create_or_reactivate_student(
             conn=conn,
@@ -3562,4 +3562,5 @@ class StudentModel:
             course_id=course_id,
             course_name=course_name,
             status=status,
+            student_type=student_type,
         )
