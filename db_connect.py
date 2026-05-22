@@ -2356,34 +2356,64 @@ class Database:
             )
             total_employees = cursor.fetchone()["total"] or 0
 
+            curfew_time = "21:40:00"
+            early_morning_cutoff = "06:00:00"
             cursor.execute(
                 """
-                SELECT e.employee_name, d.department_name, COUNT(*) as absent_count
-                FROM (
-                    SELECT ea.user_id, ea.status,
-                           ROW_NUMBER() OVER (PARTITION BY ea.user_id ORDER BY ea.event_date DESC, ea.instance_id DESC) as rn
-                    FROM event_attendance ea
-                    JOIN employees emp ON ea.user_id = emp.user_id
-                    JOIN users u ON emp.user_id = u.user_id
-                    WHERE u.active = 1
-                ) t
-                JOIN employees e ON t.user_id = e.user_id
-                JOIN departments d ON e.department_id = d.department_id
-                WHERE t.rn <= 3 AND t.status = 'Absent'
-                GROUP BY t.user_id, e.employee_name, d.department_name
-                HAVING absent_count = 3
-                LIMIT 4
-                """
+                SELECT
+                    s.student_id AS id,
+                    COALESCE(NULLIF(TRIM(s.student_name), ''), 'Unknown Student') AS name,
+                    COALESCE(NULLIF(TRIM(c.course_name), ''), 'N/A') AS course,
+                    latest_entry.entry_time,
+                    TIMESTAMPDIFF(MINUTE, latest_entry.entry_time, NOW()) AS minutes_inside
+                FROM students s
+                JOIN users u ON s.user_id = u.user_id
+                LEFT JOIN courses c ON s.course_id = c.course_id
+                JOIN (
+                    SELECT user_id, MAX(timestamp) AS entry_time
+                    FROM general_log
+                    WHERE log_type = 'Entry'
+                    GROUP BY user_id
+                ) latest_entry ON latest_entry.user_id = s.user_id
+                LEFT JOIN (
+                    SELECT user_id, MAX(timestamp) AS exit_time
+                    FROM general_log
+                    WHERE log_type = 'Exit'
+                    GROUP BY user_id
+                ) latest_exit ON latest_exit.user_id = s.user_id
+                WHERE s.status = 'Inside'
+                  AND u.role = 'student'
+                  AND u.active = 1
+                  AND (latest_exit.exit_time IS NULL OR latest_entry.entry_time > latest_exit.exit_time)
+                  AND (
+                      NOW() >= TIMESTAMP(DATE(latest_entry.entry_time), %s)
+                      OR TIME(latest_entry.entry_time) >= %s
+                      OR TIME(latest_entry.entry_time) < %s
+                  )
+                ORDER BY latest_entry.entry_time ASC
+                LIMIT 10
+                """,
+                (curfew_time, curfew_time, early_morning_cutoff),
             )
+<<<<<<< HEAD
             consecutive_absences = cursor.fetchall()
             absence_alerts = []
             for row in consecutive_absences:
                 absence_alerts.append({
+=======
+            overstaying_students = cursor.fetchall()
+            alerts = []
+            for row in overstaying_students:
+                entry_time = row.get("entry_time")
+                entry_str = entry_time.strftime("%I:%M %p").lstrip("0") if entry_time else "--:--"
+                alerts.append({
+>>>>>>> f39611b1b85917367305cf6b343271e66169060a
                     "type": "danger",
-                    "icon": "exclamation-triangle-fill",
-                    "title": "Consecutive Absence Alert",
-                    "message": f"{row['employee_name']} ({row['department_name']}) has missed 3 consecutive events.",
-                    "time": "Attendance Red Flag"
+                    "icon": "person-fill-exclamation",
+                    "title": row.get("name", "Unknown Student"),
+                    "message": row.get("course", "N/A"),
+                    "time": f"Entered: {entry_str}",
+                    "minutes_inside": int(row.get("minutes_inside") or 0),
                 })
 
             alerts = []
