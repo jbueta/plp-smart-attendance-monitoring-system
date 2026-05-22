@@ -1836,8 +1836,11 @@ class Database:
         normalized_category = {
             "general": "General Logs",
             "visitor": "Visitor Logs",
+            "visitors": "Visitor Logs",
             "event": "Event Attendance",
+            "events": "Event Attendance",
             "violation": "Violations",
+            "violations": "Violations",
         }.get((category or "").lower(), category or "General Logs")
 
         report_title = "System Report"
@@ -2399,86 +2402,6 @@ class Database:
                     "time": f"Entered: {entry_str}",
                     "minutes_inside": int(row.get("minutes_inside") or 0),
                 })
-<<<<<<< HEAD
-=======
-            alert_time = datetime.now().strftime("%I:%M %p")
-
-            cursor.execute(
-                """
-                SELECT COUNT(*) AS cnt
-                FROM students s
-                JOIN users u ON s.user_id = u.user_id
-                JOIN (
-                    SELECT user_id, MAX(timestamp) AS entry_time
-                    FROM general_log
-                    WHERE log_type = 'Entry'
-                    GROUP BY user_id
-                ) latest_entry ON latest_entry.user_id = s.user_id
-                LEFT JOIN (
-                    SELECT user_id, MAX(timestamp) AS exit_time
-                    FROM general_log
-                    WHERE log_type = 'Exit'
-                    GROUP BY user_id
-                ) latest_exit ON latest_exit.user_id = s.user_id
-                WHERE s.status = 'Inside'
-                  AND u.role = 'student'
-                  AND u.active = 1
-                  AND (latest_exit.exit_time IS NULL OR latest_entry.entry_time > latest_exit.exit_time)
-                  AND (
-                      NOW() >= TIMESTAMP(DATE(latest_entry.entry_time), %s)
-                      OR TIME(latest_entry.entry_time) >= %s
-                      OR TIME(latest_entry.entry_time) < %s
-                  )
-                """,
-                (CURFEW_TIME, CURFEW_TIME, EARLY_MORNING_CURFEW_CUTOFF),
-            )
-            curfew_students_inside = cursor.fetchone()["cnt"] or 0
-            if curfew_students_inside > 0:
-                alerts.append({
-                    "type": "danger",
-                    "icon": "shield-exclamation",
-                    "title": f"Curfew Watch: {curfew_students_inside} student(s) past curfew",
-                    "message": f"Students have an open campus entry past {CURFEW_TRIGGER_LABEL}.",
-                    "time": alert_time,
-                })
-
-            density_threshold = 1000
-            if currently_inside > density_threshold:
-                alerts.append({
-                    "type": "warning",
-                    "icon": "exclamation-triangle-fill",
-                    "title": f"High Campus Density: {currently_inside:,} people inside",
-                    "message": "Live inside count has crossed the dashboard alert threshold.",
-                    "time": alert_time,
-                })
-
-            if peak_row:
-                alerts.append({
-                    "type": "info",
-                    "icon": "graph-up-arrow",
-                    "title": f"Peak Hour Detected at {peak_hour}",
-                    "message": "Today's entry traffic has a clear highest-volume hour.",
-                    "time": "Today",
-                })
-
-            if total_invited > 0 and (total_attended / total_invited) < 0.5:
-                alerts.append({
-                    "type": "warning",
-                    "icon": "calendar-x-fill",
-                    "title": f"Low Event Attendance: {attendance_rate} turnout today",
-                    "message": attendance_raw,
-                    "time": alert_time,
-                })
-
-            if not alerts:
-                alerts.append({
-                    "type": "success",
-                    "icon": "check-circle-fill",
-                    "title": "All systems normal. No issues detected.",
-                    "message": "Campus traffic and event attendance are within expected levels.",
-                    "time": alert_time,
-                })
->>>>>>> 6443696 (feat: add student_type field for regular/irregular student classification)
 
             return {
                 "total_entries": f"{total_entries:,}",
