@@ -2395,19 +2395,12 @@ class Database:
                 """,
                 (curfew_time, curfew_time, early_morning_cutoff),
             )
-<<<<<<< HEAD
-            consecutive_absences = cursor.fetchall()
-            absence_alerts = []
-            for row in consecutive_absences:
-                absence_alerts.append({
-=======
             overstaying_students = cursor.fetchall()
-            alerts = []
+            absence_alerts = []
             for row in overstaying_students:
                 entry_time = row.get("entry_time")
                 entry_str = entry_time.strftime("%I:%M %p").lstrip("0") if entry_time else "--:--"
-                alerts.append({
->>>>>>> f39611b1b85917367305cf6b343271e66169060a
+                absence_alerts.append({
                     "type": "danger",
                     "icon": "person-fill-exclamation",
                     "title": row.get("name", "Unknown Student"),
