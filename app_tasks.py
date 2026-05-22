@@ -280,6 +280,10 @@ def calculate_daily_traffic_summary(raw_logs):
 def fetch_report_data(category, report_type, filter_val, start_date, end_date):
     conn = None
     try:
+        category_key = (category or "").lower()
+        if category_key == "violation":
+            category_key = "violations"
+
         # Debug logging
         print(f"[REPORT DEBUG] Category: {category}, Type: {report_type}, Filter: {filter_val}, Start: {start_date}, End: {end_date}")
         
@@ -296,13 +300,13 @@ def fetch_report_data(category, report_type, filter_val, start_date, end_date):
         logs = []
         metrics_data = None
         
-        if category.lower() == 'general' and report_type == 'daily_traffic':
+        if category_key == 'general' and report_type == 'daily_traffic':
             traffic_summary = calculate_daily_traffic_summary(data['raw_logs'])
             for index, row in enumerate(traffic_summary['daily_rows'], start=1):
                 row['id'] = index
                 logs.append(row)
             metrics_data = traffic_summary['metrics']
-        elif category.lower() == 'general':
+        elif category_key == 'general':
             pair_logs = pair_entry_exit_records(data['raw_logs'])
             for index, row in enumerate(pair_logs, start=1):
                 row['id'] = index
@@ -312,7 +316,7 @@ def fetch_report_data(category, report_type, filter_val, start_date, end_date):
             
             # Calculate General Logs specific metrics
             metrics_data = calculate_general_logs_metrics(pair_logs)
-        elif category.lower() == 'visitor' and report_type == 'visitor_purpose':
+        elif category_key == 'visitor' and report_type == 'visitor_purpose':
             total_visitors = sum(row.get('visitor_count', 0) for row in data['raw_logs'])
             for index, row in enumerate(data['raw_logs'], start=1):
                 visitor_count = row.get('visitor_count', 0)
@@ -325,7 +329,7 @@ def fetch_report_data(category, report_type, filter_val, start_date, end_date):
                 'purpose_categories': len(data['raw_logs']),
                 'filter_display': data.get('filter_display', filter_val)
             }
-        elif category.lower() == 'violations' and report_type == 'curfew_violations':
+        elif category_key == 'violations' and report_type == 'curfew_violations':
             total_violations = sum(row.get('violation_count', 0) for row in data['raw_logs'])
             for index, row in enumerate(data['raw_logs'], start=1):
                 row['id'] = index
@@ -350,7 +354,7 @@ def fetch_report_data(category, report_type, filter_val, start_date, end_date):
             attendance_rate = "0.0"
             if data['total_expected'] > 0:
                 attendance_rate = str(round((data['total_present'] / data['total_expected']) * 100, 1))
-            elif (category or '').lower() in ['general', 'visitor']:
+            elif category_key in ['general', 'visitor']:
                 attendance_rate = "100.0"
             metrics_data = {
                 "expected": data['total_expected'],
@@ -365,7 +369,7 @@ def fetch_report_data(category, report_type, filter_val, start_date, end_date):
     return {
         "report_data": {
             "title": data['report_title'],
-            "reference_id": f"PLP-{category[:3].upper()}-{uuid.uuid4().hex[:6].upper()}",
+            "reference_id": f"PLP-{category_key[:3].upper()}-{uuid.uuid4().hex[:6].upper()}",
             "event_name": data['event_name_display'],
             "department": data.get('filter_display', filter_val),
             "date_range": f"{start_date} to {end_date}",
@@ -373,5 +377,5 @@ def fetch_report_data(category, report_type, filter_val, start_date, end_date):
         },
         "metrics_data": metrics_data,
         "logs": logs,
-        "category": category
+        "category": category_key
     }
