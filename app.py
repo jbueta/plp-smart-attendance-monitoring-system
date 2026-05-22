@@ -152,8 +152,8 @@ EVENT_FREQUENCIES = {"ONCE", "DAILY", "WEEKLY"}
 EVENT_DAYS = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
 EMPLOYEE_UPLOAD_REQUIRED_COLUMNS = ["EMPLOYEE ID", "EMPLOYEE NAME", "DEPARTMENT"]
 EMPLOYEE_UPLOAD_OPTIONAL_COLUMNS = ["POSITION"]
-STUDENT_UPLOAD_REQUIRED_COLUMNS = ["STUDENT ID", "STUDENT NAME"]
-STUDENT_UPLOAD_OPTIONAL_COLUMNS = ["COURSE", "COURSE ID", "STATUS", "STUDENT TYPE"]
+STUDENT_UPLOAD_REQUIRED_COLUMNS = ["STUDENT ID", "STUDENT NAME", "STUDENT TYPE"]
+STUDENT_UPLOAD_OPTIONAL_COLUMNS = ["COURSE", "COURSE ID", "STATUS"]
 VISITOR_UPLOAD_REQUIRED_COLUMNS = ["NAME", "PURPOSE/OFFICE"]
 VISITOR_UPLOAD_OPTIONAL_COLUMNS = ["DETAILS"]
 
@@ -2460,7 +2460,7 @@ def parse_student_upload_file(file):
     if header_index is None:
         return {
             "success": False,
-            "error": "Could not find the required headers: Student ID, Student Name, and Course or Course ID.",
+            "error": "Could not find the required headers: Student ID, Student Name, Student Type, and Course or Course ID.",
         }
 
     missing_columns = [
@@ -2574,25 +2574,25 @@ def validate_student_upload_rows(conn, parsed_rows):
             if course_id.endswith(".0"):
                 course_id = course_id[:-2]
             status = clean_upload_text(row.get("status"))
-            student_type = clean_upload_text(row.get("student_type") or "regular").lower()
+            student_type = clean_upload_text(row.get("student_type") or "").lower()
             row_number = row.get("row_number")
-            
-            # Validate student_type
-            if student_type and student_type not in ("regular", "irregular"):
-                errors.append(f"Row {row_number}: Student Type must be 'regular' or 'irregular', got '{student_type}'")
-                continue
-            if not student_type:
-                student_type = "regular"
 
             missing_fields = []
             if not student_id:
                 missing_fields.append("Student ID")
             if not student_name:
                 missing_fields.append("Student Name")
+            if not student_type:
+                missing_fields.append("Student Type")
             if not course_id and not course_name:
                 missing_fields.append("Course or Course ID")
             if missing_fields:
                 errors.append(f"Row {row_number}: Missing {', '.join(missing_fields)}")
+                continue
+
+            # Validate student_type
+            if student_type not in ("regular", "irregular"):
+                errors.append(f"Row {row_number}: Student Type must be 'regular' or 'irregular', got '{student_type}'")
                 continue
 
             field_errors = validate_student_fields(student_id=student_id, student_name=student_name)

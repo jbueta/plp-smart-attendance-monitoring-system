@@ -1244,6 +1244,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     <td class="text-white">${escapeHtml(row.student_id)}</td>
                     <td class="text-white">${escapeHtml(row.student_name)}</td>
                     <td class="text-white-50">${escapeHtml(row.course_name)}</td>
+                    <td class="text-white-50">${escapeHtml(row.student_type ? (row.student_type.charAt(0).toUpperCase() + row.student_type.slice(1)) : 'Regular')}</td>
                     <td class="text-white-50">${escapeHtml(row.status || 'Outside')}</td>
                     <td class="text-white-50">${row.action === 'reactivate' ? 'Reactivate existing student' : 'Create new student'}</td>
                     <td class="text-end">
@@ -1251,7 +1252,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     </td>
                 </tr>
             `).join('')
-            : '<tr><td colspan="7" class="text-center text-white-50 py-4">No rows left to upload.</td></tr>';
+            : '<tr><td colspan="8" class="text-center text-white-50 py-4">No rows left to upload.</td></tr>';
 
         const validationErrors = (result.errors || []).length
             ? `
@@ -1286,6 +1287,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             <th>Student ID</th>
                             <th>Student Name</th>
                             <th>Course</th>
+                            <th>Type</th>
                             <th>Status</th>
                             <th>Result</th>
                             <th class="text-end">Action</th>
@@ -1379,7 +1381,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!Number.isNaN(index)) {
                 uploadPreviewRows.splice(index, 1);
                 renderUploadPreviewModal({
-                    required_columns: ['STUDENT ID', 'STUDENT NAME'],
+                    required_columns: ['STUDENT ID', 'STUDENT NAME', 'STUDENT TYPE'],
                     optional_columns: ['COURSE', 'COURSE ID', 'STATUS'],
                     errors: []
                 });
