@@ -88,13 +88,19 @@ class AnnouncementModel:
             for b in all_active:
                 v_scope = str(b['visibility_scope']).lower()
 
-                # Check scheduled_date filter if present
+                # Global bulletins are always shown on every kiosk regardless of
+                # scheduled_date — they are site-wide announcements and must not be
+                # filtered by date.  Only scoped bulletins (targeted, departmental,
+                # event_specific) are subject to the scheduled_date guard.
+                if v_scope == 'global':
+                    filtered.append(b)
+                    continue
+
+                # For scoped bulletins: skip if the scheduled date doesn't match today
                 if scheduled_date and str(b.get('scheduled_date')) != str(scheduled_date):
                     continue
 
-                if v_scope == 'global':
-                    filtered.append(b)
-                elif v_scope == 'targeted' and target_id and str(target_id).strip() == str(b['target_id']).strip():
+                if v_scope == 'targeted' and target_id and str(target_id).strip() == str(b['target_id']).strip():
                     filtered.append(b)
                 elif v_scope == 'departmental' and target_dept and str(target_dept).lower().strip() == str(b['target_department']).lower().strip():
                     filtered.append(b)
