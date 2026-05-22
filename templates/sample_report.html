@@ -423,152 +423,70 @@
         <!-- Data table for this page chunk -->
         <table class="report-table">
             <thead>
-                <div style="font-size: 18px; font-weight: 700;">{{ metrics.filter_display or 'All Subjects' }}</div>
-            </div>
-        </div>
-    {% endif %}
-
-    <table class="report-table">
-        <thead>
-            {% if category == 'general' and report_type == 'daily_traffic' %}
-                <tr>
-                    <th style="width: 10%;">No.</th>
-                    <th style="width: 18%;">Date</th>
-                    <th style="width: 16%;">Entries</th>
-                    <th style="width: 16%;">Exits</th>
-                    <th style="width: 20%;">Peak Hour</th>
-                    <th style="width: 20%;">Avg. Time</th>
-                </tr>
-            {% elif category == 'visitor' and report_type == 'visitor_purpose' %}
-                <tr>
-                    <th style="width: 10%;">No.</th>
-                    <th style="width: 50%; text-align: left;">Purpose</th>
-                    <th style="width: 20%;">Visitor Count</th>
-                    <th style="width: 20%;">Percentage</th>
-                </tr>
-            {% elif category == 'general' %}
-                <tr>
-                    <th style="width: 5%;">No.</th>
-                    <th style="width: 30%; text-align: left;">Student Name</th>
-                    <th style="width: 25%;">Program</th>
-                    <th style="width: 15%;">Time In</th>
-                    <th style="width: 15%;">Time Out</th>
-                    <th style="width: 10%;">Gate</th>
-                </tr>
-            {% elif category == 'visitor' %}
-                <tr>
-                    <th style="width: 5%;">No.</th>
-                    <th style="width: 25%; text-align: left;">Visitor Name</th>
-                    <th style="width: 25%;">Purpose</th>
-                    <th style="width: 15%;">Time In</th>
-                    <th style="width: 15%;">Time Out</th>
-                    <th style="width: 15%;">Visitor ID</th>
-                </tr>
-            {% elif category == 'violations' and report_type == 'curfew_violations' %}
-                <tr>
-                    <th style="width: 10%;">No.</th>
-                    <th style="width: 60%; text-align: left;">Department</th>
-                    <th style="width: 30%;">Violation Count</th>
-                </tr>
-            {% elif category == 'event' %}
-                <tr>
-                    <th style="width: 5%;">No.</th>
-                    <th style="width: 25%; text-align: left;">Participant Name</th>
-                    <th style="width: 20%;">Role / Affiliation</th>
-                    <th style="width: 15%;">Time In</th>
-                    <th style="width: 15%;">Time Out</th>
-                    <th style="width: 20%;">Status</th>
-                </tr>
-            {% else %}
-                <tr>
-                    <th style="width: 5%;">No.</th>
-                    <th style="width: 25%; text-align: left;">Name</th>
-                    <th style="width: 25%;">Description</th>
-                    <th style="width: 15%;">Time</th>
-                    <th style="width: 15%;">Status</th>
-                    <th style="width: 15%;">Remarks</th>
-                </tr>
-            {% endif %}
-        </thead>
-        <tbody>
-            {% if logs %}
                 {% if category == 'general' and report_type == 'daily_traffic' %}
-                    {% for log in logs %}
                     <tr>
-                        <td class="text-center">{{ loop.index }}</td>
-                        <td class="text-center">{{ log.date }}</td>
-                        <td class="text-center">{{ log.entries }}</td>
-                        <td class="text-center">{{ log.exits }}</td>
-                        <td class="text-center">{{ log.peak_hour }}</td>
-                        <td class="text-center">{{ log.avg_time_spent }}</td>
+                        <th style="width: 10%;">No.</th>
+                        <th style="width: 18%;">Date</th>
+                        <th style="width: 16%;">Entries</th>
+                        <th style="width: 16%;">Exits</th>
+                        <th style="width: 20%;">Peak Hour</th>
+                        <th style="width: 20%;">Avg. Time</th>
                     </tr>
-                    {% endfor %}
-
                 {% elif category == 'visitor' and report_type == 'visitor_purpose' %}
-                    {% for log in logs %}
                     <tr>
-                        <td class="text-center">{{ loop.index }}</td>
-                        <td class="text-start">{{ log.purpose }}</td>
-                        <td class="text-center">{{ log.visitor_count }}</td>
-                        <td class="text-center">{{ log.percentage }}</td>
+                        <th style="width: 10%;">No.</th>
+                        <th style="width: 50%; text-align: left;">Purpose</th>
+                        <th style="width: 20%;">Visitor Count</th>
+                        <th style="width: 20%;">Percentage</th>
                     </tr>
-                    {% endfor %}
-
                 {% elif category == 'general' %}
-                    {% for log in logs %}
                     <tr>
-                        <td class="text-center">{{ loop.index }}</td>
-                        <td class="text-start">{{ log.name }}</td>
-                        <td class="text-center">{{ log.detail }}</td>
-                        <td class="text-center">{{ log.time_in }}</td>
-                        <td class="text-center">{{ log.time_out }}</td>
-                        <td class="text-center">{{ log.remarks }}</td>
+                        <th style="width: 5%;">No.</th>
+                        <th style="width: 30%; text-align: left;">Student Name</th>
+                        <th style="width: 25%;">Program</th>
+                        <th style="width: 15%;">Time In</th>
+                        <th style="width: 15%;">Time Out</th>
+                        <th style="width: 10%;">Gate</th>
                     </tr>
-                    {% endfor %}
-
-
                 {% elif category == 'visitor' %}
-                <tr>
-                    <th style="width:5%;">No.</th>
-                    <th style="width:28%;text-align:left;">Visitor Name</th>
-                    <th style="width:22%;">Purpose</th>
-                    <th style="width:15%;">Time In</th>
-                    <th style="width:15%;">Time Out</th>
-                    <th style="width:15%;">Visitor ID</th>
-                </tr>
+                    <tr>
+                        <th style="width: 5%;">No.</th>
+                        <th style="width: 25%; text-align: left;">Visitor Name</th>
+                        <th style="width: 25%;">Purpose</th>
+                        <th style="width: 15%;">Time In</th>
+                        <th style="width: 15%;">Time Out</th>
+                        <th style="width: 15%;">Visitor ID</th>
+                    </tr>
+                {% elif category == 'violations' and report_type == 'curfew_violations' %}
+                    <tr>
+                        <th style="width: 10%;">No.</th>
+                        <th style="width: 60%; text-align: left;">Department</th>
+                        <th style="width: 30%;">Violation Count</th>
+                    </tr>
                 {% elif category == 'event' %}
-                <tr>
-                    <th style="width:5%;">No.</th>
-                    <th style="width:28%;text-align:left;">Participant Name</th>
-                    <th style="width:22%;">Role / Affiliation</th>
-                    <th style="width:15%;">Time In</th>
-                    <th style="width:15%;">Time Out</th>
-                    <th style="width:15%;">Status</th>
-                </tr>
+                    <tr>
+                        <th style="width: 5%;">No.</th>
+                        <th style="width: 25%; text-align: left;">Participant Name</th>
+                        <th style="width: 20%;">Role / Affiliation</th>
+                        <th style="width: 15%;">Time In</th>
+                        <th style="width: 15%;">Time Out</th>
+                        <th style="width: 20%;">Status</th>
+                    </tr>
                 {% else %}
-                <tr>
-                    <th style="width:5%;">No.</th>
-                    <th style="width:28%;text-align:left;">Name</th>
-                    <th style="width:22%;">Description</th>
-                    <th style="width:15%;">Time</th>
-                    <th style="width:15%;">Status</th>
-                    <th style="width:15%;">Remarks</th>
-                </tr>
+                    <tr>
+                        <th style="width: 5%;">No.</th>
+                        <th style="width: 25%; text-align: left;">Name</th>
+                        <th style="width: 25%;">Description</th>
+                        <th style="width: 15%;">Time</th>
+                        <th style="width: 15%;">Status</th>
+                        <th style="width: 15%;">Remarks</th>
+                    </tr>
                 {% endif %}
             </thead>
             <tbody>
                 {% for log in page_logs %}
                     {%- set row_num = start_idx + loop.index -%}
-                    {% if category == 'general' %}
-                    <tr>
-                        <td class="text-center">{{ row_num }}</td>
-                        <td class="col-name">{{ log.name }}</td>
-                        <td class="text-center">{{ log.detail }}</td>
-                        <td class="text-center">{{ log.time_in }}</td>
-                        <td class="text-center">{{ log.time_out }}</td>
-                        <td class="text-center">{{ log.remarks }}</td>
-                    </tr>
-                    {% elif category == 'daily_traffic' and report_type == 'daily_traffic' %}
+                    {% if category == 'general' and report_type == 'daily_traffic' %}
                     <tr>
                         <td class="text-center">{{ row_num }}</td>
                         <td class="text-center">{{ log.date }}</td>
@@ -589,6 +507,15 @@
                         <td class="text-center">{{ row_num }}</td>
                         <td class="text-start">{{ log.department }}</td>
                         <td class="text-center">{{ log.violation_count }}</td>
+                    </tr>
+                    {% elif category == 'general' %}
+                    <tr>
+                        <td class="text-center">{{ row_num }}</td>
+                        <td class="col-name">{{ log.name }}</td>
+                        <td class="text-center">{{ log.detail }}</td>
+                        <td class="text-center">{{ log.time_in }}</td>
+                        <td class="text-center">{{ log.time_out }}</td>
+                        <td class="text-center">{{ log.remarks }}</td>
                     </tr>
                     {% elif category == 'visitor' %}
                     <tr>
