@@ -600,6 +600,7 @@ CREATE TABLE `students` (
   `user_id` int(11) NOT NULL,
   `student_id` varchar(8) NOT NULL,
   `student_name` varchar(80) DEFAULT NULL,
+  `student_type` enum('regular','irregular') NOT NULL DEFAULT 'regular',
   `course_id` int(11) NOT NULL,
   `status` enum('Inside','Outside') DEFAULT 'Outside',
   `stud_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()

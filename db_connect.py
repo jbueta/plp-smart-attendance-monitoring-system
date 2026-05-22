@@ -2399,6 +2399,86 @@ class Database:
                     "time": f"Entered: {entry_str}",
                     "minutes_inside": int(row.get("minutes_inside") or 0),
                 })
+<<<<<<< HEAD
+=======
+            alert_time = datetime.now().strftime("%I:%M %p")
+
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM students s
+                JOIN users u ON s.user_id = u.user_id
+                JOIN (
+                    SELECT user_id, MAX(timestamp) AS entry_time
+                    FROM general_log
+                    WHERE log_type = 'Entry'
+                    GROUP BY user_id
+                ) latest_entry ON latest_entry.user_id = s.user_id
+                LEFT JOIN (
+                    SELECT user_id, MAX(timestamp) AS exit_time
+                    FROM general_log
+                    WHERE log_type = 'Exit'
+                    GROUP BY user_id
+                ) latest_exit ON latest_exit.user_id = s.user_id
+                WHERE s.status = 'Inside'
+                  AND u.role = 'student'
+                  AND u.active = 1
+                  AND (latest_exit.exit_time IS NULL OR latest_entry.entry_time > latest_exit.exit_time)
+                  AND (
+                      NOW() >= TIMESTAMP(DATE(latest_entry.entry_time), %s)
+                      OR TIME(latest_entry.entry_time) >= %s
+                      OR TIME(latest_entry.entry_time) < %s
+                  )
+                """,
+                (CURFEW_TIME, CURFEW_TIME, EARLY_MORNING_CURFEW_CUTOFF),
+            )
+            curfew_students_inside = cursor.fetchone()["cnt"] or 0
+            if curfew_students_inside > 0:
+                alerts.append({
+                    "type": "danger",
+                    "icon": "shield-exclamation",
+                    "title": f"Curfew Watch: {curfew_students_inside} student(s) past curfew",
+                    "message": f"Students have an open campus entry past {CURFEW_TRIGGER_LABEL}.",
+                    "time": alert_time,
+                })
+
+            density_threshold = 1000
+            if currently_inside > density_threshold:
+                alerts.append({
+                    "type": "warning",
+                    "icon": "exclamation-triangle-fill",
+                    "title": f"High Campus Density: {currently_inside:,} people inside",
+                    "message": "Live inside count has crossed the dashboard alert threshold.",
+                    "time": alert_time,
+                })
+
+            if peak_row:
+                alerts.append({
+                    "type": "info",
+                    "icon": "graph-up-arrow",
+                    "title": f"Peak Hour Detected at {peak_hour}",
+                    "message": "Today's entry traffic has a clear highest-volume hour.",
+                    "time": "Today",
+                })
+
+            if total_invited > 0 and (total_attended / total_invited) < 0.5:
+                alerts.append({
+                    "type": "warning",
+                    "icon": "calendar-x-fill",
+                    "title": f"Low Event Attendance: {attendance_rate} turnout today",
+                    "message": attendance_raw,
+                    "time": alert_time,
+                })
+
+            if not alerts:
+                alerts.append({
+                    "type": "success",
+                    "icon": "check-circle-fill",
+                    "title": "All systems normal. No issues detected.",
+                    "message": "Campus traffic and event attendance are within expected levels.",
+                    "time": alert_time,
+                })
+>>>>>>> 6443696 (feat: add student_type field for regular/irregular student classification)
 
             return {
                 "total_entries": f"{total_entries:,}",
@@ -3292,6 +3372,7 @@ class StudentModel:
         course_id=None,
         course_name=None,
         status="Outside",
+        student_type="regular",
     ):
         cursor = None
         lock_acquired = False
@@ -3299,6 +3380,9 @@ class StudentModel:
             student_id = normalize_student_id(student_id)
             student_name = normalize_student_name(student_name)
             status = normalize_student_status(status, default="Outside")
+            student_type = (student_type or "regular").lower().strip()
+            if student_type not in ("regular", "irregular"):
+                student_type = "regular"
 
             validation_errors = validate_student_fields(
                 student_id=student_id,
@@ -3368,13 +3452,15 @@ class StudentModel:
                     UPDATE students
                     SET student_name = %s,
                         course_id = %s,
-                        status = %s
+                        status = %s,
+                        student_type = %s
                     WHERE user_id = %s
                     """,
                     (
                         student_name,
                         resolved_course_id,
                         status,
+                        student_type,
                         existing_student["user_id"],
                     ),
                 )
@@ -3407,8 +3493,8 @@ class StudentModel:
             cursor.execute(
                 """
                 INSERT INTO students
-                    (user_id, student_id, student_name, course_id, status)
-                VALUES (%s, %s, %s, %s, %s)
+                    (user_id, student_id, student_name, course_id, status, student_type)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 (
                     user_id,
@@ -3416,6 +3502,7 @@ class StudentModel:
                     student_name,
                     resolved_course_id,
                     status,
+                    student_type,
                 ),
             )
             conn.commit()
@@ -3436,7 +3523,7 @@ class StudentModel:
             if cursor:
                 cursor.close()
 
-    def add_student(self, student_id, student_name, course_id, status="Outside"):
+    def add_student(self, student_id, student_name, course_id, status="Outside", student_type="regular"):
         conn = connect_db()
         if conn is None:
             return {"success": False, "error": "Database connection failed"}
@@ -3448,6 +3535,7 @@ class StudentModel:
                 student_name=student_name,
                 course_id=course_id,
                 status=status,
+                student_type=student_type,
             )
         finally:
             release_db_connection(conn)
@@ -3460,6 +3548,7 @@ class StudentModel:
         course_name=None,
         course_id=None,
         status="Outside",
+        student_type="regular",
     ):
         return self._create_or_reactivate_student(
             conn=conn,
@@ -3468,4 +3557,5 @@ class StudentModel:
             course_id=course_id,
             course_name=course_name,
             status=status,
+            student_type=student_type,
         )
