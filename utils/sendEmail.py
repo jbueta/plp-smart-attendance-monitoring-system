@@ -1,33 +1,65 @@
+import importlib
+import mimetypes
+import os
 import smtplib
 from email.message import EmailMessage
 
 
-function sendEmail(str:subject, str:body, str:recipient):
-    # CREDENTIALS
-    SENDER_EMAIL = "your_email@gmail.com"
-    SENDER_PASSWORD = "your_16_digit_app_password_here" 
-    RECEIVER_EMAIL = recipient
-
-    # CONSTRUCT
-    msg = EmailMessage()
-    msg['Subject'] = subject
-    msg['From'] = SENDER_EMAIL
-    msg['To'] = RECEIVER_EMAIL
-    msg.set_content(body)
-
-    # SEND
-    SMTP_SERVER = "smtp.gmail.com"
-    PORT = 465 
-
+def _load_dotenv_if_available():
     try:
-        print("Connecting to server...")
-        # Using 'with' ensures the server connection is closed automatically
-        with smtplib.SMTP_SSL(SMTP_SERVER, PORT) as server:
-            server.login(SENDER_EMAIL, SENDER_PASSWORD)
-            server.send_message(msg)
-            
-        print("Success! Email sent.")
-    except smtplib.SMTPAuthenticationError:
-        print("Error: Authentication failed. Did you use an App Password?")
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        dotenv = importlib.import_module("dotenv")
+    except ImportError:
+        return False
+
+    load_dotenv = getattr(dotenv, "load_dotenv", None)
+    if not callable(load_dotenv):
+        return False
+
+    return bool(load_dotenv())
+
+
+_load_dotenv_if_available()
+
+
+def send_email(
+    subject,
+    body,
+    recipient,
+    sender_email=None,
+    sender_password=None,
+    attachment_data=None,
+    filename="Report.pdf",
+):
+    """Send an email with optional PDF attachment using SMTP credentials from the environment."""
+
+    sender_email = sender_email or os.getenv("SENDER_EMAIL", "")
+    sender_password = sender_password or os.getenv("SENDER_PASSWORD", "")
+    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "465"))
+
+    if not sender_email or not sender_password:
+        raise ValueError("Missing SMTP credentials. Set SENDER_EMAIL and SENDER_PASSWORD in .env.")
+
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["From"] = sender_email
+    message["To"] = recipient
+    message.set_content(body)
+
+    if attachment_data:
+        content_type, _ = mimetypes.guess_type(filename)
+        maintype, subtype = (content_type or "application/pdf").split("/", 1)
+        message.add_attachment(
+            attachment_data,
+            maintype=maintype,
+            subtype=subtype,
+            filename=filename,
+        )
+
+    with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
+        server.login(sender_email, sender_password)
+        server.send_message(message)
+
+
+# Backward-compatible alias for older imports.
+sendEmail = send_email

@@ -1,859 +1,3291 @@
 from datetime import date, datetime, timedelta
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
-import requests
 import csv
+import glob
+import importlib
 import io
-import uuid
+import json
+import os
+import re
+import zipfile
+import xml.etree.ElementTree as ET
+from urllib.parse import urlencode, urlsplit
 
-from app_tasks import fetch_report_data     #reports generator
+import requests
+import database as database_module
+from flask import Flask, Response, flash, jsonify, redirect, render_template, request, session, url_for
+from werkzeug.exceptions import HTTPException
+from werkzeug.routing import BuildError
+from werkzeug.utils import secure_filename
+
+from app_tasks import fetch_report_data
+from announcement_bulletin_routes import bulletin_bp
+from announcement_paging_routes import paging_bp
+from config import get_config
+from database import close_db, connect_db, init_db_pool, release_db_connection
+from db_connect import (
+    Database,
+    EmployeeModel,
+    StudentModel,
+    VISITOR_PURPOSES,
+    ensure_visitor_valid_until_schema,
+    expire_expired_visitor_accounts,
+    format_visitor_valid_until,
+    normalize_visitor_purpose,
+    parse_visitor_valid_until,
+    visitor_valid_until_end_of_day,
+)
 from extensions import cache
+from utils.employee_schema import (
+    build_person_name_match_keys,
+    department_lookup_key,
+    format_employee_id,
+    normalize_employee_id,
+    normalize_text,
+    validate_department_name,
+    validate_employee_fields,
+)
+from utils.sendEmail import send_email
+from utils.student_schema import (
+    normalize_course_name,
+    normalize_student_id,
+    normalize_student_name,
+    validate_course_name,
+    validate_student_fields,
+)
+
+try:
+    import pdfkit
+except Exception:
+    pdfkit = None
+
 
 app = Flask(__name__)
-app.secret_key = 'plp_secure_key_2026'  # Required for session management
+app.config.from_object(get_config())
+app.permanent_session_lifetime = timedelta(minutes=3)
+app.register_blueprint(bulletin_bp)
+app.register_blueprint(paging_bp)
 
-# Configure and initialize cache (SimpleCache for development)
-app.config['CACHE_TYPE'] = 'SimpleCache'
+os.makedirs(os.path.dirname(app.config["LOG_FILE"]) or ".", exist_ok=True)
+REPORT_ARCHIVE_DIR = os.path.join(app.static_folder, "reports")
+LEGACY_REPORT_PATTERNS = ("attendance_report.pdf", "report_*.pdf")
+os.makedirs(REPORT_ARCHIVE_DIR, exist_ok=True)
+employee_model = EmployeeModel()
+student_model = StudentModel()
 cache.init_app(app)
 
-# ==============================================================================
-# STARTUP: Generate instances for the week every Sunday
-# ==============================================================================
-_instance_generator_run = False
+with app.app_context():
+    init_db_pool()
+    conn = connect_db()
+    if conn:
+        ensure_visitor_valid_until_schema(conn, logger=app.logger)
+        release_db_connection(conn)
 
-@app.before_request
-def generate_instances_on_sunday():
-    """
-    Runs only once per app startup.
-    If today is Sunday, generates event instances for the upcoming week.
-    """
-    global _instance_generator_run
-    
-    if not _instance_generator_run:
-        _instance_generator_run = True
-        today = date.today()
-        
-        # Check if today is Sunday (weekday() returns 6 for Sunday)
-        if today.weekday() == 6:
-            try:
-                print(f"[STARTUP] Today is Sunday. Generating instances for upcoming week...")
-                response = requests.post("http://127.0.0.1:5001/admin/generate-daily-instances", timeout=10)
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    print(f"[SUCCESS] Generated {data.get('created', 0)} instances, {data.get('failed', 0)} failures")
-                else:
-                    print(f"[ERROR] Backend returned status {response.status_code}")
-            except Exception as e:
-                print(f"[ERROR] Failed to generate instances: {str(e)}")
+app.teardown_appcontext(close_db)
 
 
-# ==============================================================================
-# MOCK DATA (Prototype State)
-# ==============================================================================
-
-# Default events that cannot be deleted in this prototype
-DEFAULT_EVENTS = [
-    {}
-]
-
-VISITORS = []
-
-LIVE_DEPARTMENTS = [
-    {}
-]
-
-# --- Database Transition Mock Models ---
-MOCK_DASHBOARD_STATS = {
-    "total_entries": "14,520",
-    "entries_trend": "+12%",
-    "event_attendance_rate": "89.5%",
-    "event_attendance_raw": "2,506 / 2,800 Attendees",
-    "currently_inside": "3,412",
-    "avg_dwell_time": "5 hrs 45 mins",
-    "peak_hour": "07:30 AM",
-    "traffic_chart": [450, 2100, 1800, 1200, 900, 600, 1100, 1400, 800, 600, 1500, 900],
-    "dept_distribution": [35, 25, 20, 15, 5], # Percentages for top 5 depts
-    "alerts": [
-        {"type": "warning", "icon": "exclamation-triangle-fill", "title": "High Density: North Gate", "time": "15 minutes ago"},
-        {"type": "info", "icon": "info-circle-fill", "title": "Peak Hour Detected", "time": "07:30 AM"}
-    ]
-}
-
-EVENTS = list(DEFAULT_EVENTS)
-
-MOCK_EMPLOYEE_STATS = {
-    "attendance_data": [75, 20, 5], 
-    "tardiness_data": [15, 12, 5, 8, 25, 18, 10],
-    "dept_participation": [
-        {"name": "College of Education", "value": 85},
-        {"name": "College of Engineering", "value": 92},
-        {"name": "College of Nursing", "value": 78},
-        {"name": "Arts & Sciences", "value": 88},
-        {"name": "Business Admin", "value": 90}
-    ],
-    "avg_tardiness": "12 mins",
-    "on_time_rate": "88%"
-}
-
-MOCK_EMPLOYEE_LOGS = [
-    {"id": "EMP-001", "initials": "JD", "name": "Juan Dela Cruz", "dept": "Civil Engineering", "position": "Professor", "in": "07:45 AM", "out": "05:00 PM", "status": "Present", "status_class": "success", "date": "2026-04-09"},
-    {"id": "EMP-002", "initials": "MS", "name": "Maria Santos", "dept": "College of Nursing", "position": "Dean", "in": "08:15 AM", "out": "--:--", "status": "Late +15m", "status_class": "warning", "date": "2026-04-09"},
-    {"id": "EMP-003", "initials": "AL", "name": "Antonio Luna", "dept": "Arts & Letters", "position": "Lecturer", "in": "08:30 AM", "out": "04:30 PM", "status": "Late", "status_class": "warning", "date": "2026-04-09"},
-    {"id": "EMP-004", "initials": "CR", "name": "Carmen Reyes", "dept": "Business Admin", "position": "Assistant Professor", "in": "07:30 AM", "out": "05:30 PM", "status": "Present", "status_class": "success", "date": "2026-04-09"},
-    {"id": "EMP-005", "initials": "RG", "name": "Roberto Garcia", "dept": "Engineering", "position": "Instructor", "in": "08:00 AM", "out": "--:--", "status": "Inside", "status_class": "success", "date": "2026-04-09"},
-    {"id": "EMP-006", "initials": "LM", "name": "Lourdes Mendoza", "dept": "Education", "position": "Professor", "in": "07:50 AM", "out": "04:45 PM", "status": "Present", "status_class": "success", "date": "2026-04-09"},
-    {"id": "EMP-007", "initials": "FT", "name": "Fernando Torres", "dept": "Arts & Sciences", "position": "Lecturer", "in": "08:20 AM", "out": "--:--", "status": "Late +20m", "status_class": "warning", "date": "2026-04-09"},
-    {"id": "EMP-008", "initials": "EV", "name": "Elena Valdez", "dept": "Nursing", "position": "Clinical Instructor", "in": "07:40 AM", "out": "05:10 PM", "status": "Present", "status_class": "success", "date": "2026-04-09"},
-    {"id": "EMP-009", "initials": "HP", "name": "Hector Perez", "dept": "Business Admin", "position": "Department Head", "in": "08:10 AM", "out": "04:50 PM", "status": "Late", "status_class": "warning", "date": "2026-04-09"},
-    {"id": "EMP-010", "initials": "IS", "name": "Isabel Santos", "dept": "Education", "position": "Assistant Professor", "in": "07:55 AM", "out": "--:--", "status": "Inside", "status_class": "success", "date": "2026-04-09"}
-]
-
-MOCK_STUDENT_STATS = {
-    "total_entries": "12,450",
-    "entries_trend": "+12%",
-    "peak_hour": "07:00 AM",
-    "peak_load": "85%",
-    "currently_inside": "3,120",
-    "avg_stay": "6.5 Hrs",
-    "curfew_trigger": "09:40:00 PM",
-    "watchlist": [],
-    "hourly_traffic": [300, 1800, 1500, 900, 700, 500, 900, 1200, 600, 400, 1200, 700]
-}
-
-MOCK_STUDENT_LOGS = [
-    {"id": "2026-0001", "name": "Juan Dela Cruz", "course": "BSCS", "time_in": "07:30 AM", "time_out": "05:00 PM", "status": "Out", "status_class": "secondary"},
-    {"id": "2026-0089", "name": "Maria Clara", "course": "BSN", "time_in": "08:15 AM", "time_out": "--:--", "status": "Inside", "status_class": "success"},
-    {"id": "2026-0152", "name": "Jose Rizal", "course": "BSA", "time_in": "07:45 AM", "time_out": "05:15 PM", "status": "Out", "status_class": "secondary"}
-]
-
-MOCK_KIOSK_DATA = {
-    "bulletin": {
-        "tag": "ANNOUNCEMENT", 
-        "author": "Admin Office", 
-        "title": "Midterm Examinations Week", 
-        "body": "Please ensure your test permits are validated before entering the examination rooms. Library hours are extended until 8:00 PM."
-    },
-    "recent_student_logs": [
-        {"type": "in", "name": "Maria Clara", "course": "BS Psychology", "time": "07:30 AM"},
-        {"type": "out", "name": "Jose Rizal", "course": "BS Accountancy", "time": "05:15 PM"}
-    ],
-    "recent_employee_logs": [
-        {"initials": "JD", "name": "Juan Dela Cruz", "dept": "Engineering", "time": "07:45 AM", "type": "success"},
-        {"initials": "MS", "name": "Maria Santos", "dept": "Nursing", "time": "08:15 AM", "type": "warning"}
-    ]
-}
-
+DEFAULT_EVENTS = []
 MOCK_REPORTS = [
     {"icon": "shield-exclamation text-danger", "name": "Curfew_Violations_Feb09.pdf", "time": "Generated 1 hr ago"},
     {"icon": "file-earmark-spreadsheet text-success", "name": "Student_Logs_Week4.csv", "time": "Generated Yesterday"},
-    {"icon": "file-earmark-pdf text-gold", "name": "Flag_Ceremony_Attendance.pdf", "time": "Generated Feb 03, 2026"}
+    {"icon": "file-earmark-pdf text-gold", "name": "Flag_Ceremony_Attendance.pdf", "time": "Generated Feb 03, 2026"},
 ]
 
-# ==============================================================================
-# MIDDLEWARE / DECORATORS
-# ==============================================================================
+MOCK_DASHBOARD_STATS = {
+    "total_entries": "0",
+    "entries_trend": "N/A",
+    "event_attendance_rate": "N/A",
+    "event_attendance_raw": "0 / 0 Attendees",
+    "currently_inside": "0",
+    "avg_dwell_time": "0 hrs 0 mins",
+    "peak_hour": "N/A",
+    "peak_window": "N/A",
+    "traffic_chart": [0] * 12,
+    "dept_distribution": [0] * 5,
+    "total_employees": "0",
+    "alerts": [],
+    "absence_alerts": [],
+}
 
-def login_required(f):
-    """Decorator to protect admin routes."""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'logged_in' not in session:
-            flash('Please log in to access this page.', 'danger')
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
+MOCK_EMPLOYEE_STATS = {
+    "attendance_data": [0, 0, 0],
+    "tardiness_data": [0] * 7,
+    "tardiness_labels": ["N/A"] * 7,
+    "attendance_trend_data": [0] * 5,
+    "attendance_trend_labels": ["N/A"] * 5,
+    "dept_participation": [],
+    "avg_tardiness": "0 mins",
+    "on_time_rate": "N/A",
+    "on_time_percentage": 0,
+    "participation_level": "N/A",
+    "target_date": "N/A",
+    "upcoming_events": [],
+    "recent_activity": [],
+    "leaderboard": [],
+    "dept_comparison": [],
+}
 
-# ==============================================================================
-# AUTHENTICATION ROUTES
-# ==============================================================================
+MOCK_STUDENT_STATS = {
+    "total_entries": "0",
+    "entries_trend": "N/A",
+    "peak_hour": "N/A",
+    "peak_load": "0%",
+    "currently_inside": "0",
+    "avg_stay": "0.0 Hrs",
+    "curfew_trigger": "09:40:00 PM",
+    "watchlist": [],
+    "hourly_traffic": [0] * 12,
+}
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        data = request.get_json()
-        if not data:
-            return jsonify({"success": False, "message": "Invalid request."}), 400
-            
-        username = data.get('username')
-        password = data.get('password')
-        
-        if not username or not password:
-            return jsonify({"success": False, "message": "Please enter a username and password."})
+MOCK_KIOSK_DATA = {
+    "bulletin": {
+        "tag": "ANNOUNCEMENT",
+        "author": "Admin Office",
+        "title": "Midterm Examinations Week",
+        "body": "Please ensure your test permits are validated before entering the examination rooms. Library hours are extended until 8:00 PM.",
+    },
+    "recent_student_logs": [
+        {"type": "in", "name": "Maria Clara", "course": "BS Psychology", "time": "07:30 AM"},
+        {"type": "out", "name": "Jose Rizal", "course": "BS Accountancy", "time": "05:15 PM"},
+    ],
+}
 
-        result = helper_admin_login(username, password)
-        
-        if result and result.get('success'):
-            data = result.get('data')
-            session['logged_in'] = True
-            return jsonify({ "success": True, "redirect_url": url_for('dashboard', user=data.get('username')) })
-        else:
-            return jsonify({"success": False, "message": result.get('message')})
-            
-    return render_template('login.html')
+EVENT_TYPES = {"Meeting", "Training", "Seminar", "Workshop", "Drill", "Activity", "Flag Ceremony", "Other"}
+EVENT_FREQUENCIES = {"ONCE", "DAILY", "WEEKLY"}
+EVENT_DAYS = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
+EMPLOYEE_UPLOAD_REQUIRED_COLUMNS = ["EMPLOYEE ID", "EMPLOYEE NAME", "DEPARTMENT"]
+EMPLOYEE_UPLOAD_OPTIONAL_COLUMNS = ["POSITION"]
+STUDENT_UPLOAD_REQUIRED_COLUMNS = ["STUDENT ID", "STUDENT NAME"]
+STUDENT_UPLOAD_OPTIONAL_COLUMNS = ["COURSE", "COURSE ID", "STATUS"]
+VISITOR_UPLOAD_REQUIRED_COLUMNS = ["NAME", "PURPOSE/OFFICE"]
+VISITOR_UPLOAD_OPTIONAL_COLUMNS = ["DETAILS"]
 
-@app.route('/logout')
-def logout():
-    session.pop('logged_in', None)
-    flash('You have been logged out.', 'info')
-    return redirect(url_for('login'))
 
-# ==============================================================================
-# PUBLIC KIOSK ROUTES
-# ==============================================================================
+def sanitize_report_archive_filename(filename, default_stem="report"):
+    candidate = secure_filename(os.path.basename(filename or "")).strip("._")
+    if not candidate:
+        candidate = f"{default_stem}.pdf"
 
-@app.route('/')
-def index():
-    """Main landing page / Kiosk Mode selection."""
-    session.pop('logged_in', None)  # Auto-logout admin if they return to home
-    return render_template('index.html')
+    stem, ext = os.path.splitext(candidate)
+    stem = re.sub(r"_+", "_", stem).strip("._") or default_stem
+    ext = ".pdf" if ext.lower() != ".pdf" else ext.lower()
+    return f"{stem[:120]}{ext}"
 
-@app.route('/kiosk/entrance')
-def kiosk_entrance():
-    session.pop('logged_in', None)
-    active_visitors = [v for v in VISITORS if v['status'] == 'Checked In']
-    logs = helper_kiosk_live_student_logs()
-    return render_template('kiosk_entrance.html', active_visitors=active_visitors, kiosk_data=logs)
 
-@app.route('/kiosk/exit')
-def kiosk_exit():
-    session.pop('logged_in', None)
-    logs = helper_kiosk_live_student_logs()
-    return render_template('kiosk_exit.html', kiosk_data=logs)
+def build_report_archive_filename(category, report_data):
+    pieces = [
+        category or "report",
+        report_data.get("event_name") or report_data.get("title") or "",
+        report_data.get("department") or "",
+        report_data.get("date_range") or "",
+    ]
+    normalized_parts = []
+    for piece in pieces:
+        cleaned = re.sub(r"[^A-Za-z0-9_-]+", "_", str(piece).strip())
+        cleaned = re.sub(r"_+", "_", cleaned).strip("_")
+        if cleaned and cleaned.lower() != "all":
+            normalized_parts.append(cleaned[:40])
 
-@app.route('/kiosk/employee/select-event')
-def kiosk_employee_select_event():
-    session.pop('logged_in', None)
-    events = helper_kiosk_live_events()
-    return render_template('kiosk_event_select.html', events=events)
+    archive_stem = "_".join(normalized_parts) or "report"
+    return sanitize_report_archive_filename(f"{archive_stem}.pdf")
 
-@app.route('/kiosk/employee')
-def kiosk_employee():
-    session.pop('logged_in', None)
-    instance_id = request.args.get('instance_id', type=int)
-    events = helper_kiosk_live_events()
-    print(events)
-    selected_event = next((e for e in events if e['instance_id'] == instance_id), None)
-    event_name = selected_event['name'] if selected_event else "General Attendance"
-    event_id = selected_event.get('event_id') if selected_event else None  # Add this line
-    return render_template('kiosk_employee.html',
-                       event_name=event_name,
-                       event_id=event_id,
-                       instance_id=instance_id,          # Pass instance_id
-                       kiosk_data=MOCK_KIOSK_DATA)
 
-@app.route('/kiosk/visitor')
-def kiosk_visitor():
-    session.pop('logged_in', None)
-    active_visitors = [v for v in VISITORS if v['status'] == 'Checked In']
-    return render_template('kiosk_visitor.html', active_visitors=active_visitors)
+def get_unique_report_archive_path(filename):
+    archive_name = sanitize_report_archive_filename(filename)
+    archive_path = os.path.join(REPORT_ARCHIVE_DIR, archive_name)
+    if not os.path.exists(archive_path):
+        return archive_path, archive_name
 
-# ==============================================================================
-# VISITOR MANAGEMENT API
-# ==============================================================================
+    stem, ext = os.path.splitext(archive_name)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    counter = 1
+    while True:
+        candidate_name = f"{stem}_{timestamp}_{counter}{ext}"
+        candidate_path = os.path.join(REPORT_ARCHIVE_DIR, candidate_name)
+        if not os.path.exists(candidate_path):
+            return candidate_path, candidate_name
+        counter += 1
 
-@app.route('/api/visitor/checkin', methods=['POST'])
-def visitor_checkin():
-    name = request.form.get('name')
-    purpose = request.form.get('purpose')
-    details = request.form.get('details')
-    source = request.form.get('source')
-    
-    if name and purpose:
-        new_id = len(VISITORS) + 1
-        now = datetime.now()
-        
-        VISITORS.append({
-            'id': new_id,
-            'name': name,
-            'purpose': purpose,
-            'details': details or 'N/A',
-            'time_in': now.strftime('%I:%M %p'),
-            'date': now.strftime('%Y-%m-%d'),
-            'time_out': None,
-            'status': 'Checked In'
-        })
-        flash(f'Welcome, {name}. Check-in successful.', 'success')
-    else:
-        flash('Check-in failed. Name and Purpose are required.', 'danger')
-        
-    return redirect(url_for(source if source else 'kiosk_entrance'))
 
-@app.route('/api/visitor/checkout/<int:visitor_id>', methods=['POST'])
-def visitor_checkout(visitor_id):
-    visitor = next((v for v in VISITORS if v['id'] == visitor_id), None)
-    source = request.args.get('source', 'kiosk_entrance')
-    
-    if visitor:
-        visitor['status'] = 'Checked Out'
-        visitor['time_out'] = datetime.now().strftime('%I:%M %p')
-        flash(f'Goodbye, {visitor["name"]}. Check-out successful.', 'success')
-    else:
-        flash('Visitor not found.', 'danger')
-        
-    return redirect(url_for(source))
+def relocate_legacy_report_files():
+    project_root = os.path.abspath(app.root_path)
+    moved_reports = []
 
-# ==============================================================================
-# ADMIN DASHBOARD ROUTES
-# ==============================================================================
+    for pattern in LEGACY_REPORT_PATTERNS:
+        for source_path in glob.glob(os.path.join(project_root, pattern)):
+            if not os.path.isfile(source_path):
+                continue
 
-@app.route('/dashboard')
-@login_required
-def dashboard():
+            archive_path, archive_name = get_unique_report_archive_path(os.path.basename(source_path))
+            if os.path.abspath(source_path) == os.path.abspath(archive_path):
+                continue
 
-    USER_NAME = request.args.get('user', 'Admin')
+            os.replace(source_path, archive_path)
+            moved_reports.append((os.path.basename(source_path), archive_name))
 
-    events = helper_admin_events()
-    overall_stats = helper_dashboard_overall_stats()
-    student_stats = helper_dashboard_student_stats()
-    employee_stats = helper_dashboard_employee_stats()
+    if moved_reports:
+        app.logger.info("Relocated %s legacy report file(s) into %s.", len(moved_reports), REPORT_ARCHIVE_DIR)
 
-    # Pass structured stats for different tabs
-    return render_template('dashboard.html', 
-                           events=events, 
-                           overall_stats=overall_stats,
-                           student_stats=student_stats,
-                           employee_stats=employee_stats,
-                           logs=MOCK_EMPLOYEE_LOGS,
-                           user=USER_NAME)
 
-@app.route('/events')
-@login_required
-def manage_events():
-    events = helper_admin_events()
-    departments = helper_admin_live_departments()
-    return render_template('events.html', events=events, departments=departments)
+def _format_report_file_size(size_bytes):
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
 
-@app.route('/admin/students')
-@login_required
-def admin_students():
-    return render_template('student_logs.html', logs=MOCK_STUDENT_LOGS)
+    size_value = float(size_bytes)
+    for unit in ("KB", "MB", "GB"):
+        size_value /= 1024.0
+        if size_value < 1024 or unit == "GB":
+            return f"{size_value:.1f} {unit}"
 
-@app.route('/admin/employees')
-@login_required
-def admin_employees():
-    logs = helper_employee_attendance()
-    return render_template('employee_logs.html', logs=logs)
+    return f"{size_bytes} B"
 
-@app.route('/admin/visitors')
-@login_required
-def admin_visitors():
-    return render_template('admin_visitors.html', visitors=VISITORS)
 
-@app.route('/analytics/employee')
-@login_required
-def analytics_employee():
-    return redirect(url_for('admin_employees'))
+def get_archived_reports():
+    reports = []
+    for entry in os.scandir(REPORT_ARCHIVE_DIR):
+        if not entry.is_file() or not entry.name.lower().endswith(".pdf"):
+            continue
 
-@app.route('/analytics/students')
-@login_required
-def analytics_students():
-    return redirect(url_for('admin_students'))
+        stats = entry.stat()
+        modified_at = datetime.fromtimestamp(stats.st_mtime)
+        reports.append(
+            {
+                "icon": "file-earmark-pdf text-danger",
+                "name": entry.name,
+                "time": modified_at.strftime("Generated %b %d, %Y %I:%M %p"),
+                "size": _format_report_file_size(stats.st_size),
+                "url": url_for("static", filename=f"reports/{entry.name}"),
+                "sort_timestamp": stats.st_mtime,
+            }
+        )
 
-@app.route('/reports')
-@login_required
-def reports():
-    return render_template('reports.html', events=EVENTS, reports=MOCK_REPORTS)
+    return sorted(reports, key=lambda report: report["sort_timestamp"], reverse=True)
 
-@app.route('/reports/sample')
-@login_required
-def sample_report():
-    return render_template('sample_report.html', current_date=datetime.now().strftime('%B %d, %Y - %I:%M %p'))
 
-# ==============================================================================
-# ADMIN MANAGEMENT API
-# ==============================================================================
+relocate_legacy_report_files()
 
-@app.route('/admin/events/add', methods=['POST'])
-@login_required
-def add_event():
-    name = request.form.get('name')
-    etype = request.form.get('type')
 
-    edate = request.form.get('event_date')
-    eday = request.form.get('day_of_week')
-    time_start = request.form.get('time_start')
-    time_end = request.form.get('time_end')
-    location = request.form.get('location')
-    
-    dept_ids = request.form.getlist('dept')
-    custom_depts_file = request.files.get('roster_file')
-    
-    frequency = request.form.get('frequency').upper()
-    participants_type = ''
+def build_sample_report_payload():
+    return {
+        "title": "Report Preview",
+        "event_name": "",
+        "department": "ALL",
+        "date_range": datetime.now().strftime("%Y-%m-%d"),
+        "archive_filename": "report_preview.pdf",
+    }
 
-    if frequency == 'ONE-TIME':
-        frequency = 'ONCE'
-        if edate is None:
-            flash('Failed to add event. For one time events, date is required.', 'danger')
-            return redirect(url_for('manage_events'))
-    elif frequency == 'WEEKLY':
-        if eday is None:
-            flash('Failed to add event. For weekly events, day of week is required.', 'danger')
-            return redirect(url_for('manage_events'))
 
-    has_file = bool(custom_depts_file and custom_depts_file.filename != '')
+def resolve_archive_report_url():
+    try:
+        return url_for("archive_report")
+    except BuildError:
+        return url_for("sample_report")
 
-    if not dept_ids and not has_file:
-        flash('Failed to add event. At least one department is required or upload a custom roster file.', 'danger')
-        return redirect(url_for('manage_events'))
-    
-    if dept_ids and has_file:
-        participants_type = 'hybrid'
-    elif dept_ids and not has_file:
-        participants_type = 'grouped'
-    elif not dept_ids and has_file:
-        participants_type = 'custom'
 
-    extracted_custom_participants = []
-    
-    if has_file:
-        if custom_depts_file.filename.endswith('.csv'):
-            try:
-                file_contents = custom_depts_file.read().decode('utf-8-sig')
-                csv_stream = io.StringIO(file_contents)
-                csv_reader = csv.DictReader(csv_stream)
-                target_column = 'ID' 
-                for row in csv_reader:
-                    if target_column in row and row[target_column].strip():
-                        extracted_custom_participants.append(row[target_column].strip())
-                csv_stream.close()            
-            except Exception as e:
-                flash(f"Failed to process the CSV file: {str(e)}", "danger")
-                return redirect(url_for('manage_events'))
-        else:
-            flash("Please upload a valid .csv file.", "warning")
-            return redirect(url_for('manage_events'))
+def resolve_report_context(category, report_type, filter_value, start_date, end_date):
+    report_results = fetch_report_data(category, report_type, filter_value, start_date, end_date)
+    if "error" in report_results:
+        return None, report_results["error"]
+
+    report_data = dict(report_results["report_data"])
+    report_data["archive_filename"] = build_report_archive_filename(category, report_data)
+    return report_data, None
+
+
+def load_archived_report_attachment(category, report_type, filter_value, start_date, end_date):
+    report_data, error = resolve_report_context(category, report_type, filter_value, start_date, end_date)
+    if error:
+        return None, None, error
+
+    archive_path = os.path.join(REPORT_ARCHIVE_DIR, report_data["archive_filename"])
+    if not os.path.exists(archive_path):
+        return (
+            None,
+            report_data,
+            "Archived PDF not found yet. Use 'Download and Archive PDF' first, then send it by email.",
+        )
+
+    with open(archive_path, "rb") as archived_pdf:
+        return archived_pdf.read(), report_data, None
+
+def normalize_event_frequency(value):
+    frequency = (value or "").strip().upper().replace("_", "-")
+    if frequency in {"ONE-TIME", "ONETIME"}:
+        return "ONCE"
+    return frequency
+
+
+def split_manual_participant_ids(values):
+    participant_ids = []
+    for value in values:
+        for token in re.split(r"[,;\n\r]+", value or ""):
+            participant_id = token.strip()
+            if participant_id:
+                participant_ids.append(participant_id)
+    return participant_ids
+
+
+def unique_values(values):
+    seen = set()
+    unique = []
+    for value in values:
+        key = value.upper() if isinstance(value, str) else value
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(value)
+    return unique
+
+
+def clean_upload_text(text):
+    return normalize_text(text)
+
+
+def resolve_course_id(value):
+    raw_value = str(value or "").strip()
+    if not raw_value:
+        return None
+
+    conn = connect_db()
+    if not conn:
+        return raw_value
+
+    cursor = None
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT course_id
+            FROM courses
+            WHERE course_id = %s OR UPPER(TRIM(course_name)) = UPPER(TRIM(%s))
+            LIMIT 1
+            """,
+            (raw_value, raw_value),
+        )
+        row = cursor.fetchone()
+        return str(row[0]) if row else raw_value
+    finally:
+        if cursor:
+            cursor.close()
+        release_db_connection(conn)
+
+
+def resolve_department_id(value):
+    raw_value = str(value or "").strip()
+    if not raw_value:
+        return None
+
+    conn = connect_db()
+    if not conn:
+        return raw_value
+
+    cursor = None
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT department_id
+            FROM departments
+            WHERE department_id = %s OR UPPER(TRIM(department_name)) = UPPER(TRIM(%s))
+            LIMIT 1
+            """,
+            (raw_value, raw_value),
+        )
+        row = cursor.fetchone()
+        return str(row[0]) if row else raw_value
+    finally:
+        if cursor:
+            cursor.close()
+        release_db_connection(conn)
+
+
+def build_name_match_lookup(names):
+    lookup = {}
+    for name in names:
+        register_name_match_source(lookup, name, name)
+    return lookup
+
+
+def register_name_match_source(lookup, name, source):
+    for key in build_person_name_match_keys(name):
+        lookup.setdefault(key, set()).add(source)
+
+
+def find_name_match_sources(name, lookup):
+    matches = set()
+    for key in build_person_name_match_keys(name):
+        matches.update(lookup.get(key, set()))
+    return matches
+
+
+def has_name_match_conflict(name, lookup, exclude_sources=None):
+    matches = find_name_match_sources(name, lookup)
+    if exclude_sources:
+        matches.difference_update(
+            {
+                source
+                for source in exclude_sources
+                if source is not None and str(source).strip() != ""
+            }
+        )
+    return bool(matches)
+
+
+def same_role_name_conflict_error(role):
+    return (
+        f"A similar name already exists in {role} records. "
+        "Please review the existing records first."
+    )
+
+
+def cross_role_name_conflict_error(source_role, counterpart_role):
+    source_article = "an" if source_role == "employee" else "a"
+    counterpart_article = "an" if counterpart_role == "employee" else "a"
+    return (
+        f"A similar name already exists in {counterpart_role} records. "
+        f"A person cannot be both {source_article} {source_role} and {counterpart_article} {counterpart_role}. "
+        "Please review the existing records first."
+    )
+
+
+def _excel_column_index(cell_ref):
+    match = re.match(r"([A-Z]+)", (cell_ref or "").upper())
+    if not match:
+        return 0
+
+    index = 0
+    for char in match.group(1):
+        index = index * 26 + (ord(char) - ord("A") + 1)
+    return max(index - 1, 0)
+
+
+def _xlsx_cell_value(cell, shared_strings, namespace):
+    cell_type = cell.attrib.get("t")
+
+    if cell_type == "inlineStr":
+        return "".join(text.text or "" for text in cell.findall(".//a:t", namespace))
+
+    value_node = cell.find("a:v", namespace)
+    raw_value = value_node.text if value_node is not None and value_node.text is not None else ""
+    if cell_type == "s" and raw_value != "":
+        try:
+            return shared_strings[int(raw_value)]
+        except (ValueError, IndexError):
+            return raw_value
+
+    return raw_value
+
+
+def _read_xlsx_rows(file):
+    namespace = {"a": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    relationship_ns = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
 
     try:
-        event_payload = {
-            "event_name": name,
-            "event_type": etype,
-            "frequency": frequency,
-            "location": location,
-            "event_date": edate,
-            "time_start": time_start,
-            "time_end": time_end,
-            "day": eday,
-            "participants_type": participants_type, 
-            "grouped_participants": dept_ids,
-            "custom_participants": extracted_custom_participants
+        workbook_bytes = file.read()
+        with zipfile.ZipFile(io.BytesIO(workbook_bytes)) as workbook:
+            shared_strings = []
+            if "xl/sharedStrings.xml" in workbook.namelist():
+                root = ET.fromstring(workbook.read("xl/sharedStrings.xml"))
+                for string_item in root.findall("a:si", namespace):
+                    shared_strings.append(
+                        "".join(text.text or "" for text in string_item.findall(".//a:t", namespace))
+                    )
+
+            workbook_root = ET.fromstring(workbook.read("xl/workbook.xml"))
+            rels_root = ET.fromstring(workbook.read("xl/_rels/workbook.xml.rels"))
+            rel_map = {
+                rel.attrib["Id"]: rel.attrib["Target"]
+                for rel in rels_root
+                if rel.attrib.get("Id") and rel.attrib.get("Target")
+            }
+
+            sheets = workbook_root.find("a:sheets", namespace)
+            if sheets is None or not list(sheets):
+                return {"success": False, "error": "The workbook does not contain any sheets."}
+
+            first_sheet = list(sheets)[0]
+            relationship_id = first_sheet.attrib.get(relationship_ns)
+            target = rel_map.get(relationship_id)
+            if not target:
+                return {"success": False, "error": "Could not resolve the first worksheet in the workbook."}
+
+            sheet_path = target if target.startswith("xl/") else f"xl/{target}"
+            sheet_root = ET.fromstring(workbook.read(sheet_path))
+
+            rows = []
+            for row in sheet_root.findall(".//a:sheetData/a:row", namespace):
+                source_row_number = int(row.attrib.get("r") or 0)
+                values_by_index = {}
+                max_index = -1
+
+                for cell in row.findall("a:c", namespace):
+                    column_index = _excel_column_index(cell.attrib.get("r"))
+                    values_by_index[column_index] = _xlsx_cell_value(cell, shared_strings, namespace)
+                    max_index = max(max_index, column_index)
+
+                row_values = [
+                    values_by_index.get(index, "")
+                    for index in range(max_index + 1)
+                ] if max_index >= 0 else []
+
+                rows.append({"source_row_number": source_row_number, "values": row_values})
+
+            return {"success": True, "rows": rows}
+    except zipfile.BadZipFile:
+        return {"success": False, "error": "The uploaded .xlsx file is not a valid Excel workbook."}
+    except ET.ParseError as err:
+        return {"success": False, "error": f"Could not read the Excel workbook structure: {err}"}
+    except Exception as err:
+        return {"success": False, "error": f"Could not read the Excel workbook: {err}"}
+    finally:
+        file.seek(0)
+
+
+def _read_csv_rows(file):
+    try:
+        content = file.read()
+        if isinstance(content, bytes):
+            text = content.decode("utf-8-sig")
+        else:
+            text = str(content)
+
+        reader = csv.reader(io.StringIO(text))
+        rows = []
+        for index, values in enumerate(reader, start=1):
+            rows.append({"source_row_number": index, "values": values})
+
+        return {"success": True, "rows": rows}
+    except UnicodeDecodeError as err:
+        return {"success": False, "error": f"Could not decode the CSV file: {err}"}
+    except Exception as err:
+        return {"success": False, "error": f"Could not read the CSV file: {err}"}
+    finally:
+        file.seek(0)
+
+
+def _read_xls_rows(file):
+    try:
+        xlrd = importlib.import_module("xlrd")
+    except ImportError:
+        return {
+            "success": False,
+            "error": "Legacy .xls support requires xlrd. Install requirements.txt, or save the file as .xlsx or .csv.",
         }
 
-        print(event_payload)
-        api_url = "http://127.0.0.1:5001/admin/dashboard/add-events"
-        response = requests.post(api_url, json=event_payload, timeout=5)
-        
-        if response.status_code in [200, 201]:
-            api_data = response.json()
-            
-            if api_data.get('success'):
-                flash(f'Event "{name}" added successfully.', 'success')
+    try:
+        workbook = xlrd.open_workbook(file_contents=file.read())
+        if workbook.nsheets < 1:
+            return {"success": False, "error": "The workbook does not contain any sheets."}
+
+        sheet = workbook.sheet_by_index(0)
+        rows = []
+        for row_index in range(sheet.nrows):
+            values = []
+            for cell in sheet.row(row_index):
+                value = cell.value
+                if cell.ctype == xlrd.XL_CELL_NUMBER and float(value).is_integer():
+                    value = str(int(value))
+                values.append(value)
+            rows.append({"source_row_number": row_index + 1, "values": values})
+        return {"success": True, "rows": rows}
+    except Exception as err:
+        return {"success": False, "error": f"Could not read the .xls workbook: {err}"}
+    finally:
+        file.seek(0)
+
+
+def _extract_upload_rows(file, file_ext):
+    if file_ext == ".xlsx":
+        return _read_xlsx_rows(file)
+    if file_ext == ".csv":
+        return _read_csv_rows(file)
+    if file_ext == ".xls":
+        return _read_xls_rows(file)
+
+    return {"success": False, "error": "Please upload a valid Excel or CSV file."}
+
+
+def parse_employee_upload_file(file):
+    if not file or not file.filename:
+        return {"success": False, "error": "No file uploaded"}
+
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in {".xls", ".xlsx", ".csv"}:
+        return {"success": False, "error": "Please upload a valid Excel or CSV file."}
+
+    extracted = _extract_upload_rows(file, file_ext)
+    if not extracted.get("success"):
+        return extracted
+
+    required_column_set = set(EMPLOYEE_UPLOAD_REQUIRED_COLUMNS)
+    source_rows = extracted.get("rows", [])
+
+    header_index = None
+    header_source_row_number = None
+    normalized_headers = []
+
+    for index, row in enumerate(source_rows):
+        row_values = {
+            clean_upload_text(value).upper()
+            for value in row.get("values", [])
+            if clean_upload_text(value)
+        }
+        if required_column_set.issubset(row_values):
+            header_index = index
+            header_source_row_number = row.get("source_row_number") or (index + 1)
+            normalized_headers = [clean_upload_text(value).upper() for value in row.get("values", [])]
+            break
+
+    if header_index is None:
+        return {
+            "success": False,
+            "error": "Could not find the required headers: Employee ID, Employee Name, and Department.",
+        }
+
+    missing_columns = [column.title() for column in EMPLOYEE_UPLOAD_REQUIRED_COLUMNS if column not in normalized_headers]
+    if missing_columns:
+        return {
+            "success": False,
+            "error": f"Missing required column(s): {', '.join(missing_columns)}",
+        }
+
+    parsed_rows = []
+    for row in source_rows[header_index + 1:]:
+        row_values = list(row.get("values", []))
+        row_map = {}
+        for column_index, header in enumerate(normalized_headers):
+            if not header:
+                continue
+            row_map[header] = clean_upload_text(row_values[column_index]) if column_index < len(row_values) else ""
+
+        required_values = [row_map.get(column, "") for column in EMPLOYEE_UPLOAD_REQUIRED_COLUMNS]
+        optional_values = [row_map.get(column, "") for column in EMPLOYEE_UPLOAD_OPTIONAL_COLUMNS]
+        if not any(value.strip() for value in [*required_values, *optional_values]):
+            continue
+
+        parsed_rows.append(
+            {
+                "row_number": row.get("source_row_number") or (header_source_row_number + 1),
+                "employee_id": row_map.get("EMPLOYEE ID", ""),
+                "employee_name": row_map.get("EMPLOYEE NAME", ""),
+                "department_name": row_map.get("DEPARTMENT", ""),
+                "position": row_map.get("POSITION", ""),
+            }
+        )
+
+    return {
+        "success": True,
+        "required_columns": EMPLOYEE_UPLOAD_REQUIRED_COLUMNS,
+        "optional_columns": EMPLOYEE_UPLOAD_OPTIONAL_COLUMNS,
+        "parsed_rows": parsed_rows,
+    }
+
+
+def validate_employee_upload_rows(conn, parsed_rows):
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT department_id, department_name
+            FROM departments
+            """
+        )
+        department_lookup = {}
+        for department_id, department_name in cursor.fetchall():
+            key = department_lookup_key(department_name)
+            if key:
+                department_lookup.setdefault(key, []).append(
+                    {
+                        "department_id": department_id,
+                        "department_name": clean_upload_text(department_name),
+                    }
+                )
+
+        cursor.execute(
+            """
+            SELECT
+                e.employee_id,
+                employee_name,
+                COALESCE(u.active, 1) AS is_active
+            FROM employees e
+            JOIN users u ON e.user_id = u.user_id
+            """
+        )
+        employee_rows = cursor.fetchall()
+        active_employee_ids = set()
+        inactive_employee_ids = set()
+        employee_name_lookup = {}
+        for row in employee_rows:
+            employee_id = format_employee_id(row[0])
+            target = active_employee_ids if bool(row[2]) else inactive_employee_ids
+            target.add(employee_id)
+            register_name_match_source(employee_name_lookup, row[1], employee_id)
+
+        cursor.execute(
+            """
+            SELECT student_name
+            FROM students
+            """
+        )
+        student_name_lookup = build_name_match_lookup(row[0] for row in cursor.fetchall())
+
+        valid_rows = []
+        errors = []
+        seen_employee_ids = {}
+        seen_name_rows = {}
+
+        for row in parsed_rows:
+            employee_id = normalize_employee_id(row.get("employee_id"))
+            employee_name = clean_upload_text(row.get("employee_name"))
+            department_name = clean_upload_text(row.get("department_name"))
+            position = clean_upload_text(row.get("position"))
+            row_number = row.get("row_number")
+
+            missing_fields = []
+            if not employee_id:
+                missing_fields.append("Employee ID")
+            if not employee_name:
+                missing_fields.append("Employee Name")
+            if not department_name:
+                missing_fields.append("Department")
+            if missing_fields:
+                errors.append(f"Row {row_number}: Missing {', '.join(missing_fields)}")
+                continue
+
+            employee_field_errors = validate_employee_fields(
+                employee_id=row.get("employee_id"),
+                employee_name=employee_name,
+                position=position,
+                require_employee_id=True,
+                require_position=False,
+            )
+            department_errors = validate_department_name(department_name)
+            if employee_field_errors or department_errors:
+                errors.append(
+                    f"Row {row_number}: {(employee_field_errors + department_errors)[0]}"
+                )
+                continue
+
+            dept_key = department_lookup_key(department_name)
+            department_matches = department_lookup.get(dept_key, [])
+            if not department_matches:
+                errors.append(f"Row {row_number}: Department not found: {department_name}")
+                continue
+            if len(department_matches) > 1:
+                errors.append(f"Row {row_number}: Department is ambiguous: {department_name}")
+                continue
+            department_match = department_matches[0]
+            department_id = department_match["department_id"]
+            resolved_department_name = department_match["department_name"]
+
+            if employee_id in seen_employee_ids:
+                errors.append(
+                    f"Row {row_number}: Duplicate Employee ID already appears in row {seen_employee_ids[employee_id]} of the uploaded file."
+                )
+                continue
+
+            duplicate_name_rows = find_name_match_sources(employee_name, seen_name_rows)
+            if duplicate_name_rows:
+                errors.append(
+                    f"Row {row_number}: Similar name already appears in row {min(duplicate_name_rows)} of the uploaded file."
+                )
+                continue
+
+            if employee_id in active_employee_ids:
+                errors.append(
+                    f"Row {row_number}: Employee already exists with ID {employee_id}."
+                )
+                continue
+
+            if has_name_match_conflict(
+                employee_name,
+                employee_name_lookup,
+                exclude_sources={employee_id} if employee_id in inactive_employee_ids else None,
+            ):
+                errors.append(
+                    f"Row {row_number}: {same_role_name_conflict_error('employee')}"
+                )
+                continue
+
+            if has_name_match_conflict(employee_name, student_name_lookup):
+                errors.append(
+                    f"Row {row_number}: {cross_role_name_conflict_error('employee', 'student')}"
+                )
+                continue
+
+            seen_employee_ids[employee_id] = row_number
+            register_name_match_source(seen_name_rows, employee_name, row_number)
+
+            valid_rows.append(
+                {
+                    "row_number": row_number,
+                    "employee_id": employee_id,
+                    "employee_name": employee_name,
+                    "department_name": resolved_department_name,
+                    "department_id": department_id,
+                    "position": position,
+                    "action": "reactivate" if employee_id in inactive_employee_ids else "create",
+                    "source_department_name": department_name,
+                }
+            )
+
+        return {"success": True, "valid_rows": valid_rows, "errors": errors}
+    finally:
+        cursor.close()
+
+
+class InternalBackendResponse:
+    def __init__(self, response):
+        self._response = response
+        self.status_code = response.status_code
+        self.ok = 200 <= response.status_code < 300
+        self.text = response.get_data(as_text=True)
+
+    def json(self):
+        data = self._response.get_json(silent=True)
+        if data is not None:
+            return data
+        if not self.text:
+            return {}
+        return json.loads(self.text)
+
+
+def backend_url(path):
+    base_url = app.config["BACKEND_API_URL"].rstrip("/")
+    return f"{base_url}/{path.lstrip('/')}"
+
+
+def should_use_internal_backend_fallback():
+    parsed = urlsplit(app.config["BACKEND_API_URL"])
+    return parsed.hostname in {"127.0.0.1", "localhost"} and parsed.port == 5001
+
+
+def internal_backend_request(method, path, **kwargs):
+    from app_extension import app as backend_app
+
+    request_path = path
+    params = kwargs.get("params")
+    if params:
+        query_string = urlencode(params, doseq=True)
+        separator = "&" if "?" in request_path else "?"
+        request_path = f"{request_path}{separator}{query_string}"
+
+    request_kwargs = {}
+    if "json" in kwargs:
+        request_kwargs["json"] = kwargs["json"]
+    elif "data" in kwargs:
+        request_kwargs["data"] = kwargs["data"]
+
+    with backend_app.test_client() as client:
+        response = client.open(request_path, method=method.upper(), **request_kwargs)
+    return InternalBackendResponse(response)
+
+
+def backend_request(method, path, **kwargs):
+    kwargs.setdefault("timeout", app.config["BACKEND_TIMEOUT"])
+    try:
+        return requests.request(method, backend_url(path), **kwargs)
+    except requests.RequestException:
+        if should_use_internal_backend_fallback():
+            app.logger.warning("Backend service unavailable on port 5001. Falling back to in-process backend for %s %s.", method.upper(), path)
+            return internal_backend_request(method, path, **kwargs)
+        raise
+
+
+@app.context_processor
+def inject_template_config():
+    return {
+        "backend_api_url": app.config["BACKEND_API_URL"],
+        "is_logged_in": bool(session.get("logged_in")),
+    }
+
+
+def login_required(view_func):
+    @wraps(view_func)
+    def wrapped_view(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect(url_for("login"))
+        return view_func(*args, **kwargs)
+
+    return wrapped_view
+
+
+def validate_visitor_valid_until(value, default_to_today=False):
+    valid_until = parse_visitor_valid_until(value, default_to_today=default_to_today)
+    if not valid_until:
+        return None, "Select a valid account expiration date."
+    if valid_until < datetime.now().replace(microsecond=0):
+        return None, "Account expiration must be today or a future date."
+    return valid_until, None
+
+
+@app.before_request
+def disable_expired_visitor_accounts():
+    if request.endpoint == "static":
+        return
+
+    conn = connect_db()
+    if not conn:
+        return
+
+    expire_expired_visitor_accounts(conn, logger=app.logger)
+
+
+@app.errorhandler(Exception)
+def handle_app_exception(err):
+    if request.path.startswith("/upload_employees"):
+        if isinstance(err, HTTPException):
+            return jsonify({"success": False, "error": err.description}), err.code
+
+        app.logger.exception("Unhandled upload route exception on %s", request.path)
+        return jsonify({"success": False, "error": f"Unhandled upload error: {err}"}), 500
+
+    if isinstance(err, HTTPException):
+        return err
+
+    app.logger.exception("Unhandled application exception.")
+    return "Internal Server Error", 500
+
+
+def resolve_visitor_source(source, fallback="kiosk_entrance"):
+    if source and source in app.view_functions:
+        return source
+    return fallback
+
+
+def fetch_visitor_logs(status=None, search_term=None, visit_date=None, include_inactive=False):
+    conn = connect_db()
+    if not conn:
+        return []
+
+    logs = Database(conn).get_visitor_logs(
+        search_term=search_term,
+        visit_date=visit_date,
+        include_inactive=include_inactive,
+    )
+
+    if status:
+        logs = [log for log in logs if log.get("status") == status]
+
+    return logs
+
+
+def get_next_visitor_id():
+    if database_module.global_pool is None:
+        return None
+
+    conn = connect_db()
+    if not conn:
+        return None
+
+    cursor = None
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT AUTO_INCREMENT
+            FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'visitors'
+            LIMIT 1
+            """
+        )
+        row = cursor.fetchone()
+        next_seq = int(row[0]) if row and row[0] else 1
+        return f"VT-{next_seq:05d}"
+    finally:
+        if cursor:
+            cursor.close()
+        release_db_connection(conn)
+
+
+def parse_visitor_upload_file(file):
+    if not file or not file.filename:
+        return {"success": False, "error": "No file uploaded"}
+
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in {".xls", ".xlsx", ".csv"}:
+        return {"success": False, "error": "Please upload a valid Excel or CSV file."}
+
+    extracted = _extract_upload_rows(file, file_ext)
+    if not extracted.get("success"):
+        return extracted
+
+    source_rows = extracted.get("rows", [])
+    header_aliases = {
+        "NAME": "NAME",
+        "VISITOR NAME": "NAME",
+        "FULL NAME": "NAME",
+        "PURPOSE": "PURPOSE/OFFICE",
+        "PURPOSE/OFFICE": "PURPOSE/OFFICE",
+        "PURPOSE / OFFICE": "PURPOSE/OFFICE",
+        "OFFICE": "PURPOSE/OFFICE",
+        "OFFICE/PURPOSE": "PURPOSE/OFFICE",
+        "OFFICE / PURPOSE": "PURPOSE/OFFICE",
+        "DETAIL": "DETAILS",
+        "DETAILS": "DETAILS",
+        "DESCRIPTION": "DETAILS",
+    }
+
+    if not source_rows:
+        return {"success": False, "error": "The uploaded file does not contain any rows."}
+
+    header_index = 0
+    header_source_row_number = source_rows[0].get("source_row_number") or 1
+    normalized_headers = [
+        header_aliases.get(clean_upload_text(value).upper(), clean_upload_text(value).upper())
+        for value in source_rows[0].get("values", [])
+    ]
+    header_values = {header for header in normalized_headers if header}
+
+    if not set(VISITOR_UPLOAD_REQUIRED_COLUMNS).issubset(header_values):
+        return {
+            "success": False,
+            "error": "The first row must contain the required headers: Name and Purpose/Office.",
+        }
+
+    missing_columns = [
+        column.title()
+        for column in VISITOR_UPLOAD_REQUIRED_COLUMNS
+        if column not in normalized_headers
+    ]
+    if missing_columns:
+        return {
+            "success": False,
+            "error": f"Missing required column(s): {', '.join(missing_columns)}",
+        }
+
+    parsed_rows = []
+    for row in source_rows[header_index + 1:]:
+        row_values = list(row.get("values", []))
+        row_map = {}
+        for column_index, header in enumerate(normalized_headers):
+            if not header:
+                continue
+            row_map[header] = clean_upload_text(row_values[column_index]) if column_index < len(row_values) else ""
+
+        relevant_values = [
+            row_map.get(column, "")
+            for column in VISITOR_UPLOAD_REQUIRED_COLUMNS + VISITOR_UPLOAD_OPTIONAL_COLUMNS
+        ]
+        if not any(value.strip() for value in relevant_values):
+            continue
+
+        parsed_rows.append(
+            {
+                "row_number": row.get("source_row_number") or (header_source_row_number + 1),
+                "name": row_map.get("NAME", ""),
+                "purpose": row_map.get("PURPOSE/OFFICE", ""),
+                "details": row_map.get("DETAILS", ""),
+            }
+        )
+
+    return {
+        "success": True,
+        "required_columns": VISITOR_UPLOAD_REQUIRED_COLUMNS,
+        "optional_columns": VISITOR_UPLOAD_OPTIONAL_COLUMNS,
+        "parsed_rows": parsed_rows,
+    }
+
+
+def normalize_visitor_upload_purpose_and_details(raw_purpose, raw_details):
+    purpose_or_office = clean_upload_text(raw_purpose)
+    details = clean_upload_text(raw_details)
+    purpose = normalize_visitor_purpose(purpose_or_office)
+
+    if purpose:
+        return purpose, details
+
+    return None, details
+
+
+def validate_visitor_upload_rows(parsed_rows):
+    valid_rows = []
+    errors = []
+    seen_names = {}
+
+    next_visitor_id = get_next_visitor_id()
+    next_seq = 1
+    if next_visitor_id:
+        match = re.match(r"^VT-(\d{5})$", next_visitor_id)
+        if match:
+            next_seq = int(match.group(1))
+
+    for row in parsed_rows:
+        row_number = row.get("row_number")
+        visitor_name = clean_upload_text(row.get("name"))
+        raw_purpose = clean_upload_text(row.get("purpose"))
+        purpose, details = normalize_visitor_upload_purpose_and_details(raw_purpose, row.get("details"))
+
+        missing_fields = []
+        if not visitor_name:
+            missing_fields.append("Name")
+        if not raw_purpose:
+            missing_fields.append("Purpose/Office")
+        if missing_fields:
+            errors.append(f"Row {row_number}: Missing {', '.join(missing_fields)}")
+            continue
+
+        if not purpose:
+            errors.append(f"Row {row_number}: Invalid purpose. Must be one of: {', '.join(VISITOR_PURPOSES)}")
+            continue
+
+        if purpose == "Other" and not details:
+            errors.append(f"Row {row_number}: Details is required when Purpose is 'Other'.")
+            continue
+
+        name_key = visitor_name.upper()
+        if name_key in seen_names:
+            errors.append(
+                f"Row {row_number}: Duplicate visitor name already appears in row {seen_names[name_key]} of the uploaded file."
+            )
+            continue
+        seen_names[name_key] = row_number
+
+        preview_id = f"VT-{next_seq + len(valid_rows):05d}"
+        valid_rows.append(
+            {
+                "row_number": row_number,
+                "visitor_id": preview_id,
+                "name": visitor_name,
+                "purpose": purpose,
+                "details": details if purpose == "Other" else "",
+            }
+        )
+
+    return {"success": True, "valid_rows": valid_rows, "errors": errors}
+
+
+def fetch_live_student_logs():
+    current_kiosk_data = dict(MOCK_KIOSK_DATA)
+    try:
+        response = backend_request("GET", "/kiosk/students/student-logs")
+        if response.ok:
+            payload = response.json()
+            if payload.get("success"):
+                current_kiosk_data["recent_student_logs"] = payload.get("logs", [])
+    except requests.RequestException as err:
+        app.logger.warning("Could not fetch student logs: %s", err)
+
+    return current_kiosk_data
+
+
+def build_recent_kiosk_feed(limit=6):
+    visitor_feed = []
+    for visitor in fetch_visitor_logs()[:limit]:
+        is_checked_in = visitor.get("status") == "Checked In"
+        visitor_label = visitor.get("details") if visitor.get("purpose") == "Other" and visitor.get("details") else visitor.get("purpose", "N/A")
+        visitor_feed.append(
+            {
+                "type": "in" if is_checked_in else "out",
+                "name": visitor.get("name"),
+                "course": f"Visitor - {visitor_label}",
+                "time": visitor.get("time_in") if is_checked_in else (visitor.get("time_out") or visitor.get("time_in")),
+            }
+        )
+    return visitor_feed
+
+
+def get_kiosk_data_with_live_feed(limit=6):
+    kiosk_data = fetch_live_student_logs()
+    kiosk_data["recent_activity_logs"] = (
+        build_recent_kiosk_feed(limit=limit) + kiosk_data.get("recent_student_logs", [])
+    )[:limit]
+    return kiosk_data
+
+
+def fetch_backend_events():
+    try:
+        response = backend_request("GET", "/admin/dashboard/events")
+        if response.ok:
+            payload = response.json()
+            if payload.get("success"):
+                return payload.get("events", [])
+    except requests.RequestException as err:
+        app.logger.warning("Could not fetch dashboard events: %s", err)
+    return []
+
+
+def fetch_kiosk_live_events():
+    try:
+        response = backend_request("GET", "/kiosk/employee/select-event")
+        if response.ok:
+            payload = response.json()
+            if payload.get("success"):
+                return payload.get("events", [])
+    except requests.RequestException as err:
+        app.logger.warning("Could not fetch kiosk events: %s", err)
+    return []
+
+
+def fetch_report_events():
+    try:
+        response = backend_request("GET", "/api/reports/all-events")
+        if response.ok:
+            payload = response.json()
+            if payload.get("success"):
+                return payload.get("events", [])
+    except requests.RequestException as err:
+        app.logger.warning("Could not fetch report events: %s", err)
+    return []
+
+
+def fetch_departments():
+    try:
+        response = backend_request("GET", "/admin/dashboard/events/live-departments")
+        if response.ok:
+            payload = response.json()
+            if payload.get("success"):
+                departments = [
+                    {
+                        "department_id": dept.get("dept_id"),
+                        "department_name": dept.get("dept_name"),
+                    }
+                    for dept in payload.get("departments", [])
+                ]
+                if departments:
+                    return departments
+    except requests.RequestException as err:
+        app.logger.warning("Could not fetch departments: %s", err)
+
+    conn = connect_db()
+    if not conn:
+        return []
+    try:
+        return [
+            {
+                "department_id": dept.get("dept_id"),
+                "department_name": dept.get("dept_name"),
+            }
+            for dept in Database.get_admin_departments(conn)
+        ]
+    finally:
+        release_db_connection(conn)
+
+
+def fetch_employee_attendance():
+    conn = connect_db()
+    if not conn:
+        return []
+    return Database.get_admin_employee_activity(conn)
+
+
+def fetch_admin_students_page_data():
+    conn = connect_db()
+    if not conn:
+        return [], [], []
+
+    logs = Database.get_admin_student_activity(conn)
+    records = Database.get_admin_student_records(conn)
+    course_options = sorted(
+        {
+            item.get("course")
+            for item in [*logs, *records]
+            if item.get("course") and item.get("course") != "N/A"
+        }
+    )
+    return logs, records, course_options
+
+
+def split_employee_departments(departments):
+    office_keywords = (
+        "office",
+        "library",
+        "human resources",
+        "hr",
+        "registrar",
+        "accounting",
+        "mis",
+    )
+
+    teaching_departments = []
+    office_departments = []
+
+    for dept in departments:
+        dept_name = str(dept.get("department_name") or "").strip()
+        if not dept_name:
+            continue
+
+        target_list = (
+            office_departments
+            if any(keyword in dept_name.lower() for keyword in office_keywords)
+            else teaching_departments
+        )
+        target_list.append(dept)
+
+    return teaching_departments, office_departments
+
+
+def fetch_admin_employees_page_data():
+    conn = connect_db()
+    if not conn:
+        return [], [], []
+
+    logs = Database.get_admin_employee_activity(conn)
+    records = Database.get_admin_employee_records(conn)
+    department_options = sorted(
+        {
+            item.get("dept")
+            for item in [*logs, *records]
+            if item.get("dept") and item.get("dept") != "N/A"
+        }
+    )
+    return logs, records, department_options
+
+
+def fetch_dashboard_stats(path, fallback):
+    try:
+        response = backend_request("GET", path)
+        if response.ok:
+            payload = response.json()
+            if payload.get("success"):
+                return payload.get("data", fallback)
+    except requests.RequestException as err:
+        app.logger.warning("Could not fetch dashboard stats from %s: %s", path, err)
+    return fallback
+
+
+def helper_admin_login(username, password):
+    try:
+        response = backend_request(
+            "POST",
+            "/admin/login/auth",
+            json={"username": username, "password": password},
+        )
+        return response.json()
+    except requests.RequestException as err:
+        app.logger.error("Authentication backend is unavailable: %s", err)
+        return {"success": False, "message": "Authentication service is unavailable."}
+
+
+def helper_delete_events(event_id, delete_type):
+    if delete_type == "single":
+        payload = {"event_id": event_id}
+        path = "/admin/events/delete-event"
+    else:
+        payload = {"event_ids": event_id}
+        path = "/admin/events/delete-events"
+
+    try:
+        response = backend_request("PUT", path, json=payload)
+        return response.json()
+    except requests.RequestException as err:
+        app.logger.error("Could not delete event(s): %s", err)
+        return {"success": False, "message": "Backend service is unavailable."}
+
+
+def proxy_backend_json(method, path, **kwargs):
+    try:
+        response = backend_request(method, path, **kwargs)
+        return jsonify(response.json()), response.status_code
+    except requests.RequestException as err:
+        app.logger.error("Backend proxy failed for %s %s: %s", method.upper(), path, err)
+        return jsonify({"success": False, "message": "Backend service unavailable."}), 503
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        payload = request.get_json(silent=True) or request.form
+        username = (payload.get("username") or "").strip()
+        password = payload.get("password") or ""
+
+        if not username or not password:
+            return jsonify({"success": False, "message": "Please enter a username and password."}), 400
+
+        result = helper_admin_login(username, password)
+        if result.get("success"):
+            session.clear()
+            session.permanent = True
+            session["logged_in"] = True
+            session["admin_username"] = result.get("data", {}).get("username", username)
+            return jsonify({"success": True, "redirect_url": url_for("dashboard")})
+
+        return jsonify({"success": False, "message": result.get("message", "Incorrect username or password.")})
+
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    flash("You have been logged out.", "info")
+    return redirect(url_for("login"))
+
+
+@app.route("/")
+def index():
+    session.clear()
+    return render_template("index.html")
+
+
+@app.route("/kiosk/entrance")
+def kiosk_entrance():
+    visitor_welcome = session.pop("visitor_welcome", None)
+    session.pop("logged_in", None)
+    session.pop("admin_username", None)
+    return render_template(
+        "kiosk_entrance.html",
+        active_visitors=fetch_visitor_logs(status="Checked In"),
+        kiosk_data=get_kiosk_data_with_live_feed(),
+        visitor_welcome=visitor_welcome,
+    )
+
+
+@app.route("/kiosk/exit")
+def kiosk_exit():
+    session.clear()
+    return render_template("kiosk_exit.html", kiosk_data=get_kiosk_data_with_live_feed())
+
+
+@app.route("/kiosk/employee/select-event")
+def kiosk_employee_select_event():
+    session.clear()
+    employee_stats = fetch_dashboard_stats("/admin/dashboard/analytics/employees", dict(MOCK_EMPLOYEE_STATS))
+    return render_template(
+        "kiosk_event_select.html", 
+        events=fetch_kiosk_live_events(),
+        upcoming_events=employee_stats.get("upcoming_events", [])
+    )
+
+
+@app.route("/kiosk/employee")
+def kiosk_employee():
+    session.clear()
+    instance_id = request.args.get("instance_id", type=int)
+    events = fetch_kiosk_live_events()
+    selected_event = next((event for event in events if event.get("instance_id") == instance_id), None)
+
+    return render_template(
+        "kiosk_employee.html",
+        event_name=selected_event.get("name", "General Attendance") if selected_event else "General Attendance",
+        event_id=selected_event.get("event_id") if selected_event else None,
+        instance_id=instance_id,
+        kiosk_data=get_kiosk_data_with_live_feed(),
+    )
+
+
+@app.route("/kiosk/visitor")
+def kiosk_visitor():
+    visitor_welcome = session.pop("visitor_welcome", None)
+    session.pop("logged_in", None)
+    session.pop("admin_username", None)
+    return render_template(
+        "kiosk_visitor.html",
+        active_visitors=fetch_visitor_logs(status="Checked In"),
+        visitor_welcome=visitor_welcome,
+    )
+
+
+@app.route("/api/visitor/checkin", methods=["POST"])
+def visitor_checkin():
+    name = (request.form.get("name") or "").strip()
+    purpose = normalize_visitor_purpose(request.form.get("purpose"))
+    details = (request.form.get("details") or "").strip()
+    source = resolve_visitor_source(request.form.get("source"), fallback="kiosk_visitor")
+    wants_json = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+    if not name:
+        if wants_json:
+            return jsonify({"success": False, "message": "Check-in failed. Visitor name is required."}), 400
+        flash("Check-in failed. Visitor name is required.", "danger")
+        return redirect(url_for(source))
+    if not purpose:
+        if wants_json:
+            return jsonify({"success": False, "message": "Check-in failed. Select a valid visitor purpose."}), 400
+        flash("Check-in failed. Select a valid visitor purpose.", "danger")
+        return redirect(url_for(source))
+    if purpose == "Other" and not details:
+        if wants_json:
+            return jsonify({"success": False, "message": "Check-in failed. Visit description is required when purpose is Other."}), 400
+        flash("Check-in failed. Visit description is required when purpose is Other.", "danger")
+        return redirect(url_for(source))
+
+    conn = connect_db()
+    if not conn:
+        if wants_json:
+            return jsonify({"success": False, "message": "Check-in failed. Visitor database is unavailable."}), 503
+        flash("Check-in failed. Visitor database is unavailable.", "danger")
+        return redirect(url_for(source))
+
+    valid_until = visitor_valid_until_end_of_day()
+    result = Database(conn, (name, purpose, details, "Gate 1", valid_until)).add_visitor_log()
+    if result.get("success"):
+        session["visitor_welcome"] = {
+            "name": name,
+            "visitor_id": result.get("visitor_id") or "Pending ID",
+        }
+        if wants_json:
+            return jsonify(
+                {
+                    "success": True,
+                    "message": f"Welcome, {name}. Check-in successful.",
+                    "visitor": {
+                        "name": name,
+                        "visitor_id": result.get("visitor_id") or "Pending ID",
+                        "purpose": details if purpose.lower() == "other" and details else purpose,
+                        "valid_until": result.get("valid_until"),
+                    },
+                }
+            ), 200
+
+    if wants_json:
+        return jsonify({"success": False, "message": result.get("message", "Check-in failed.")}), 400
+
+    flash(
+        f"Welcome, {name}. Check-in successful." if result.get("success") else result.get("message", "Check-in failed."),
+        "success" if result.get("success") else "danger",
+    )
+    return redirect(url_for(source))
+
+
+@app.route("/add_visitor", methods=["POST"])
+@login_required
+def add_visitor():
+    data = request.get_json(silent=True) or {}
+    name = (data.get("visitor_name") or data.get("name") or "").strip()
+    purpose = normalize_visitor_purpose(data.get("purpose"))
+    details = (data.get("details") or "").strip()
+    valid_until, valid_until_error = validate_visitor_valid_until(data.get("valid_until"))
+
+    if not name:
+        return jsonify({"success": False, "error": "Visitor name is required."}), 400
+    if not purpose:
+        return jsonify({"success": False, "error": "Select a valid visitor purpose."}), 400
+    if purpose == "Other" and not details:
+        return jsonify({"success": False, "error": "Visit description is required when purpose is Other."}), 400
+    if valid_until_error:
+        return jsonify({"success": False, "error": valid_until_error}), 400
+
+    conn = connect_db()
+    if not conn:
+        return jsonify({"success": False, "error": "Database offline"}), 500
+
+    result = Database(conn, (name, purpose, details, "Gate 1", valid_until)).add_visitor_log()
+    status_code = 200 if result.get("success") else 400
+    return jsonify(result), status_code
+
+
+@app.route("/admin/visitors/send-qr-email", methods=["POST"])
+@login_required
+def send_visitor_qr_email():
+    data = request.get_json(silent=True) or {}
+    recipient = (data.get("email") or "").strip()
+    visitor_id = (data.get("visitor_id") or "").strip()
+    visitor_name = (data.get("visitor_name") or data.get("name") or "").strip()
+    purpose = normalize_visitor_purpose(data.get("purpose"))
+    details = (data.get("details") or "").strip()
+    qr_data = (data.get("qr_data") or "").strip()
+    qr_url = (data.get("qr_url") or "").strip()
+    valid_until = parse_visitor_valid_until(data.get("valid_until"))
+
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", recipient):
+        return jsonify({"success": False, "message": "Enter a valid visitor email address."}), 400
+    if not visitor_id or not visitor_name or not purpose:
+        return jsonify({"success": False, "message": "Generate the visitor QR code before sending email."}), 400
+    if purpose == "Other" and not details:
+        return jsonify({"success": False, "message": "Visit description is required when purpose is Other."}), 400
+
+    qr_data = qr_data or f"{visitor_name} [{visitor_id}] {details if purpose == 'Other' and details else purpose}"
+    qr_url = qr_url or f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={urlencode({'': qr_data})[1:]}"
+    attachment_data = None
+
+    try:
+        response = requests.get(qr_url, timeout=10)
+        response.raise_for_status()
+        attachment_data = response.content
+    except requests.RequestException as err:
+        app.logger.warning("Could not fetch visitor QR attachment: %s", err)
+
+    email_body = (
+        "Attached is your PLP visitor QR code.\n\n"
+        f"Visitor ID: {visitor_id}\n"
+        f"Visitor Name: {visitor_name}\n"
+        f"Purpose: {purpose}\n"
+    )
+    if purpose == "Other":
+        email_body += f"Details: {details}\n"
+    if valid_until:
+        email_body += f"Valid Until: {format_visitor_valid_until(valid_until)}\n"
+    if not attachment_data:
+        email_body += f"\nQR Code Link: {qr_url}\n"
+
+    try:
+        send_email(
+            subject=f"PLP Visitor QR Code - {visitor_id}",
+            body=email_body,
+            recipient=recipient,
+            attachment_data=attachment_data,
+            filename=f"{visitor_id}_qr.png",
+        )
+    except ValueError as err:
+        return jsonify({"success": False, "message": str(err)}), 400
+    except Exception as err:
+        app.logger.exception("Failed to send visitor QR email to %s", recipient)
+        return jsonify({"success": False, "message": f"Failed to send visitor QR email: {err}"}), 500
+
+    return jsonify({"success": True, "message": f"Visitor QR email sent to {recipient}."})
+
+
+def commit_visitors_upload_payload(rows):
+    if not isinstance(rows, list) or not rows:
+        return jsonify({"success": False, "error": "No visitor rows provided for upload."}), 400
+
+    inserted = 0
+    errors = []
+    inserted_ids = []
+
+    for row in rows:
+        row_number = row.get("row_number") or "Unknown"
+        visitor_name = clean_upload_text(row.get("name"))
+        purpose, details = normalize_visitor_upload_purpose_and_details(row.get("purpose"), row.get("details"))
+        valid_until, valid_until_error = validate_visitor_valid_until(
+            row.get("valid_until"),
+            default_to_today=True,
+        )
+
+        if not visitor_name or not purpose:
+            errors.append(f"Row {row_number}: Missing Name or Purpose/Office.")
+            continue
+        if valid_until_error:
+            errors.append(f"Row {row_number}: {valid_until_error}")
+            continue
+        if purpose != "Other":
+            details = ""
+        if purpose == "Other" and not details:
+            errors.append(f"Row {row_number}: Details is required when Purpose is Other.")
+            continue
+
+        conn = connect_db()
+        if not conn:
+            errors.append(f"Row {row_number}: Database connection failed.")
+            continue
+
+        try:
+            result = Database(conn, (visitor_name, purpose, details, "Gate 1", valid_until)).add_visitor_log()
+            if result.get("success"):
+                inserted += 1
+                if result.get("visitor_id"):
+                    inserted_ids.append(result.get("visitor_id"))
             else:
-                error_msg = api_data.get('message', 'Unknown API error')
-                flash(f'Failed to add event: {error_msg}', 'danger')
+                errors.append(f"Row {row_number}: {result.get('message', 'Failed to add visitor.')}")
+        except Exception as err:
+            app.logger.warning("Failed to add visitor from upload. row=%s error=%s", row_number, err)
+            errors.append(f"Row {row_number}: {err}")
+        finally:
+            release_db_connection(conn)
+
+    app.logger.info(
+        "Visitor upload completed. inserted=%s errors=%s",
+        inserted,
+        len(errors),
+    )
+    return jsonify(
+        {
+            "success": inserted > 0,
+            "inserted": inserted,
+            "inserted_ids": inserted_ids,
+            "errors": errors,
+        }
+    ), (200 if inserted > 0 else 400)
+
+
+@app.route("/upload_visitors/template.csv", methods=["GET"])
+@login_required
+def download_visitor_upload_template():
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(VISITOR_UPLOAD_REQUIRED_COLUMNS + VISITOR_UPLOAD_OPTIONAL_COLUMNS)
+    writer.writerow(["Maria Santos", "Official Business", ""])
+    writer.writerow(["Juan Dela Cruz", "Document Submission", ""])
+    writer.writerow(["Anna Rivera", "Other", "Campus inspection and audit"])
+
+    csv_content = output.getvalue()
+    output.close()
+
+    return Response(
+        csv_content,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=visitor_upload_template.csv"},
+    )
+
+
+@app.route("/upload_visitors/preview", methods=["POST"])
+@login_required
+def preview_visitors_upload():
+    try:
+        file = request.files.get("file")
+        app.logger.info(
+            "Visitor upload preview requested. filename=%s",
+            getattr(file, "filename", None),
+        )
+        parsed = parse_visitor_upload_file(file)
+        if not parsed.get("success"):
+            app.logger.warning(
+                "Visitor upload parsing rejected. filename=%s error=%s",
+                getattr(file, "filename", None),
+                parsed.get("error"),
+            )
+            return jsonify(parsed), 400
+    except Exception as err:
+        app.logger.exception("Unexpected visitor upload parsing failure.")
+        return jsonify({"success": False, "error": f"Upload parsing failed: {err}"}), 500
+
+    validation = validate_visitor_upload_rows(parsed.get("parsed_rows", []))
+    app.logger.info(
+        "Visitor upload preview validated. valid_rows=%s errors=%s",
+        len(validation.get("valid_rows", [])),
+        len(validation.get("errors", [])),
+    )
+    return jsonify(
+        {
+            "success": True,
+            "required_columns": parsed.get("required_columns", []),
+            "optional_columns": parsed.get("optional_columns", []),
+            "preview_rows": validation.get("valid_rows", []),
+            "errors": validation.get("errors", []),
+        }
+    )
+
+
+@app.route("/upload_visitors/commit", methods=["POST"])
+@login_required
+def commit_visitors_upload():
+    data = request.get_json(silent=True) or {}
+    rows = data.get("rows", [])
+    return commit_visitors_upload_payload(rows)
+
+
+@app.route("/api/visitor/checkout/<visitor_id>", methods=["POST"])
+def visitor_checkout(visitor_id):
+    source = resolve_visitor_source(request.args.get("source"), fallback="kiosk_entrance")
+    conn = connect_db()
+    if not conn:
+        flash("Check-out failed. Visitor database is unavailable.", "danger")
+        return redirect(url_for(source))
+
+    result = Database(conn, (visitor_id, "Gate 2")).checkout_visitor_log()
+    flash(
+        f"Goodbye, {result.get('name', 'Visitor')}. Check-out successful."
+        if result.get("success")
+        else result.get("message", "Visitor not found."),
+        "success" if result.get("success") else "danger",
+    )
+    return redirect(url_for(source))
+
+
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    instance_id = request.args.get('instance_id')
+    emp_stats_url = f"/admin/dashboard/analytics/employees?instance_id={instance_id}" if instance_id else "/admin/dashboard/analytics/employees"
+    return render_template(
+        "dashboard.html",
+        events=fetch_backend_events(),
+        overall_stats=fetch_dashboard_stats("/admin/dashboard/analytics/overall", dict(MOCK_DASHBOARD_STATS)),
+        student_stats=fetch_dashboard_stats("/admin/dashboard/analytics/students", dict(MOCK_STUDENT_STATS)),
+        employee_stats=fetch_dashboard_stats(emp_stats_url, dict(MOCK_EMPLOYEE_STATS)),
+        logs=fetch_employee_attendance(),
+        user=session.get("admin_username", "Admin"),
+    )
+
+
+@app.route("/announcement_manager")
+@login_required
+def announcement_manager():
+    return render_template(
+        "announcement_manager.html",
+        user=session.get("admin_username", "Admin"),
+        departments=fetch_departments(),
+        events=fetch_backend_events(),
+    )
+
+
+@app.route("/events")
+@login_required
+def manage_events():
+    return render_template(
+        "events.html",
+        events=fetch_backend_events(),
+        departments=fetch_departments(),
+    )
+
+
+@app.route("/admin/students")
+@login_required
+def admin_students():
+    logs, records, course_options = fetch_admin_students_page_data()
+    return render_template(
+        "student_logs.html",
+        logs=logs,
+        records=records,
+        course_options=course_options,
+    )
+
+
+@app.route("/admin/employees")
+@login_required
+def admin_employees():
+    logs, records, department_options = fetch_admin_employees_page_data()
+    departments = fetch_departments()
+    teaching_departments, office_departments = split_employee_departments(departments)
+
+    if not departments:
+        departments = [
+            {"department_id": "", "department_name": department}
+            for department in department_options
+        ]
+        teaching_departments, office_departments = split_employee_departments(departments)
+
+    return render_template(
+        "employee_logs.html",
+        logs=logs,
+        records=records,
+        employees=records,
+        department_options=department_options,
+        departments=departments,
+        teaching_departments=teaching_departments,
+        office_departments=office_departments,
+    )
+
+
+@app.route("/admin/visitors")
+@login_required
+def admin_visitors():
+    search_term = (request.args.get("search") or "").strip()
+    visit_date = (request.args.get("date") or "").strip()
+    visitors = fetch_visitor_logs(search_term=search_term or None, visit_date=visit_date or None)
+    return render_template(
+        "admin_visitors.html",
+        visitors=visitors,
+        search_term=search_term,
+        visit_date=visit_date,
+    )
+
+
+@app.route("/admin/visitors/<visitor_id>", methods=["PUT"])
+@login_required
+def update_visitor(visitor_id):
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    purpose = normalize_visitor_purpose(data.get("purpose"))
+    details = (data.get("details") or "").strip()
+    valid_until, valid_until_error = validate_visitor_valid_until(data.get("valid_until"))
+
+    if not name:
+        return jsonify({"success": False, "message": "Visitor name is required."}), 400
+    if not purpose:
+        return jsonify({"success": False, "message": "Select a valid visitor purpose."}), 400
+    if purpose == "Other" and not details:
+        return jsonify({"success": False, "message": "Visit description is required when purpose is Other."}), 400
+    if valid_until_error:
+        return jsonify({"success": False, "message": valid_until_error}), 400
+
+    conn = connect_db()
+    if not conn:
+        return jsonify({"success": False, "message": "Database offline"}), 500
+
+    result = Database(conn, (visitor_id, name, purpose, details, valid_until)).update_visitor_record()
+    return jsonify(result), (200 if result.get("success") else 400)
+
+
+@app.route("/admin/visitors/<visitor_id>", methods=["DELETE"])
+@login_required
+def delete_visitor(visitor_id):
+    conn = connect_db()
+    if not conn:
+        return jsonify({"success": False, "message": "Database offline"}), 500
+
+    result = Database(conn, (visitor_id,)).delete_visitor_record()
+    return jsonify(result), (200 if result.get("success") else 404)
+
+
+@app.route("/analytics/employee")
+@login_required
+def analytics_employee():
+    return redirect(url_for("admin_employees"))
+
+
+@app.route("/analytics/students")
+@login_required
+def analytics_students():
+    return redirect(url_for("admin_students"))
+
+
+@app.route("/reports")
+@login_required
+def reports():
+    relocate_legacy_report_files()
+    return render_template("reports.html", events=fetch_report_events(), reports=get_archived_reports())
+
+
+@app.route("/reports/sample")
+@login_required
+def sample_report():
+    return render_template(
+        "sample_report.html",
+        current_date=datetime.now().strftime("%B %d, %Y - %I:%M %p"),
+        report=build_sample_report_payload(),
+        metrics={},
+        logs=[],
+        archive_report_url=resolve_archive_report_url(),
+    )
+
+
+@app.route("/admin/events/add", methods=["POST"])
+@login_required
+def add_event():
+    name = (request.form.get("name") or "").strip()
+    event_type = (request.form.get("type") or "").strip()
+    event_date = (request.form.get("event_date") or "").strip()
+    day_of_week = (request.form.get("day_of_week") or "").strip()
+    time_start = (request.form.get("time_start") or "").strip()
+    time_end = (request.form.get("time_end") or "").strip()
+    location = (request.form.get("location") or "").strip()
+    department_ids = [
+        dept_id.strip()
+        for dept_id in request.form.getlist("dept")
+        if dept_id and dept_id.strip().isdigit()
+    ]
+    manual_participant_ids = split_manual_participant_ids(request.form.getlist("custom_dept"))
+    roster_file = request.files.get("roster_file")
+
+    frequency = normalize_event_frequency(request.form.get("frequency"))
+
+    validation_errors = []
+    if not name:
+        validation_errors.append("Event name is required.")
+    if event_type not in EVENT_TYPES:
+        validation_errors.append("Select a valid event type.")
+    if frequency not in EVENT_FREQUENCIES:
+        validation_errors.append("Select a valid event frequency.")
+    if not location:
+        validation_errors.append("Location is required.")
+    if not time_start:
+        validation_errors.append("Start time is required.")
+    if not time_end:
+        validation_errors.append("End time is required.")
+    if frequency != "DAILY" and not event_date:
+        validation_errors.append("Event date is required.")
+    if frequency == "WEEKLY" and day_of_week not in EVENT_DAYS:
+        validation_errors.append("Event day is required for weekly events.")
+
+    if event_date:
+        try:
+            parsed_event_date = datetime.strptime(event_date, "%Y-%m-%d").date()
+            if parsed_event_date < date.today():
+                validation_errors.append("Event date cannot be in the past.")
+        except ValueError:
+            validation_errors.append("Event date must use YYYY-MM-DD format.")
+
+    if time_start and time_end:
+        try:
+            parsed_start = datetime.strptime(time_start, "%H:%M").time()
+            parsed_end = datetime.strptime(time_end, "%H:%M").time()
+            if parsed_end <= parsed_start:
+                validation_errors.append("End time must be later than start time.")
+        except ValueError:
+            validation_errors.append("Start time and end time must use HH:MM format.")
+
+    has_file = bool(roster_file and roster_file.filename)
+    if not department_ids and not has_file and not manual_participant_ids:
+        validation_errors.append("Select at least one department, upload a CSV roster, or enter participant IDs.")
+
+    if validation_errors:
+        flash(" ".join(validation_errors), "danger")
+        return redirect(url_for("manage_events"))
+
+    custom_participants = list(manual_participant_ids)
+
+    if has_file:
+        if not roster_file.filename.lower().endswith(".csv"):
+            flash("Please upload a valid .csv file.", "warning")
+            return redirect(url_for("manage_events"))
+        try:
+            file_contents = roster_file.read().decode("utf-8-sig")
+            csv_stream = io.StringIO(file_contents)
+            for row in csv.DictReader(csv_stream):
+                if row.get("ID"):
+                    custom_participants.append(row["ID"].strip())
+        except Exception as err:
+            flash(f"Failed to process the CSV file: {err}", "danger")
+            return redirect(url_for("manage_events"))
+
+    custom_participants = unique_values(custom_participants)
+    if not department_ids and not custom_participants:
+        flash("Failed to add event. Provide at least one valid participant ID or select a department.", "danger")
+        return redirect(url_for("manage_events"))
+
+    participants_type = "hybrid" if department_ids and custom_participants else "grouped" if department_ids else "custom"
+
+    payload = {
+        "event_name": name,
+        "event_type": event_type,
+        "frequency": frequency,
+        "location": location,
+        "event_date": event_date,
+        "time_start": time_start,
+        "time_end": time_end,
+        "day": day_of_week,
+        "participants_type": participants_type,
+        "grouped_participants": department_ids,
+        "custom_participants": custom_participants,
+    }
+
+    try:
+        response = backend_request("POST", "/admin/dashboard/add-events", json=payload)
+        api_data = response.json()
+        if response.ok and api_data.get("success"):
+            flash(f'Event "{name}" added successfully.', "success")
         else:
-            flash(f'Server error. Status code: {response.status_code}', 'danger')
-                
-    except requests.exceptions.RequestException as e:
-        print(f"Backend API Connection Error: {e}")
-        flash(f'Event "{name}" failed to add. Could not connect to the database.', 'danger')
+            api_error = api_data.get("message") or api_data.get("error") or "Unknown API error"
+            flash(f"Failed to add event: {api_error}", "danger")
+    except requests.RequestException as err:
+        app.logger.error("Could not add event: %s", err)
+        flash(f'Event "{name}" failed to add. Could not connect to the backend.', "danger")
+    except ValueError:
+        flash(f'Event "{name}" failed to add. Backend returned an invalid response.', "danger")
 
-    return redirect(url_for('manage_events'))
+    return redirect(url_for("manage_events"))
 
-@app.route('/admin/events/delete/<int:event_id>', methods=['POST'])
+
+@app.route("/admin/events/delete/<int:event_id>", methods=["POST"])
 @login_required
 def delete_event(event_id):
     if event_id <= 2:
-        return jsonify({'success': False, 'message': 'Cannot delete default system events.'}), 403
+        return jsonify({"success": False, "message": "Cannot delete default system events."}), 403
 
-    result = helper_admin_delete_events(event_id, 'single')
+    result = helper_delete_events(event_id, "single")
+    return jsonify(result), (200 if result.get("success") else 500)
 
-    if result and result.get('success'):
-        return jsonify({'success': True, 'message': result.get('message', 'Event deleted successfully.')}), 200
-    else:
-        return jsonify({'success': False, 'message': result.get('message', 'Failed to delete event.')}), 500
 
-@app.route('/admin/events/bulk-delete', methods=['POST'])
+@app.route("/admin/events/bulk-delete", methods=["POST"])
 @login_required
 def bulk_delete_events():
-    data = request.get_json()
-    event_ids = data.get('event_ids', [])
+    data = request.get_json(silent=True) or {}
+    event_ids = data.get("event_ids", [])
+    valid_ids = [str(event_id) for event_id in event_ids if int(event_id) > 2]
 
-    if not event_ids:
-        return jsonify({'success': False, 'message': 'No events selected.'}), 400
-
-    # Protect default system events from bulk deletion
-    valid_ids = [str(eid) for eid in event_ids if int(eid) > 2]
-    
     if not valid_ids:
-        return jsonify({'success': False, 'message': 'Cannot delete default system events.'}), 403
+        return jsonify({"success": False, "message": "Cannot delete default system events."}), 403
 
-    try:
-        helper_admin_delete_events(valid_ids, 'bulk')
-            
-        return jsonify({'success': True, 'message': f'{len(valid_ids)} events deleted successfully.'}), 200
-        
-    except Exception as e:
-        print(f"Bulk delete error: {e}")
-        return jsonify({'success': False, 'message': 'An error occurred during bulk deletion.'}), 500
+    result = helper_delete_events(valid_ids, "bulk")
+    return jsonify(result), (200 if result.get("success") else 500)
 
-@app.route('/admin/profile/update', methods=['POST'])
+
+@app.route("/admin/profile/update", methods=["POST"])
 @login_required
 def update_profile():
-    flash('Admin profile updated successfully.', 'success')
-    return redirect(url_for('dashboard'))
+    flash("Admin profile updated successfully.", "success")
+    return redirect(url_for("dashboard"))
 
-# ==============================================================================
-# STUDENT API (MOCK)
-# ==============================================================================
 
-@app.route('/api/check_student_status', methods=['POST'])
+@app.route("/api/check_student_status", methods=["POST"])
 def check_student_status():
-    data = request.get_json()
-    student_id = data.get('student_id')
-    
+    data = request.get_json(silent=True) or {}
+    student_id = data.get("student_id")
+
     mock_students = {
-        '2026-001': {'name': 'Maria Clara', 'course': 'BS Psychology', 'status': 'TIMED IN'},
-        '2026-002': {'name': 'Jose Rizal', 'course': 'BS Accountancy', 'status': 'TIMED OUT'},
-        '2026-003': {'name': 'Andres Bonifacio', 'course': 'BS Criminology', 'status': 'TIMED IN'}
+        "2026-001": {"name": "Maria Clara", "course": "BS Psychology", "status": "TIMED IN"},
+        "2026-002": {"name": "Jose Rizal", "course": "BS Accountancy", "status": "TIMED OUT"},
+        "2026-003": {"name": "Andres Bonifacio", "course": "BS Information Technology", "status": "TIMED IN"},
     }
-    
-    student = mock_students.get(student_id)
-    if student:
-        return {
-            'status': 'found',
-            'name': student['name'],
-            'course': student['course'],
-            'attendance_status': student['status']
-        }
-    return {'status': 'not_found'}
-    
-# ==============================================================================
-# STATIC/ROUTE BASED GETTER METHODS
-# ==============================================================================
-@app.route('/api/kiosk/live-events')
-def kiosk_live_event():    
+
+    if student_id in mock_students:
+        student = mock_students[student_id]
+        return jsonify(
+            {
+                "status": "found",
+                "name": student["name"],
+                "course": student["course"],
+                "attendance_status": student["status"],
+            }
+        )
+
+    return jsonify({"status": "not_found"})
+
+
+@app.route("/api/kiosk/live-events")
+def kiosk_live_event():
     try:
-        response = requests.get("http://127.0.0.1:5001/kiosk/employee/select-event", timeout=5)
-        if response.status_code == 200:
-            return jsonify(response.json()) 
-            
-    except requests.exceptions.RequestException as e:
-        print(f"API Bridge Error: {e}")
+        response = backend_request("GET", "/kiosk/employee/select-event")
+        return jsonify(response.json()), response.status_code
+    except requests.RequestException as err:
+        app.logger.error("Kiosk live events bridge failed: %s", err)
+        return jsonify({"success": False, "message": "Backend service unavailable."}), 503
 
 
-@app.route('/api/admin/live-events')
-def admin_live_event():    
+@app.route("/api/admin/live-events")
+def admin_live_event():
     try:
-        response = requests.get("http://127.0.0.1:5001/admin/dashboard/events", timeout=5)
-        if response.status_code == 200:
-            return jsonify(response.json()) 
-            
-    except requests.exceptions.RequestException as e:
-        print(f"API Bridge Error: {e}")
+        response = backend_request("GET", "/admin/dashboard/events")
+        return jsonify(response.json()), response.status_code
+    except requests.RequestException as err:
+        app.logger.error("Admin live events bridge failed: %s", err)
+        return jsonify({"success": False, "message": "Backend service unavailable."}), 503
 
-@app.route('/api/admin/live-departments')
-def admin_live_departments():    
+
+@app.route("/api/admin/live-departments")
+def admin_live_departments():
     try:
-        response = requests.get("http://127.0.0.1:5001/admin/dashboard/events/live-departments", timeout=5)
-        if response.status_code == 200:
-            return jsonify(response.json()) 
-            
-    except requests.exceptions.RequestException as e:
-        print(f"API Bridge Error: {e}")
+        response = backend_request("GET", "/admin/dashboard/events/live-departments")
+        return jsonify(response.json()), response.status_code
+    except requests.RequestException as err:
+        app.logger.error("Admin live departments bridge failed: %s", err)
+        return jsonify({"success": False, "message": "Backend service unavailable."}), 503
 
 
-# ==============================================================================
-# HELPER
-# ==============================================================================
+@app.route("/api/backend/admin/user/authentication", methods=["POST"])
+def backend_user_authentication_proxy():
+    return proxy_backend_json("POST", "/admin/user/authentication", json=request.get_json(silent=True) or {})
 
-def helper_employee_attendance():
+
+@app.route("/api/backend/events/manual-entry", methods=["POST"])
+def backend_manual_event_entry_proxy():
+    return proxy_backend_json("POST", "/api/events/manual_entry", json=request.get_json(silent=True) or {})
+
+
+@app.route("/api/backend/admin/event/<int:event_id>/instances")
+def backend_event_instances_proxy(event_id):
+    return proxy_backend_json("GET", f"/admin/event/{event_id}/instances")
+
+
+@app.route("/api/backend/admin/instances/<int:instance_id>/attendance")
+def backend_instance_attendance_proxy(instance_id):
+    return proxy_backend_json("GET", f"/admin/instances/{instance_id}/get-attendance")
+
+
+@app.route("/api/backend/admin/instances/<int:instance_id>/logs")
+def backend_instance_logs_proxy(instance_id):
+    return proxy_backend_json("GET", f"/admin/instances/{instance_id}/get-logs")
+
+
+@app.route("/api/retrieve/events")
+def retrieve_all_events_for_reports():
+    return jsonify(fetch_report_events())
+
+
+@app.route("/api/retrieve/departments")
+def retrieve_departments():
+    return jsonify(fetch_departments())
+
+
+@app.route("/api/retrieve/courses")
+def retrieve_courses():
+    conn = connect_db()
+    if not conn:
+        return jsonify([])
+
+    cursor = conn.cursor(dictionary=True)
     try:
-        response = requests.get("http://127.0.0.1:5001/admin/employees/attendance", timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            if data.get('success'):
-                return data.get('logs', [])
-    except requests.exceptions.RequestException as e:
-        print(f"Backend API Error: {e}")
-    return []
-
-def helper_admin_login(username, password):
-    url = "http://127.0.0.1:5001/admin/login/auth"
-    headers = {"Content-Type": "application/json"}
-    payload = {"username": username, "password": password}   
-
-    try:
-        response = requests.post(url, headers=headers, json=payload, timeout=5)
-        response.raise_for_status()
-        return response.json()   
-    except requests.exceptions.RequestException as e:
-        print(f"API for admin authentication bridge error: {e}")
-        return {"success": False, "message": f"Authentication service unavailable: {str(e)}"}
-
-@app.route('/api/retrieve/events')
-def retrieve_all_events_for_reports():    
-    current_events = list(DEFAULT_EVENTS)
-    
-    try:
-        response = requests.get("http://127.0.0.1:5001/api/reports/all-events", timeout=5)
-        
-        if response.status_code == 200:
-            api_data = response.json()
-            
-            if api_data.get('success'):
-                real_events = []
-                for event in api_data.get('events', []):
-                    real_events.append({
-                        'instance_id': event.get('instance_id', ''),
-                        'event_id': event.get('event_id', ''),
-                        'name': event.get('name', 'Unknown'),
-                        'type': event.get('type', 'Unknown'),
-                        'frequency': event.get('frequency', 'dd/mm/yyyy'),
-                        'date': event.get('date', 'Unknown'),
-                        'time_start': event.get('time_start', 'Unknown'),
-                        'time_end': event.get('time_end', 'Unknown'),
-                        'location': event.get('location', 'Unknown'),
-                        'active': event.get('active', 1)
-                    })
-                
-                current_events = real_events
-                
-    except requests.exceptions.RequestException as e:
-        print(f"Backend API Error: {e}")
-        
-    return current_events
-
-def helper_kiosk_live_events():    
-    current_kiosk_events = list(DEFAULT_EVENTS)
-    
-    try:
-        response = requests.get("http://127.0.0.1:5001/kiosk/employee/select-event", timeout=5)
-        
-        if response.status_code == 200:
-            api_data = response.json()
-            
-            if api_data.get('success'):
-                real_events = []
-                for event in api_data.get('events', []):
-                    real_events.append({
-                        'instance_id': event.get('instance_id', ''),
-                        'event_id': event.get('event_id', ''),
-                        'name': event.get('name', 'Unknown'),
-                        'type': event.get('type', 'Unknown'),
-                        'frequency': event.get('frequency', 'dd/mm/yyyy'),
-                        'date': event.get('date', 'Unknown'),
-                        'time_start': event.get('time_start', 'Unknown'),
-                        'time_end': event.get('time_end', 'Unknown'),
-                        'location': event.get('location', 'Unknown')
-                    })
-                
-                current_kiosk_events = real_events
-                
-    except requests.exceptions.RequestException as e:
-        print(f"Backend API Error: {e}")
-        
-    return current_kiosk_events
-
-def helper_kiosk_live_student_logs():    
-    current_kiosk_data = dict(MOCK_KIOSK_DATA)
-    
-    try:
-        response = requests.get("http://127.0.0.1:5001/kiosk/students/student-logs", timeout=5)
-        
-        if response.status_code == 200:
-            api_data = response.json()
-            
-            if api_data.get('success'):
-                real_logs = []
-                for log in api_data.get('logs', []):
-                    real_logs.append({
-                        'type': 'in' if log.get('type') in ['in', 'entry'] else 'out',
-                        'name': log.get('name', 'Unknown'),
-                        'course': log.get('course', 'Unknown'),
-                        'time': log.get('time', '')
-                    })
-                
-                current_kiosk_data['recent_student_logs'] = real_logs
-                
-    except requests.exceptions.RequestException as e:
-        print(f"Backend API Error: {e}")
-        
-    return current_kiosk_data 
-
-@app.route('/api/retrieve/departments')
-def helper_admin_live_departments(): 
-    current_live_departments = list(LIVE_DEPARTMENTS)
-    
-    try:
-        response = requests.get("http://127.0.0.1:5001/admin/dashboard/events/live-departments", timeout=5)
-        
-        if response.status_code == 200:
-            api_data = response.json()
-            
-            if api_data.get('success'):
-                real_departments = []
-                for dept in api_data.get('departments', []):
-                    real_departments.append({
-                        'department_id': dept.get('dept_id', ''),
-                        'department_name': dept.get('dept_name', 'Unknown')
-                    })
-                
-                current_live_departments = real_departments
-                
-    except requests.exceptions.RequestException as e:
-        print(f"Backend API Error: {e}")
-        
-    return current_live_departments 
-
-def helper_admin_events():    
-    current_kiosk_events = list(DEFAULT_EVENTS)
-    
-    try:
-        response = requests.get("http://127.0.0.1:5001/admin/dashboard/events", timeout=5)
-        
-        if response.status_code == 200:
-            api_data = response.json()
-            
-            if api_data.get('success'):
-                real_events = []
-                for event in api_data.get('events', []):
-                    real_events.append({
-                        'event_id': event.get('event_id', ''),
-                        'name': event.get('name', 'Unknown'),
-                        'type': event.get('type', 'Unknown'),
-                        'date': event.get('date', 'Unknown'),
-                        'dept': event.get('dept', 'Unknown'),
-                        'time_start': event.get('time_start', 'Unknown'),
-                        'time_end': event.get('time_end', 'Unknown'),
-                        'location': event.get('location', 'Unknown'),
-                        'all_departments': event.get('all_departments', False)
-                    })
-                
-                current_kiosk_events = real_events
-                
-    except requests.exceptions.RequestException as e:
-        print(f"Backend API Error: {e}")
-        
-    return current_kiosk_events 
+        cursor.execute(
+            """
+            SELECT course_id, course_name
+            FROM courses
+            ORDER BY course_name ASC
+            """
+        )
+        return jsonify(cursor.fetchall())
+    finally:
+        cursor.close()
 
 
-def helper_admin_delete_events(event_id, delete_type):
-    """
-    Call the backend API to soft‑delete an event.
-    Returns the JSON response from the backend.
-    """
-    if delete_type == 'single':
-        url = "http://127.0.0.1:5001/admin/events/delete-event"
-    elif delete_type == 'bulk':
-        url = "http://127.0.0.1:5001/admin/events/delete-events"
-    headers = {"Content-Type": "application/json"}
-    payload = {"event_ids": event_id}
+@app.route("/api/retrieve/visitor-purposes")
+def retrieve_visitor_purposes():
+    return jsonify(list(VISITOR_PURPOSES))
+
+
+@app.route("/api/visitors/next-id")
+@login_required
+def retrieve_next_visitor_id():
+    next_visitor_id = get_next_visitor_id()
+    if not next_visitor_id:
+        return jsonify({"success": False, "message": "Visitor ID generator unavailable."}), 503
+    return jsonify({"success": True, "visitor_id": next_visitor_id})
+
+
+@app.route("/api/attendance/update", methods=["POST"])
+@login_required
+def update_attendance_proxy():
+    data = request.get_json(silent=True) or {}
+    if not data.get("attendance_id") or not data.get("status"):
+        return jsonify({"success": False, "message": "Missing attendance_id or status."}), 400
 
     try:
-        response = requests.put(url, headers=headers, json=payload, timeout=5)
-        response.raise_for_status()          
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Backend API Error: {e}")
-        return {"success": False, "message": f"Backend error: {e}"}
+        response = backend_request("POST", "/api/attendance/update", json=data)
+        return jsonify(response.json()), response.status_code
+    except requests.RequestException as err:
+        app.logger.error("Attendance update proxy failed: %s", err)
+        return jsonify({"success": False, "message": "Backend service unavailable."}), 503
 
-# ==============================================================================
-# REPORTS GENERATION FUNCTION
-# ==============================================================================
 
-@app.route('/generate_report')
+@app.route("/generate_report")
+@login_required
 def generate_report():
-    category = request.args.get('category')
-    report_type = request.args.get('type')
-    filter_val = request.args.get('filter', 'All')
-    start_date = request.args.get('start')
-    end_date = request.args.get('end')
-    
-    # Validate date range
+    category = request.args.get("category")
+    report_type = request.args.get("type")
+    filter_value = request.args.get("filter", "All")
+    start_date = request.args.get("start")
+    end_date = request.args.get("end")
+
     if start_date and end_date:
         try:
-            start = datetime.strptime(start_date, '%Y-%m-%d')
-            end = datetime.strptime(end_date, '%Y-%m-%d')
-            
+            start = datetime.strptime(start_date, "%Y-%m-%d")
+            end = datetime.strptime(end_date, "%Y-%m-%d")
             if start > end:
-                error_msg = f"Invalid date range: 'From' date ({start_date}) cannot be after 'To' date ({end_date})."
-                return f"<h1>Report Error</h1><p>{error_msg}</p>", 400
-        except ValueError as e:
-            return f"<h1>Report Error</h1><p>Invalid date format. Please use YYYY-MM-DD format.</p>", 400
-    
-    report_results = fetch_report_data(category, report_type, filter_val, start_date, end_date)
-    
-    # 3. Handle any errors returned by the service
+                return "<h1>Report Error</h1><p>Invalid date range. 'From' date cannot be after 'To' date.</p>", 400
+        except ValueError:
+            return "<h1>Report Error</h1><p>Invalid date format. Please use YYYY-MM-DD.</p>", 400
+
+    report_results = fetch_report_data(category, report_type, filter_value, start_date, end_date)
     if "error" in report_results:
         return f"<h1>Report Error</h1><p>{report_results['error']}</p>", 500
-        
-    # 4. Render the template using the clean dictionaries returned by tasks.py
+
+    report_data = dict(report_results["report_data"])
+    report_data["archive_filename"] = build_report_archive_filename(category, report_data)
+
     return render_template(
-        'sample_report.html',
-        current_date=datetime.now().strftime('%B %d, %Y - %I:%M %p'),
-        report=report_results['report_data'],
-        metrics=report_results['metrics_data'],
-        logs=report_results['logs']
+        "sample_report.html",
+        current_date=datetime.now().strftime("%B %d, %Y - %I:%M %p"),
+        report=report_data,
+        metrics=report_results["metrics_data"],
+        logs=report_results["logs"],
+        archive_report_url=resolve_archive_report_url(),
     )
 
-def helper_dashboard_overall_stats():
-    stats = dict(MOCK_DASHBOARD_STATS)  
+
+@app.route("/reports/archive", methods=["POST"])
+@login_required
+def archive_report():
+    report_file = request.files.get("report_file")
+    requested_filename = (request.form.get("filename") or "").strip()
+
+    if not report_file or not report_file.filename:
+        return jsonify({"success": False, "message": "Missing report file."}), 400
+
+    incoming_name = requested_filename or report_file.filename
+    if not str(incoming_name).lower().endswith((".pdf", ".csv")):
+        return jsonify({"success": False, "message": "Only PDF report files can be archived."}), 400
+
+    if report_file.content_type not in ('application/pdf', 'text/csv'):
+        return jsonify({"success": False, "message": "Invalid file type."}), 400
+
+    archive_path, archive_name = get_unique_report_archive_path(incoming_name)
+    report_file.save(archive_path)
+
+    return (
+        jsonify(
+            {
+                "success": True,
+                "filename": archive_name,
+                "url": url_for("static", filename=f"reports/{archive_name}"),
+            }
+        ),
+        201,
+    )
+
+
+@app.route("/send_report_email", methods=["POST"])
+@login_required
+def send_report_email():
+    recipient = (request.form.get("email") or "").strip()
+    category = (request.form.get("category") or "").strip()
+    report_type = (request.form.get("type") or "").strip()
+    filter_value = (request.form.get("filter") or "All").strip()
+    start_date = (request.form.get("start") or "").strip()
+    end_date = (request.form.get("end") or "").strip()
+    report_title = (request.form.get("report_title") or "PLP Report").strip()
+    report_scope = (request.form.get("report_scope") or "ALL").strip()
+    report_date_range = (request.form.get("report_date_range") or f"{start_date} to {end_date}").strip()
+    requested_filename = (request.form.get("filename") or "").strip()
+    uploaded_report = request.files.get("report_file")
+
+    if not recipient:
+        return jsonify({"success": False, "message": "Recipient email is required."}), 400
+
+    attachment_data = None
+    attachment_filename = sanitize_report_archive_filename(requested_filename or "report.pdf")
+
+    if uploaded_report and uploaded_report.filename:
+        attachment_data = uploaded_report.read()
+        attachment_filename = sanitize_report_archive_filename(requested_filename or uploaded_report.filename)
+    else:
+        # Attempt server-side PDF generation (preferred) when possible for deterministic pagination
+        server_pdf = None
+        server_filename = None
+        report_data = None
+        if pdfkit is not None:
+            try:
+                report_results = fetch_report_data(category, report_type, filter_value, start_date, end_date)
+                if "error" not in report_results:
+                    report_data = dict(report_results["report_data"])
+                    report_data["archive_filename"] = build_report_archive_filename(category, report_data)
+                    html = render_template(
+                        "sample_report.html",
+                        current_date=datetime.now().strftime("%B %d, %Y - %I:%M %p"),
+                        report=report_data,
+                        metrics=report_results.get("metrics_data", {}),
+                        logs=report_results.get("logs", []),
+                        archive_report_url=resolve_archive_report_url(),
+                    )
+                    options = {
+                        "enable-local-file-access": None,
+                        "print-media-type": None,
+                        "zoom": "1",
+                        "margin-top": "0.4in",
+                        "margin-bottom": "0.4in",
+                        "margin-left": "0.4in",
+                        "margin-right": "0.4in",
+                    }
+                    try:
+                        pdf_bytes = pdfkit.from_string(html, False, options=options)
+                        if pdf_bytes:
+                            server_pdf = pdf_bytes
+                            server_filename = sanitize_report_archive_filename(report_data.get("archive_filename") or requested_filename or "report.pdf")
+                    except Exception:
+                        app.logger.exception("pdfkit failed to render the report HTML to PDF")
+            except Exception:
+                app.logger.exception("Failed to fetch report data for server-side PDF generation")
+
+        if server_pdf:
+            attachment_data = server_pdf
+            attachment_filename = server_filename
+            # update metadata from generated report if available
+            if report_data:
+                report_title = (report_data.get("event_name") or report_data.get("title") or report_title).strip()
+                report_scope = (report_data.get("department") or report_scope).strip()
+                report_date_range = (report_data.get("date_range") or report_date_range).strip()
+        else:
+            # fallback to attaching an archived report if server-side generation is unavailable
+            attachment_data, resolved_report_data, error = load_archived_report_attachment(
+                category,
+                report_type,
+                filter_value,
+                start_date,
+                end_date,
+            )
+            if error:
+                return jsonify({"success": False, "message": error}), 400
+
+            attachment_filename = resolved_report_data["archive_filename"]
+            report_title = (resolved_report_data.get("event_name") or resolved_report_data.get("title") or report_title).strip()
+            report_scope = (resolved_report_data.get("department") or report_scope).strip()
+            report_date_range = (resolved_report_data.get("date_range") or report_date_range).strip()
+
+    if not attachment_data:
+        return jsonify({"success": False, "message": "No report PDF is available to attach."}), 400
+
+    email_subject = f"PLP Report - {report_title}"
+    email_body = (
+        "Attached is a system generated PLP report send by an admin.\n\n"
+        f"Report: {report_title}\n"
+        f"Scope: {report_scope}\n"
+        f"Date Range: {report_date_range}\n"
+        f"Generated By: {session.get('admin_username', 'PLP Admin')}\n"
+    )
+
     try:
-        response = requests.get("http://127.0.0.1:5001/admin/dashboard/analytics/overall", timeout=5)
-        if response.status_code == 200:
-            api_data = response.json()
-            if api_data.get('success'):
-                stats = api_data['data']
-    except requests.exceptions.RequestException as e:
-        print(f"Backend API Error (overall stats): {e}")
-    return stats
+        send_email(
+            subject=email_subject,
+            body=email_body,
+            recipient=recipient,
+            attachment_data=attachment_data,
+            filename=attachment_filename,
+        )
+    except ValueError as err:
+        return jsonify({"success": False, "message": str(err)}), 400
+    except Exception as err:
+        app.logger.exception("Failed to send report email to %s", recipient)
+        return jsonify({"success": False, "message": f"Failed to send the report email: {err}"}), 500
+
+    return jsonify({"success": True, "message": f"Report emailed successfully to {recipient}."}), 200
 
 
-def helper_dashboard_student_stats():
-    stats = dict(MOCK_STUDENT_STATS)
+@app.route("/get_courses")
+@login_required
+def get_courses():
+    conn = connect_db()
+    if not conn:
+        return jsonify([])
+
+    cursor = conn.cursor(dictionary=True)
     try:
-        response = requests.get("http://127.0.0.1:5001/admin/dashboard/analytics/students", timeout=5)
-        if response.status_code == 200:
-            api_data = response.json()
-            if api_data.get('success'):
-                stats = api_data['data']
-    except requests.exceptions.RequestException as e:
-        print(f"Backend API Error (student stats): {e}")
-    return stats
+        cursor.execute(
+            """
+            SELECT course_id, course_name
+            FROM courses
+            ORDER BY course_name ASC
+            """
+        )
+        rows = cursor.fetchall()
+        return jsonify(
+            [
+                {
+                    "course_id": row["course_id"],
+                    "course_name": row["course_name"],
+                    "name": (row["course_name"] or "").upper(),
+                }
+                for row in rows
+            ]
+        )
+    finally:
+        cursor.close()
 
 
-def helper_dashboard_employee_stats():
-    stats = dict(MOCK_EMPLOYEE_STATS)
+def parse_student_upload_file(file):
+    if not file or not file.filename:
+        return {"success": False, "error": "No file uploaded"}
+
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in {".xls", ".xlsx", ".csv"}:
+        return {"success": False, "error": "Please upload a valid Excel or CSV file."}
+
+    extracted = _extract_upload_rows(file, file_ext)
+    if not extracted.get("success"):
+        return extracted
+
+    source_rows = extracted.get("rows", [])
+    header_index = None
+    header_source_row_number = None
+    normalized_headers = []
+
+    for index, row in enumerate(source_rows):
+        row_headers = [clean_upload_text(value).upper() for value in row.get("values", [])]
+        header_values = {header for header in row_headers if header}
+        has_required = set(STUDENT_UPLOAD_REQUIRED_COLUMNS).issubset(header_values)
+        has_course = "COURSE" in header_values or "COURSE ID" in header_values
+        if has_required and has_course:
+            header_index = index
+            header_source_row_number = row.get("source_row_number") or (index + 1)
+            normalized_headers = row_headers
+            break
+
+    if header_index is None:
+        return {
+            "success": False,
+            "error": "Could not find the required headers: Student ID, Student Name, and Course or Course ID.",
+        }
+
+    missing_columns = [
+        column.title() for column in STUDENT_UPLOAD_REQUIRED_COLUMNS if column not in normalized_headers
+    ]
+    if "COURSE" not in normalized_headers and "COURSE ID" not in normalized_headers:
+        missing_columns.append("Course or Course ID")
+    if missing_columns:
+        return {
+            "success": False,
+            "error": f"Missing required column(s): {', '.join(missing_columns)}",
+        }
+
+    parsed_rows = []
+    for row in source_rows[header_index + 1:]:
+        row_values = list(row.get("values", []))
+        row_map = {}
+        for column_index, header in enumerate(normalized_headers):
+            if not header:
+                continue
+            row_map[header] = clean_upload_text(row_values[column_index]) if column_index < len(row_values) else ""
+
+        relevant_values = [
+            row_map.get(column, "")
+            for column in STUDENT_UPLOAD_REQUIRED_COLUMNS + STUDENT_UPLOAD_OPTIONAL_COLUMNS
+        ]
+        if not any(value.strip() for value in relevant_values):
+            continue
+
+        course_id = str(row_map.get("COURSE ID", "") or "").strip()
+        if course_id.endswith(".0"):
+            course_id = course_id[:-2]
+
+        parsed_rows.append(
+            {
+                "row_number": row.get("source_row_number") or (header_source_row_number + 1),
+                "student_id": row_map.get("STUDENT ID", ""),
+                "student_name": row_map.get("STUDENT NAME", ""),
+                "course_name": row_map.get("COURSE", ""),
+                "course_id": course_id,
+                "status": row_map.get("STATUS", ""),
+            }
+        )
+
+    return {
+        "success": True,
+        "required_columns": STUDENT_UPLOAD_REQUIRED_COLUMNS,
+        "optional_columns": STUDENT_UPLOAD_OPTIONAL_COLUMNS,
+        "parsed_rows": parsed_rows,
+    }
+
+
+def validate_student_upload_rows(conn, parsed_rows):
+    cursor = conn.cursor()
     try:
-        response = requests.get("http://127.0.0.1:5001/admin/dashboard/analytics/employees", timeout=5)
-        if response.status_code == 200:
-            api_data = response.json()
-            if api_data.get('success'):
-                stats = api_data['data']
-    except requests.exceptions.RequestException as e:
-        print(f"Backend API Error (employee stats): {e}")
-    return stats
-    
+        cursor.execute(
+            """
+            SELECT course_id, course_name
+            FROM courses
+            """
+        )
+        course_lookup_by_id = {}
+        course_lookup_by_name = {}
+        for course_id, course_name in cursor.fetchall():
+            normalized_course = normalize_course_name(course_name)
+            course_data = {
+                "course_id": course_id,
+                "course_name": normalized_course,
+            }
+            course_lookup_by_id[str(course_id)] = course_data
+            if normalized_course:
+                course_lookup_by_name.setdefault(normalized_course.upper(), []).append(course_data)
 
-# ==============================================================================
-# EMPLOYEE LOGS HELPER
-# ==============================================================================
+        cursor.execute(
+            """
+            SELECT s.student_id, s.student_name, COALESCE(u.active, 1) AS is_active
+            FROM students s
+            JOIN users u ON s.user_id = u.user_id
+            """
+        )
+        active_ids = set()
+        inactive_ids = set()
+        student_name_lookup = {}
+        for student_id, student_name, is_active in cursor.fetchall():
+            normalized_id = normalize_student_id(student_id)
+            register_name_match_source(student_name_lookup, student_name, normalized_id)
+            if bool(is_active):
+                active_ids.add(normalized_id)
+            else:
+                inactive_ids.add(normalized_id)
 
-def helper_employee_attendance():
+        cursor.execute(
+            """
+            SELECT employee_name
+            FROM employees
+            """
+        )
+        employee_name_lookup = build_name_match_lookup(row[0] for row in cursor.fetchall())
+
+        valid_rows = []
+        errors = []
+        seen_ids = {}
+        seen_name_rows = {}
+
+        for row in parsed_rows:
+            student_id = normalize_student_id(row.get("student_id"))
+            student_name = normalize_student_name(row.get("student_name"))
+            course_name = normalize_course_name(row.get("course_name"))
+            course_id = str(row.get("course_id") or "").strip()
+            if course_id.endswith(".0"):
+                course_id = course_id[:-2]
+            status = clean_upload_text(row.get("status"))
+            row_number = row.get("row_number")
+
+            missing_fields = []
+            if not student_id:
+                missing_fields.append("Student ID")
+            if not student_name:
+                missing_fields.append("Student Name")
+            if not course_id and not course_name:
+                missing_fields.append("Course or Course ID")
+            if missing_fields:
+                errors.append(f"Row {row_number}: Missing {', '.join(missing_fields)}")
+                continue
+
+            field_errors = validate_student_fields(student_id=student_id, student_name=student_name)
+            course_errors = validate_course_name(course_name) if course_name else []
+            if field_errors or course_errors:
+                errors.append(f"Row {row_number}: {(field_errors + course_errors)[0]}")
+                continue
+
+            if course_id:
+                course_match = course_lookup_by_id.get(course_id)
+                if not course_match:
+                    errors.append(f"Row {row_number}: Course ID not found: {course_id}")
+                    continue
+                resolved_course = course_match
+            else:
+                course_matches = course_lookup_by_name.get(course_name.upper(), [])
+                if not course_matches:
+                    errors.append(f"Row {row_number}: Course not found: {course_name}")
+                    continue
+                if len(course_matches) > 1:
+                    errors.append(f"Row {row_number}: Course is ambiguous: {course_name}")
+                    continue
+                resolved_course = course_matches[0]
+
+            if student_id in seen_ids:
+                errors.append(
+                    f"Row {row_number}: Duplicate of row {seen_ids[student_id]} in the uploaded file."
+                )
+                continue
+
+            duplicate_name_rows = find_name_match_sources(student_name, seen_name_rows)
+            if duplicate_name_rows:
+                errors.append(
+                    f"Row {row_number}: Similar name already appears in row {min(duplicate_name_rows)} of the uploaded file."
+                )
+                continue
+
+            if student_id in active_ids:
+                errors.append(f"Row {row_number}: Student already exists with ID {student_id}.")
+                continue
+
+            if has_name_match_conflict(
+                student_name,
+                student_name_lookup,
+                exclude_sources={student_id} if student_id in inactive_ids else None,
+            ):
+                errors.append(
+                    f"Row {row_number}: {same_role_name_conflict_error('student')}"
+                )
+                continue
+
+            if has_name_match_conflict(student_name, employee_name_lookup):
+                errors.append(
+                    f"Row {row_number}: {cross_role_name_conflict_error('student', 'employee')}"
+                )
+                continue
+
+            seen_ids[student_id] = row_number
+            register_name_match_source(seen_name_rows, student_name, row_number)
+
+            valid_rows.append(
+                {
+                    "row_number": row_number,
+                    "student_id": student_id,
+                    "student_name": student_name,
+                    "course_id": resolved_course["course_id"],
+                    "course_name": resolved_course["course_name"],
+                    "status": status or "Outside",
+                    "action": "reactivate" if student_id in inactive_ids else "create",
+                }
+            )
+
+        return {"success": True, "valid_rows": valid_rows, "errors": errors}
+    finally:
+        cursor.close()
+
+
+@app.route("/add_student", methods=["POST"])
+@app.route("/add_student_manual", methods=["POST"])
+@login_required
+def add_student_manual():
+    data = request.get_json(silent=True) or {}
+    student_id = (data.get("student_id") or data.get("id") or "").strip()
+    student_name = (data.get("student_name") or data.get("name") or "").strip()
+    course_id = resolve_course_id(data.get("course_id") or data.get("course"))
+    status = (data.get("status") or "Outside").strip()
+
+    validation_errors = validate_student_fields(student_id=student_id, student_name=student_name)
+    if not course_id:
+        return jsonify({"success": False, "error": "Course is required."}), 400
+    if validation_errors:
+        return jsonify({"success": False, "error": validation_errors[0]}), 400
+
+    result = student_model.add_student(
+        student_id=student_id,
+        student_name=student_name,
+        course_id=course_id,
+        status=status,
+    )
+    return jsonify(result), (200 if result.get("success") else 400)
+
+
+@app.route("/upload_students", methods=["POST"])
+@login_required
+def upload_students():
+    preview_response, preview_status = preview_students_upload()
+    if preview_status != 200:
+        return preview_response, preview_status
+
+    preview_data = preview_response.get_json(silent=True) or {}
+    valid_rows = preview_data.get("preview_rows", [])
+    if not valid_rows:
+        return jsonify({"success": False, "error": "No valid student rows to upload."}), 400
+
+    return commit_students_upload_payload(valid_rows)
+
+
+@app.route("/upload_students/template.csv", methods=["GET"])
+@login_required
+def download_student_upload_template():
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["STUDENT ID", "STUDENT NAME", "COURSE"])
+    writer.writerow(["23-00312", "Juan Dela Cruz", "BS Information Technology"])
+    writer.writerow(["24-00101", "Maria Santos", "BS Nursing"])
+    csv_content = output.getvalue()
+    output.close()
+
+    return Response(
+        csv_content,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=student_upload_template.csv"},
+    )
+
+
+@app.route("/upload_students/preview", methods=["POST"])
+@login_required
+def preview_students_upload():
     try:
-        response = requests.get("http://127.0.0.1:5001/admin/employees/attendance", timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            if data.get('success'):
-                return data.get('logs', [])
-    except requests.exceptions.RequestException as e:
-        print(f"Backend API Error: {e}")
-    return []
-# ==============================================================================
-# MAIN ENTRY POINT
-# ==============================================================================
+        file = request.files.get("file")
+        app.logger.info(
+            "Student upload preview requested. filename=%s",
+            getattr(file, "filename", None),
+        )
+        parsed = parse_student_upload_file(file)
+        if not parsed.get("success"):
+            app.logger.warning(
+                "Student upload parsing rejected. filename=%s error=%s",
+                getattr(file, "filename", None),
+                parsed.get("error"),
+            )
+            return jsonify(parsed), 400
+    except Exception as err:
+        app.logger.exception("Unexpected student upload parsing failure.")
+        return jsonify({"success": False, "error": f"Upload parsing failed: {err}"}), 500
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    conn = connect_db()
+    if conn is None:
+        app.logger.error("Student upload preview failed: database connection unavailable.")
+        return jsonify({"success": False, "error": "Database connection failed"}), 500
+    try:
+        validation = validate_student_upload_rows(conn, parsed.get("parsed_rows", []))
+        app.logger.info(
+            "Student upload preview validated. valid_rows=%s errors=%s",
+            len(validation.get("valid_rows", [])),
+            len(validation.get("errors", [])),
+        )
+        return jsonify(
+            {
+                "success": True,
+                "required_columns": parsed.get("required_columns", []),
+                "optional_columns": parsed.get("optional_columns", []),
+                "preview_rows": validation.get("valid_rows", []),
+                "errors": validation.get("errors", []),
+            }
+        )
+    except Exception as err:
+        app.logger.exception("Student upload validation failed unexpectedly.")
+        return jsonify({"success": False, "error": str(err)}), 500
+    finally:
+        release_db_connection(conn)
+
+
+def commit_students_upload_payload(rows):
+    conn = connect_db()
+    if conn is None:
+        return jsonify({"success": False, "error": "Database connection failed"}), 500
+
+    inserted = 0
+    reactivated = 0
+    errors = []
+    try:
+        for row in rows:
+            student_id = normalize_student_id(row.get("student_id"))
+            student_name = normalize_student_name(row.get("student_name"))
+            course_id = str(row.get("course_id") or "").strip()
+            course_name = normalize_course_name(row.get("course_name"))
+            status = clean_upload_text(row.get("status")) or "Outside"
+            row_number = row.get("row_number") or "Unknown"
+
+            if not student_id or not student_name or not course_id:
+                errors.append(f"Row {row_number}: Missing Student ID, Student Name, or Course.")
+                continue
+
+            result = student_model.add_student_excel(
+                conn=conn,
+                student_id=student_id,
+                student_name=student_name,
+                course_id=course_id,
+                course_name=course_name,
+                status=status,
+            )
+            if result.get("success"):
+                if result.get("reactivated"):
+                    reactivated += 1
+                else:
+                    inserted += 1
+            else:
+                errors.append(f"Row {row_number}: {result.get('error')}")
+
+        return jsonify(
+            {
+                "success": True,
+                "inserted": inserted,
+                "reactivated": reactivated,
+                "errors": errors,
+            }
+        ), 200
+    except Exception as err:
+        conn.rollback()
+        return jsonify({"success": False, "error": str(err)}), 500
+    finally:
+        release_db_connection(conn)
+
+
+@app.route("/upload_students/commit", methods=["POST"])
+@login_required
+def commit_students_upload():
+    data = request.get_json(silent=True) or {}
+    rows = data.get("rows", [])
+    if not isinstance(rows, list) or not rows:
+        return jsonify({"success": False, "error": "No student rows provided for upload."}), 400
+
+    return commit_students_upload_payload(rows)
+
+
+@app.route("/update_student", methods=["POST"])
+@login_required
+def update_student():
+    data = request.get_json(silent=True) or {}
+    student_id = (data.get("student_id") or data.get("id") or "").strip()
+    student_name = (data.get("student_name") or data.get("name") or "").strip()
+    course_id = resolve_course_id(data.get("course_id") or data.get("course"))
+
+    validation_errors = validate_student_fields(student_id=student_id, student_name=student_name)
+    if not course_id:
+        return jsonify({"success": False, "error": "Course is required."}), 400
+    if validation_errors:
+        return jsonify({"success": False, "error": validation_errors[0]}), 400
+
+    conn = connect_db()
+    if conn is None:
+        return jsonify({"success": False, "error": "Database connection failed"}), 500
+
+    cursor = None
+    try:
+        if not conn.in_transaction:
+            conn.start_transaction()
+
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT user_id
+            FROM students
+            WHERE student_id = %s
+            LIMIT 1
+            """,
+            (normalize_student_id(student_id),),
+        )
+        student = cursor.fetchone()
+        if not student:
+            conn.rollback()
+            return jsonify({"success": False, "error": "Student not found."}), 404
+
+        cursor.execute(
+            """
+            SELECT course_id, course_name
+            FROM courses
+            WHERE course_id = %s
+            LIMIT 1
+            """,
+            (course_id,),
+        )
+        course = cursor.fetchone()
+        if not course:
+            conn.rollback()
+            return jsonify({"success": False, "error": "Selected course does not exist."}), 400
+
+        cursor.execute(
+            """
+            UPDATE students
+            SET student_name = %s,
+                course_id = %s
+            WHERE student_id = %s
+            """,
+            (
+                normalize_student_name(student_name),
+                course[0],
+                normalize_student_id(student_id),
+            ),
+        )
+        conn.commit()
+        return jsonify(
+            {
+                "success": True,
+                "course_id": course[0],
+                "course_name": normalize_course_name(course[1]),
+            }
+        )
+    except Exception as err:
+        conn.rollback()
+        return jsonify({"success": False, "error": str(err)}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        release_db_connection(conn)
+
+
+@app.route("/delete_student", methods=["POST"])
+@login_required
+def delete_student():
+    data = request.get_json(silent=True) or {}
+    student_id = (data.get("student_id") or "").strip()
+
+    if not student_id:
+        return jsonify({"success": False, "error": "Missing student_id."}), 400
+
+    conn = connect_db()
+    if conn is None:
+        return jsonify({"success": False, "error": "Database connection failed"}), 500
+
+    cursor = None
+    try:
+        if not conn.in_transaction:
+            conn.start_transaction()
+
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT s.user_id, COALESCE(u.active, 1) AS is_active
+            FROM students s
+            JOIN users u ON s.user_id = u.user_id
+            WHERE s.student_id = %s
+            LIMIT 1
+            """,
+            (normalize_student_id(student_id),),
+        )
+        student = cursor.fetchone()
+        if not student:
+            conn.rollback()
+            return jsonify({"success": False, "error": "Student not found."}), 404
+
+        if not bool(student[1]):
+            conn.rollback()
+            return jsonify({"success": True, "already_inactive": True})
+
+        cursor.execute("UPDATE users SET active = 0 WHERE user_id = %s", (student[0],))
+        cursor.execute("UPDATE students SET status = %s WHERE user_id = %s", ("Outside", student[0]))
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as err:
+        conn.rollback()
+        return jsonify({"success": False, "error": str(err)}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        release_db_connection(conn)
+
+
+@app.route("/add_employee", methods=["POST"])
+@login_required
+def add_employee():
+    data = request.get_json(silent=True) or {}
+
+    result = employee_model.add_employee(
+        employee_id=(data.get("employee_id") or data.get("id") or "").strip(),
+        employee_name=(data.get("employee_name") or data.get("name") or "").strip(),
+        department_id=resolve_department_id(data.get("department_id") or data.get("department")),
+        position=(data.get("position") or "").strip(),
+    )
+
+    return jsonify(result), (200 if result.get("success") else 400)
+
+
+@app.route("/upload_employees", methods=["POST"])
+@login_required
+def upload_employees():
+    preview_response, preview_status = preview_employees_upload()
+    if preview_status != 200:
+        return preview_response, preview_status
+
+    preview_data = preview_response.get_json(silent=True) or {}
+    valid_rows = preview_data.get("preview_rows", [])
+    if not valid_rows:
+        return jsonify({"success": False, "error": "No valid employee rows to upload."}), 400
+
+    return commit_employees_upload_payload(valid_rows)
+
+
+@app.route("/upload_employees/template.csv", methods=["GET"])
+@login_required
+def download_employee_upload_template():
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(EMPLOYEE_UPLOAD_REQUIRED_COLUMNS + EMPLOYEE_UPLOAD_OPTIONAL_COLUMNS)
+    writer.writerow(["00005", "Juan Dela Cruz", "College of Information Technology", "Instructor I"])
+    writer.writerow(["00010", "Maria Santos", "Registrar's Office", "Admin Officer"])
+
+    csv_content = output.getvalue()
+    output.close()
+
+    return Response(
+        csv_content,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=employee_upload_template.csv"},
+    )
+
+
+@app.route("/upload_employees/preview", methods=["POST"])
+@login_required
+def preview_employees_upload():
+    try:
+        file = request.files.get("file")
+        app.logger.info(
+            "Employee upload preview requested. filename=%s",
+            getattr(file, "filename", None),
+        )
+        parsed = parse_employee_upload_file(file)
+        if not parsed.get("success"):
+            app.logger.warning(
+                "Employee upload parsing rejected. filename=%s error=%s",
+                getattr(file, "filename", None),
+                parsed.get("error"),
+            )
+            return jsonify(parsed), 400
+    except Exception as err:
+        app.logger.exception("Unexpected employee upload parsing failure.")
+        return jsonify({"success": False, "error": f"Upload parsing failed: {err}"}), 500
+
+    conn = connect_db()
+    if conn is None:
+        app.logger.error("Employee upload preview failed: database connection unavailable.")
+        return jsonify({"success": False, "error": "Database connection failed"}), 500
+    try:
+        validation = validate_employee_upload_rows(conn, parsed.get("parsed_rows", []))
+        app.logger.info(
+            "Employee upload preview validated. valid_rows=%s errors=%s",
+            len(validation.get("valid_rows", [])),
+            len(validation.get("errors", [])),
+        )
+        return jsonify(
+            {
+                "success": True,
+                "required_columns": parsed.get("required_columns", []),
+                "optional_columns": parsed.get("optional_columns", []),
+                "preview_rows": validation.get("valid_rows", []),
+                "errors": validation.get("errors", []),
+            }
+        )
+    except Exception as err:
+        app.logger.exception("Employee upload validation failed unexpectedly.")
+        return jsonify({"success": False, "error": str(err)}), 500
+    finally:
+        release_db_connection(conn)
+
+
+def commit_employees_upload_payload(rows):
+    conn = connect_db()
+    if conn is None:
+        return jsonify({"success": False, "error": "Database connection failed"}), 500
+
+    inserted = 0
+    reactivated = 0
+    errors = []
+    try:
+        for row in rows:
+            employee_id = normalize_employee_id(row.get("employee_id"))
+            employee_name = clean_upload_text(row.get("employee_name"))
+            department_name = clean_upload_text(row.get("department_name"))
+            department_id = str(row.get("department_id") or "").strip()
+            position = clean_upload_text(row.get("position"))
+            row_number = row.get("row_number") or "Unknown"
+
+            if not employee_id or not employee_name or not department_name:
+                errors.append(f"Row {row_number}: Missing Employee ID, Employee Name, or Department.")
+                continue
+
+            result = employee_model.add_employee_excel(
+                conn=conn,
+                employee_id=employee_id,
+                employee_name=employee_name,
+                department_id=department_id,
+                department_name=department_name,
+                position=position,
+            )
+            if result.get("success"):
+                if result.get("reactivated"):
+                    reactivated += 1
+                else:
+                    inserted += 1
+            else:
+                errors.append(f"Row {row_number}: {result.get('error')}")
+
+        return jsonify(
+            {
+                "success": True,
+                "inserted": inserted,
+                "reactivated": reactivated,
+                "errors": errors,
+            }
+        ), 200
+    except Exception as err:
+        conn.rollback()
+        return jsonify({"success": False, "error": str(err)}), 500
+    finally:
+        release_db_connection(conn)
+
+
+@app.route("/upload_employees/commit", methods=["POST"])
+@login_required
+def commit_employees_upload():
+    data = request.get_json(silent=True) or {}
+    rows = data.get("rows", [])
+    if not isinstance(rows, list) or not rows:
+        return jsonify({"success": False, "error": "No employee rows provided for upload."}), 400
+
+    return commit_employees_upload_payload(rows)
+
+
+@app.route("/update_employee", methods=["POST"])
+@login_required
+def update_employee():
+    data = request.get_json(silent=True) or {}
+    employee_id = normalize_employee_id(data.get("employee_id") or data.get("id"))
+    employee_name = (data.get("employee_name") or data.get("name") or "").strip()
+    department_id = resolve_department_id(data.get("department_id") or data.get("department"))
+    position = (data.get("position") or "").strip()
+
+    validation_errors = validate_employee_fields(
+        employee_id=data.get("employee_id") or data.get("id"),
+        employee_name=employee_name,
+        position=position,
+        require_employee_id=True,
+        require_position=False,
+    )
+    if not employee_id or not department_id:
+        return jsonify({"success": False, "error": "Employee ID and Department are required."}), 400
+    if validation_errors:
+        return jsonify({"success": False, "error": validation_errors[0]}), 400
+
+    conn = connect_db()
+    if conn is None:
+        return jsonify({"success": False, "error": "Database connection failed"}), 500
+
+    cursor = None
+    try:
+        if not conn.in_transaction:
+            conn.start_transaction()
+
+        cursor = conn.cursor()
+        normalized_employee_name = clean_upload_text(employee_name)
+        normalized_position = clean_upload_text(position)
+
+        cursor.execute(
+            """
+            SELECT user_id
+            FROM employees
+            WHERE employee_id = %s
+            LIMIT 1
+            """,
+            (employee_id,),
+        )
+        employee = cursor.fetchone()
+        if not employee:
+            conn.rollback()
+            return jsonify({"success": False, "error": "Employee not found."}), 404
+
+        cursor.execute(
+            """
+            SELECT department_id
+            FROM departments
+            WHERE department_id = %s
+            LIMIT 1
+            """,
+            (department_id,),
+        )
+        department = cursor.fetchone()
+        print(department)
+        if not department:
+            conn.rollback()
+            return jsonify({"success": False, "error": "Selected department does not exist."}), 400
+
+        cursor.execute(
+            """
+            SELECT employee_id
+            FROM employees
+            WHERE UPPER(TRIM(employee_name)) = UPPER(TRIM(%s))
+              AND department_id = %s
+              AND UPPER(TRIM(COALESCE(position, ''))) = UPPER(TRIM(%s))
+              AND employee_id <> %s
+            LIMIT 1
+            """,
+            (normalized_employee_name, department[0], normalized_position, employee_id),
+        )
+        duplicate = cursor.fetchone()
+        if duplicate:
+            conn.rollback()
+            return jsonify(
+                {
+                    "success": False,
+                    "error": f"Another employee already uses this combination ({format_employee_id(duplicate[0])}).",
+                }
+            ), 400
+
+        cursor.execute(
+            """
+            UPDATE employees
+            SET employee_name = %s,
+                department_id = %s,
+                position = %s
+            WHERE employee_id = %s
+            """,
+            (normalized_employee_name, department[0], normalized_position or None, employee_id),
+        )
+
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as err:
+        conn.rollback()
+        return jsonify({"success": False, "error": str(err)}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        release_db_connection(conn)
+
+
+@app.route("/delete_employee", methods=["POST"])
+@login_required
+def delete_employee():
+    data = request.get_json(silent=True) or {}
+    employee_id = normalize_employee_id(data.get("employee_id") or data.get("id"))
+
+    if not employee_id:
+        return jsonify({"success": False, "error": "Missing employee_id."}), 400
+    if not employee_id.isdigit() or len(employee_id) != 5:
+        return jsonify({"success": False, "error": "Invalid employee ID format."}), 400
+
+    conn = connect_db()
+    if conn is None:
+        return jsonify({"success": False, "error": "Database connection failed"}), 500
+
+    cursor = None
+    try:
+        if not conn.in_transaction:
+            conn.start_transaction()
+
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT e.user_id, COALESCE(u.active, 1) AS is_active
+            FROM employees e
+            JOIN users u ON e.user_id = u.user_id
+            WHERE e.employee_id = %s
+            LIMIT 1
+            """,
+            (employee_id,),
+        )
+        employee = cursor.fetchone()
+
+        if not employee:
+            conn.rollback()
+            return jsonify({"success": False, "error": "Employee not found."}), 404
+
+        if not bool(employee[1]):
+            conn.rollback()
+            return jsonify({"success": True, "already_inactive": True})
+
+        cursor.execute("UPDATE users SET active = 0 WHERE user_id = %s", (employee[0],))
+        cursor.execute("UPDATE employees SET status = %s WHERE user_id = %s", ("Outside", employee[0]))
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as err:
+        conn.rollback()
+        return jsonify({"success": False, "error": str(err)}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        release_db_connection(conn)
+
+
+if __name__ == "__main__":
+    app.run(debug=app.config["DEBUG"], host="0.0.0.0", port=5000)

@@ -74,7 +74,8 @@ plp_monitoring_system/
 │       ├── main.js         # Core interactions and clock
 │       ├── kiosk.js        # Kiosk-specific logic
 │       ├── events.js       # Event management logic
-│       └── reports.js      # Reporting functionality
+│       ├── reports.js      # Reporting functionality
+│       └── simulation.js   # Inactive data simulation/chart updates
 └── templates/          # HTML templates (Jinja2)
 ```
 
@@ -88,12 +89,27 @@ plp_monitoring_system/
    ```bash
    pip install -r requirements.txt
    ```
-3. **Database Configuration:**
-   Ensure your MySQL server is running and initialize the database using the provided `schema.sql` file when you are ready to migrate off the mock data.
-4. **Run the Application:**
+3. **Environment Configuration:**
+   Copy `.env.template` to `.env` and set your local database credentials, secrets, and allowed origins.
+4. **Database Configuration:**
+   Ensure your MySQL server is running and initialize the database using `schema.sql`. The checked-in schema now includes the visitor and employee `is_active` / formatted-ID updates expected by the current codebase.
+5. **Run the Application:**
    ```bash
    python app.py
    python app_extension.py
    ```
-5. **Access the System:**
+6. **Access the System:**
    Navigate to `http://127.0.0.1:5000` in your web browser. *(Prototype Admin Credentials: Username: `admin`, Password: `admin123`)*
+
+`app.py` serves the frontend/UI on port `5000`.
+`app_extension.py` serves the API/backend on port `5001`.
+
+### Event Instance Background Job
+
+`app_extension.py` starts a dependency-free background scheduler with the backend API. While the backend is running, it checks every `INSTANCE_GENERATOR_CHECK_SECONDS` seconds and runs the event instance generator every `INSTANCE_GENERATOR_RUN_INTERVAL_SECONDS` seconds; by default this is once per hour. Each run creates any missing instances for the next `INSTANCE_GENERATOR_LOOKAHEAD_DAYS` days, including daily events, weekly events on their scheduled weekday, and one-time events on their event date. The generation endpoint remains available for Windows Task Scheduler or another external cron:
+
+```bash
+curl -X POST http://127.0.0.1:5001/admin/generate-daily-instances
+```
+
+The frontend polls `/admin/generate-daily-instances/status` and shows a bottom-left notification while the job is running or when it finishes.

@@ -3,336 +3,908 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
     <title>PLP Report - {{ report.title }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
-        body { background-color: #fff; color: #000; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 2rem; font-size: 14px; }
-        .report-header { border-bottom: 2px solid #000; padding-bottom: 1rem; margin-bottom: 2rem; }
-        .report-title { font-size: 24px; font-weight: bold; text-transform: uppercase; }
-        .logo-placeholder { width: 80px; height: 80px; background-color: #f8f9fa; border: 1px solid #dee2e6; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #6c757d; }
-        .meta-box { border: 1px solid #000; padding: 1rem; background-color: #f8f9fa; }
-        .summary-metric { text-align: center; padding: 1rem; border: 1px solid #dee2e6; }
-        .summary-metric h3 { margin: 0; font-size: 28px; font-weight: bold; color: #0b7d3f; }
-        th { background-color: #0b7d3f !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        .footer { margin-top: 3rem; border-top: 1px solid #dee2e6; padding-top: 1rem; font-size: 12px; color: #6c757d; }
+        /* ── Base ────────────────────────────────────────────────────── */
+        body {
+            font-family: Arial, sans-serif;
+            background: #d0d5db;
+            color: #000;
+            font-size: 13px;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* ── Toolbar (never printed) ─────────────────────────────────── */
+        .report-toolbar {
+            background: #1e293b;
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.35);
+        }
+        .report-toolbar .toolbar-label {
+            color: rgba(255,255,255,0.55);
+            font-size: 0.78rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-right: 4px;
+        }
+        .report-toolbar .form-control {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.20);
+            color: #fff;
+            font-size: 0.82rem;
+            max-width: 240px;
+        }
+        .report-toolbar .form-control::placeholder { color: rgba(255,255,255,0.35); }
+        .report-toolbar .form-control:focus {
+            background: rgba(255,255,255,0.13);
+            border-color: rgba(255,255,255,0.38);
+            color: #fff;
+            box-shadow: none;
+        }
+        .report-toolbar .btn-send {
+            background: #16a34a;
+            border: 1px solid #15803d;
+            color: #fff;
+            font-size: 0.82rem;
+            font-weight: 600;
+            border-radius: 7px;
+            padding: 6px 16px;
+            white-space: nowrap;
+        }
+        .report-toolbar .btn-send:hover { background: #15803d; }
+
+        .toolbar-divider {
+            width: 1px;
+            height: 28px;
+            background: rgba(255,255,255,0.15);
+            margin: 0 6px;
+        }
+
+        .btn-export {
+            background: #1d4ed8;
+            border: 1px solid #1e40af;
+            color: #fff;
+            font-size: 0.82rem;
+            font-weight: 600;
+            border-radius: 7px;
+            padding: 6px 16px;
+        }
+        .btn-export:hover { background: #1e40af; }
+        .btn-export-split {
+            background: #1d4ed8;
+            border: 1px solid #1e40af;
+            border-left: 1px solid rgba(255,255,255,0.25);
+            color: #fff;
+            border-radius: 0 7px 7px 0;
+        }
+        .btn-export-split:hover { background: #1e40af; }
+
+        /* ── Page wrapper ────────────────────────────────────────────── */
+        .pages-wrapper {
+            padding: 24px 0 40px;
+        }
+
+        /* ── Each page block ─────────────────────────────────────────── */
+        .page-block {
+            background: #fff;
+            width: 950px;
+            margin: 0 auto 24px;
+            padding: 40px 50px;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.18);
+            box-sizing: border-box;
+            page-break-after: always;
+        }
+        .page-block:last-child {
+            page-break-after: auto;
+            margin-bottom: 0;
+        }
+
+        /* ── Report header ───────────────────────────────────────────── */
+        .header-container { display: flex; align-items: flex-start; margin-bottom: 18px; }
+        .logos { display: flex; align-items: center; gap: 12px; }
+        .logo-img { height: 72px; object-fit: contain; }
+        .header-text { margin-left: auto; text-align: right; }
+        .header-blue-bar {
+            background-color: #215A8E;
+            color: white;
+            padding: 4px 15px;
+            font-weight: bold;
+            font-size: 15px;
+            letter-spacing: 1px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .header-subtext { font-size: 10.5px; margin-top: 2px; }
+
+        .report-title { text-align: center; font-weight: bold; text-transform: uppercase; font-size: 15px; margin-top: 12px; }
+        .report-date { text-align: center; font-weight: bold; font-size: 13px; margin-bottom: 16px; text-transform: uppercase; }
+        .office-name { font-weight: bold; font-size: 12px; text-transform: uppercase; margin-bottom: 2px; }
+        .instruction { font-style: italic; font-size: 11px; margin-bottom: 6px; }
+
+        /* ── Table ───────────────────────────────────────────────────── */
+        table.report-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 0;
+            border: 2px solid #000 !important;
+            table-layout: fixed;
+        }
+        table.report-table th,
+        table.report-table td {
+            border: 1px solid #000 !important;
+            padding: 6px 8px;
+            font-size: 12px;
+            vertical-align: middle;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        table.report-table th {
+            background-color: #e9ecef !important;
+            text-align: center;
+            font-weight: bold;
+            font-size: 12px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        /* Name column — text-align left, never clip */
+        table.report-table td.col-name {
+            text-align: left;
+            word-break: break-word;
+        }
+        /* Prevent rows from splitting inside a row */
+        table.report-table tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        thead { display: table-header-group; }
+
+        /* ── Status badges ───────────────────────────────────────────── */
+        .status-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 50px;
+            font-weight: bold;
+            font-size: 10px;
+            text-transform: uppercase;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .badge-success { background-color: #d1e7dd !important; color: #0f5132 !important; border: 1px solid #badbcc !important; }
+        .badge-warning { background-color: #fff3cd !important; color: #664d03 !important; border: 1px solid #ffecb5 !important; }
+        .badge-danger  { background-color: #f8d7da !important; color: #842029 !important; border: 1px solid #f5c2c7 !important; }
+        .badge-info    { background-color: #cff4fc !important; color: #055160 !important; border: 1px solid #b6effb !important; }
+
+        /* ── Footer / signature (only on last page) ──────────────────── */
+        .footer-section { margin-top: 28px; font-size: 12px; }
+        .signature-line { border-bottom: 1px solid #000; width: 250px; margin-top: 38px; margin-bottom: 4px; }
+
+        /* Page number indicator ─────────────────────────────────────── */
+        .page-indicator {
+            text-align: right;
+            font-size: 10px;
+            color: #777;
+            margin-bottom: 6px;
+        }
+
+        /* ── Feedback toast ──────────────────────────────────────────── */
+        .feedback-indicator {
+            font-family: Arial, sans-serif;
+            min-width: 300px;
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            background: #fff;
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            opacity: 0;
+            transition: all 0.4s ease;
+            z-index: 10000;
+            border: 1px solid #ccc;
+            pointer-events: none;
+        }
+        .feedback-indicator.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+        .feedback-indicator.success { border-color: #10B981; background: #ecfdf5; color: #065f46; }
+        .feedback-indicator.error { border-color: #EF4444; background: #fef2f2; color: #991b1b; }
+        .feedback-indicator__icon { margin-right: 12px; font-size: 18px; }
+        .feedback-indicator__title { font-weight: bold; font-size: 14px; }
+
+        /* ── Print overrides ─────────────────────────────────────────── */
         @media print {
-            body { padding: 0; }
-            button { display: none; }
-            @page { margin: 1cm; }
+            body { background: #fff; }
+            .report-toolbar,
+            .d-print-none { display: none !important; }
+            .pages-wrapper { padding: 0; }
+            .page-block {
+                width: 100%;
+                margin: 0;
+                padding: 1cm;
+                box-shadow: none;
+                page-break-after: always;
+            }
+            .page-block:last-child { page-break-after: auto; }
+            @page { margin: 1cm; size: letter portrait; }
         }
     </style>
 </head>
 <body>
 
-    <button onclick="window.print()" class="btn btn-primary d-print-none mb-4">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-printer me-2" viewBox="0 0 16 16">
-            <path d="M2.5 8a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z" />
-            <path d="M5 1a2 2 0 0 0-2 2v2H2a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1v1a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1V3a2 2 0 0 0-2-2H5zM4 3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2H4V3zm1 5a2 2 0 0 0-2 2v1H2a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v-1a2 2 0 0 0-2-2H5zm7 2v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1z" />
-        </svg>
-        Print / Save as PDF
-    </button>
+<!-- ══════════════════════════════════════════════════════════════════════
+     TOOLBAR — always outside the printable content
+     ══════════════════════════════════════════════════════════════════════ -->
+<div class="report-toolbar d-print-none">
 
-    <div class="report-header d-flex justify-content-between align-items-center">
-        <div class="d-flex align-items-center">
-            <div class="logo-placeholder me-3">
-                <img src="{{ url_for('static', filename='images/plp_logo.png') }}" alt="PLP Logo" style="max-width: 100%; max-height: 100%; object-fit: contain;"></div>
-            <div>
-                <div class="report-title">Pamantasan ng Lungsod ng Pasig</div>
-                <div class="text-secondary">Official Data Monitoring System</div>
-            </div>
-        </div>
-        <div class="text-end text-muted small">
-            Generated: <strong>{{ current_date }}</strong><br>
-            Reference: <strong>{{ report.reference_id }}</strong>
-        </div>
+    <!-- Email form -->
+    <span class="toolbar-label">Email Report</span>
+    <form id="sendReportEmailForm" action="/send_report_email" method="POST"
+          class="d-flex align-items-center gap-2">
+        <label for="send-email-input" class="visually-hidden">Recipient email</label>
+        <input id="send-email-input" type="email" name="email" class="form-control"
+               placeholder="Enter recipient email" required>
+        <input type="hidden" name="category"     value="{{ request.args.get('category') }}">
+        <input type="hidden" name="type"         value="{{ request.args.get('type') }}">
+        <input type="hidden" name="filter"       value="{{ request.args.get('filter') }}">
+        <input type="hidden" name="start"        value="{{ request.args.get('start') }}">
+        <input type="hidden" name="end"          value="{{ request.args.get('end') }}">
+        <input type="hidden" name="filename"     value="{{ report.archive_filename }}">
+        <input type="hidden" name="report_title" value="{{ report.event_name if report.event_name else report.title }}">
+        <input type="hidden" name="report_scope" value="{{ report.department if report.department else 'ALL' }}">
+        <input type="hidden" name="report_date_range" value="{{ report.date_range }}">
+        <button type="submit" class="btn btn-send">
+            <i class="bi bi-envelope me-1"></i> Send as PDF
+        </button>
+    </form>
+    <div id="sendReportEmailStatus" class="small" style="color:rgba(255,255,255,0.60);"></div>
+
+    <div class="toolbar-divider"></div>
+
+    <!-- Export options -->
+    <div class="btn-group">
+        <button id="export-options-btn" type="button" class="btn btn-export">
+            <i class="bi bi-file-earmark-bar-graph me-1"></i> Export Options
+        </button>
+        <button type="button" class="btn btn-export-split dropdown-toggle dropdown-toggle-split"
+                data-bs-toggle="dropdown" aria-expanded="false">
+            <span class="visually-hidden">Toggle Dropdown</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow">
+            <li>
+                <a id="print-document" class="dropdown-item py-2 fw-bold" href="#">
+                    <i class="bi bi-printer me-2 text-primary"></i> Print Document
+                </a>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+                <a id="download-pdf" class="dropdown-item py-2 fw-bold" href="#">
+                    <i class="bi bi-file-pdf me-2 text-danger"></i> Download and Archive PDF
+                </a>
+            </li>
+            <li>
+                <a id="download-csv" class="dropdown-item py-2 fw-bold" href="#"
+                   data-filename="{{ ('Report_' + (report.date_range | replace(' ', '_') | default('')) + '.csv') | default('report.csv') }}">
+                    <i class="bi bi-filetype-csv me-2 text-success"></i> Download as CSV
+                </a>
+            </li>
+        </ul>
     </div>
 
-    <div class="row mb-4">
-        <div class="col-8">
-            <h5 class="mb-3 text-uppercase">{{ report.title }}</h5>
-            <p class="mb-0"><strong>Event/Scope:</strong> {{ report.event_name }}</p>
-            <p class="mb-0"><strong>Target Department:</strong> {{ report.department }}</p>
-            <p class="mb-0"><strong>Date Filter:</strong> {{ report.date_range }}</p>
-        </div>
-        <div class="col-4">
-            <div class="meta-box small">
-                <strong>Prepared By:</strong> System Administrator<br>
-                <strong>Status:</strong> <span class="text-success fw-bold">FINAL</span><br>
-                <strong>Confidentiality:</strong> Internal Use Only
+</div><!-- /.report-toolbar -->
+
+<!-- ── Feedback Toast ──────────────────────────────────────────────────── -->
+<div id="system-feedback-indicator" class="feedback-indicator" role="status">
+    <div class="feedback-indicator__icon" id="feedback-icon-container">
+        <i id="feedback-icon" class="bi"></i>
+    </div>
+    <div class="feedback-indicator__title" id="feedback-message"></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     PRINTABLE CONTENT — paginated, 10 rows per page
+     ══════════════════════════════════════════════════════════════════════ -->
+{% set ROWS_PER_PAGE = 10 %}
+{% set requested_category = request.args.get('category', '').lower() %}
+{% set category = 'violations' if requested_category == 'violation' else requested_category %}
+{% set report_type = request.args.get('type', '').lower() %}
+{% set total_logs = logs | length if logs else 0 %}
+{% set total_pages = ((total_logs - 1) // ROWS_PER_PAGE + 1) if total_logs > 0 else 1 %}
+
+<div class="pages-wrapper" id="report-content">
+
+{% if logs %}
+    {%- for page_num in range(total_pages) -%}
+    {%- set start_idx = page_num * ROWS_PER_PAGE -%}
+    {%- set end_idx   = start_idx + ROWS_PER_PAGE -%}
+    {%- set page_logs = logs[start_idx:end_idx] -%}
+
+    <div class="page-block">
+
+        <!-- Page indicator (screen only) -->
+        <div class="page-indicator d-print-none">Page {{ page_num + 1 }} of {{ total_pages }}</div>
+
+        <!-- Header (repeated on every page) -->
+        <div class="header-container">
+            <div class="logos">
+                <img src="{{ url_for('static', filename='images/LOGO_Pasig Seal.png') }}" class="logo-img" alt="Pasig Seal">
+                <img src="{{ url_for('static', filename='images/LOGO_Pasig.png') }}"      class="logo-img" alt="Pasig Umaagos">
+                <img src="{{ url_for('static', filename='images/plp_logo.png') }}"         class="logo-img" alt="PLP Logo">
+            </div>
+            <div class="header-text">
+                <div class="header-blue-bar">PAMANTASAN NG LUNGSOD NG PASIG</div>
+                <div style="font-weight:bold;font-size:12px;margin-top:4px;">Office of the Human Resource Development</div>
+                <div class="header-subtext">Alkalde Jose St., Kapasigan Pasig City, Philippines 1600</div>
+                <div class="header-subtext">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="currentColor" class="bi bi-telephone-fill" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.885.511a1.745 1.745 0 0 1 2.61.163L6.29 2.98c.329.423.445.974.315 1.494l-.547 2.19a.678.678 0 0 0 .178.643l2.457 2.457a.678.678 0 0 0 .644.178l2.189-.547a1.745 1.745 0 0 1 1.494.315l2.306 1.794c.829.645.905 1.87.163 2.611l-1.034 1.034c-.74.74-1.846 1.065-2.877.702a18.634 18.634 0 0 1-7.01-4.42 18.634 18.634 0 0 1-4.42-7.009c-.362-1.03-.037-2.137.703-2.877L1.885.511z"/></svg>
+                    628-1014 Loc. 106 &nbsp;&nbsp;
+                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="currentColor" class="bi bi-envelope-fill" viewBox="0 0 16 16"><path d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555zM0 4.697v7.104l5.803-3.558L0 4.697zM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757zm3.436-.586L16 11.801V4.697l-5.803 3.546z"/></svg>
+                    hrd@plpasig.edu.ph
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="row g-3 mb-4">
-        {% set category = request.args.get('category', '').lower() %}
-        {% set type = request.args.get('type', '').lower() %}
-        
-        {% if category == 'general' %}
-            {% if type == 'student_entry_exit' %}
-                <!-- General Logs for Daily Student Entry/Exit Logs Metrics -->
-                <div class="col-4">
-                    <div class="summary-metric border rounded bg-light">
-                        <div class="text-secondary text-uppercase small fw-bold mb-1">Total Entry</div>
-                        <h3>{{ metrics.total_entry }}</h3>
+        <div class="report-title">{{ report.event_name if report.event_name else report.title }}</div>
+        <div class="report-date">DATE: {{ report.date_range }}</div>
+
+        <div class="office-name">REPORT SCOPE: {{ report.department if report.department else 'ALL' }}</div>
+        <div class="instruction">Please put a check (✔) in the opposite box if present; if absent write A and if late write L.</div>
+
+        {% if page_num == 0 %}
+            {% if category == 'general' and report_type == 'daily_traffic' %}
+                <div class="d-flex flex-wrap gap-3 mb-4">
+                    <div style="background: #f8f9fa; padding: 14px 18px; border: 1px solid #dee2e6; border-radius: 12px; min-width: 180px;">
+                        <div style="font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: .08em;">Total Entries</div>
+                        <div style="font-size: 24px; font-weight: 700;">{{ metrics.total_entries or 0 }}</div>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 14px 18px; border: 1px solid #dee2e6; border-radius: 12px; min-width: 180px;">
+                        <div style="font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: .08em;">Total Exits</div>
+                        <div style="font-size: 24px; font-weight: 700;">{{ metrics.total_exits or 0 }}</div>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 14px 18px; border: 1px solid #dee2e6; border-radius: 12px; min-width: 180px;">
+                        <div style="font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: .08em;">Peak Hour</div>
+                        <div style="font-size: 24px; font-weight: 700;">{{ metrics.peak_hour or 'N/A' }}</div>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 14px 18px; border: 1px solid #dee2e6; border-radius: 12px; min-width: 220px;">
+                        <div style="font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: .08em;">Average Time Spent</div>
+                        <div style="font-size: 24px; font-weight: 700;">{{ metrics.avg_time_spent or '0h 0m' }}</div>
                     </div>
                 </div>
-                <div class="col-4">
-                    <div class="summary-metric border rounded bg-light">
-                        <div class="text-secondary text-uppercase small fw-bold mb-1">Peak Time Hour</div>
-                        <h3 style="color: #FF9800;">{{ metrics.peak_hour }}</h3>
+            {% elif category == 'visitor' and report_type == 'visitor_purpose' %}
+                <div class="d-flex flex-wrap gap-3 mb-4">
+                    <div style="background: #f8f9fa; padding: 14px 18px; border: 1px solid #dee2e6; border-radius: 12px; min-width: 220px;">
+                        <div style="font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: .08em;">Total Visitor Sessions</div>
+                        <div style="font-size: 24px; font-weight: 700;">{{ metrics.total_visitors or 0 }}</div>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 14px 18px; border: 1px solid #dee2e6; border-radius: 12px; min-width: 220px;">
+                        <div style="font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: .08em;">Purpose Categories</div>
+                        <div style="font-size: 24px; font-weight: 700;">{{ metrics.purpose_categories or 0 }}</div>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 14px 18px; border: 1px solid #dee2e6; border-radius: 12px; min-width: 220px;">
+                        <div style="font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: .08em;">Filter Applied</div>
+                        <div style="font-size: 18px; font-weight: 700;">{{ metrics.filter_display or 'All Visitor Purposes' }}</div>
                     </div>
                 </div>
-                <div class="col-4">
-                    <div class="summary-metric border rounded bg-light">
-                        <div class="text-secondary text-uppercase small fw-bold mb-1">Avg Time Spent</div>
-                        <h3>{{ metrics.avg_time_spent }}</h3>
+            {% elif category == 'violations' and report_type == 'curfew_violations' %}
+                <div class="d-flex flex-wrap gap-3 mb-4">
+                    <div style="background: #f8f9fa; padding: 14px 18px; border: 1px solid #dee2e6; border-radius: 12px; min-width: 220px;">
+                        <div style="font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: .08em;">Total Curfew Violations</div>
+                        <div style="font-size: 24px; font-weight: 700;">{{ metrics.total_violations or 0 }}</div>
                     </div>
-                </div>
-            {% elif type == 'daily_traffic' %}
-                <!-- General Logs for Daily Traffic Analysis Metrics -->
-                    <div class="col-4">
-                        <div class="summary-metric border rounded bg-light">
-                            <div class="text-secondary text-uppercase small fw-bold mb-1">Total Entry</div>
-                            <!-- <h3>{{ metrics.total_entry }}</h3> -->
-                             <h3>{{ metrics.total_entry }}</h3>
-                        </div>
+                    <div style="background: #f8f9fa; padding: 14px 18px; border: 1px solid #dee2e6; border-radius: 12px; min-width: 220px;">
+                        <div style="font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: .08em;">Departments Included</div>
+                        <div style="font-size: 24px; font-weight: 700;">{{ logs | length }}</div>
                     </div>
-                    <div class="col-4">
-                        <div class="summary-metric border rounded bg-light">
-                            <div class="text-secondary text-uppercase small fw-bold mb-1">Total Foot Traffic</div>
-                            <!-- <h3 style="color: #FF9800;">{{ metrics.total_foot_traffic }}</h3> -->
-                             <h3>{{ metrics.peak_hour }}</h3>
-                        </div>
+                    <div style="background: #f8f9fa; padding: 14px 18px; border: 1px solid #dee2e6; border-radius: 12px; min-width: 220px;">
+                        <div style="font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: .08em;">Top Offenders</div>
+                        <div style="font-size: 18px; font-weight: 700;">{{ metrics.top_offenders | length or 0 }}</div>
                     </div>
-                    <div class="col-4">
-                        <div class="summary-metric border rounded bg-light">
-                            <div class="text-secondary text-uppercase small fw-bold mb-1">Net Campus Population</div>
-                            <!-- <h3>{{ metrics.campus_population }}</h3> -->
-                            <h3>{{ metrics.avg_time_spent }}</h3>
-                        </div>
-                    </div>
-                </div>
-                <div class="row g-3 mb-4">
-                    <div class="col-4">
-                        <div class="summary-metric border rounded bg-light">
-                            <div class="text-secondary text-uppercase small fw-bold mb-1">Faculty/Staff Footprint</div>
-                            <h3>{{ metrics.total_entry }}</h3>
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <div class="summary-metric border rounded bg-light">
-                            <div class="text-secondary text-uppercase small fw-bold mb-1">Student Footprint</div>
-                            <h3 style="color: #FF9800;">{{ metrics.peak_hour }}</h3>
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <div class="summary-metric border rounded bg-light">
-                            <div class="text-secondary text-uppercase small fw-bold mb-1">Visitor Footprint</div>
-                            <h3>{{ metrics.avg_time_spent }}</h3>
-                        </div>
+                    <div style="background: #f8f9fa; padding: 14px 18px; border: 1px solid #dee2e6; border-radius: 12px; min-width: 220px;">
+                        <div style="font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: .08em;">Filter Applied</div>
+                        <div style="font-size: 18px; font-weight: 700;">{{ metrics.filter_display or 'All Subjects' }}</div>
                     </div>
                 </div>
             {% endif %}
-
-        {% elif category == 'visitor' %}
-            <!-- General Logs for Daily Student Entry/Exit Logs Metrics -->
-            <div class="col-4">
-                <div class="summary-metric border rounded bg-light">
-                    <div class="text-secondary text-uppercase small fw-bold mb-1">Total Entry</div>
-                    <h3>{{ metrics.total_entry }}</h3>
-                </div>
-            </div>
-            <div class="col-4">
-                <div class="summary-metric border rounded bg-light">
-                    <div class="text-secondary text-uppercase small fw-bold mb-1">Peak Time Hour</div>
-                    <h3 style="color: #FF9800;">{{ metrics.peak_hour }}</h3>
-                </div>
-            </div>
-            <div class="col-4">
-                <div class="summary-metric border rounded bg-light">
-                    <div class="text-secondary text-uppercase small fw-bold mb-1">Avg Time Spent</div>
-                    <h3>{{ metrics.avg_time_spent }}</h3>
-                </div>
-            </div>
-        {% elif category == 'event' %}
-        
-        {% elif category == 'violation' %}
-
-        {% else %}
-            <!-- Standard Event/Visitor Metrics -->
-            <div class="col-4">
-                <div class="summary-metric border rounded bg-light">
-                    <div class="text-secondary text-uppercase small fw-bold mb-1">Total Expected</div>
-                    <h3>{{ metrics.expected }}</h3>
-                </div>
-            </div>
-            <div class="col-4">
-                <div class="summary-metric border rounded bg-light">
-                    <div class="text-secondary text-uppercase small fw-bold mb-1">Total Present</div>
-                    <h3 style="color: #198754;">{{ metrics.present }}</h3>
-                </div>
-            </div>
-            <div class="col-4">
-                <div class="summary-metric border rounded bg-light">
-                    <div class="text-secondary text-uppercase small fw-bold mb-1">Attendance Rate</div>
-                    <h3>{{ metrics.rate }}</h3>
-                </div>
-            </div>
         {% endif %}
-    </div>
-    
-    <h5 class="mb-3 text-uppercase">Detailed Action Logs</h5>
-    <table class="table table-bordered table-striped" style="border-color: #dee2e6;">
-        <thead>
-            {% set category = request.args.get('category', '').lower() %}
 
-            {% if category == 'general' %}
+        <!-- Data table for this page chunk -->
+        <table class="report-table">
+            <thead>
+                {% if category == 'general' and report_type == 'daily_traffic' %}
                 <tr>
-                    <th>#</th>
-                    <th>Name</th>
-                    <th>Role / Affiliation</th>
-                    <th>Time In</th>
-                    <th>Time Out</th>
-                    <th>Status</th>
-                    <th>Gate</th>
+                    <th style="width: 10%;">No.</th>
+                    <th style="width: 18%;">Date</th>
+                    <th style="width: 16%;">Entries</th>
+                    <th style="width: 16%;">Exits</th>
+                    <th style="width: 20%;">Peak Hour</th>
+                    <th style="width: 20%;">Avg. Time</th>
+                </tr>
+            {% elif category == 'visitor' and report_type == 'visitor_purpose' %}
+                <tr>
+                    <th style="width: 10%;">No.</th>
+                    <th style="width: 50%; text-align: left;">Purpose</th>
+                    <th style="width: 20%;">Visitor Count</th>
+                    <th style="width: 20%;">Percentage</th>
+                </tr>
+            {% elif category == 'general' %}
+                <tr>
+                    <th style="width: 5%;">No.</th>
+                    <th style="width: 30%; text-align: left;">Student Name</th>
+                    <th style="width: 25%;">Program</th>
+                    <th style="width: 15%;">Time In</th>
+                    <th style="width: 15%;">Time Out</th>
+                    <th style="width: 10%;">Gate</th>
                 </tr>
             {% elif category == 'visitor' %}
                 <tr>
-                    <th>#</th>
-                    <th>Visitor Name</th>
-                    <th>Purpose</th>
-                    <th>Time In</th>
-                    <th>Time Out</th>
-                    <th>Status</th>
+                    <th style="width: 5%;">No.</th>
+                    <th style="width: 25%; text-align: left;">Visitor Name</th>
+                    <th style="width: 25%;">Purpose</th>
+                    <th style="width: 15%;">Time In</th>
+                    <th style="width: 15%;">Time Out</th>
+                    <th style="width: 15%;">Visitor ID</th>
+                </tr>
+            {% elif category == 'violations' and report_type == 'curfew_violations' %}
+                <tr>
+                    <th style="width: 10%;">No.</th>
+                    <th style="width: 60%; text-align: left;">Department</th>
+                    <th style="width: 30%;">Violation Count</th>
                 </tr>
             {% elif category == 'event' %}
                 <tr>
-                    <th>#</th>
-                    <th>Participant Name</th>
-                    <th>Role / Affiliation</th>
-                    <th>Time In</th>
-                    <th>Time Out</th>
-                    <th>Status</th>
-                    <th>Remarks</th>
+                    <th style="width: 5%;">No.</th>
+                    <th style="width: 25%; text-align: left;">Participant Name</th>
+                    <th style="width: 20%;">Role / Affiliation</th>
+                    <th style="width: 15%;">Time In</th>
+                    <th style="width: 15%;">Time Out</th>
+                    <th style="width: 20%;">Status</th>
                 </tr>
             {% else %}
                 <tr>
-                    <th>#</th>
-                    <th>Name</th>
-                    <th>Detail</th>
-                    <th>Time In</th>
-                    <th>Time Out</th>
-                    <th>Status</th>
-                    <th>Remarks</th>
+                    <th style="width: 5%;">No.</th>
+                    <th style="width: 25%; text-align: left;">Name</th>
+                    <th style="width: 25%;">Description</th>
+                    <th style="width: 15%;">Time</th>
+                    <th style="width: 15%;">Status</th>
+                    <th style="width: 15%;">Remarks</th>
                 </tr>
-            {% endif %}
-        </thead>
-        <tbody>
-            {% if logs %}
-                {% if category == 'general' %}
-                    {% for log in logs %}
-                    <tr>
-                        <td>{{ log.id }}</td>
-                        <td>{{ log.name }}</td>
-                        <td>{{ log.detail }}</td>
-                        <td>{{ log.time_in }}</td>
-                        <td>{{ log.time_out }}</td>
-                        <td>
-                            {% if log.status in ['Present', 'Entry'] %}
-                                <strong class="text-success">{{ log.status }}</strong>
-                            {% elif log.status in ['Exit', 'Absent'] %}
-                                <strong class="text-danger">{{ log.status }}</strong>
-                            {% elif log.status == 'In Progress' %}
-                                <strong class="text-warning text-dark">In Progress</strong>
-                            {% else %}
-                                <strong class="text-info">{{ log.status }}</strong>
-                            {% endif %}
-                        </td>
-                        <td>{{ log.remarks }}</td>
-                    </tr>
-                    {% endfor %}
-                    
-                {% elif category == 'visitor' %}
-                    {% for log in logs %}
-                    <tr>
-                        <td>{{ log.id }}</td>
-                        <td>{{ log.name }}</td>
-                        <td>{{ log.detail }}</td>
-                        <td>{{ log.time_in }}</td>
-                        <td>{{ log.time_out }}</td>
-                        <td>
-                            {% if log.status in ['Present', 'Entry'] %}
-                                <strong class="text-success">{{ log.status }}</strong>
-                            {% elif log.status in ['Exit', 'Absent'] %}
-                                <strong class="text-danger">{{ log.status }}</strong>
-                            {% else %}
-                                <strong class="text-info">{{ log.status }}</strong>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                    
-                {% elif category == 'event' %}
-                    {% for log in logs %}
-                    <tr>
-                        <td>{{ log.id }}</td>
-                        <td>{{ log.name }}</td>
-                        <td>{{ log.detail }}</td>
-                        <td>{{ log.time_in }}</td>
-                        <td>{{ log.time_out }}</td>
-                        <td>
-                            {% if log.status in ['Present', 'Late'] %}
-                                <strong class="text-success">{{ log.status }}</strong>
-                            {% elif log.status in ['Absent', 'Excused'] %}
-                                <strong class="text-danger">{{ log.status }}</strong>
-                            {% else %}
-                                <strong class="text-info">{{ log.status }}</strong>
-                            {% endif %}
-                        </td>
-                        <td>{{ log.remarks }}</td>
-                    </tr>
-                    {% endfor %}
-                    
-                {% else %}
-                    {% for log in logs %}
-                    <tr>
-                        <td>{{ log.id }}</td>
-                        <td>{{ log.name }}</td>
-                        <td>{{ log.detail }}</td>
-                        <td>{{ log.time_in if log.time_in else 'N/A' }}</td>
-                        <td>{{ log.time_out if log.time_out else 'N/A' }}</td>
-                        <td>
-                            {% if log.status in ['Present', 'Late'] %}
-                                <strong class="text-success">{{ log.status }}</strong>
-                            {% elif log.status in ['Absent', 'Exit'] %}
-                                <strong class="text-danger">{{ log.status }}</strong>
-                            {% else %}
-                                <strong class="text-info">{{ log.status }}</strong>
-                            {% endif %}
-                        </td>
-                        <td>{{ log.remarks }}</td>
-                    </tr>
-                    {% endfor %}
-                    
                 {% endif %}
-            {% else %}
+            </thead>
+            <tbody>
+                {% for log in page_logs %}
+                    {%- set row_num = start_idx + loop.index -%}
+                    {% if category == 'general' and report_type == 'daily_traffic' %}
+                    <tr>
+                        <td class="text-center">{{ row_num }}</td>
+                        <td class="text-center">{{ log.date }}</td>
+                        <td class="text-center">{{ log.entries }}</td>
+                        <td class="text-center">{{ log.exits }}</td>
+                        <td class="text-center">{{ log.peak_hour }}</td>
+                        <td class="text-center">{{ log.avg_time_spent }}</td>
+                    </tr>
+                    {% elif category == 'visitor' and report_type == 'visitor_purpose' %}
+                    <tr>
+                        <td class="text-center">{{ row_num }}</td>
+                        <td class="text-start">{{ log.purpose }}</td>
+                        <td class="text-center">{{ log.visitor_count }}</td>
+                        <td class="text-center">{{ log.percentage }}</td>
+                    </tr>
+                    {% elif category == 'general' %}
+                    <tr>
+                        <td class="text-center">{{ row_num }}</td>
+                        <td class="col-name">{{ log.name }}</td>
+                        <td class="text-center">{{ log.detail }}</td>
+                        <td class="text-center">{{ log.time_in }}</td>
+                        <td class="text-center">{{ log.time_out }}</td>
+                        <td class="text-center">{{ log.remarks }}</td>
+                    </tr>
+                    {% elif category == 'violations' and report_type == 'curfew_violations' %}
+                    <tr>
+                        <td class="text-center">{{ row_num }}</td>
+                        <td class="text-start">{{ log.department }}</td>
+                        <td class="text-center">{{ log.violation_count }}</td>
+                    </tr>
+                    {% elif category == 'visitor' %}
+                    <tr>
+                        <td class="text-center">{{ row_num }}</td>
+                        <td class="col-name">{{ log.name }}</td>
+                        <td class="text-center">{{ log.detail }}</td>
+                        <td class="text-center">{{ log.time_in }}</td>
+                        <td class="text-center">{{ log.time_out }}</td>
+                        <td class="text-center">{{ log.remarks }}</td>
+                    </tr>
+                    {% elif category == 'event' %}
+                    <tr>
+                        <td class="text-center">{{ row_num }}</td>
+                        <td class="col-name">{{ log.name }}</td>
+                        <td class="text-center">{{ log.detail }}</td>
+                        <td class="text-center">{{ log.time_in }}</td>
+                        <td class="text-center">{{ log.time_out }}</td>
+                        <td class="text-center">
+                            {% if log.status == 'Present' %}<span class="status-badge badge-success">{{ log.status }}</span>
+                            {% elif log.status == 'Late' %}<span class="status-badge badge-warning">{{ log.status }}</span>
+                            {% elif log.status == 'Absent' %}<span class="status-badge badge-danger">{{ log.status }}</span>
+                            {% else %}<span class="status-badge badge-info">{{ log.status }}</span>{% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td class="text-center">{{ row_num }}</td>
+                        <td class="col-name">{{ log.name }}</td>
+                        <td class="text-center">{{ log.detail }}</td>
+                        <td class="text-center">{{ log.time }}</td>
+                        <td class="text-center">
+                            {% if log.status in ['Present', 'Late'] %}<span class="status-badge badge-success">{{ log.status }}</span>
+                            {% elif log.status in ['Absent', 'Exit'] %}<span class="status-badge badge-danger">{{ log.status }}</span>
+                            {% else %}<span class="status-badge badge-info">{{ log.status }}</span>{% endif %}
+                        </td>
+                        <td class="text-center">{{ log.remarks }}</td>
+                    </tr>
+                    {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Supplemental curfew tables — only on the LAST page -->
+        {% if loop.last and category == 'violations' and report_type == 'curfew_violations' %}
+        <div class="report-title" style="margin-top:18px;font-size:14px;">Peak Curfew Violation Days</div>
+        <table class="report-table">
+            <thead>
                 <tr>
-                    <td colspan="8" class="text-center py-3">No records found for this date range.</td>
+                    <th style="width:10%;">No.</th>
+                    <th style="width:50%;">Date</th>
+                    <th style="width:40%;">Violation Count</th>
                 </tr>
-            {% endif %}
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                {% if metrics.peak_days %}
+                    {% for peak in metrics.peak_days %}
+                    <tr>
+                        <td class="text-center">{{ loop.index }}</td>
+                        <td class="text-start">{{ peak.violation_date }}</td>
+                        <td class="text-center">{{ peak.violation_count }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr><td colspan="3" class="text-center py-4">No peak day data available.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+        {% if metrics.top_offenders %}
+        <div class="report-title" style="margin-top:14px;font-size:14px;">Top Curfew Offenders</div>
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th style="width:10%;">No.</th>
+                    <th style="width:70%;">Offender</th>
+                    <th style="width:20%;">Violation Count</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for offender in metrics.top_offenders %}
+                <tr>
+                    <td class="text-center">{{ loop.index }}</td>
+                    <td class="text-start">{{ offender.offender_name }}</td>
+                    <td class="text-center">{{ offender.violation_count }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+        {% endif %}
 
-    <div class="mt-5">
-        <p class="mb-5">Certified Correct By:</p>
-        <div style="width: 250px; border-bottom: 1px solid #000; margin-bottom: 5px;"></div>
-        <p class="text-muted small">Signature over Printed Name</p>
+        <!-- Footer & signature — only on the LAST page -->
+        {% if loop.last %}
+        <div class="footer-section">
+            <div>Recorded by HRD Personnel</div>
+            <div style="margin-bottom:20px;">Attendance checked/monitored by:</div>
+            <div class="signature-line"></div>
+            <div style="padding-left:20px;">Signature Over Printed Name</div>
+            <div style="padding-left:60px;">Head of Office</div>
+            <div style="margin-top:26px;font-size:10.5px;color:#555;">
+                * All erasures / corrections shall be countersigned by the HRD Head
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Print page number in footer -->
+        <div style="text-align:right;font-size:9px;color:#999;margin-top:8px;">
+            Page {{ page_num + 1 }} / {{ total_pages }}
+        </div>
+
+    </div><!-- /.page-block -->
+    {%- endfor -%}
+
+{% else %}
+    <!-- No records — single empty page -->
+    <div class="page-block">
+        <div class="header-container">
+            <div class="logos">
+                <img src="{{ url_for('static', filename='images/LOGO_Pasig Seal.png') }}" class="logo-img" alt="Pasig Seal">
+                <img src="{{ url_for('static', filename='images/LOGO_Pasig.png') }}"      class="logo-img" alt="Pasig Umaagos">
+                <img src="{{ url_for('static', filename='images/plp_logo.png') }}"         class="logo-img" alt="PLP Logo">
+            </div>
+            <div class="header-text">
+                <div class="header-blue-bar">PAMANTASAN NG LUNGSOD NG PASIG</div>
+                <div style="font-weight:bold;font-size:12px;margin-top:4px;">Office of the Human Resource Development</div>
+                <div class="header-subtext">Alkalde Jose St., Kapasigan Pasig City, Philippines 1600</div>
+                <div class="header-subtext">628-1014 Loc. 106 &nbsp;&nbsp; hrd@plpasig.edu.ph</div>
+            </div>
+        </div>
+        <div class="report-title">{{ report.event_name if report.event_name else report.title }}</div>
+        <div class="report-date">DATE: {{ report.date_range }}</div>
+        <div class="office-name">REPORT SCOPE: {{ report.department if report.department else 'ALL PROGRAMS' }}</div>
+        {% if category == 'violations' and report_type == 'curfew_violations' %}
+        <div class="d-flex flex-wrap gap-3 mb-4" style="margin-top:12px;">
+            <div style="background: #f8f9fa; padding: 14px 18px; border: 1px solid #dee2e6; border-radius: 12px; min-width: 220px;">
+                <div style="font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: .08em;">Total Curfew Violations</div>
+                <div style="font-size: 24px; font-weight: 700;">{{ metrics.total_violations or 0 }}</div>
+            </div>
+            <div style="background: #f8f9fa; padding: 14px 18px; border: 1px solid #dee2e6; border-radius: 12px; min-width: 220px;">
+                <div style="font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: .08em;">Departments Included</div>
+                <div style="font-size: 24px; font-weight: 700;">{{ logs | length }}</div>
+            </div>
+            <div style="background: #f8f9fa; padding: 14px 18px; border: 1px solid #dee2e6; border-radius: 12px; min-width: 220px;">
+                <div style="font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: .08em;">Top Offenders</div>
+                <div style="font-size: 18px; font-weight: 700;">{{ metrics.top_offenders | length or 0 }}</div>
+            </div>
+            <div style="background: #f8f9fa; padding: 14px 18px; border: 1px solid #dee2e6; border-radius: 12px; min-width: 220px;">
+                <div style="font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: .08em;">Filter Applied</div>
+                <div style="font-size: 18px; font-weight: 700;">{{ metrics.filter_display or 'All Subjects' }}</div>
+            </div>
+        </div>
+        {% endif %}
+        <table class="report-table" style="margin-top:12px;">
+            <tbody>
+                <tr><td colspan="6" class="text-center" style="padding:40px 0;color:#666;">
+                    No records found for this date range.
+                </td></tr>
+            </tbody>
+        </table>
+        <div class="footer-section">
+            <div>Recorded by HRD Personnel</div>
+            <div style="margin-bottom:20px;">Attendance checked/monitored by:</div>
+            <div class="signature-line"></div>
+            <div style="padding-left:20px;">Signature Over Printed Name</div>
+            <div style="padding-left:60px;">Head of Office</div>
+            <div style="margin-top:26px;font-size:10.5px;color:#555;">* All erasures / corrections shall be countersigned by the HRD Head</div>
+        </div>
     </div>
+{% endif %}
 
-    <div class="footer d-flex justify-content-between">
-        <span>Pamantasan ng Lungsod ng Pasig - Data Privacy Compliance</span>
-        <span>Page 1 of 1</span>
-    </div>
+</div><!-- /#report-content -->
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<!-- html2canvas must be loaded BEFORE html2pdf so window.html2canvas is defined -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<!-- jsPDF standalone: exposes window.jspdf for direct per-page PDF construction -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+    const archiveReportUrl = {{ archive_report_url | default(None) | tojson }};
+    const sampleReportUrl  = {{ url_for('sample_report') | default('') | tojson }};
+    const archiveFilename  = {{ report.archive_filename | default('report.pdf') | tojson }};
+
+    /* ── PDF generation — per-block auto-sizing ─────────────────
+     *
+     * Strategy:
+     *   1. Find every .page-block element.
+     *   2. Capture each one individually with html2canvas at scale 2.
+     *   3. Measure the exact rendered pixel size of the canvas.
+     *   4. Convert pixels → mm  (96dpi × scale = 192dpi → 1px = 25.4/192 mm).
+     *   5. Create a jsPDF page whose dimensions exactly match that block.
+     *   6. Stamp the JPEG onto that page — full width, full height, zero margins.
+     *
+     * Result: every page fits its content perfectly regardless of row count,
+     *         name length, or table width.  No clipping.  No white gaps.
+     * ──────────────────────────────────────────────────────────── */
+    async function createReportPdfBlob(filename) {
+        // Hide non-printable chrome
+        const hiddenEls = Array.from(document.querySelectorAll('.d-print-none'));
+        hiddenEls.forEach(el => { el._prev = el.style.display; el.style.display = 'none'; });
+
+        try {
+            const blocks = Array.from(document.querySelectorAll('#report-content .page-block'));
+            if (blocks.length === 0) throw new Error('No .page-block elements found in #report-content');
+
+            // jsPDF is exposed by the UMD bundle as window.jspdf
+            const { jsPDF } = window.jspdf;
+
+            const SCALE    = 2;                       // html2canvas capture scale
+            const DPI      = 96 * SCALE;              // effective DPI at that scale
+            const MM_PER_PX = 25.4 / DPI;            // how many mm per captured pixel
+
+            let pdf = null;
+
+            for (let i = 0; i < blocks.length; i++) {
+                const block = blocks[i];
+
+                // Capture this single page block at high resolution
+                const canvas = await html2canvas(block, {
+                    scale:           SCALE,
+                    useCORS:         true,
+                    logging:         false,
+                    backgroundColor: '#ffffff',
+                    // Capture at the block's natural scroll width/height
+                    width:  block.scrollWidth,
+                    height: block.scrollHeight,
+                    windowWidth:  block.scrollWidth,
+                    windowHeight: block.scrollHeight
+                });
+
+                // Exact page dimensions derived from the captured canvas
+                const mmW = canvas.width  * MM_PER_PX;
+                const mmH = canvas.height * MM_PER_PX;
+                const orientation = mmH >= mmW ? 'portrait' : 'landscape';
+
+                if (!pdf) {
+                    // First page — initialise jsPDF with this page's size
+                    pdf = new jsPDF({ unit: 'mm', format: [mmW, mmH], orientation });
+                } else {
+                    // Subsequent pages — add a new page with THIS block's size
+                    pdf.addPage([mmW, mmH], orientation);
+                }
+
+                // Render the canvas as a JPEG image that fills the page exactly
+                const imgData = canvas.toDataURL('image/jpeg', 0.97);
+                pdf.addImage(imgData, 'JPEG', 0, 0, mmW, mmH);
+            }
+
+            const blob = pdf.output('blob');
+            return { blob, filename: filename || archiveFilename };
+
+        } finally {
+            hiddenEls.forEach(el => { el.style.display = el._prev || ''; delete el._prev; });
+        }
+    }
+
+    function triggerPDFDownload(blob, filename) {
+        const url  = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = url;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+
+    async function archivePDF(blob, filename) {
+        if (!archiveReportUrl || archiveReportUrl === sampleReportUrl) return;
+        const fd = new FormData();
+        fd.append('filename', filename);
+        fd.append('report_file', new File([blob], filename, { type: 'application/pdf' }));
+        const res = await fetch(archiveReportUrl, { method: 'POST', body: fd });
+        if (!res.ok) throw new Error(`Archive failed: ${res.status}`);
+    }
+
+    async function downloadPDF() {
+        showLocalFeedback('Generating PDF…', 'success');
+        try {
+            const result = await createReportPdfBlob(archiveFilename);
+            triggerPDFDownload(result.blob, result.filename);
+            await archivePDF(result.blob, result.filename);
+            showLocalFeedback('Report archived successfully.', 'success');
+        } catch(e) {
+            showLocalFeedback('PDF generation failed. Please try again.', 'error');
+        }
+    }
+
+    /* ── Feedback toast ──────────────────────────────────────── */
+    let feedbackTimer = null;
+    function showLocalFeedback(message, type = 'success') {
+        const el  = document.getElementById('system-feedback-indicator');
+        const ico = document.getElementById('feedback-icon');
+        const msg = document.getElementById('feedback-message');
+        if (!el || !ico || !msg) return;
+        msg.textContent = message;
+        el.classList.remove('success', 'error');
+        el.classList.add(type);
+        ico.className = type === 'success' ? 'bi bi-check-circle-fill' : 'bi bi-exclamation-triangle-fill';
+        el.classList.add('show');
+        clearTimeout(feedbackTimer);
+        feedbackTimer = setTimeout(() => el.classList.remove('show'), 4000);
+    }
+
+    /* ── Email form ──────────────────────────────────────────── */
+    const sendReportEmailForm   = document.getElementById('sendReportEmailForm');
+    const sendReportEmailStatus = document.getElementById('sendReportEmailStatus');
+
+    if (sendReportEmailForm) {
+        sendReportEmailForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn   = sendReportEmailForm.querySelector('button[type="submit"]');
+            const label = btn ? btn.textContent : '';
+            if (sendReportEmailStatus) sendReportEmailStatus.textContent = 'Generating PDF…';
+            if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+            try {
+                const result = await createReportPdfBlob(archiveFilename);
+                const fd = new FormData(sendReportEmailForm);
+                fd.append('report_file', new File([result.blob], result.filename, { type: 'application/pdf' }));
+                const res  = await fetch(sendReportEmailForm.action, { method: 'POST', body: fd });
+                const json = await res.json();
+                if (!res.ok || !json.success) throw new Error(json.message || `Status ${res.status}`);
+                if (sendReportEmailStatus) {
+                    sendReportEmailStatus.textContent = json.message || 'Report emailed successfully.';
+                    sendReportEmailStatus.style.color = '#4ade80';
+                }
+            } catch(err) {
+                showLocalFeedback(err.message || 'Could not send report email.', 'error');
+                if (sendReportEmailStatus) { sendReportEmailStatus.textContent = ''; }
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = label; }
+            }
+        });
+    }
+
+    /* ── Export buttons ──────────────────────────────────────── */
+    document.addEventListener('DOMContentLoaded', () => {
+        const exportBtn  = document.getElementById('export-options-btn');
+        const printDoc   = document.getElementById('print-document');
+        const dlPdf      = document.getElementById('download-pdf');
+        const dlCsv      = document.getElementById('download-csv');
+
+        if (exportBtn) exportBtn.addEventListener('click', () => window.print());
+        if (printDoc)  printDoc.addEventListener('click', e => { e.preventDefault(); window.print(); });
+        if (dlPdf)     dlPdf.addEventListener('click',    e => { e.preventDefault(); downloadPDF(); });
+        if (dlCsv) {
+            dlCsv.addEventListener('click', e => {
+                e.preventDefault();
+                const fn = dlCsv.dataset.filename || ('Report_' + new Date().toISOString().slice(0,10) + '.csv');
+                exportTableToCSV(fn);
+            });
+        }
+    });
+
+    /* ── CSV export ──────────────────────────────────────────── */
+    function exportTableToCSV(filename) {
+        function clean(name) {
+            let s = (name||'').replace(/[^A-Za-z0-9_.-]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'');
+            if (!s || s==='.') s = 'report';
+            if (!s.toLowerCase().endsWith('.csv')) s += '.csv';
+            return s;
+        }
+        const rows = document.querySelectorAll('table.report-table tr');
+        const csv  = [];
+        rows.forEach(row => {
+            const cols = row.querySelectorAll('td, th');
+            const r = [];
+            cols.forEach(col => {
+                let t = col.innerText.replace(/[\r\n]+/g,' ').trim().replace(/"/g,'""');
+                if (/[",\n]/.test(t)) t = '"' + t + '"';
+                r.push(t);
+            });
+            csv.push(r.join(','));
+        });
+        const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.download = clean(filename);
+        a.href = url;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showLocalFeedback('CSV downloaded successfully.', 'success');
+    }
+</script>
 </body>
 </html>

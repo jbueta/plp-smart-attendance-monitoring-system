@@ -8,10 +8,20 @@ venv/
 .venv/
 env.bak/
 venv.bak/
-.env
 
 # VS Code
 .vscode/
 .history/
 
 logs/
+
+# Generated reports
+/attendance_report.pdf
+/report_*.pdf
+/static/reports/*
+!/static/reports/.gitkeep
+
+logs/app.log
+server.log
+server_debug.log
+server_debug_trace.log

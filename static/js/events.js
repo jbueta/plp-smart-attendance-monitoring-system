@@ -1,6 +1,21 @@
 /* Event management functionality */
 
 var selectionMode = false;
+const frontendBaseUrl = window.location.origin;
+const backendProxyBaseUrl = `${frontendBaseUrl}/api/backend`;
+
+function getLocalDateString(date = new Date()) {
+    const localDate = new Date(date);
+    localDate.setMinutes(localDate.getMinutes() - localDate.getTimezoneOffset());
+    return localDate.toISOString().split('T')[0];
+}
+
+function parseTimeToMinutes(value) {
+    if (!value) return null;
+    const parts = value.split(':').map(Number);
+    if (parts.length < 2 || parts.some(Number.isNaN)) return null;
+    return (parts[0] * 60) + parts[1];
+}
 
 function toggleSelectionMode() {
     selectionMode = !selectionMode;
@@ -89,7 +104,7 @@ function fetchEventInstances(eventId) {
     
     tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-white-50"><div class="spinner-border spinner-border-sm text-info me-2"></div> Loading instances...</td></tr>';
     
-    fetch(`http://127.0.0.1:5001/admin/event/${eventId}/instances`)
+    fetch(`${backendProxyBaseUrl}/admin/event/${eventId}/instances`)
         .then(response => response.json())
         .then(instances => {
             console.log("Fetched instances:", instances);
@@ -128,7 +143,7 @@ function fetchAttendanceData(instanceId) {
     
     tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-white-50"><div class="spinner-border spinner-border-sm text-info me-2"></div> Loading attendance...</td></tr>';
 
-    fetch(`http://127.0.0.1:5001/admin/instances/${instanceId}/get-attendance`)
+    fetch(`${backendProxyBaseUrl}/admin/instances/${instanceId}/attendance`)
         .then(response => response.json())
         .then(data => {
             console.log("Fetched attendance:", data);
@@ -224,18 +239,38 @@ function updateStatus(attendanceId, newStatus, selectElement) {
         if(data.success) {
             fetchAttendanceData(currentInstanceId); 
         } else {
-            alert('Failed to update status.');
+            window.showSystemFeedback('Failed to update status.', 'error');
         }
+
     })
     .catch(error => console.error("Update Error:", error));
 }
 
-function deleteSingleEvent(eventId) {
-    if (!confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
+function requestEventConfirmation(options) {
+    if (typeof window.showSystemConfirm === 'function') {
+        return window.showSystemConfirm(options);
+    }
+
+    if (typeof window.showSystemFeedback === 'function') {
+        window.showSystemFeedback('Confirmation dialog is not available.', 'error');
+    }
+    return Promise.resolve(false);
+}
+
+async function deleteSingleEvent(eventId) {
+    const confirmed = await requestEventConfirmation({
+        title: 'Delete this event?',
+        message: 'This action cannot be undone.',
+        confirmText: 'Delete',
+        cancelText: 'Cancel',
+        tone: 'danger'
+    });
+
+    if (!confirmed) {
         return;
     }
 
-    fetch(`http://127.0.0.1:5000/admin/events/delete/${eventId}`, {
+    fetch(`${frontendBaseUrl}/admin/events/delete/${eventId}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -255,30 +290,41 @@ function deleteSingleEvent(eventId) {
             
             console.log(data.message); 
         } else {
-            alert(data.message || 'Failed to delete event.');
+            window.showSystemFeedback(data.message || 'Failed to delete event.', 'error');
         }
+
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('A network error occurred while trying to delete the event.');
+        window.showSystemFeedback('A network error occurred while trying to delete the event.', 'error');
     });
+
 }
 
-function deleteSelectedEvents() {
+async function deleteSelectedEvents() {
     const selectedCheckboxes = document.querySelectorAll('.event-checkbox:checked');
     
     if (selectedCheckboxes.length === 0) {
-        alert("Please select at least one event to delete.");
+        window.showSystemFeedback("Please select at least one event to delete.", 'error');
         return;
     }
+
 
     const eventIds = Array.from(selectedCheckboxes).map(cb => cb.value);
 
-    if (!confirm(`Are you sure you want to delete ${eventIds.length} events? This action cannot be undone.`)) {
+    const confirmed = await requestEventConfirmation({
+        title: `Delete ${eventIds.length} selected event${eventIds.length === 1 ? '' : 's'}?`,
+        message: 'This action cannot be undone.',
+        confirmText: 'Delete',
+        cancelText: 'Cancel',
+        tone: 'danger'
+    });
+
+    if (!confirmed) {
         return;
     }
 
-    fetch(`http://127.0.0.1:5000/admin/events/bulk-delete`, {
+    fetch(`${frontendBaseUrl}/admin/events/bulk-delete`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -300,13 +346,15 @@ function deleteSelectedEvents() {
             toggleSelectionMode(); 
             console.log(data.message);
         } else {
-            alert(data.message || 'Failed to delete selected events.');
+            window.showSystemFeedback(data.message || 'Failed to delete selected events.', 'error');
         }
+
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('A network error occurred while trying to delete events.');
+        window.showSystemFeedback('A network error occurred while trying to delete events.', 'error');
     });
+
 }
 
 function filterEvents() {
@@ -322,7 +370,7 @@ function filterEvents() {
 
         if (nameCell && dateCell) {
             const eventName = nameCell.textContent.toLowerCase();
-            const eventDate = dateCell.textContent.trim();
+            const eventDate = dateCell.getAttribute('data-date') || dateCell.textContent.trim();
 
             const matchesSearch = eventName.includes(searchQuery);
             const matchesDate = (dateQuery === "") || (eventDate === dateQuery);
@@ -359,6 +407,55 @@ document.addEventListener('DOMContentLoaded', function () {
     const dateLabel = document.getElementById('date-label');
     const wrapper = document.querySelector('.date-filter-wrapper');
     const datepicker = document.getElementById('dateFilter');
+    const addEventForm = document.getElementById('add-event-form');
+    const rosterInput = addEventForm ? addEventForm.querySelector('input[name="roster_file"]') : null;
+    const startInput = addEventForm ? addEventForm.querySelector('input[name="time_start"]') : null;
+    const endInput = addEventForm ? addEventForm.querySelector('input[name="time_end"]') : null;
+    const todayString = getLocalDateString();
+
+    if (dateInput) {
+        dateInput.min = todayString;
+    }
+
+    if (daySelect && frequencySelect && frequencySelect.value !== 'weekly') {
+        daySelect.disabled = true;
+    }
+
+    function validateAddEventForm() {
+        if (!addEventForm) return true;
+
+        if (allDeptCheck) allDeptCheck.setCustomValidity('');
+        if (rosterInput) rosterInput.setCustomValidity('');
+        if (dateInput) dateInput.setCustomValidity('');
+        if (endInput) endInput.setCustomValidity('');
+
+        const hasDepartment = Array.from(document.querySelectorAll('.dept-cb')).some(cb => cb.checked);
+        const hasRoster = Boolean(rosterInput && rosterInput.files && rosterInput.files.length > 0);
+        const hasManualParticipants = Array.from(addEventForm.querySelectorAll('input[name="custom_dept"]'))
+            .some(input => input.value.trim() !== '');
+
+        if (!hasDepartment && !hasRoster && !hasManualParticipants && allDeptCheck) {
+            allDeptCheck.setCustomValidity('Select a department, upload a CSV roster, or enter participant IDs.');
+        }
+
+        if (hasRoster && rosterInput && !rosterInput.files[0].name.toLowerCase().endsWith('.csv')) {
+            rosterInput.setCustomValidity('Upload a CSV roster file.');
+        }
+
+        if (frequencySelect && frequencySelect.value !== 'daily' && dateInput && !dateInput.value) {
+            dateInput.setCustomValidity('Event date is required.');
+        } else if (dateInput && dateInput.value && dateInput.value < todayString) {
+            dateInput.setCustomValidity('Event date cannot be in the past.');
+        }
+
+        const startMinutes = startInput ? parseTimeToMinutes(startInput.value) : null;
+        const endMinutes = endInput ? parseTimeToMinutes(endInput.value) : null;
+        if (startMinutes !== null && endMinutes !== null && endMinutes <= startMinutes && endInput) {
+            endInput.setCustomValidity('End time must be later than start time.');
+        }
+
+        return addEventForm.checkValidity();
+    }
 
     if (wrapper && datepicker) {
         wrapper.addEventListener('click', function(e) {
@@ -381,21 +478,22 @@ document.addEventListener('DOMContentLoaded', function () {
     if (frequencySelect) {
         frequencySelect.addEventListener('change', function () {
             if (this.value === 'weekly') {
-                dateInput.classList.add('d-none');
-                dateInput.removeAttribute('required');
+                dateInput.classList.remove('d-none');
+                dateInput.setAttribute('required', 'required');
                 dateInput.disabled = false;
                 
                 daySelect.classList.remove('d-none');
                 daySelect.setAttribute('required', 'required');
                 daySelect.disabled = false;
                 
-                dateLabel.innerHTML = 'Event Day <span class="text-danger">*</span>';
+                dateLabel.innerHTML = 'Start Date / Event Day <span class="text-danger">*</span>';
                 
             } else if (this.value === 'daily') {
                 daySelect.classList.add('d-none');
                 daySelect.removeAttribute('required');
+                daySelect.disabled = true;
                 
-                dateInput.classList.remove('d-none');
+                dateInput.classList.add('d-none');
                 dateInput.removeAttribute('required');
                 dateInput.disabled = true;
                 dateInput.value = ''; 
@@ -405,6 +503,7 @@ document.addEventListener('DOMContentLoaded', function () {
             } else {
                 daySelect.classList.add('d-none');
                 daySelect.removeAttribute('required');
+                daySelect.disabled = true;
                 
                 dateInput.classList.remove('d-none');
                 dateInput.setAttribute('required', 'required');
@@ -412,6 +511,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 
                 dateLabel.innerHTML = 'Event Date <span class="text-danger">*</span>';
             }
+
+            validateAddEventForm();
         });
     }
 
@@ -421,12 +522,14 @@ document.addEventListener('DOMContentLoaded', function () {
     if (allDeptCheck && deptChecks.length > 0) {
         allDeptCheck.addEventListener('change', function () {
             deptChecks.forEach(cb => cb.checked = this.checked);
+            validateAddEventForm();
         });
 
         deptChecks.forEach(cb => {
             cb.addEventListener('change', function () {
                 const allChecked = Array.from(deptChecks).every(c => c.checked);
                 allDeptCheck.checked = allChecked;
+                validateAddEventForm();
             });
         });
     }
@@ -439,7 +542,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const row = document.createElement('div');
             row.className = 'd-flex align-items-center mt-2';
             row.innerHTML = `
-                <input type="text" name="custom_dept" class="form-control bg-dark text-white border-secondary form-control-sm" placeholder="e.g. Parents, Sponsors">
+                <input type="text" name="custom_dept" class="form-control bg-dark text-white border-secondary form-control-sm" placeholder="e.g. 00001, 23-00312">
                 <button type="button" class="btn btn-sm btn-outline-danger ms-2 remove-custom-btn" title="Remove">
                     <i class="bi bi-x"></i>
                 </button>
@@ -452,6 +555,7 @@ document.addEventListener('DOMContentLoaded', function () {
             removeBtn.addEventListener('click', function () {
                 row.remove();
                 updateRemoveButtons();
+                validateAddEventForm();
             });
         });
 
@@ -464,6 +568,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
         }
+    }
+
+    if (addEventForm) {
+        addEventForm.addEventListener('input', validateAddEventForm);
+        addEventForm.addEventListener('change', validateAddEventForm);
+        addEventForm.addEventListener('submit', function (event) {
+            if (!validateAddEventForm()) {
+                event.preventDefault();
+                event.stopPropagation();
+                addEventForm.classList.add('was-validated');
+                addEventForm.reportValidity();
+            }
+        });
     }
     
     const instanceSelect = document.getElementById('instanceSelect');

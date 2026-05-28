@@ -1,10 +1,228 @@
 /* Main.js - PLP Smart System Interactions */
 
+// Global interval manager to prevent duplicates and memory leaks
+const intervalManager = {
+    intervals: new Map(),
+    
+    set(key, intervalId) {
+        if (this.intervals.has(key)) {
+            clearInterval(this.intervals.get(key));
+        }
+        this.intervals.set(key, intervalId);
+    },
+    
+    clear(key) {
+        if (this.intervals.has(key)) {
+            clearInterval(this.intervals.get(key));
+            this.intervals.delete(key);
+        }
+    },
+    
+    clearAll() {
+        for (let intervalId of this.intervals.values()) {
+            clearInterval(intervalId);
+        }
+        this.intervals.clear();
+    }
+};
+
+// Cleanup intervals when leaving the page
+window.addEventListener('beforeunload', () => {
+    intervalManager.clearAll();
+});
+
 document.addEventListener('DOMContentLoaded', () => {
     initClock();
     initAnimations();
+    initInstanceGeneratorToast();
+    initSystemFeedback();
+    initSystemConfirm();
     populateRandomStudentRecords();
 });
+
+function initSystemFeedback() {
+    let feedbackTimer = null;
+
+    window.showSystemFeedback = function (message, type = 'success') {
+        const indicator = document.getElementById('system-feedback-indicator');
+        const icon = document.getElementById('feedback-icon');
+        const messageEl = document.getElementById('feedback-message');
+
+        if (!indicator || !icon || !messageEl) return;
+
+        // Update content
+        messageEl.textContent = message;
+
+        // Update style
+        indicator.classList.remove('success', 'error');
+        indicator.classList.add(type);
+
+        icon.className = type === 'success' ? 'bi bi-check-circle-fill' : 'bi bi-exclamation-triangle-fill';
+
+        // Show
+        indicator.classList.add('show');
+
+        if (feedbackTimer) {
+            clearTimeout(feedbackTimer);
+        }
+
+        feedbackTimer = setTimeout(() => {
+            indicator.classList.remove('show');
+            feedbackTimer = null;
+        }, 4500);
+    };
+}
+
+function initSystemConfirm() {
+    window.showSystemConfirm = function ({
+        title = 'Confirm action',
+        message = '',
+        confirmText = 'Confirm',
+        cancelText = 'Cancel',
+        tone = 'danger'
+    } = {}) {
+        return new Promise(resolve => {
+            const overlay = document.getElementById('global-confirm-overlay');
+            const titleEl = document.getElementById('global-confirm-title');
+            const messageEl = document.getElementById('global-confirm-message');
+            const confirmBtn = document.getElementById('global-confirm-ok');
+            const cancelBtn = document.getElementById('global-confirm-cancel');
+
+            if (!overlay || !titleEl || !messageEl || !confirmBtn || !cancelBtn) {
+                if (window.showSystemFeedback) {
+                    window.showSystemFeedback('Confirmation dialog is not available.', 'error');
+                }
+                resolve(false);
+                return;
+            }
+
+            titleEl.textContent = title;
+            messageEl.textContent = message;
+            confirmBtn.textContent = confirmText;
+            cancelBtn.textContent = cancelText;
+            confirmBtn.className = tone === 'danger'
+                ? 'btn btn-danger px-4'
+                : 'btn btn-primary-gold px-4';
+
+            const nextConfirmBtn = confirmBtn.cloneNode(true);
+            const nextCancelBtn = cancelBtn.cloneNode(true);
+            confirmBtn.replaceWith(nextConfirmBtn);
+            cancelBtn.replaceWith(nextCancelBtn);
+
+            function cleanup(result) {
+                overlay.classList.remove('show');
+                overlay.classList.add('d-none');
+                document.removeEventListener('keydown', handleKeydown);
+                overlay.removeEventListener('click', handleOverlayClick);
+                resolve(result);
+            }
+
+            function handleKeydown(event) {
+                if (event.key === 'Escape') {
+                    cleanup(false);
+                }
+            }
+
+            function handleOverlayClick(event) {
+                if (event.target === overlay) cleanup(false);
+            }
+
+            nextConfirmBtn.addEventListener('click', () => cleanup(true), { once: true });
+            nextCancelBtn.addEventListener('click', () => cleanup(false), { once: true });
+            overlay.addEventListener('click', handleOverlayClick);
+            document.addEventListener('keydown', handleKeydown);
+
+            overlay.classList.remove('d-none');
+            requestAnimationFrame(() => overlay.classList.add('show'));
+            nextCancelBtn.focus();
+        });
+    };
+}
+
+
+function initInstanceGeneratorToast() {
+    const toast = document.getElementById('instance-generator-toast');
+    if (!toast) return;
+
+    const title = document.getElementById('instance-generator-title');
+    const message = document.getElementById('instance-generator-message');
+    const spinner = document.getElementById('instance-generator-spinner');
+    const successIcon = document.getElementById('instance-generator-success');
+    const errorIcon = document.getElementById('instance-generator-error');
+    const backendUrl = window.APP_CONFIG?.backendApiUrl || 'http://127.0.0.1:5001';
+    const statusUrl = `${backendUrl}/admin/generate-daily-instances/status`;
+    let lastShownFinishedAt = sessionStorage.getItem('instanceGeneratorLastShown') || '';
+    let hideTimer = null;
+
+    function showToast(mode, heading, details) {
+        title.textContent = heading;
+        message.textContent = details;
+        spinner.classList.toggle('d-none', mode !== 'running');
+        successIcon.classList.toggle('d-none', mode !== 'success');
+        errorIcon.classList.toggle('d-none', mode !== 'error');
+        toast.classList.remove('d-none');
+
+        if (hideTimer) {
+            clearTimeout(hideTimer);
+            hideTimer = null;
+        }
+
+        if (mode !== 'running') {
+            hideTimer = setTimeout(() => toast.classList.add('d-none'), 9000);
+        }
+    }
+
+    function hideToast() {
+        if (hideTimer) {
+            clearTimeout(hideTimer);
+            hideTimer = null;
+        }
+        toast.classList.add('d-none');
+    }
+
+    function formatResult(result) {
+        if (!result) return 'No run details available yet.';
+        const created = Number(result.created || 0);
+        const existing = Number(result.existing || 0);
+        const failed = Number(result.failed || 0);
+        const range = result.date_range ? ` ${result.date_range}` : '';
+        return `Created ${created}, already existing ${existing}, failed ${failed}.${range}`;
+    }
+
+    async function pollStatus() {
+        try {
+            const response = await fetch(statusUrl, { cache: 'no-store' });
+            if (!response.ok) {
+                hideToast();
+                return;
+            }
+
+            const payload = await response.json();
+            const job = payload.job || {};
+            if (job.running) {
+                showToast('running', 'Generating event instances', 'Preparing upcoming event attendance records...');
+                return;
+            }
+
+            if (job.last_finished_at && job.last_finished_at !== lastShownFinishedAt) {
+                lastShownFinishedAt = job.last_finished_at;
+                sessionStorage.setItem('instanceGeneratorLastShown', lastShownFinishedAt);
+
+                if (job.last_error) {
+                    showToast('error', 'Event generation failed', job.last_error);
+                } else {
+                    showToast('success', 'Event instances ready', formatResult(job.last_result));
+                }
+            }
+        } catch (error) {
+            hideToast();
+        }
+    }
+
+    pollStatus();
+    const pollIntervalId = setInterval(pollStatus, 8000);
+    intervalManager.set('instanceGeneratorPoll', pollIntervalId);
+}
 
 // --- Real-time Clock ---
 function initClock() {
@@ -32,12 +250,13 @@ function initClock() {
     }
 
     updateTime();
-    setInterval(updateTime, 1000);
+    const clockIntervalId = setInterval(updateTime, 1000);
+    intervalManager.set('liveClockUpdate', clockIntervalId);
 }
 
 // --- Kiosk Logic (State Machine) ---
 let isScanning = false;
-let scanState = {}; 
+let scanState = {};
 
 function showSuccessOverlay(type, manualData = null) {
     const overlay = document.getElementById('scan-overlay');
@@ -47,56 +266,68 @@ function showSuccessOverlay(type, manualData = null) {
     const overlayStatus = document.getElementById('scan-status');
     const overlayRing = document.getElementById('scan-ring');
 
-    // Randomize Data (if not manual)
-    const names = ["Juan Dela Cruz", "Maria Clara", "Jose Rizal", "Andres Bonifacio"];
-    const depts = ["College of Computer Studies", "College of Nursing", "College of Engineering", "College of Arts"];
-    let randIndex = Math.floor(Math.random() * names.length);
+    // Setup Data
+    let name = manualData ? (manualData.name || "Unknown User") : "User";
+    let id = manualData ? (manualData.id || "N/A") : "N/A";
+    let dept = manualData ? (manualData.affiliation || "Department") : "Department";
 
-    let name = names[randIndex];
-    let dept = depts[randIndex];
-    let id = "2026-00" + Math.floor(Math.random() * 9000 + 1000);
-
-    // Override with Manual Data if provided
-    if (manualData) {
-        name = manualData.name || "Unknown User";
-        id = manualData.id || "N/A";
-        // Dept is mocked for manual entry for now
-        dept = manualData.affiliation
-    }
-
-    overlayName.innerText = name;
-    overlayId.innerText = "ID: " + id;
+    // Update overlay content if elements exist
+    if (overlayName) overlayName.innerText = name;
+    if (overlayId) overlayId.innerText = "ID: " + id;
 
     if (type === 'entry') {
-        overlayTitle.innerText = "ACCESS GRANTED";
-        overlayTitle.className = "display-6 fw-bold text-success mb-2";
-        overlayStatus.innerText = "ENTRY RECORDED • " + dept;
-        overlayRing.className = "rounded-circle border border-5 border-success p-1 mb-3";
+        if (overlayTitle) {
+            overlayTitle.innerText = "ACCESS GRANTED";
+            overlayTitle.className = "display-6 fw-bold text-success mb-2";
+        }
+        if (overlayStatus) overlayStatus.innerText = "ENTRY RECORDED • " + dept;
+        if (overlayRing) overlayRing.className = "rounded-circle border border-5 border-success p-1 mb-3 d-inline-block";
     } else if (type === 'employee') {
-        overlayTitle.innerText = "ATTENDANCE LOGGED";
-        overlayTitle.className = "display-6 fw-bold text-gold mb-2";
-        overlayStatus.innerText = "FLAG CEREMONY: PRESENT";
-        overlayRing.className = "rounded-circle border border-5 border-warning p-1 mb-3";
+        if (overlayTitle) {
+            overlayTitle.innerText = "ATTENDANCE LOGGED";
+            overlayTitle.className = "display-6 fw-bold text-gold mb-2";
+        }
+        if (overlayStatus) overlayStatus.innerText = "FLAG CEREMONY: PRESENT";
+        if (overlayRing) overlayRing.className = "rounded-circle border border-5 border-warning p-1 mb-3 d-inline-block";
     } else if (type === 'employee-out') {
-        overlayTitle.innerText = "LOGGED OUT";
-        overlayTitle.className = "display-6 fw-bold text-info mb-2";
-        overlayStatus.innerText = "TIME OUT RECORDED";
-        overlayRing.className = "rounded-circle border border-5 border-info p-1 mb-3";
+        if (overlayTitle) {
+            overlayTitle.innerText = "LOGGED OUT";
+            overlayTitle.className = "display-6 fw-bold text-info mb-2";
+        }
+        if (overlayStatus) overlayStatus.innerText = "TIME OUT RECORDED";
+        if (overlayRing) overlayRing.className = "rounded-circle border border-5 border-info p-1 mb-3 d-inline-block";
     } else {
-        overlayTitle.innerText = "EXIT RECORDED";
-        overlayTitle.className = "display-6 fw-bold text-info mb-2";
-        overlayStatus.innerText = "SEE YOU TOMORROW • " + dept;
-        overlayRing.className = "rounded-circle border border-5 border-info p-1 mb-3";
+        if (overlayTitle) {
+            overlayTitle.innerText = "EXIT RECORDED";
+            overlayTitle.className = "display-6 fw-bold text-info mb-2";
+        }
+        if (overlayStatus) overlayStatus.innerText = "SEE YOU TOMORROW • " + dept;
+        if (overlayRing) overlayRing.className = "rounded-circle border border-5 border-info p-1 mb-3 d-inline-block";
     }
 
-    overlay.classList.remove('d-none');
-    overlay.classList.add('d-flex');
+    // Only show visual overlay if it's a visitor
+    const isVisitor = id === 'VISITOR' || (id && String(id).startsWith('VT-'));
 
-    setTimeout(() => {
-        overlay.classList.remove('d-flex');
-        overlay.classList.add('d-none');
-    }, 1500);
+    if (overlay && isVisitor) {
+        overlay.classList.remove('d-none');
+        overlay.classList.add('d-flex');
+
+        setTimeout(() => {
+            overlay.classList.remove('d-flex');
+            overlay.classList.add('d-none');
+        }, 1500);
+    }
+
+    // [MODERNIZED FEEDBACK] - Always show the top indicator for ALL successful scans
+    if (window.showSystemFeedback) {
+        const feedbackMsg = type === 'entry' ? `Access Granted: Welcome, ${name}` :
+                           type === 'employee' ? `Attendance Logged: ${name}` :
+                           type === 'employee-out' ? `Logged Out: ${name}` :
+                           `Exit Recorded: Goodbye, ${name}`;
+        window.showSystemFeedback(feedbackMsg, 'success');
+    }
 }
+
 
 function initAnimations() {
     const cards = document.querySelectorAll('.transition-hover');
@@ -189,3 +420,93 @@ function populateRandomStudentRecords() {
         tableBody.appendChild(row);
     }
 }
+
+// --- Global Status Card (Success/Fail) ---
+let gscTimeout = null;
+
+window.showStatusCard = function(type, title, message) {
+    const card = document.getElementById('global-status-card');
+    const icon = document.getElementById('gsc-icon');
+    const titleEl = document.getElementById('gsc-title');
+    const msgEl = document.getElementById('gsc-message');
+
+    if (!card) return;
+
+    // Reset classes
+    card.className = 'position-fixed top-0 start-50 translate-middle-x mt-4 p-3 rounded-4 shadow-lg d-flex align-items-center';
+
+    // Apply success (green) or fail (red) colors + appropriate icons
+    if (type === 'success') {
+        card.classList.add('bg-success');
+        icon.innerHTML = '<i class="bi bi-check-circle-fill text-white"></i>';
+    } else {
+        card.classList.add('bg-danger');
+        icon.innerHTML = '<i class="bi bi-x-circle-fill text-white"></i>';
+    }
+
+    titleEl.innerText = title;
+    msgEl.innerText = message;
+
+    // Show card
+    card.style.opacity = '1';
+    card.style.pointerEvents = 'auto';
+    card.style.transform = 'translateY(0)';
+
+    // Clear existing timeout
+    if (gscTimeout) clearTimeout(gscTimeout);
+
+    // Hide automatically after 2 seconds
+    gscTimeout = setTimeout(hideStatusCard, 2000);
+};
+
+window.hideStatusCard = function() {
+    const card = document.getElementById('global-status-card');
+    if (card) {
+        card.style.opacity = '0';
+        card.style.pointerEvents = 'none';
+        card.style.transform = 'translateY(-20px)';
+    }
+};
+
+// Hide on any key press or click anywhere
+document.addEventListener('keydown', hideStatusCard);
+document.addEventListener('click', (e) => {
+    const card = document.getElementById('global-status-card');
+    if (card && card.style.opacity === '1') {
+        hideStatusCard();
+    }
+});
+
+// --- Global Confirm Modal ---
+let confirmCallback = null;
+
+window.showConfirmModal = function(title, message, onConfirm) {
+    const modal = document.getElementById('global-confirm-modal');
+    const titleEl = document.getElementById('gcm-title');
+    const msgEl = document.getElementById('gcm-message');
+    const confirmBtn = document.getElementById('gcm-confirm-btn');
+
+    if (!modal) return;
+
+    titleEl.innerText = title || "Confirm Action";
+    msgEl.innerText = message || "Are you sure you want to proceed?";
+    confirmCallback = onConfirm;
+
+    modal.classList.remove('d-none');
+    modal.classList.add('d-flex');
+    
+    // Overwrite the onclick handler dynamically
+    confirmBtn.onclick = function() {
+        if (confirmCallback) confirmCallback();
+        hideConfirmModal();
+    };
+};
+
+window.hideConfirmModal = function() {
+    const modal = document.getElementById('global-confirm-modal');
+    if (modal) {
+        modal.classList.remove('d-flex');
+        modal.classList.add('d-none');
+    }
+    confirmCallback = null;
+};

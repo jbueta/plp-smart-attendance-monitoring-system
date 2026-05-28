@@ -6,23 +6,49 @@
 
     <!-- Page content -->
     {% block content %}
-    <!-- Full Screen Scan Overlay (Hidden by default) -->
-    <div id="scan-overlay"
-        class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-75 d-none align-items-center justify-content-center"
-        style="z-index: 2000; backdrop-filter: blur(10px);">
-        <div class="card-glass p-5 text-center shadow-lg" style="min-width: 400px; transform: scale(1.1);">
-            <div id="scan-ring" class="rounded-circle border border-5 border-success p-1 mb-3 d-inline-block">
-                <i class="bi bi-person-badge text-white display-1"></i>
+
+<div id="welcome-overlay"
+    class="position-fixed top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center px-3"
+    style="z-index: 2100; background: rgba(3, 17, 8, 0.85); backdrop-filter: blur(12px);">
+    <div class="p-4 p-md-5 position-relative text-center shadow-lg w-100"
+        style="max-width: 500px; background: #1a2c20; border: 1px solid rgba(245, 221, 0, 0.2); border-radius: 20px;">
+        
+        <button type="button" id="close-welcome-overlay"
+            class="btn rounded-circle position-absolute top-0 end-0 mt-3 me-3 d-inline-flex align-items-center justify-content-center hover-scale"
+            style="width: 36px; height: 36px; background: rgba(255,255,255,0.05); color: #a1a1aa; border: 1px solid rgba(255,255,255,0.1);" 
+            aria-label="Close panel">
+            <i class="bi bi-x-lg"></i>
+        </button>
+
+        <div class="rounded-circle border p-1 mb-3 d-inline-block" style="border-color: #4ade80 !important; border-width: 2px !important;">
+            <div class="rounded-circle d-flex align-items-center justify-content-center"
+                style="width: 76px; height: 76px; background: rgba(74, 222, 128, 0.1);">
+                <i class="bi bi-person-check-fill mb-0" style="font-size: 2.5rem; color: #4ade80;"></i>
             </div>
-            <h2 id="scan-title" class="display-6 fw-bold text-success mb-2">ATTENDANCE LOGGED</h2>
-            <h3 id="scan-name" class="h2 text-white mb-0">Faculty Member</h3>
-            <p id="scan-id" class="text-white-50 font-monospace mb-3">ID: 2026-FAC-001</p>
-            <div class="badge bg-white bg-opacity-10 text-white px-3 py-2 rounded-pill">
-                <i class="bi bi-check-circle-fill me-2 text-success"></i><span id="scan-status">FLAG CEREMONY:
-                    PRESENT</span>
+        </div>
+
+        <div id="welcome-role" class="text-uppercase small fw-bold mb-2" style="letter-spacing: 0.18em; color: #fbbf24;">
+            Employee Verified
+        </div>
+        
+        <h2 id="welcome-action" class="display-6 fw-bold mb-3" style="color: #4ade80; letter-spacing: -0.5px;">
+            Attendance Logged
+        </h2>
+        
+        <h3 id="welcome-name" class="h2 text-white mb-3 fw-bold text-uppercase" style="letter-spacing: 0.5px;">
+            EMPLOYEE NAME
+        </h3>
+    
+        <div class="px-4 py-3 mx-auto rounded-4" style="max-width: 280px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.04);">
+            <div id="welcome-id-label" class="text-uppercase small mb-1 fw-semibold" style="letter-spacing: 0.15em; color: #9ca3af; font-size: 0.75rem;">
+                Employee ID
+            </div>
+            <div id="welcome-id-val" class="h4 font-monospace text-white fw-bold mb-0" style="letter-spacing: 1px;">
+                00000
             </div>
         </div>
     </div>
+</div>
 
     <div class="container py-4 d-flex flex-column min-vh-100">
         <!-- Header -->
@@ -86,12 +112,14 @@
                         <!-- Logs will be inserted here by JavaScript -->
                     </div>
                     <!-- Bulletin for Employees -->
-                    <div class="mt-3 pt-3 border-top border-secondary">
+                    <div class="mt-3 pt-3 border-top border-secondary bulletin-container">
                         <div class="d-flex align-items-center mb-1">
                             <i class="bi bi-info-circle-fill text-info me-2"></i>
-                            <small class="fw-bold text-info">HR MEMO</small>
+                            <small id="bulletin-category" class="fw-bold text-info">HR MEMO</small>
+                            <small id="bulletin-source" class="ms-2 text-white-50">PLP Attendance Monitoring System</small>
                         </div>
-                        <p class="small text-white-50 mb-0">Submission of IPCR is due on Friday. Please coordinate with your department heads.</p>
+                        <p id="bulletin-title" class="fw-bold text-white small mb-1">Status Update</p>
+                        <p id="bulletin-body" class="small text-white-50 mb-0">No announcements displayed at this time.</p>
                     </div>
                 </div>
             </div>
@@ -110,7 +138,7 @@
                     <div class="mb-3">
                         <label for="manual-employee-id" class="form-label text-white-50">Employee ID Number</label>
                         <input type="text" class="form-control bg-transparent text-white border-secondary"
-                            id="manual-employee-id" placeholder="e.g. 2026-FAC-001">
+                            id="manual-employee-id" placeholder="e.g. 00001" inputmode="numeric" pattern="[0-9]{5}" maxlength="5">
                     </div>
                     <div class="d-grid gap-2">
                         <button type="button" class="btn btn-primary-gold" onclick="submitManualEntry('employee')">Log
@@ -123,10 +151,15 @@
     {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/kiosk.js') }}"></script>
 <script>
     window.currentEventId = JSON.parse('{{ event_id|tojson|safe }}');
     window.currentInstanceId = JSON.parse('{{ instance_id|tojson|safe }}');
+    window.currentEventName = JSON.parse('{{ event_name|tojson|safe }}');
+</script>
+<script src="{{ url_for('static', filename='js/kiosk.js') }}"></script>
+<script src="{{ url_for('static', filename='js/announcement_bulletin_kiosk.js') }}"></script>
+<script src="{{ url_for('static', filename='js/announcement_paging_kiosk.js') }}"></script>
+<script>
 
     // Live clock (unchanged)
     function updateClock() {
@@ -140,9 +173,49 @@
     setInterval(updateClock, 1000);
     updateClock();
 
+    // --- OVERLAY & SUCCESS LOGIC ---
+    const welcomeOverlay = document.getElementById('welcome-overlay');
+    const closeWelcomeBtn = document.getElementById('close-welcome-overlay');
+
+    if (closeWelcomeBtn && welcomeOverlay) {
+        closeWelcomeBtn.addEventListener('click', () => {
+            welcomeOverlay.classList.replace('d-flex', 'd-none');
+        });
+    }
+
+    // Global Overlay Trigger
+    window.showSuccessOverlay = function(logType, data) {
+        document.getElementById('welcome-role').textContent = 'EMPLOYEE VERIFIED';
+        document.getElementById('welcome-action').textContent = 'Attendance Logged';
+        document.getElementById('welcome-action').style.color = '#4ade80'; 
+        
+        document.getElementById('welcome-name').textContent = data.name || 'UNKNOWN';
+        
+        document.getElementById('welcome-id-label').textContent = 'EMPLOYEE ID';
+        document.getElementById('welcome-id-val').textContent = data.id || 'N/A';
+
+        welcomeOverlay.classList.replace('d-none', 'd-flex');
+
+        setTimeout(() => {
+            welcomeOverlay.classList.replace('d-flex', 'd-none');
+        }, 4500);
+    };
+
     // Scanner variables
     let barcodeBuffer = "";
     let scanTimeout = null;
+
+    function extractEmployeeQrId(rawText) {
+        const scannedText = String(rawText || '').trim();
+        const bracketMatch = scannedText.match(/(.*?)\[(.*?)\](.*)/s);
+
+        if (bracketMatch) {
+            const employeeId = bracketMatch[2].trim();
+            return /^[0-9]{5}$/.test(employeeId) ? employeeId : "";
+        }
+
+        return /^[0-9]{5}$/.test(scannedText) ? scannedText : "";
+    }
 
     document.addEventListener('keydown', function (e) {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
@@ -151,15 +224,40 @@
 
         if (e.key === 'Enter') {
             if (barcodeBuffer.length > 3) {
+                const scannedText = barcodeBuffer;
+                const employeeId = extractEmployeeQrId(scannedText);
                 const feedText = document.getElementById('scanner-text');
                 const frame = document.querySelector('.scanner-frame');
+
+                if (!employeeId) {
+                    frame.style.borderColor = '#ef4444';
+                    frame.style.boxShadow = '0 0 30px rgba(239, 68, 68, 0.3)';
+                    feedText.innerText = "INVALID QR FORMAT";
+                    feedText.className = "position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-danger font-monospace fw-bold scanning-text";
+
+                    if (typeof showScanBanner === 'function') {
+                        showScanBanner('error', { id: scannedText });
+                    }
+
+                    setTimeout(() => {
+                        frame.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                        frame.style.boxShadow = 'none';
+                        feedText.innerText = "[QR CAMERA FEED]";
+                        feedText.className = "position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-gold-50 small font-monospace";
+                    }, 2500);
+
+                    barcodeBuffer = "";
+                    if (scanTimeout) clearTimeout(scanTimeout);
+                    return;
+                }
+
                 frame.style.borderColor = '#F5DD00';
                 frame.style.boxShadow = '0 0 30px rgba(245, 221, 0, 0.3)';
                 feedText.innerText = "VERIFYING EMPLOYEE ID...";
                 feedText.className = "position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-gold font-monospace fw-bold scanning-text";
 
                 setTimeout(() => {
-                    submitManualEntry('employee', barcodeBuffer);
+                    submitManualEntry('employee', employeeId);
                     frame.style.borderColor = 'rgba(255, 255, 255, 0.2)';
                     frame.style.boxShadow = 'none';
                     feedText.innerText = "[QR CAMERA FEED]";

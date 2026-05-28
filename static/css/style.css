@@ -5,34 +5,59 @@
 
 :root {
     /* Brand Core */
-    --plp-green: #0B7D3F;
-    --plp-gold: #F5DD00;
+    --plp-gold: #FFD700;
+    /* Deeper gold to be exquisitely legible on white */
 
     /* Theme Colors (Overriding Bootstrap logic visually) */
-    --bg-deep: #051a10;
-    --glass-surface: rgba(7, 36, 22, 0.85);
-    --glass-border: rgba(255, 255, 255, 0.1);
+    --bg-deep: #051A0A;
+    --glass-surface: rgba(255, 255, 255, 0.08);
+    /* Authentic, light translucent glass */
+    --glass-border: rgba(255, 255, 255, 0.35);
+    /* Crisp, high-intensity border */
+    --text-main: #ffffff;
+    --text-light: #ffffff;
+    --text-dark: #ffffff;
+    /* Deepest green for perfect readability */
 
     /* Gradients */
-    --gold-gradient: linear-gradient(135deg, #F5DD00 0%, #D4AF37 100%);
+    --gold-gradient: linear-gradient(135deg, #FFF38F 0%, #FFDE21 100%);
 }
 
 body {
     background-color: var(--bg-deep);
-    background-image: url('../images/bg-main.png');
+    /* We move the background image to a pseudo-element for blurring */
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
     background-repeat: no-repeat;
-    color: #fff;
+    color: var(--text-light);
     font-family: 'Outfit', sans-serif;
     min-height: 100vh;
     position: relative;
     overflow-x: hidden;
 }
 
-/* Animated Ambient Background Overlay */
+/* Blurred, dimmed actual background image layer */
 body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -2;
+    background-image: url('../images/bg-main-deep-green.png');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    filter: blur(14px) brightness(0.65);
+    /* Heavily blurred and dimmed to push background backwards */
+    transform: scale(1.05);
+    /* Prevent blur edges from showing */
+}
+
+/* Ambient glows */
+body::after {
     content: "";
     position: fixed;
     top: 0;
@@ -41,10 +66,23 @@ body::before {
     height: 100%;
     z-index: -1;
     background-image:
-        radial-gradient(circle at 15% 50%, rgba(11, 125, 63, 0.4), transparent 50%),
-        radial-gradient(circle at 85% 30%, rgba(212, 175, 55, 0.4), transparent 50%);
+        radial-gradient(circle at 15% 50%, rgba(30, 200, 110, 0.2), transparent 50%),
+        radial-gradient(circle at 85% 30%, rgba(200, 255, 100, 0.15), transparent 50%);
     background-size: 200% 200%;
     animation: ambientShift 20s ease-in-out infinite alternate;
+    pointer-events: none;
+}
+
+/* Vignette and dimming overlay for better background readability */
+.vignette-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    /* Very light, minimal vignette so it sits idly */
+    background: radial-gradient(circle at center, transparent 40%, rgba(0, 30, 10, 0.4) 150%);
     pointer-events: none;
 }
 
@@ -54,18 +92,110 @@ body::before {
 /* Glass Cards - Used globally for main panels and widget containers across portals */
 .card-glass {
     background: var(--glass-surface);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    color: var(--text-light);
+    backdrop-filter: blur(16px) saturate(200%);
+    -webkit-backdrop-filter: blur(16px) saturate(200%);
     border: 1px solid var(--glass-border);
     border-radius: 1rem;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(255, 255, 255, 0.05);
+    /* Deep outer shadow, subtle inner glow for intensity */
+}
+
+/* Global Form Controls - Ensured readability and consistent branding */
+.form-control,
+.form-select,
+.input-group-text {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: var(--text-light) !important;
+    font-weight: 500;
+}
+
+.form-control:focus,
+.form-select:focus {
+    background: rgba(255, 255, 255, 0.12) !important;
+    border-color: var(--plp-gold) !important;
+    box-shadow: 0 0 0 0.25rem rgba(255, 222, 33, 0.25) !important;
+    color: var(--text-light) !important;
+}
+
+.form-control::placeholder {
+    color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Dropdown Menus and Options Styling */
+.dropdown-menu {
+    background-color: rgba(13, 46, 21, 0.95) !important;
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    padding: 0.5rem 0;
+    z-index: 1060 !important; /* Increased from 1040 to ensure it appears above table cards */
+}
+
+.dropdown-item {
+    color: var(--text-light) !important;
+    transition: background-color 0.2s ease;
+    border-left: 3px solid transparent;
+    /* Prepare for active state to prevent jump */
+}
+
+.dropdown-item.active,
+.dropdown-item:active {
+    background-color: #0d2e15 !important;
+    color: var(--text-light) !important;
+    border-left: 3px solid var(--plp-gold) !important;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+    background-color: #235d3a !important;
+    color: var(--text-light) !important;
+}
+
+/* Native Select Options Styling */
+option {
+    background-color: #0d2e15 !important;
+    color: var(--text-light) !important;
+}
+
+option:hover,
+option:focus,
+option:active,
+option:checked {
+    background-color: #235d3a !important;
+    color: #ffffff !important;
+}
+
+/* Fix for date/time/search/dropdown darkened inputs */
+input[type="date"],
+input[type="time"],
+input[type="search"],
+select,
+.form-select {
+    color-scheme: dark;
+}
+
+/* Portal Card Hover Effects (for index and modal cards) */
+.portal-card {
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
+    cursor: pointer;
+}
+
+.portal-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3), inset 0 0 10px rgba(255, 255, 255, 0.05);
 }
 
 /* Sidebar - Primarily used in base.html and admin dashboards */
 .sidebar {
     width: 280px;
     height: 100vh;
-    background: rgba(5, 26, 16, 0.95);
+    background: rgba(255, 255, 255, 0.05);
+    /* True glass */
+    backdrop-filter: blur(16px) saturate(200%);
+    -webkit-backdrop-filter: blur(16px) saturate(200%);
+    color: var(--text-light);
     border-right: 1px solid var(--glass-border);
     position: fixed;
     top: 0;
@@ -102,18 +232,20 @@ body::before {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    font-weight: 500;
 }
 
 .nav-pills .nav-link:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-light);
 }
 
 .nav-pills .nav-link.active {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.15);
     border-left: 4px solid var(--plp-gold);
     border-radius: 0.25rem 0.5rem 0.5rem 0.25rem;
-    color: #fff;
+    color: var(--text-light);
+    font-weight: 600;
 }
 
 /* Typography Overrides */
@@ -125,10 +257,12 @@ h5,
 h6 {
     font-weight: 600;
     letter-spacing: -0.02em;
+    color: inherit;
 }
 
 .text-gold {
     color: var(--plp-gold) !important;
+    font-weight: 600;
 }
 
 .text-gold-gradient {
@@ -154,29 +288,34 @@ h6 {
 }
 
 .btn-glass {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: var(--text-light);
+    font-weight: 600;
 }
 
 .btn-glass:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--text-light);
+}
+
+.hover-text-dark:hover {
+    color: var(--bg-deep) !important;
 }
 
 /* Tables - Used extensively in admin dashboards, logs, and reports */
 .table-dark-glass {
-    color: #fff;
+    color: var(--text-light);
     --bs-table-bg: transparent;
-    --bs-table-border-color: rgba(255, 255, 255, 0.1);
+    --bs-table-border-color: rgba(255, 255, 255, 0.15);
 }
 
 .table-dark-glass th {
     font-size: 0.8rem;
     text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.5);
-    font-weight: 600;
-    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.80);
+    font-weight: 700;
+    letter-spacing: 0.06em;
 }
 
 .table-dark-glass td {
@@ -252,25 +391,429 @@ h6 {
    PAGE: LOGIN - Specific styles for login.html
    ========================================================================== */
 .login-card {
-    background: rgba(20, 20, 35, 0.6);
-    backdrop-filter: blur(15px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-light);
+    backdrop-filter: blur(20px) saturate(200%);
+    -webkit-backdrop-filter: blur(20px) saturate(200%);
+    border: 1px solid rgba(255, 255, 255, 0.35);
     border-radius: 16px;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
 }
 
-.login-card .form-control {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: white;
+/* Login Card overrides removed as they are now global */
+
+/* ==========================================================================
+   UTILITY COLOR ADJUSTMENTS FOR GLASS UI
+   ========================================================================== */
+.text-success {
+    color: #50d287 !important;
 }
 
-.login-card .form-control:focus {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: #d4af37;
-    box-shadow: 0 0 0 0.25rem rgba(212, 175, 55, 0.25);
-    color: white;
+/* Vibrant readable green */
+.text-danger {
+    color: #ff3b30 !important;
 }
+
+/* Gold Theme Utilities */
+.bg-gold {
+    background-color: var(--plp-gold) !important;
+}
+.border-gold {
+    border-color: var(--plp-gold) !important;
+}
+
+/* Modern High-Contrast Premium Glassmorphic Red Alerts */
+/* Modern High-Contrast Premium Glassmorphic Red Alerts */
+.alert.alert-danger, .alert-danger, .plp-alert-card-danger {
+    background: rgba(6, 28, 12, 0.92) !important; /* Premium deep dark forest green glass matching the system theme */
+    backdrop-filter: blur(20px) saturate(200%) !important; /* High blur saturation for a premium glass sheen */
+    -webkit-backdrop-filter: blur(20px) saturate(200%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important; /* Standard crisp glass border */
+    border-left: 4px solid #ff453a !important; /* Luminous left side warning accent */
+    border-radius: 12px !important;
+    color: #ffffff !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(255, 255, 255, 0.03) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.plp-alert-card-danger:hover {
+    transform: translateY(-4px) !important;
+    background: rgba(8, 35, 15, 0.95) !important; /* Subtle elevation and glow on hover */
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    border-left-color: #ff453a !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), inset 0 0 20px rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Red title styling inside alert cards for semantic meaning */
+.plp-alert-card-danger strong,
+.plp-alert-card-danger h6,
+.plp-alert-card-danger .alert-title {
+    color: #ff6b6b !important;
+    font-weight: 700 !important;
+}
+
+.plp-alert-icon-box-danger {
+    background: rgba(255, 59, 48, 0.18) !important;
+    color: #ff453a !important;
+    border-radius: 8px;
+    padding: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 59, 48, 0.25);
+    flex-shrink: 0;
+}
+
+.plp-alert-badge-danger {
+    background: rgba(220, 38, 38, 0.85) !important;  /* Solid vivid red — no longer near-transparent */
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 100, 100, 0.6) !important;
+    font-size: 10px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.06em !important;
+    text-transform: uppercase !important;
+    padding: 3px 7px !important;
+    border-radius: 6px !important;
+}
+
+/* Highly specific text overrides to prevent any red colors from bleeding into the alert body and meta-tags */
+.plp-alert-card-danger .plp-alert-text-muted,
+.plp-alert-card-danger p,
+.plp-alert-card-danger p.plp-alert-text-muted,
+.plp-alert-card-danger span.plp-alert-text-muted,
+.plp-alert-card-danger .alert-body,
+.plp-alert-text-muted {
+    color: rgba(255, 255, 255, 0.75) !important; /* Beautiful high-contrast off-white, NOT red */
+    font-size: 0.82rem !important;
+    font-weight: 400;
+}
+
+.plp-alert-card-danger .plp-alert-text-dimmed,
+.plp-alert-card-danger div.plp-alert-text-dimmed,
+.plp-alert-card-danger .plp-alert-text-dimmed i,
+.plp-alert-card-danger small.plp-alert-text-dimmed,
+.plp-alert-card-danger .alert-meta,
+.plp-alert-text-dimmed {
+    color: rgba(255, 255, 255, 0.5) !important; /* Beautiful high-contrast lighter muted color, NOT red */
+    font-size: 0.72rem !important;
+    font-weight: 500;
+}
+
+/* Consecutive Absence Cards and standard bootstrap danger container override */
+.bg-danger.bg-opacity-10.border.border-danger,
+.bg-danger.bg-opacity-10.border.border-danger-subtle {
+    background: rgba(6, 28, 12, 0.92) !important; /* Premium deep dark forest green glass matching the system theme */
+    backdrop-filter: blur(20px) saturate(200%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(200%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important; /* Standard crisp glass border */
+    border-left: 4px solid #ff453a !important; /* Red left accent border */
+    border-radius: 12px !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(255, 255, 255, 0.03) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.bg-danger.bg-opacity-10.border.border-danger:hover,
+.bg-danger.bg-opacity-10.border.border-danger-subtle:hover {
+    transform: translateY(-4px) !important;
+    background: rgba(8, 35, 15, 0.95) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    border-left-color: #ff453a !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), inset 0 0 20px rgba(255, 255, 255, 0.05) !important;
+}
+.bg-danger.bg-opacity-20 {
+    background-color: rgba(255, 59, 48, 0.18) !important;
+}
+.bg-danger.bg-opacity-20 {
+    background-color: rgba(255, 59, 48, 0.18) !important;
+}
+
+/* Compact Inline Event Filter Select — used as a contextual filter, not a KPI card */
+.plp-filter-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-color: rgba(255, 255, 255, 0.06) !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(255,255,255,0.4)'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border-radius: 20px !important;
+    color: rgba(255, 255, 255, 0.85) !important;
+    font-family: 'Outfit', 'Inter', sans-serif !important;
+    font-size: 0.75rem !important;
+    font-weight: 500 !important;
+    padding: 5px 28px 5px 12px !important;
+    height: auto !important;
+    max-width: 260px;
+    min-width: 160px;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.plp-filter-select:hover {
+    background-color: rgba(255, 255, 255, 0.10) !important;
+    border-color: rgba(255, 255, 255, 0.28) !important;
+}
+
+.plp-filter-select:focus {
+    background-color: rgba(255, 255, 255, 0.10) !important;
+    border-color: rgba(74, 222, 128, 0.5) !important;
+    box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.15) !important;
+}
+
+.plp-filter-select option {
+    background-color: #0f1f12 !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+    font-size: 0.8rem !important;
+}
+
+/* Primary/Secondary KPI Metrics - Distinct visual hierarchy */
+.plp-kpi-row {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 12px !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-top: 12px !important;
+    width: 100% !important;
+    overflow: visible !important;
+}
+
+.plp-kpi-col {
+    display: block !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+    min-height: 90px !important;
+    max-height: 100px !important;
+    height: 95px !important;
+    margin: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    overflow: visible !important;
+    position: relative !important;
+}
+
+.plp-primary-metric-card,
+.plp-secondary-metric-card {
+    flex: 1 !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    min-height: 90px !important;
+    max-height: 100px !important;
+    height: 95px !important;
+    position: relative !important;
+    overflow: visible !important;
+}
+
+.plp-primary-metric-card .card-body,
+.plp-secondary-metric-card .card-body {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    height: 100% !important;
+    padding: 12px !important;
+    position: relative !important;
+    overflow: visible !important;
+}
+
+.plp-primary-metric-card {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    border-radius: 1.25rem !important;
+    box-shadow: 0 10px 35px rgba(0, 0, 0, 0.45), inset 0 0 25px rgba(255, 255, 255, 0.06);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.plp-primary-metric-card:hover {
+    transform: translateY(-4px) !important;
+    background: rgba(255, 255, 255, 0.09) !important;
+    border-color: rgba(255, 255, 255, 0.35) !important;
+    box-shadow: 0 15px 45px rgba(0, 0, 0, 0.6), inset 0 0 25px rgba(255, 255, 255, 0.1) !important;
+}
+
+.plp-secondary-metric-card {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border-radius: 1rem !important;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35), inset 0 0 15px rgba(255, 255, 255, 0.04);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.plp-secondary-metric-card:hover {
+    transform: translateY(-3px) !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: rgba(255, 255, 255, 0.25) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Custom KPI Typography Scale & Styling with Fluid Premium Scaling */
+.plp-kpi-label {
+    font-family: 'Outfit', 'Inter', sans-serif !important;
+    font-size: 11px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.08em !important;
+    font-weight: 600 !important;
+    color: rgba(255, 255, 255, 0.6) !important;
+    margin-bottom: 2px !important;
+    display: block !important;
+    line-height: 1.2 !important;
+}
+
+.plp-kpi-number {
+    font-family: 'Outfit', 'Inter', sans-serif !important;
+    font-weight: 700 !important;
+    color: #ffffff !important;
+    margin: 0 !important;
+    line-height: 1.1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+h2.plp-kpi-number {
+    font-size: 28px !important;
+}
+
+h4.plp-kpi-number {
+    font-size: 20px !important;
+}
+
+.plp-kpi-delta {
+    font-family: 'Outfit', 'Inter', sans-serif !important;
+    font-size: 12px !important;
+    color: rgba(255, 255, 255, 0.70) !important;
+    font-weight: 500 !important;
+    line-height: 1.2 !important;
+    margin-top: 2px !important;
+}
+
+/* KPI Card Icon Badges with solid background fills for high contrast */
+.plp-kpi-icon-badge {
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 12px !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+    flex-shrink: 0 !important;
+    overflow: visible !important;
+    margin-right: 12px !important;
+}
+
+.plp-kpi-icon-badge svg {
+    width: 20px !important;
+    height: 20px !important;
+}
+
+.plp-kpi-icon-badge.bg-blue {
+    background: rgba(37, 99, 235, 0.85) !important;
+    border: 1px solid rgba(59, 130, 246, 0.4) !important;
+}
+.plp-kpi-icon-badge.bg-cyan {
+    background: rgba(6, 182, 212, 0.85) !important;
+    border: 1px solid rgba(34, 211, 238, 0.4) !important;
+}
+.plp-kpi-icon-badge.bg-warning {
+    background: rgba(217, 119, 6, 0.85) !important;
+    border: 1px solid rgba(245, 158, 11, 0.4) !important;
+}
+.plp-kpi-icon-badge.bg-gold {
+    background: rgba(204, 153, 0, 0.9) !important;
+    border: 1px solid rgba(255, 215, 0, 0.45) !important;
+}
+.plp-kpi-icon-badge.bg-teal {
+    background: rgba(13, 148, 136, 0.85) !important;
+    border: 1px solid rgba(20, 184, 166, 0.4) !important;
+}
+
+/* High Contrast Status Pills */
+.plp-status-pill {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 2px 8px !important; /* Standard standardized padding */
+    font-size: 11px !important; /* Consistent legible font size */
+    font-weight: 800 !important; /* Extra-bold weight for readability */
+    height: 20px !important; /* Unified perfect height */
+    line-height: 1 !important;
+    letter-spacing: 0.05em !important;
+    text-transform: uppercase !important;
+    border-radius: 30px !important;
+    transition: all 0.2s ease !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
+    border: none !important; /* Standardize with no borders */
+}
+
+.plp-kpi-col .plp-status-pill {
+    position: absolute !important;
+    top: 10px !important; /* Pinned to top-right corner of the card */
+    right: 10px !important;
+    z-index: 10 !important;
+    margin: 0 !important;
+}
+
+.plp-kpi-text-wrap {
+    min-width: 0 !important;
+    flex: 1 !important;
+    padding-right: 40px !important; /* Fixed padding buffer to completely prevent overlap with status pill */
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: flex-start !important;
+}
+
+
+.plp-status-pill.pill-success {
+    background: #d1fae5 !important; /* Solid pastel green background */
+    color: #022c22 !important; /* Near-black forest green saturated text (9.5:1 ratio) */
+    border: none !important;
+}
+.plp-status-pill.pill-info {
+    background: #e0f2fe !important; /* Solid pastel blue background */
+    color: #082f49 !important; /* Near-black ocean blue saturated text (10:1 ratio) */
+    border: none !important;
+}
+.plp-status-pill.pill-warning {
+    background: #ffedd5 !important; /* Solid pastel orange background */
+    color: #431407 !important; /* Near-black amber saturated text (9.8:1 ratio) */
+    border: none !important;
+}
+.plp-status-pill.pill-gold {
+    background: #fef3c7 !important; /* Solid pastel gold background */
+    color: #451a03 !important; /* Near-black gold saturated text (9.5:1 ratio) */
+    border: none !important;
+}
+.plp-status-pill.pill-danger {
+    background: #fca5a5 !important;  /* Vivid pastel red — readable on both dark and light surfaces */
+    color: #3b0000 !important;        /* Deep near-black red for max contrast */
+    border: none !important;
+}
+
+
+/* Bright red */
+.text-warning {
+    color: #ffd166 !important;
+}
+
+/* Luminous yellow */
+.text-info {
+    color: #48cae4 !important;
+}
+
+/* Cyan */
+.text-primary {
+    color: #82b1ff !important;
+}
+
+/* Soft blue */
 
 /* ==========================================================================
    PAGE: EVENTS - Base style for the department boxes
@@ -287,33 +830,62 @@ h6 {
     border: 1.5px solid transparent;
     border-radius: 8px;
     white-space: nowrap;
-    
+
     /* --- NEW ANIMATION PROPERTIES --- */
-    max-width: 300px; /* Must be larger than your longest department name */
+    max-width: 300px;
+    /* Must be larger than your longest department name */
     opacity: 1;
-    overflow: hidden; /* Keeps text from spilling out while shrinking */
+    overflow: hidden;
+    /* Keeps text from spilling out while shrinking */
     vertical-align: middle;
     transition: max-width 0.4s ease, padding 0.4s ease, margin 0.4s ease, opacity 0.4s ease, border-width 0.4s ease;
 }
 
-.dept-badge[data-dept="Arts & Sciences"] { border-color: #ef4444; color: #fff; } 
-.dept-badge[data-dept="Information Technology"] { border-color: #3b82f6; color: #fff; } 
-.dept-badge[data-dept="Nursing"] { border-color: #10b981; color: #fff; } 
-.dept-badge[data-dept="Electrical Engineering"] { border-color: #f59e0b; color: #fff; } 
-.dept-badge[data-dept="Business and Accountancy"] { border-color: #8b5cf6; color: #fff; }
-.dept-badge[data-dept="International Hospitality Management"] { border-color: #ec4899; color: #fff; }
-.dept-badge[data-dept="Education"] { border-color: #06b6d4; color: #fff; } 
+.dept-badge[data-dept="Arts & Sciences"] {
+    border-color: #ef4444;
+    color: #fff;
+}
+
+.dept-badge[data-dept="Information Technology"] {
+    border-color: #3b82f6;
+    color: #fff;
+}
+
+.dept-badge[data-dept="Nursing"] {
+    border-color: #10b981;
+    color: #fff;
+}
+
+.dept-badge[data-dept="Electrical Engineering"] {
+    border-color: #f59e0b;
+    color: #fff;
+}
+
+.dept-badge[data-dept="Business and Accountancy"] {
+    border-color: #8b5cf6;
+    color: #fff;
+}
+
+.dept-badge[data-dept="International Hospitality Management"] {
+    border-color: #ec4899;
+    color: #fff;
+}
+
+.dept-badge[data-dept="Education"] {
+    border-color: #06b6d4;
+    color: #fff;
+}
 
 .dept-badge.badge-all {
-    border-color: #fff; 
+    border-color: #fff;
     color: #fff;
     font-style: bold;
 }
 
 .dept-badge.badge-more {
-    border-color: #6b7280; 
+    border-color: #6b7280;
     color: #6b7280;
-    border-style: dashed; 
+    border-style: dashed;
     padding: 0.35em 0.5em;
 }
 
@@ -328,11 +900,11 @@ h6 {
 }
 
 .dept-badge.badge-more {
-    border-color: #6b7280; 
+    border-color: #6b7280;
     color: #6b7280;
-    border-style: dashed; 
+    border-style: dashed;
     padding: 0.35em 0.5em;
-    cursor: pointer; 
+    cursor: pointer;
     user-select: none;
 }
 
@@ -342,9 +914,359 @@ h6 {
 
 /* Dynamic font reduction for expanded department rows */
 .shrink-font {
-    font-size: 0.9em !important;  /* 10% reduction */
+    font-size: 0.9em !important;
+    /* 10% reduction */
 }
 
 .shrink-font-date {
-    font-size: 0.7em !important;  /* 30% reduction */
+    font-size: 0.7em !important;
+    /* 30% reduction */
 }
+
+/* Background job notification */
+.instance-generator-toast {
+    position: fixed;
+    left: 1rem;
+    bottom: 1rem;
+    z-index: 2050;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    width: min(360px, calc(100vw - 2rem));
+    min-height: 72px;
+    padding: 0.9rem 1rem;
+    color: #fff;
+    background: rgba(15, 23, 42, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 8px;
+    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.38);
+    backdrop-filter: blur(16px);
+}
+
+.instance-generator-toast__icon {
+    width: 34px;
+    min-width: 34px;
+    display: grid;
+    place-items: center;
+}
+
+.instance-generator-toast__title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.instance-generator-toast__message {
+    margin-top: 0.2rem;
+    color: rgba(255, 255, 255, 0.68);
+    font-size: 0.78rem;
+    line-height: 1.35;
+}
+
+/* ==========================================================================
+   FEEDBACK INDICATOR COMPONENT
+   ========================================================================== */
+.feedback-indicator {
+    font-family: 'Outfit', sans-serif;
+    min-width: 340px;
+    max-width: 480px;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: start;
+    border-radius: 12px;
+    box-shadow: 0 15px 45px rgba(0, 0, 0, 0.7);
+    background: rgba(7, 34, 15, 0.96); /* Deep PLP Green */
+    backdrop-filter: blur(15px);
+    transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+    position: fixed;
+    top: 40px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-30px);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 10000;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.feedback-indicator.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+    pointer-events: all;
+}
+
+.feedback-indicator.success {
+    border-color: #10B981;
+    box-shadow: 0 15px 45px rgba(16, 185, 129, 0.15);
+}
+
+.feedback-indicator.error {
+    border-color: #EF4444;
+    box-shadow: 0 15px 45px rgba(239, 68, 68, 0.15);
+}
+
+.feedback-indicator__icon {
+    font-size: 1.5rem;
+    margin-right: 14px;
+    display: flex;
+    align-items: center;
+    line-height: 1;
+}
+
+.feedback-indicator.success .feedback-indicator__icon {
+    color: #10B981;
+}
+
+.feedback-indicator.error .feedback-indicator__icon {
+    color: #EF4444;
+}
+
+.feedback-indicator__title {
+    font-weight: 500;
+    font-size: 15px;
+    color: #ffffff;
+    line-height: 1.4;
+    letter-spacing: 0.2px;
+}
+
+/* ==========================================================================
+   GLOBAL CONFIRMATION MODAL
+   ========================================================================== */
+.global-confirm-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(0, 0, 0, 0.58);
+    backdrop-filter: blur(6px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 10001;
+}
+
+.global-confirm-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.global-confirm-modal {
+    width: min(440px, 100%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    background: rgba(14, 19, 24, 0.98);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+    color: #ffffff;
+    padding: 24px;
+    transform: translateY(10px) scale(0.98);
+    transition: transform 0.2s ease;
+}
+
+.global-confirm-overlay.show .global-confirm-modal {
+    transform: translateY(0) scale(1);
+}
+
+.global-confirm-modal__icon {
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(220, 53, 69, 0.14);
+    color: #ff6b7a;
+    font-size: 1.25rem;
+    margin-bottom: 16px;
+}
+
+.global-confirm-modal__title {
+    margin-bottom: 8px;
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.global-confirm-modal__message {
+    color: rgba(255, 255, 255, 0.68);
+    font-size: 0.92rem;
+    line-height: 1.45;
+}
+
+.global-confirm-modal__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 24px;
+}
+
+/* Curfew Watchlist Panel Scoped Alignment Styles */
+.plp-curfew-panel {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid rgba(255, 69, 58, 0.35) !important; /* Premium warning-red glowing border */
+    border-radius: 16px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), inset 0 0 20px rgba(255, 255, 255, 0.02) !important;
+}
+
+.plp-curfew-subtext {
+    font-size: 13px !important;
+    color: rgba(255, 255, 255, 0.75) !important;
+    font-weight: 500 !important;
+    margin-bottom: 20px !important;
+    display: block !important;
+}
+
+.plp-curfew-row-card {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 12px !important;
+    padding: 10px 14px !important;
+    margin-bottom: 8px !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    transition: all 0.2s ease-in-out !important;
+}
+
+.plp-curfew-row-card:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    transform: translateY(-1px) !important;
+}
+
+.plp-curfew-avatar {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
+    background: rgba(255, 69, 58, 0.2) !important;
+    border: 1px solid rgba(255, 69, 58, 0.4) !important;
+    color: #ff6b6b !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 50% !important;
+    margin-right: 12px !important;
+    flex-shrink: 0 !important;
+}
+
+.plp-curfew-avatar i {
+    font-size: 1.1rem !important;
+    line-height: 1 !important;
+    color: #ff6b6b !important;
+}
+
+.plp-curfew-student-name {
+    font-family: 'Outfit', 'Inter', sans-serif !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    color: #ffffff !important;
+    letter-spacing: 0.02em !important;
+    line-height: 1.2 !important;
+    margin-bottom: 3px !important;
+}
+
+.plp-curfew-student-course {
+    font-family: 'Outfit', 'Inter', sans-serif !important;
+    font-size: 12px !important;
+    color: rgba(255, 255, 255, 0.78) !important;
+    font-weight: 500 !important;
+}
+
+/* Attendance Alerts pagination buttons — high-contrast glass style */
+#attendanceAlertPager button {
+    background: rgba(255, 255, 255, 0.10) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    color: rgba(255, 255, 255, 0.90) !important;
+    font-size: 0.72rem !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    padding: 4px 12px !important;
+    transition: background 0.2s ease, border-color 0.2s ease !important;
+}
+
+#attendanceAlertPager button:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.18) !important;
+    border-color: rgba(255, 255, 255, 0.4) !important;
+}
+
+#attendanceAlertPager button:disabled {
+    opacity: 0.3 !important;
+    cursor: not-allowed !important;
+}
+
+#aaPageInfo {
+    font-size: 0.72rem !important;
+    color: rgba(255, 255, 255, 0.70) !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.04em !important;
+}
+
+/* ==========================================================================
+   ADMIN LOG PAGES — Readability overrides
+   Applies to: /admin/students, /admin/employees, /admin/visitors
+   ========================================================================== */
+
+/* ── ID / reference columns ──────────────────────────────────────────────── */
+/* Student ID (23-XXXXX), Visitor ID (VT-XXXXX), Employee ID columns         */
+td.font-monospace.text-white-50 {
+    color: rgba(255, 255, 255, 0.88) !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.04em;
+}
+
+/* ── Secondary text columns (course, department, purpose) ────────────────── */
+td.text-white-50 {
+    color: rgba(255, 255, 255, 0.82) !important;
+}
+
+/* ── Time In cell ─────────────────────────────────────────────────────────── */
+/* text-success on dark green bg is dim; use vivid green */
+td.text-success.font-monospace {
+    color: #4ade80 !important;
+    font-weight: 500 !important;
+}
+
+/* ── Time Out cell ────────────────────────────────────────────────────────── */
+/* text-danger on dark green bg is hard to read; use bright coral */
+td.text-danger.font-monospace {
+    color: #fca5a5 !important;
+    font-weight: 500 !important;
+}
+
+/* ── Status / record badges — bg-opacity-25 makes them nearly invisible ───── */
+/* Badge pattern: bg-{x} bg-opacity-25 border border-{x} text-{x}            */
+.badge.bg-success.bg-opacity-25  { color: #4ade80 !important;              border-color: rgba(74,222,128,0.55) !important;  background-color: rgba(74,222,128,0.18) !important;  font-weight: 700 !important; }
+.badge.bg-danger.bg-opacity-25   { color: #fca5a5 !important;              border-color: rgba(252,165,165,0.55) !important; background-color: rgba(252,165,165,0.15) !important; font-weight: 700 !important; }
+.badge.bg-warning.bg-opacity-25  { color: #fde68a !important;              border-color: rgba(253,230,138,0.55) !important; background-color: rgba(253,230,138,0.15) !important; font-weight: 700 !important; }
+.badge.bg-info.bg-opacity-25     { color: #7dd3fc !important;              border-color: rgba(125,211,252,0.55) !important; background-color: rgba(125,211,252,0.15) !important; font-weight: 700 !important; }
+.badge.bg-secondary.bg-opacity-25{ color: rgba(255,255,255,0.82) !important; border-color: rgba(255,255,255,0.30) !important; background-color: rgba(255,255,255,0.10) !important; font-weight: 700 !important; }
+
+/* ── Active view toggle pill ─────────────────────────────────────────────── */
+.view-toggle:checked + label {
+    background-color: #ffffff !important;
+    color: #0b1a0f !important;
+    box-shadow: 0 2px 12px rgba(255,255,255,0.18) !important;
+}
+
+/* ==========================================================================
+   GOLD UTILITY CLASSES
+   Used in /reports "Authorized" badge: bg-gold, text-gold, border-gold
+   ========================================================================== */
+:root {
+    --gold: #d4af37;
+    --gold-rgb: 212, 175, 55;
+}
+
+.text-gold  { color: var(--gold) !important; }
+.bg-gold    { background-color: var(--gold) !important; }
+.border-gold{ border-color: var(--gold) !important; }
+
+/* bg-opacity variants for gold (mirrors Bootstrap's bg-opacity helpers) */
+.bg-gold.bg-opacity-10  { background-color: rgba(var(--gold-rgb), 0.10) !important; }
+.bg-gold.bg-opacity-25  { background-color: rgba(var(--gold-rgb), 0.25) !important; }
+.bg-gold.bg-opacity-50  { background-color: rgba(var(--gold-rgb), 0.50) !important; }
+
+/* border-opacity variants for gold */
+.border-gold.border-opacity-25 { border-color: rgba(var(--gold-rgb), 0.35) !important; }
+.border-gold.border-opacity-50 { border-color: rgba(var(--gold-rgb), 0.55) !important; }

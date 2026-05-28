@@ -1,39 +1,424 @@
 
-from datetime import date, datetime
-from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, request, g
-from datetime import date, timedelta, datetime
-
-from db_connect import Database
-from database import init_db_pool, connect_db, close_db
-
-import json
-import os
 import logging
-import mysql.connector as connector
-from mysql.connector import pooling
+import os
+import threading
+import time
+from datetime import date, datetime, timedelta
+
+from flask import Flask, jsonify, request
 from flask_cors import CORS
-from functools import wraps
-import jwt  #token based authentication
 
-JWT_SECRET = 'plp_jwt_secret_key_2026'  # Secret key for JWT (to be changed)
-JWT_ALGORITHM = 'HS256'
-JWT_EXPIRATION_DELTA = timedelta(hours=8)  # Token valid for 8 hours
-        
+from config import get_config
+from database import close_db, connect_db, init_db_pool, release_db_connection
+from db_connect import Database, ensure_visitor_valid_until_schema, expire_expired_visitor_accounts
+
+
 app = Flask(__name__)
-app.secret_key = 'plp_secure_key_2026'  # Required for session management
+app.config.from_object(get_config())
+app.secret_key = app.config["SECRET_KEY"]
 
-app.logger.setLevel(logging.DEBUG)
-app.logger.addHandler(logging.StreamHandler())
-app.logger.addHandler(logging.FileHandler('logs/app.log'))
+os.makedirs(os.path.dirname(app.config["LOG_FILE"]) or ".", exist_ok=True)
 
-allowed_origins = [
-    "http://localhost:5000",
-    "http://127.0.0.1:5000",
-    "http://192.168.1.3:5000"
-]
+app.logger.setLevel(getattr(logging, app.config["LOG_LEVEL"].upper(), logging.INFO))
+if not any(isinstance(handler, logging.StreamHandler) for handler in app.logger.handlers):
+    app.logger.addHandler(logging.StreamHandler())
 
-CORS(app, origins=allowed_origins)
+log_file = os.path.abspath(app.config["LOG_FILE"])
+if not any(
+    isinstance(handler, logging.FileHandler) and getattr(handler, "baseFilename", None) == log_file
+    for handler in app.logger.handlers
+):
+    app.logger.addHandler(logging.FileHandler(log_file))
+
+CORS(app, origins=app.config["ALLOWED_ORIGINS"])
+app.teardown_appcontext(close_db)
+
+EVENT_TYPES = {"Meeting", "Training", "Seminar", "Workshop", "Drill", "Activity", "Flag Ceremony", "Other"}
+EVENT_FREQUENCIES = {"ONCE", "DAILY", "WEEKLY"}
+EVENT_DAYS = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
+
+
+def clean_text(value):
+    return str(value).strip() if value is not None else ""
+
+
+def normalize_event_frequency(value):
+    frequency = clean_text(value).upper().replace("_", "-")
+    if frequency in {"ONE-TIME", "ONETIME"}:
+        return "ONCE"
+    return frequency
+
+
+def parse_event_time(value):
+    for time_format in ("%H:%M", "%H:%M:%S"):
+        try:
+            return datetime.strptime(value, time_format).time()
+        except ValueError:
+            continue
+    raise ValueError("Invalid time format")
+
+
+def normalize_requested_log_type(value):
+    action = clean_text(value).lower().replace("_", " ").replace("-", " ")
+    if action in {"entry", "entrance", "in", "time in"}:
+        return "Entry"
+    if action in {"exit", "out", "outside", "time out"}:
+        return "Exit"
+    return None
+
+
+def get_kiosk_actor_label(role):
+    actor = clean_text(role).lower()
+    if actor in {"student", "employee", "visitor"}:
+        return actor
+    return "user"
+
+
+def build_kiosk_block_message(requested_log_type, current_status, role):
+    action = "Entry" if requested_log_type == "Entry" else "Exit"
+    status = "inside" if clean_text(current_status).lower() == "inside" else "outside"
+    actor = get_kiosk_actor_label(role)
+    return f"{action} denied: {actor} is already {status}."
+
+
+def validation_error(errors):
+    message = " ".join(errors)
+    return jsonify({"success": False, "message": message, "error": message, "errors": errors}), 400
+
+
+INSTANCE_GENERATOR_CHECK_SECONDS = int(os.getenv("INSTANCE_GENERATOR_CHECK_SECONDS", "60"))
+INSTANCE_GENERATOR_RUN_INTERVAL_SECONDS = int(os.getenv("INSTANCE_GENERATOR_RUN_INTERVAL_SECONDS", "3600"))
+INSTANCE_GENERATOR_LOOKAHEAD_DAYS = int(os.getenv("INSTANCE_GENERATOR_LOOKAHEAD_DAYS", "7"))
+CURFEW_ENFORCEMENT_CHECK_SECONDS = int(os.getenv("CURFEW_ENFORCEMENT_CHECK_SECONDS", "60"))
+CURFEW_ENFORCEMENT_RUN_INTERVAL_SECONDS = int(os.getenv("CURFEW_ENFORCEMENT_RUN_INTERVAL_SECONDS", "3600"))
+INSTANCE_GENERATOR_STATE = {
+    "running": False,
+    "last_started_at": None,
+    "last_finished_at": None,
+    "last_success_at": None,
+    "last_error": None,
+    "last_result": None,
+    "last_trigger": None,
+    "next_check_at": None,
+    "next_run_at": None,
+    "run_interval_seconds": INSTANCE_GENERATOR_RUN_INTERVAL_SECONDS,
+    "lookahead_days": INSTANCE_GENERATOR_LOOKAHEAD_DAYS,
+}
+CURFEW_ENFORCEMENT_STATE = {
+    "running": False,
+    "last_started_at": None,
+    "last_finished_at": None,
+    "last_success_at": None,
+    "last_error": None,
+    "last_result": None,
+    "last_trigger": None,
+    "next_check_at": None,
+    "next_run_at": None,
+    "run_interval_seconds": CURFEW_ENFORCEMENT_RUN_INTERVAL_SECONDS,
+}
+_instance_generator_lock = threading.Lock()
+_curfew_enforcement_lock = threading.Lock()
+_instance_generator_thread_started = False
+_curfew_enforcement_thread_started = False
+_last_scheduled_generation_at = None
+_last_scheduled_curfew_enforcement_at = None
+
+
+def _iso_timestamp(value):
+    return value.isoformat(sep=" ", timespec="seconds") if value else None
+
+
+def _copy_instance_generator_state():
+    with _instance_generator_lock:
+        return dict(INSTANCE_GENERATOR_STATE)
+
+
+def _copy_curfew_enforcement_state():
+    with _curfew_enforcement_lock:
+        return dict(CURFEW_ENFORCEMENT_STATE)
+
+
+def generate_event_instances_for_range(start_date=None, days=7, trigger="manual"):
+    conn = connect_db()
+    if not conn:
+        return {
+            "success": False,
+            "message": "Database offline",
+            "created": 0,
+            "existing": 0,
+            "matched": 0,
+            "failed": 0,
+            "trigger": trigger,
+        }
+
+    start_date = start_date or date.today()
+    days = max(1, int(days or 1))
+    target_dates = [start_date + timedelta(days=i) for i in range(days)]
+    created_count = 0
+    existing_count = 0
+    matched_count = 0
+    failed_count = 0
+
+    for target_date in target_dates:
+        day_name = target_date.strftime("%A")
+        cursor = conn.cursor(dictionary=True)
+        try:
+            cursor.execute(
+                """
+                SELECT event_id, event_name, frequency, event_date
+                FROM events
+                WHERE active = 1 AND (
+                    (frequency = 'WEEKLY' AND day = %s AND event_date <= %s) OR
+                    (frequency = 'DAILY' AND event_date <= %s) OR
+                    (frequency = 'ONCE' AND event_date = %s)
+                )
+                """,
+                (day_name, target_date, target_date, target_date),
+            )
+            events = cursor.fetchall()
+        finally:
+            cursor.close()
+
+        matched_count += len(events)
+        for event in events:
+            event_id = event["event_id"]
+            check_cursor = conn.cursor(dictionary=True)
+            try:
+                check_cursor.execute(
+                    """
+                    SELECT instance_id
+                    FROM event_instances
+                    WHERE event_id = %s AND event_date = %s
+                    LIMIT 1
+                    """,
+                    (event_id, target_date),
+                )
+                already_exists = bool(check_cursor.fetchone())
+            finally:
+                check_cursor.close()
+
+            instance_result = Database(conn, (event_id, target_date)).add_event_instances()
+            if instance_result.get("success"):
+                if already_exists:
+                    existing_count += 1
+                else:
+                    created_count += 1
+            else:
+                failed_count += 1
+                app.logger.error(
+                    "Failed to add instance for event_id=%s date=%s: %s",
+                    event_id,
+                    target_date,
+                    instance_result.get("message"),
+                )
+
+    return {
+        "success": failed_count == 0,
+        "message": f"Event instances generated for the next {days} day(s).",
+        "created": created_count,
+        "existing": existing_count,
+        "matched": matched_count,
+        "failed": failed_count,
+        "date_range": f"{target_dates[0]} to {target_dates[-1]}",
+        "trigger": trigger,
+    }
+
+
+def run_instance_generation_job(trigger="manual", start_date=None, days=None):
+    now = datetime.now()
+    generation_days = days or INSTANCE_GENERATOR_LOOKAHEAD_DAYS
+    with _instance_generator_lock:
+        if INSTANCE_GENERATOR_STATE["running"]:
+            return {
+                "success": False,
+                "message": "Event instance generation is already running.",
+                "state": dict(INSTANCE_GENERATOR_STATE),
+            }
+        INSTANCE_GENERATOR_STATE.update(
+            {
+                "running": True,
+                "last_started_at": _iso_timestamp(now),
+                "last_finished_at": None,
+                "last_error": None,
+                "last_trigger": trigger,
+            }
+        )
+
+    try:
+        result = generate_event_instances_for_range(
+            start_date=start_date,
+            days=generation_days,
+            trigger=trigger,
+        )
+        finished_at = datetime.now()
+        with _instance_generator_lock:
+            INSTANCE_GENERATOR_STATE.update(
+                {
+                    "running": False,
+                    "last_finished_at": _iso_timestamp(finished_at),
+                    "last_success_at": _iso_timestamp(finished_at) if result.get("success") else INSTANCE_GENERATOR_STATE["last_success_at"],
+                    "last_error": None if result.get("success") else result.get("message"),
+                    "last_result": result,
+                }
+            )
+        app.logger.info(
+            "Event instance generation finished: trigger=%s created=%s existing=%s failed=%s",
+            trigger,
+            result.get("created", 0),
+            result.get("existing", 0),
+            result.get("failed", 0),
+        )
+        return result
+    except Exception as err:
+        finished_at = datetime.now()
+        result = {
+            "success": False,
+            "message": str(err),
+            "created": 0,
+            "existing": 0,
+            "matched": 0,
+            "failed": 1,
+            "trigger": trigger,
+        }
+        with _instance_generator_lock:
+            INSTANCE_GENERATOR_STATE.update(
+                {
+                    "running": False,
+                    "last_finished_at": _iso_timestamp(finished_at),
+                    "last_error": str(err),
+                    "last_result": result,
+                }
+            )
+        app.logger.exception("Event instance generation failed")
+        return result
+
+
+def _instance_generation_scheduler_loop():
+    global _last_scheduled_generation_at
+
+    while True:
+        now = datetime.now()
+        next_check = now + timedelta(seconds=INSTANCE_GENERATOR_CHECK_SECONDS)
+        next_run = (
+            now
+            if _last_scheduled_generation_at is None
+            else _last_scheduled_generation_at + timedelta(seconds=INSTANCE_GENERATOR_RUN_INTERVAL_SECONDS)
+        )
+        with _instance_generator_lock:
+            INSTANCE_GENERATOR_STATE["next_check_at"] = _iso_timestamp(next_check)
+            INSTANCE_GENERATOR_STATE["next_run_at"] = _iso_timestamp(next_run)
+
+        should_run = (
+            now >= next_run
+            and not _copy_instance_generator_state().get("running")
+        )
+
+        if should_run:
+            app.logger.info(
+                "Hourly event instance scheduler starting for %s day(s).",
+                INSTANCE_GENERATOR_LOOKAHEAD_DAYS,
+            )
+            with app.app_context():
+                result = run_instance_generation_job(trigger="scheduler")
+                close_db(None)
+            _last_scheduled_generation_at = datetime.now()
+
+        time.sleep(INSTANCE_GENERATOR_CHECK_SECONDS)
+
+
+def start_instance_generation_scheduler():
+    global _instance_generator_thread_started
+
+    if _instance_generator_thread_started:
+        return
+    if app.debug and os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+        return
+
+    scheduler_thread = threading.Thread(
+        target=_instance_generation_scheduler_loop,
+        name="event-instance-generator",
+        daemon=True,
+    )
+    scheduler_thread.start()
+    _instance_generator_thread_started = True
+    app.logger.info("Event instance background scheduler started.")
+
+
+def _curfew_enforcement_scheduler_loop():
+    global _last_scheduled_curfew_enforcement_at
+
+    while True:
+        now = datetime.now()
+        next_check = now + timedelta(seconds=CURFEW_ENFORCEMENT_CHECK_SECONDS)
+        next_run = (
+            now
+            if _last_scheduled_curfew_enforcement_at is None
+            else _last_scheduled_curfew_enforcement_at + timedelta(seconds=CURFEW_ENFORCEMENT_RUN_INTERVAL_SECONDS)
+        )
+        with _curfew_enforcement_lock:
+            CURFEW_ENFORCEMENT_STATE["next_check_at"] = _iso_timestamp(next_check)
+            CURFEW_ENFORCEMENT_STATE["next_run_at"] = _iso_timestamp(next_run)
+
+        should_run = (
+            now >= next_run
+            and not _copy_curfew_enforcement_state().get("running")
+        )
+
+        if should_run:
+            app.logger.info("Curfew enforcement scheduler starting.")
+            with _curfew_enforcement_lock:
+                CURFEW_ENFORCEMENT_STATE.update(
+                    {
+                        "running": True,
+                        "last_started_at": _iso_timestamp(now),
+                        "last_trigger": "scheduler",
+                    }
+                )
+            try:
+                with app.app_context():
+                    conn = connect_db()
+                    if conn:
+                        db = Database(conn)
+                        result = db.enforce_curfew_violations()
+                        if result.get("success"):
+                            CURFEW_ENFORCEMENT_STATE["last_success_at"] = _iso_timestamp(datetime.now())
+                        CURFEW_ENFORCEMENT_STATE["last_result"] = result
+                        if conn:
+                            close_db(None)
+                    else:
+                        CURFEW_ENFORCEMENT_STATE["last_result"] = {"success": False, "message": "Database offline"}
+            except Exception as err:
+                CURFEW_ENFORCEMENT_STATE["last_error"] = str(err)
+                app.logger.exception("Curfew enforcement scheduler failed")
+            finally:
+                with _curfew_enforcement_lock:
+                    CURFEW_ENFORCEMENT_STATE.update(
+                        {
+                            "running": False,
+                            "last_finished_at": _iso_timestamp(datetime.now()),
+                        }
+                    )
+                _last_scheduled_curfew_enforcement_at = datetime.now()
+
+        time.sleep(CURFEW_ENFORCEMENT_CHECK_SECONDS)
+
+
+def start_curfew_enforcement_scheduler():
+    global _curfew_enforcement_thread_started
+
+    if _curfew_enforcement_thread_started:
+        return
+    if app.debug and os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+        return
+
+    scheduler_thread = threading.Thread(
+        target=_curfew_enforcement_scheduler_loop,
+        name="curfew-enforcement-scheduler",
+        daemon=True,
+    )
+    scheduler_thread.start()
+    _curfew_enforcement_thread_started = True
+    app.logger.info("Curfew enforcement background scheduler started.")
 
 # ==============================================================================
 # DATABASE INITIALIZATION
@@ -41,8 +426,24 @@ CORS(app, origins=allowed_origins)
 
 with app.app_context():
     init_db_pool()
+    conn = connect_db()
+    if conn:
+        ensure_visitor_valid_until_schema(conn, logger=app.logger)
+        release_db_connection(conn)
 
 app.teardown_appcontext(close_db)
+
+
+@app.before_request
+def disable_expired_visitor_accounts():
+    if request.endpoint == "static":
+        return
+
+    conn = connect_db()
+    if not conn:
+        return
+
+    expire_expired_visitor_accounts(conn, logger=app.logger)
 
 
 # ==============================================================================
@@ -82,13 +483,18 @@ def user_authenticate():
     conn = None
     try:
         print("Authenticating...")
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         print(data)
 
         if not data or not data.get('id'):
-            return jsonify({"error": "ID is required. No ID string attached"}), 400
+            return jsonify({"success": False, "message": "ID is required. No ID string attached"}), 400
         
-        scan_id = data.get('id')
+        scan_id = clean_text(data.get('id'))
+        requested_log_type = None
+        if data.get('requested_log_type'):
+            requested_log_type = normalize_requested_log_type(data.get('requested_log_type'))
+            if not requested_log_type:
+                return jsonify({"success": False, "message": "Invalid kiosk action requested."}), 400
         
         conn = connect_db()
         if not conn:
@@ -109,14 +515,41 @@ def user_authenticate():
         user_id = user_data['user_id']
         role = user_data['role']
         current_status = user_data['current_status']
+        current_status_normalized = clean_text(current_status).lower() or "outside"
 
         full_name = user_data.get('full_name', 'Unknown User')
         affiliation = user_data.get('affiliation', 'N/A')
 
         print(f"User found: ID {user_id}, Role: {role}, Status: {current_status}")
 
+        if requested_log_type == "Entry" and current_status_normalized == "inside":
+            return jsonify({
+                "success": False,
+                "message": "Cannot allow entry. User is currently inside.",
+                "status": "blocked",
+                "error_code": "already_inside",
+                "current_status": "Inside",
+                "requested_log_type": requested_log_type,
+                "name": full_name,
+                "affiliation": affiliation,
+                "student_type": user_data.get('student_type') if user_data else None,
+            }), 409
+
+        if requested_log_type == "Exit" and current_status_normalized != "inside":
+            return jsonify({
+                "success": False,
+                "message": "Cannot allow exit. User is currently outside.",
+                "status": "blocked",
+                "error_code": "already_outside",
+                "current_status": "Outside",
+                "requested_log_type": requested_log_type,
+                "name": full_name,
+                "affiliation": affiliation,
+                "student_type": user_data.get('student_type') if user_data else None,
+            }), 409
+
         # 3. CHANGE STATUS
-        db_status_param = (user_id, current_status, role)
+        db_status_param = (user_id, current_status, role, requested_log_type)
         db_status = Database(conn, db_status_param)
         
         db_status_result = db_status.change_status()
@@ -153,6 +586,7 @@ def user_authenticate():
             "attendance_status": log_type,
             "name": full_name,
             "affiliation": affiliation,
+            "student_type": user_data.get('student_type') if user_data else None,
         }), 200
 
     except Exception as e:
@@ -173,60 +607,94 @@ def add_events():
         if not conn:
             return jsonify({"success": False, "message": "Database offline"}), 500  
 
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         if not data:
-            return jsonify({"error": "No JSON data provided"}), 400
+            return validation_error(["No JSON data provided."])
 
-        required_fields = ['event_name', 'event_type', 'frequency', 'location', 'event_date', 'time_start', 'time_end', 'participants_type']
-        missing_fields = [field for field in required_fields if not data.get(field)]
-        if missing_fields:
-            return jsonify({"success": False, "error": f"Missing required fields: {', '.join(missing_fields)}"}), 400
-        
-        participants_type = data.get('participants_type')
+        event_name = clean_text(data.get('event_name'))
+        event_type = clean_text(data.get('event_type'))
+        frequency = normalize_event_frequency(data.get('frequency'))
+        ed = clean_text(data.get('event_date'))
+        day = clean_text(data.get('day'))
+        time_start = clean_text(data.get('time_start'))
+        time_end = clean_text(data.get('time_end'))
+        location = clean_text(data.get('location'))
+        participants_type = clean_text(data.get('participants_type')).lower()
+
+        validation_errors = []
+        if not event_name:
+            validation_errors.append("Event name is required.")
+        if event_type not in EVENT_TYPES:
+            validation_errors.append("Select a valid event type.")
+        if frequency not in EVENT_FREQUENCIES:
+            validation_errors.append("Select a valid event frequency.")
+        if not location:
+            validation_errors.append("Location is required.")
+        if not time_start:
+            validation_errors.append("Start time is required.")
+        if not time_end:
+            validation_errors.append("End time is required.")
+        if frequency != 'DAILY' and not ed:
+            validation_errors.append("Event date is required.")
+        if frequency == 'WEEKLY' and day not in EVENT_DAYS:
+            validation_errors.append("Event day is required for weekly events.")
+
         participants = None
-        match (participants_type):
-            case 'grouped':
-                participants = data.get('grouped_participants')
-                if not participants:
-                    return jsonify({"success": False, "error": "Participants are required"}), 400
-            case 'custom':
-                participants = data.get('custom_participants')
-                if not participants:
-                    return jsonify({"success": False, "error": "Participants are required"}), 400
-            case 'hybrid':
-                participants = {"grouped_participants": data.get('grouped_participants') or [], 
-                                "custom_participants": data.get('custom_participants') or []
-                               }
-                if not participants["grouped_participants"] and not participants["custom_participants"]:
-                    return jsonify({"success": False, "error": "At least one participant type is required for hybrid"}), 400
-            case _:
-                return jsonify({"success": False, "error": "Invalid participants type"}), 400
+        if participants_type == 'grouped':
+            participants = [
+                clean_text(item)
+                for item in data.get('grouped_participants') or []
+                if clean_text(item).isdigit()
+            ]
+            if not participants:
+                validation_errors.append("Select at least one participant department.")
+        elif participants_type == 'custom':
+            participants = [clean_text(item) for item in data.get('custom_participants') or [] if clean_text(item)]
+            if not participants:
+                validation_errors.append("Provide at least one participant ID.")
+        elif participants_type == 'hybrid':
+            participants = {
+                "grouped_participants": [
+                    clean_text(item)
+                    for item in data.get('grouped_participants') or []
+                    if clean_text(item).isdigit()
+                ],
+                "custom_participants": [
+                    clean_text(item) for item in data.get('custom_participants') or [] if clean_text(item)
+                ],
+            }
+            if not participants["grouped_participants"] and not participants["custom_participants"]:
+                validation_errors.append("Select departments or provide participant IDs.")
+        else:
+            validation_errors.append("Select a valid participants type.")
 
-        ed = data.get('event_date')
+        if validation_errors:
+            return validation_error(validation_errors)
+
         cd = date.today()
+
+        if frequency == 'DAILY' and not ed:
+            ed = cd.isoformat()
 
         try:
             event_date = datetime.strptime(ed, '%Y-%m-%d').date()
             current_date = cd
         except ValueError:
-            return jsonify({"success": False, "error": "Invalid date format. Use YYYY-MM-DD"}), 400
+            return validation_error(["Event date must use YYYY-MM-DD format."])
             
         if event_date < current_date:
-            return jsonify({"success": False, "error": "Event Date cannot be in the past"}), 400
+            return validation_error(["Event date cannot be in the past."])
 
-        frequency = data.get('frequency')
-        if frequency == 'WEEKLY':
-            day = data.get('day')
-            if not day:
-                return jsonify({"success": False, "error": "Day is required"}), 400
-            
-        event_name = data.get('event_name')
-        event_type = data.get('event_type')
-        day = data.get('day')
-        event_date = data.get('event_date')
-        time_start = data.get('time_start')
-        time_end = data.get('time_end')
-        location = data.get('location')
+        try:
+            parsed_start = parse_event_time(time_start)
+            parsed_end = parse_event_time(time_end)
+        except ValueError:
+            return validation_error(["Start time and end time must use HH:MM format."])
+
+        if parsed_end <= parsed_start:
+            return validation_error(["End time must be later than start time."])
+
+        event_date = ed
 
         db = Database(conn, (event_name, event_type, frequency, day, event_date, time_start, time_end, location, participants, participants_type))
         db_result = db.add_event()
@@ -246,16 +714,26 @@ def add_events():
 
 
 # ==========================================
-# ENDPOINT 1: The Weekly Instance Generator (Triggered by Cron Every Sunday)
+# ENDPOINT 1: Event Instance Generator (manual, scheduler, or external cron)
 
 @app.route("/admin/generate-daily-instances", methods=["POST"])
 def generate_daily_instances():
     """
-    Triggered every Sunday at midnight by a cron job or cloud scheduler.
-    Generates instances for the upcoming 7 days including:
+    Triggered by the background scheduler or an external cron/Task Scheduler.
+    Generates instances for the configured lookahead window including:
     - WEEKLY events for their scheduled days
     - DAILY events for every day
     - ONCE events on their scheduled date
+    """
+    result = run_instance_generation_job(trigger="manual")
+    return jsonify(result), (200 if result.get("success") else 409)
+
+
+@app.route("/admin/enforce-curfew-violations", methods=["POST"])
+def enforce_curfew_violations():
+    """
+    Triggered by an external cron, scheduled job, or manual admin action.
+    Inserts curfew violation records for students who remain inside past curfew.
     """
     conn = None
     try:
@@ -263,55 +741,26 @@ def generate_daily_instances():
         if not conn:
             return jsonify({"success": False, "message": "Database offline"}), 500
 
-        today = date.today()
-        upcoming_week = [today + timedelta(days=i) for i in range(7)]
-        
-        created_count = 0
-        failed_count = 0
-
-        for target_date in upcoming_week:
-            day_name = target_date.strftime("%A")
-            
-            cursor = conn.cursor(dictionary=True)
-            
-            # Get all active events matching this day
-            # WEEKLY events: match day name and event_date <= target_date
-            # DAILY events: all active daily events
-            # ONCE events: event_date == target_date
-            query = """
-                SELECT event_id, event_name, frequency, event_date
-                FROM events
-                WHERE active = 1 AND (
-                    (frequency = 'WEEKLY' AND day = %s AND event_date <= %s) OR
-                    (frequency = 'DAILY' AND event_date <= %s) OR
-                    (frequency = 'ONCE' AND event_date = %s)
-                )
-            """
-            cursor.execute(query, (day_name, target_date, target_date, target_date))
-            events = cursor.fetchall()
-            
-            for event in events:
-                event_id = event['event_id']
-                new_db = Database(conn, (event_id, target_date))
-                instance_result = new_db.add_event_instances()
-                
-                if instance_result.get('success'):
-                    created_count += 1
-                else:
-                    failed_count += 1
-                    print(f"Failed to add instance for Event {event_id} on {target_date}: {instance_result.get('message')}")
-        
-        return jsonify({
-            "success": True,
-            "message": f"Daily instances generated for the upcoming week",
-            "created": created_count,
-            "failed": failed_count,
-            "date_range": f"{today} to {upcoming_week[-1]}"
-        }), 200
-
+        db = Database(conn)
+        result = db.enforce_curfew_violations()
+        status_code = 200 if result.get("success") else 500
+        app.logger.info(
+            "Curfew enforcement run: inserted=%s skipped=%s candidates=%s errors=%s",
+            result.get("inserted"),
+            result.get("skipped"),
+            result.get("candidates"),
+            len(result.get("errors", [])),
+        )
+        return jsonify(result), status_code
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-    
+        app.logger.exception("Curfew enforcement failed")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/admin/generate-daily-instances/status", methods=["GET"])
+def generate_daily_instances_status():
+    return jsonify({"success": True, "job": _copy_instance_generator_state()}), 200
+
 
 # ==========================================
 # ENDPOINT 2: The Gate Swipe Webhook
@@ -365,7 +814,8 @@ def events_authentication():
 # ====================================================
 # ENDPOINT 3: Status Update for Excused Individuals
 # ====================================================
-@app.route("/admin/update-attendance", methods=["PUT"])
+@app.route("/admin/update-attendance", methods=["PUT", "POST"])
+@app.route("/api/attendance/update", methods=["POST"])
 def update_attendance():
     conn = None
     try:
@@ -373,20 +823,23 @@ def update_attendance():
         if not conn:
             return jsonify({"success": False, "message": "Database offline"}), 500
 
-        data = request.get_json()
-        required_fields = ["user_id", "instance_id", "status"]
-        if not data or not all(field in data for field in required_fields):
-            return jsonify({"success": False, "message": "Missing required fields"}), 400
-
-        user_id = data['user_id']
-        instance_id = data['instance_id']
-        status = data['status'] 
+        data = request.get_json() or {}
+        status = data.get('status')
         remarks = data.get('remarks', None)
 
         if status not in ['Present', 'Absent', 'Late', 'Excused']:
             return jsonify({"success": False, "message": "Invalid status option"}), 400
 
-        params = (status, remarks, user_id, instance_id)
+        attendance_id = data.get('attendance_id')
+        if attendance_id:
+            params = (status, remarks, attendance_id)
+        else:
+            user_id = data.get('user_id')
+            instance_id = data.get('instance_id')
+            if not user_id or not instance_id:
+                return jsonify({"success": False, "message": "Missing attendance_id or user_id + instance_id"}), 400
+            params = (status, remarks, user_id, instance_id)
+
         db = Database(conn, params)
         result = db.update_attendance_status()
 
@@ -432,7 +885,7 @@ def update_event_status():
         events = db.get_all_events()
         return jsonify({"success": True, 
                         "message": f"Event status updated to {status}.",
-                        "data": events.get('data')
+                        "data": events
                       }), 200
 
     except Exception as e:
@@ -455,11 +908,9 @@ def delete_event():
         if not data or not all(field in data for field in required_fields):
             return jsonify({"success": False, "message": "Missing required fields"}), 400
 
-        event_id = data['event_id']
-
-        if isinstance(event_id, str):
-            pass
-        else:
+        try:
+            event_id = int(data['event_id'])
+        except (KeyError, TypeError, ValueError):
             return jsonify({"success": False, "message": "Invalid event ID"}), 400
 
         params = (event_id,)
@@ -595,7 +1046,9 @@ def live_student_logs():
         if not conn:
             return jsonify({"success": False, "message": "Database offline"}), 500
 
-        logs = Database.get_student_logs(conn)
+        limit = request.args.get("limit", default=6, type=int) or 6
+        limit = min(max(limit, 1), 20)
+        logs = Database.get_student_logs(conn, limit=limit)
 
         if logs is None:
             return jsonify({"success": False, "message": "Error fetching student_logs"}), 500
@@ -735,11 +1188,12 @@ def dashboard_student_stats():
 def dashboard_employee_stats():
     conn = None
     try:
+        instance_id = (request.args.get("instance_id") or "").strip() or None
         conn = connect_db()
         if not conn:
             return jsonify({"success": False, "message": "Database offline"}), 500
 
-        stats = Database.get_employee_dashboard_stats(conn)
+        stats = Database.get_employee_dashboard_stats(conn, instance_id=instance_id)
         if stats is None:
             return jsonify({"success": False, "message": "Error fetching employee stats"}), 500
 
@@ -871,7 +1325,7 @@ def manual_event_entry():
         return jsonify({"success": False, "message": str(e)}), 500
     finally:
         if conn:
-            close_db(conn)
+            release_db_connection(conn)
 
 # ==============================================================================
 # ENDPOINT: Get Today's Attendance for All Employees (For Admin Dashboard)
@@ -954,7 +1408,7 @@ def get_employee_attendance():
         return jsonify({"success": False, "message": str(e)}), 500
     finally:
         if conn:
-            close_db(conn)
+            release_db_connection(conn)
 
 # ==============================================================================
 # ENDPOINT: Delete an Attendance Record (For Admin Corrections)
@@ -1002,7 +1456,7 @@ def delete_attendance_record(attendance_id):
         return jsonify({"success": False, "message": str(e)}), 500
     finally:
         if conn:
-            close_db(conn)
+            release_db_connection(conn)
 
 # ==============================================================================
 # ENDPOINT: Time in/Time out Log in Kiosk Event
@@ -1067,7 +1521,10 @@ def get_instance_logs(instance_id):
         return jsonify({"success": False, "message": str(e)}), 500
     finally:
         if conn:
-            close_db(conn)
+            release_db_connection(conn)
+
+start_instance_generation_scheduler()
+start_curfew_enforcement_scheduler()
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5001)
+    app.run(debug=app.config["DEBUG"], host='0.0.0.0', port=5001)

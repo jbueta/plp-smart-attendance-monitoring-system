@@ -1,0 +1,28 @@
+user_id,employee_id,employee_name,department_id,position,status,emp_last_updated
+23,1,Gregoria De Jesus,3,Professor,Inside,2026-05-08 13:36:17
+24,2,Melchora Aquino,4,Dean,Inside,2026-05-08 12:37:01
+25,3,Antonio Luna,5,Faculty,Outside,2026-05-01 14:18:40
+26,4,Gabriela Silang,6,Department Chair,Inside,2026-05-08 12:38:36
+27,5,Josefa Llanes Escoda,7,Registrar,Inside,2026-05-08 12:48:52
+29,8,Jason Jay M. Recto,3,Professor I,Inside,2026-05-16 21:34:56
+30,9,"GONATO, VINCE RUSSEL H.",4,PROFESSOR I,Inside,2026-05-21 12:54:58
+31,10,"GONATO, RHEA VIANCA H.",3,PROFESSOR II,Outside,2026-05-01 14:18:40
+32,11,"HENSON, HONEYPEARL CHARISSE B.",5,INSTRUCTOR I,Outside,2026-05-01 14:18:40
+33,12,"CABUGUANG, JUAN MIGUEL",3,PROFESSOR I,Outside,2026-05-01 14:18:40
+34,13,"GUNGON, KARL",1,PROFESSOR II,Outside,2026-05-01 14:18:40
+35,14,"Moncada, Ashanti Martir M.",5,Dean,Outside,2026-05-01 14:18:40
+38,15,Maryjoy Bernabe,2,Professor I,Outside,2026-05-01 23:01:47
+44,16,"GONATO, VINCE",1,PROFESSOR I,Inside,2026-05-01 23:22:17
+45,17,"Gonato, Rhea Vianca H.",3,PROFESSOR II,Inside,2026-05-01 23:00:26
+46,18,"Henson, Honeypearl Charisse B.",5,INSTRUCTOR I,Outside,2026-05-01 14:18:40
+47,19,Ed Sheeran,3,Instructor II,Outside,2026-05-20 23:27:25
+105,22,Miley Cyrus,8,Clerk,Outside,2026-05-20 23:28:41
+106,25,John Cena,10,Admin Aide,Outside,2026-05-20 23:30:25
+107,27,Anne Marie,8,Admin Officer,Outside,2026-05-20 23:35:32
+108,29,Post Malone,6,Professor I,Outside,2026-05-21 01:10:25
+51,31,Ashanti Moncada,19,Admin Aide,Outside,2026-05-01 22:26:49
+111,35,Juan Perez,17,Director,Outside,2026-05-21 11:06:07
+49,201,Nellyn Moncada Recto,2,Professor II,Outside,2026-05-01 14:28:59
+50,202,Rogelio Recto Sr.,5,Professor,Outside,2026-05-01 14:43:47
+5,1098,Apolinario Mabini Sr.,2,Dean,Outside,2026-05-01 14:43:31
+4,2015,Juan Dela Cruz Jr.,1,Faculty,Outside,2026-05-01 14:51:47

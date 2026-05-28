@@ -1,5 +1,8 @@
 /* Kiosk functionality - Student and Employee */
 
+const frontendBaseUrl = window.location.origin;
+const backendProxyBaseUrl = `${frontendBaseUrl}/api/backend`;
+
 /**
  * Format a datetime string to 12-hour time (e.g., "7:45 AM")
  */
@@ -29,12 +32,102 @@ function getInitials(name) {
  */
 function escapeHtml(str) {
     if (!str) return '';
-    return str.replace(/[&<>]/g, function(m) {
+    return String(str).replace(/[&<>"']/g, function(m) {
         if (m === '&') return '&amp;';
         if (m === '<') return '&lt;';
         if (m === '>') return '&gt;';
+        if (m === '"') return '&quot;';
+        if (m === "'") return '&#39;';
         return m;
     });
+}
+
+function getKioskAuthErrorMessage(data, fallback = 'ID not found!') {
+    if (!data || typeof data !== 'object') return fallback;
+    return data.message || data.Invalid || fallback;
+}
+
+function normalizeManualKioskId(value, type) {
+    const normalized = String(value || '').trim();
+    return type === 'employee' ? normalized : normalized.toUpperCase();
+}
+
+function isGeneralKioskScanId(value) {
+    return /^(?:[0-9]{2}-[0-9]{5}|VT-[0-9]{5})$/.test(normalizeManualKioskId(value, 'student'));
+}
+
+function extractGeneralKioskQrId(rawText) {
+    const scannedText = String(rawText || '').trim();
+    const bracketMatch = scannedText.match(/(.*?)\[(.*?)\](.*)/s);
+    const candidateId = bracketMatch ? bracketMatch[2].trim() : scannedText;
+    const normalizedId = normalizeManualKioskId(candidateId, 'student');
+
+    return isGeneralKioskScanId(normalizedId) ? normalizedId : "";
+}
+
+function clearManualEntryInput(idField) {
+    const input = document.getElementById(idField);
+    if (input) {
+        input.value = "";
+        input.setCustomValidity("");
+    }
+}
+
+function initGeneralManualIdFormatting() {
+    document.querySelectorAll('#manual-student-id').forEach(input => {
+        input.addEventListener('input', () => {
+            const cursorStart = input.selectionStart;
+            const cursorEnd = input.selectionEnd;
+            input.value = normalizeManualKioskId(input.value, 'student');
+
+            if (cursorStart !== null && cursorEnd !== null) {
+                input.setSelectionRange(cursorStart, cursorEnd);
+            }
+        });
+
+        input.addEventListener('keydown', event => {
+            if (event.key !== 'Enter') return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            submitManualEntry('student');
+        });
+    });
+
+    const manualEntryModal = document.getElementById('manualEntryModal');
+    if (manualEntryModal) {
+        manualEntryModal.addEventListener('shown.bs.modal', () => {
+            const input = document.getElementById('manual-student-id');
+            if (input) {
+                input.focus({ preventScroll: true });
+                input.select();
+            }
+        });
+
+        manualEntryModal.addEventListener('hidden.bs.modal', () => {
+            clearManualEntryInput('manual-student-id');
+            clearManualEntryInput('manual-employee-id');
+
+            document.querySelectorAll('[data-bs-target="#manualEntryModal"]').forEach(trigger => {
+                if (typeof trigger.blur === 'function') {
+                    trigger.blur();
+                }
+            });
+        });
+    }
+}
+
+/**
+ * Parse a fetch response without losing backend validation messages on non-2xx replies.
+ */
+async function parseJsonResponse(response, fallbackMessage = 'Server error') {
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok && !data.message && !data.error && !data.Invalid) {
+        throw new Error(fallbackMessage);
+    }
+
+    return data;
 }
 
 /**
@@ -84,6 +177,106 @@ function addNewLog(log, logType) {
 }
 
 /**
+ * Shared live feed for the student entrance and exit kiosks.
+ */
+const liveFeedLimit = 6;
+let liveFeedRefreshTimer = null;
+let liveFeedRefreshInFlight = false;
+let liveFeedLastLocalAppendAt = 0;
+
+function normalizeLiveFeedType(type) {
+    const normalized = String(type || '').toLowerCase();
+    return normalized === 'out' || normalized === 'exit' || normalized === 'time out' ? 'out' : 'in';
+}
+
+function formatLiveFeedTime(value) {
+    if (!value) {
+        return new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    const rawValue = String(value);
+    const parsed = new Date(rawValue);
+    if (!Number.isNaN(parsed.getTime())) {
+        return parsed.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    return rawValue;
+}
+
+function buildLiveFeedItem(log) {
+    log = log || {};
+    const type = normalizeLiveFeedType(log.type || log.logType || log.attendance_status);
+    const isEntry = type === 'in';
+    const iconBg = isEntry ? 'bg-success text-success' : 'bg-secondary text-white';
+    const iconClass = isEntry ? 'bi-check-lg' : 'bi-arrow-right';
+    const badgeClass = isEntry ? 'bg-success text-success' : 'bg-secondary text-white';
+    const badgeText = isEntry ? 'TIME IN' : 'TIME OUT';
+    const name = log.name || 'Unknown';
+    const affiliation = log.course || log.affiliation || log.department || 'N/A';
+    const time = formatLiveFeedTime(log.time || log.created_at || log.timestamp);
+
+    return `
+        <div class="d-flex align-items-center p-2 rounded live-feed-item" style="background: rgba(255,255,255,0.03);">
+            <div class="rounded-circle ${iconBg} bg-opacity-25 p-2 me-3">
+                <i class="bi ${iconClass}"></i>
+            </div>
+            <div class="flex-grow-1 lh-1">
+                <h6 class="mb-0 small">${escapeHtml(name)}</h6>
+                <small class="text-white-50" style="font-size: 0.75rem">${escapeHtml(affiliation)}</small>
+            </div>
+            <div class="text-end">
+                <div class="badge ${badgeClass} bg-opacity-10 mb-1">${badgeText}</div>
+                <div class="font-monospace small text-white-50">${escapeHtml(time)}</div>
+            </div>
+        </div>
+    `;
+}
+
+function renderLiveFeed(logs) {
+    const feedContainer = document.getElementById('live-feed-list');
+    if (!feedContainer) return;
+
+    const feedLogs = Array.isArray(logs) ? logs : [];
+    feedContainer.innerHTML = feedLogs
+        .slice(0, liveFeedLimit)
+        .map(buildLiveFeedItem)
+        .join('');
+}
+
+async function refreshLiveFeed() {
+    const feedContainer = document.getElementById('live-feed-list');
+    if (!feedContainer || liveFeedRefreshInFlight) return;
+
+    const requestStartedAt = Date.now();
+    liveFeedRefreshInFlight = true;
+    try {
+        const response = await fetch(`/api/kiosk/live-feed?limit=${liveFeedLimit}`, {
+            headers: { Accept: 'application/json' },
+            cache: 'no-store'
+        });
+        const payload = await parseJsonResponse(response, 'Unable to refresh live feed');
+        if (payload.success) {
+            if (requestStartedAt < liveFeedLastLocalAppendAt) {
+                window.setTimeout(refreshLiveFeed, 300);
+                return;
+            }
+            renderLiveFeed(payload.logs || []);
+        }
+    } catch (error) {
+        console.warn('Live feed refresh failed:', error);
+    } finally {
+        liveFeedRefreshInFlight = false;
+    }
+}
+
+function initLiveFeedRefresh() {
+    if (!document.getElementById('live-feed-list') || liveFeedRefreshTimer) return;
+
+    refreshLiveFeed();
+    liveFeedRefreshTimer = window.setInterval(refreshLiveFeed, 4000);
+}
+
+/**
  * Add a log entry to the live feed for general kiosk (entrance/exit)
  * @param {string} name - participant name
  * @param {string} affiliation - department/course affiliation
@@ -91,42 +284,36 @@ function addNewLog(log, logType) {
  */
 function appendToLiveFeed(name, affiliation, logType) {
     const feedContainer = document.getElementById('live-feed-list');
-    if (!feedContainer) {
-        console.warn('Live feed container not found');
-        return;
-    }
+    if (!feedContainer) return;
 
-    const now = new Date();
-    const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    
-    const isEntry = logType.toLowerCase() === 'entry';
-    const iconBg = isEntry ? 'bg-success text-success' : 'bg-secondary text-white';
-    const iconClass = isEntry ? 'bi-check-lg' : 'bi-arrow-right';
-    const badgeClass = isEntry ? 'bg-success text-success' : 'bg-secondary text-white';
-    const badgeText = isEntry ? 'TIME IN' : 'TIME OUT';
-
-    const logHtml = `
-        <div class="d-flex align-items-center p-2 rounded live-feed-item" style="background: rgba(255,255,255,0.03);">
-            <div class="rounded-circle ${iconBg} bg-opacity-25 p-2 me-3">
-                <i class="bi ${iconClass}"></i>
-            </div>
-            <div class="flex-grow-1 lh-1">
-                <h6 class="mb-0 small">${name}</h6>
-                <small class="text-white-50" style="font-size: 0.75rem">${affiliation || 'N/A'}</small>
-            </div>
-            <div class="text-end">
-                <div class="badge ${badgeClass} bg-opacity-10 mb-1">${badgeText}</div>
-                <div class="font-monospace small text-white-50">${timeString}</div>
-            </div>
-        </div>
-    `;
-
-    feedContainer.insertAdjacentHTML('afterbegin', logHtml);
+    liveFeedLastLocalAppendAt = Date.now();
+    feedContainer.insertAdjacentHTML('afterbegin', buildLiveFeedItem({
+        type: normalizeLiveFeedType(logType),
+        name,
+        course: affiliation,
+        time: new Date()
+    }));
 
     // Keep only the latest 6 logs
-    while (feedContainer.children.length > 6) {
+    while (feedContainer.children.length > liveFeedLimit) {
         feedContainer.lastElementChild.remove();
     }
+
+    window.setTimeout(refreshLiveFeed, 800);
+}
+
+window.appendToLiveFeed = appendToLiveFeed;
+window.refreshLiveFeed = refreshLiveFeed;
+window.renderLiveFeed = renderLiveFeed;
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        initLiveFeedRefresh();
+        initGeneralManualIdFormatting();
+    });
+} else {
+    initLiveFeedRefresh();
+    initGeneralManualIdFormatting();
 }
 
 /**
@@ -136,7 +323,7 @@ function appendToLiveFeed(name, affiliation, logType) {
  */
 function loadEventAttendance(instanceId) {
     console.log(`Loading event logs for instance ${instanceId}`);
-    fetch(`http://127.0.0.1:5001/admin/instances/${instanceId}/get-logs`)
+    fetch(`${backendProxyBaseUrl}/admin/instances/${instanceId}/logs`)
         .then(response => {
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             return response.json();
@@ -162,23 +349,40 @@ function loadEventAttendance(instanceId) {
  */
 function submitManualEntry(type, manualId = null) {
     const idField = type === 'employee' ? 'manual-employee-id' : 'manual-student-id';
-    const id = manualId !== null ? manualId : document.getElementById(idField).value.trim();
+    const inputElement = manualId === null ? document.getElementById(idField) : null;
+    const rawId = manualId !== null ? manualId : (inputElement ? inputElement.value : "");
+    const id = type === 'employee'
+        ? normalizeManualKioskId(rawId, type)
+        : (extractGeneralKioskQrId(rawId) || normalizeManualKioskId(rawId, type));
+
+    if (inputElement) {
+        inputElement.value = id;
+    }
     
     if (!id) {
-        alert("Please enter an ID");
+        window.showSystemFeedback("Please enter an ID", 'error');
+        return;
+    }
+
+
+    if (inputElement && !inputElement.checkValidity()) {
+        inputElement.reportValidity();
         return;
     }
     
     const modalEl = document.getElementById('manualEntryModal');
     const modal = bootstrap.Modal.getInstance(modalEl);
     if (modal) modal.hide();
+    if (manualId === null) {
+        clearManualEntryInput(idField);
+    }
     
     // Determine if this is an event kiosk (employee event page has currentEventId)
     const isEventKiosk = type === 'employee' && window.currentEventId && window.currentEventId !== null;
     
     if (isEventKiosk) {
         console.log('Sending manual entry request:', { employee_id: id, event_id: window.currentEventId });
-        fetch('http://127.0.0.1:5001/api/events/manual_entry', {
+        fetch(`${backendProxyBaseUrl}/events/manual-entry`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -186,17 +390,7 @@ function submitManualEntry(type, manualId = null) {
                 event_id: window.currentEventId
             })
         })
-        .then(async r => {
-            if (!r.ok) {
-                let errorMsg = `HTTP ${r.status}`;
-                try {
-                    const errorData = await r.json();
-                    errorMsg = errorData.message || errorMsg;
-                } catch (e) {}
-                throw new Error(errorMsg);
-            }
-            return r.json();
-        })
+        .then(r => parseJsonResponse(r, 'Failed to contact the event attendance service.'))
         .then(data => {
             console.log('Manual entry response:', data);
             if (data.success) {
@@ -211,31 +405,36 @@ function submitManualEntry(type, manualId = null) {
                         affiliation: data.log.dept
                     });
                 }
-                if (manualId === null) {
-                    document.getElementById(idField).value = '';
-                }
+                // [ANNOUNCEMENT FEATURE] - Update context for targeted/departmental bulletins
+                window.lastScannedId = id;
+                window.currentDept = data.log ? data.log.dept : null;
+                if (typeof window.fetchBulletins === 'function') window.fetchBulletins();
+                if (typeof window.fetchActiveAlerts === 'function') window.fetchActiveAlerts();
 
             } else {
-                alert(data.message || "Failed to log attendance.");
+                window.showSystemFeedback(data.message || "Failed to log attendance.", 'error');
                 if (typeof showScanBanner === 'function') showScanBanner('error', { id: id });
             }
+
         })
         .catch(err => {
             console.error('Manual entry error:', err);
-            alert(`Error: ${err.message}`);
+            window.showSystemFeedback(`Error: ${err.message}`, 'error');
             if (typeof showScanBanner === 'function') showScanBanner('error', { id: id });
         });
+
     } else {
         // Fallback to general authentication (students, visitor, etc.)
-        fetch('http://127.0.0.1:5001/admin/user/authentication', {
+        const requestedLogType = window.GENERAL_KIOSK_ACTION || null;
+        fetch(`${backendProxyBaseUrl}/admin/user/authentication`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: id })
+            body: JSON.stringify({
+                id: id,
+                requested_log_type: requestedLogType
+            })
         })
-        .then(r => {
-            if (!r.ok && r.status !== 404) throw new Error('Server error');
-            return r.json();
-        })
+        .then(r => parseJsonResponse(r, 'Server error'))
         .then(data => {
             if (data.success) {
                 const logType = data.attendance_status.toLowerCase();
@@ -253,23 +452,32 @@ function submitManualEntry(type, manualId = null) {
                     showSuccessOverlay(logType, {
                         id: id,
                         name: data.name,
-                        affiliation: data.affiliation
+                        affiliation: data.affiliation,
+                        // pass through student_type when available so overlay can display Regular/Irregular
+                        student_type: data.student_type || data.status
                     });
                 }
-                if (manualId === null) {
-                    document.getElementById(idField).value = '';
-                }
+                // [ANNOUNCEMENT FEATURE] - Update context for targeted/departmental bulletins
+                window.lastScannedId = id;
+                window.currentDept = data.affiliation;
+                if (typeof window.fetchBulletins === 'function') window.fetchBulletins();
+                if (typeof window.fetchActiveAlerts === 'function') window.fetchActiveAlerts();
 
                 appendToLiveFeed(data.name, data.affiliation, logType);
             } else {
-                alert(data.Invalid || "ID not found!");
+                window.showSystemFeedback(getKioskAuthErrorMessage(data, 'ID not found!'), 'error');
                 if (typeof showScanBanner === 'function') showScanBanner('error', { id: id });
             }
+
         })
         .catch(err => {
             console.error('General auth error:', err);
-            alert("Connection error: " + err.message + ". Please try again.");
+            const message = err.message
+                ? `Connection error: ${err.message}. Please try again.`
+                : 'Connection error. Please try again.';
+            window.showSystemFeedback(message, 'error');
             if (typeof showScanBanner === 'function') showScanBanner('error', { id: id });
         });
+
     }
 }

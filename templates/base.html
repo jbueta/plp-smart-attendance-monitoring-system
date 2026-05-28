@@ -4,6 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Prevent browser caching to ensure changes are visible immediately -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
     <title>{% block title %}PLP Smart System{% endblock %}</title>
 
     <!-- Bootstrap 5 CSS -->
@@ -13,6 +19,74 @@
     <!-- Custom Theme -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 
+    <style>
+        .session-timeout-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 1200;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            background: rgba(4, 16, 11, 0.72);
+            backdrop-filter: blur(8px);
+        }
+
+        .session-timeout-card {
+            width: min(420px, calc(100vw - 32px));
+            padding: 2rem 1.75rem;
+            border-radius: 22px;
+            background: rgba(8, 32, 20, 0.98);
+            border: 1px solid rgba(239, 68, 68, 0.28);
+            box-shadow: 0 28px 70px rgba(0, 0, 0, 0.55);
+            text-align: center;
+            animation: sessionTimeoutIn 0.24s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        .session-timeout-icon {
+            width: 58px;
+            height: 58px;
+            margin: 0 auto 1rem;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            background: #ef4444;
+            color: #fff;
+            font-size: 1.45rem;
+            box-shadow: 0 0 0 9px rgba(239, 68, 68, 0.14);
+        }
+
+        .session-timeout-title {
+            margin-bottom: 0.55rem;
+            color: #fff;
+            font-weight: 700;
+        }
+
+        .session-timeout-message {
+            margin-bottom: 1.25rem;
+            color: rgba(255, 255, 255, 0.72);
+            line-height: 1.5;
+        }
+
+        .session-timeout-note {
+            margin-bottom: 1.25rem;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.85rem;
+        }
+
+        @keyframes sessionTimeoutIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+    </style>
+
     {% block extra_css %}{% endblock %}
 </head>
 
@@ -20,17 +94,160 @@
     <!-- Overlay for background dimming -->
     <div class="vignette-overlay"></div>
 
+    <!-- Global Status Card (Success / Fail Toast) -->
+    <div id="global-status-card" class="position-fixed top-0 start-50 translate-middle-x mt-4 p-3 rounded-4 shadow-lg d-flex align-items-center" style="z-index: 9999; min-width: 320px; opacity: 0; pointer-events: none; transition: opacity 0.3s ease, transform 0.3s ease; transform: translateY(-20px);">
+        <div id="gsc-icon" class="fs-2 me-3"></div>
+        <div>
+            <h6 id="gsc-title" class="mb-1 fw-bold text-white"></h6>
+            <p id="gsc-message" class="mb-0 small text-white-50"></p>
+        </div>
+    </div>
+
+    <!-- Global Confirm Modal (Deletion/Action Confirm) -->
+    <div id="global-confirm-modal" class="position-fixed top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center" style="z-index: 10000; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(5px);">
+        <div class="card-glass p-4 text-center shadow-lg" style="min-width: 350px; max-width: 400px; border-top: 4px solid #dc3545;">
+            <div class="mb-3">
+                <i class="bi bi-exclamation-triangle-fill text-danger display-4"></i>
+            </div>
+            <h5 id="gcm-title" class="fw-bold text-white mb-2">Confirm Deletion</h5>
+            <p id="gcm-message" class="text-white-50 small mb-4">Are you sure you want to delete this item? This action cannot be undone.</p>
+            <div class="d-flex justify-content-center gap-3">
+                <button type="button" class="btn btn-outline-light px-4" onclick="hideConfirmModal()">Cancel</button>
+                <button type="button" id="gcm-confirm-btn" class="btn btn-danger px-4">Delete</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Main Content Block - To be overridden by child templates -->
     {% block content %}{% endblock %}
+
+    <div id="instance-generator-toast" class="instance-generator-toast d-none" role="status" aria-live="polite">
+        <div class="instance-generator-toast__icon">
+            <div class="spinner-border spinner-border-sm text-gold" id="instance-generator-spinner" aria-hidden="true">
+            </div>
+            <i class="bi bi-check-circle-fill text-success d-none" id="instance-generator-success"></i>
+            <i class="bi bi-exclamation-triangle-fill text-danger d-none" id="instance-generator-error"></i>
+        </div>
+        <div class="instance-generator-toast__body">
+            <div class="instance-generator-toast__title" id="instance-generator-title">Preparing event instances</div>
+            <div class="instance-generator-toast__message" id="instance-generator-message">Checking scheduler status...
+            </div>
+        </div>
+    </div>
+
+    {% if is_logged_in %}
+    <div id="session-timeout-overlay" class="session-timeout-overlay d-none" role="alertdialog" aria-modal="true"
+        aria-labelledby="session-timeout-title" aria-describedby="session-timeout-message">
+        <div class="session-timeout-card">
+            <div class="session-timeout-icon">
+                <i class="bi bi-hourglass-split" aria-hidden="true"></i>
+            </div>
+            <h5 id="session-timeout-title" class="session-timeout-title">Session Timed Out</h5>
+            <p id="session-timeout-message" class="session-timeout-message">
+                Your session expired due to inactivity. You will be redirected to the login page.
+            </p>
+            <p class="session-timeout-note">Select the button below to continue immediately.</p>
+            <button type="button" id="session-timeout-action" class="btn btn-primary-gold px-4">
+                Back to Login
+            </button>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Global Feedback Indicator -->
+    <div id="system-feedback-indicator" class="feedback-indicator" role="status" aria-live="polite">
+        <div class="feedback-indicator__icon">
+            <i id="feedback-icon" class="bi bi-check-circle-fill"></i>
+        </div>
+        <div class="feedback-indicator__title" id="feedback-message">
+            Action completed successfully.
+        </div>
+    </div>
+
+    <div id="global-confirm-overlay" class="global-confirm-overlay d-none" role="alertdialog" aria-modal="true"
+        aria-labelledby="global-confirm-title" aria-describedby="global-confirm-message">
+        <div class="global-confirm-modal">
+            <div class="global-confirm-modal__icon">
+                <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+            </div>
+            <div class="global-confirm-modal__body">
+                <h5 id="global-confirm-title" class="global-confirm-modal__title">Confirm action</h5>
+                <p id="global-confirm-message" class="global-confirm-modal__message mb-0"></p>
+            </div>
+            <div class="global-confirm-modal__actions">
+                <button type="button" id="global-confirm-cancel" class="btn btn-outline-light px-4">Cancel</button>
+                <button type="button" id="global-confirm-ok" class="btn btn-danger px-4">Confirm</button>
+            </div>
+        </div>
+    </div>
+
 
     <!-- Bootstrap JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Main Custom JS -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        window.APP_CONFIG = {{ { "backendApiUrl": backend_api_url }| tojson }};
+    </script>
+    {% if is_logged_in %}
+    <script>
+        (function () {
+            const IDLE_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
+            const REDIRECT_DELAY_MS = 1800;
+            const logoutUrl = "{{ url_for('logout') }}";
+            let idleTimer = null;
+            let redirectTimer = null;
+            let didTimeout = false;
 
-    {% block extra_js %}{% endblock %}
-    <!-- Custom Simulation -->
+            function redirectToLogout() {
+                window.location.href = logoutUrl;
+            }
+
+            function handleSessionTimeout() {
+                if (didTimeout) return;
+
+                didTimeout = true;
+                if (idleTimer) {
+                    clearTimeout(idleTimer);
+                }
+
+                const overlay = document.getElementById('session-timeout-overlay');
+                const actionBtn = document.getElementById('session-timeout-action');
+
+                if (overlay) {
+                    overlay.classList.remove('d-none');
+                    document.body.classList.add('overflow-hidden');
+                }
+
+                if (actionBtn) {
+                    actionBtn.addEventListener('click', redirectToLogout, { once: true });
+                    actionBtn.focus({ preventScroll: true });
+                }
+
+                redirectTimer = setTimeout(redirectToLogout, REDIRECT_DELAY_MS);
+            }
+
+            function resetIdleTimer() {
+                if (didTimeout) return;
+                if (idleTimer) {
+                    clearTimeout(idleTimer);
+                }
+                idleTimer = setTimeout(handleSessionTimeout, IDLE_TIMEOUT_MS);
+            }
+
+            ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'].forEach((eventName) => {
+                document.addEventListener(eventName, resetIdleTimer, { passive: true });
+            });
+
+            window.addEventListener('load', resetIdleTimer);
+            resetIdleTimer();
+        })();
+    </script>
+    {% endif %}
+
+    <!-- Charting library used by dashboard analytics pages -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    {% block extra_js %}{% endblock %}
 </body>
 
 </html>
