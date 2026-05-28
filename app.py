@@ -101,9 +101,12 @@ MOCK_DASHBOARD_STATS = {
     "currently_inside": "0",
     "avg_dwell_time": "0 hrs 0 mins",
     "peak_hour": "N/A",
+    "peak_window": "N/A",
     "traffic_chart": [0] * 12,
     "dept_distribution": [0] * 5,
+    "total_employees": "0",
     "alerts": [],
+    "absence_alerts": [],
 }
 
 MOCK_EMPLOYEE_STATS = {

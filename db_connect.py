@@ -39,6 +39,10 @@ VISITOR_PURPOSES = (
     "Other",
 )
 
+CURFEW_TIME = "21:40:00"
+CURFEW_TRIGGER_LABEL = "09:40:00 PM"
+EARLY_MORNING_CURFEW_CUTOFF = "06:00:00"
+
 
 def visitor_valid_until_end_of_day(target_date=None):
     if isinstance(target_date, datetime):
@@ -480,7 +484,12 @@ class Database:
             print(f"Error inserting violation: {err}")
             return {"success": False, "message": f"Database Error: {err}"}
 
-    def enforce_curfew_violations(self, curfew_time="21:40:00", early_morning_cutoff="06:00:00", description="Curfew violation"):
+    def enforce_curfew_violations(
+        self,
+        curfew_time=CURFEW_TIME,
+        early_morning_cutoff=EARLY_MORNING_CURFEW_CUTOFF,
+        description="Curfew violation",
+    ):
         try:
             cursor = self.conn.cursor(dictionary=True)
             cursor.execute(
@@ -2280,7 +2289,7 @@ class Database:
                 (today,),
             )
             hourly = {row["hr"]: row["cnt"] for row in cursor.fetchall()}
-            traffic_chart = [hourly.get(hour, 0) for hour in range(24)]
+            traffic_chart = [hourly.get(hour, 0) for hour in range(6, 18)]
 
             cursor.execute(
                 """
@@ -2351,34 +2360,136 @@ class Database:
             )
             total_employees = cursor.fetchone()["total"] or 0
 
+            curfew_time = "21:40:00"
+            early_morning_cutoff = "06:00:00"
             cursor.execute(
                 """
-                SELECT e.employee_name, d.department_name, COUNT(*) as absent_count
-                FROM (
-                    SELECT ea.user_id, ea.status,
-                           ROW_NUMBER() OVER (PARTITION BY ea.user_id ORDER BY ea.event_date DESC, ea.instance_id DESC) as rn
-                    FROM event_attendance ea
-                    JOIN employees emp ON ea.user_id = emp.user_id
-                    JOIN users u ON emp.user_id = u.user_id
-                    WHERE u.active = 1
-                ) t
-                JOIN employees e ON t.user_id = e.user_id
-                JOIN departments d ON e.department_id = d.department_id
-                WHERE t.rn <= 3 AND t.status = 'Absent'
-                GROUP BY t.user_id, e.employee_name, d.department_name
-                HAVING absent_count = 3
-                LIMIT 4
-                """
+                SELECT
+                    s.student_id AS id,
+                    COALESCE(NULLIF(TRIM(s.student_name), ''), 'Unknown Student') AS name,
+                    COALESCE(NULLIF(TRIM(c.course_name), ''), 'N/A') AS course,
+                    latest_entry.entry_time,
+                    TIMESTAMPDIFF(MINUTE, latest_entry.entry_time, NOW()) AS minutes_inside
+                FROM students s
+                JOIN users u ON s.user_id = u.user_id
+                LEFT JOIN courses c ON s.course_id = c.course_id
+                JOIN (
+                    SELECT user_id, MAX(timestamp) AS entry_time
+                    FROM general_log
+                    WHERE log_type = 'Entry'
+                    GROUP BY user_id
+                ) latest_entry ON latest_entry.user_id = s.user_id
+                LEFT JOIN (
+                    SELECT user_id, MAX(timestamp) AS exit_time
+                    FROM general_log
+                    WHERE log_type = 'Exit'
+                    GROUP BY user_id
+                ) latest_exit ON latest_exit.user_id = s.user_id
+                WHERE s.status = 'Inside'
+                  AND u.role = 'student'
+                  AND u.active = 1
+                  AND (latest_exit.exit_time IS NULL OR latest_entry.entry_time > latest_exit.exit_time)
+                  AND (
+                      NOW() >= TIMESTAMP(DATE(latest_entry.entry_time), %s)
+                      OR TIME(latest_entry.entry_time) >= %s
+                      OR TIME(latest_entry.entry_time) < %s
+                  )
+                ORDER BY latest_entry.entry_time ASC
+                LIMIT 10
+                """,
+                (curfew_time, curfew_time, early_morning_cutoff),
             )
-            consecutive_absences = cursor.fetchall()
+            overstaying_students = cursor.fetchall()
+            absence_alerts = []
+            for row in overstaying_students:
+                entry_time = row.get("entry_time")
+                entry_str = entry_time.strftime("%I:%M %p").lstrip("0") if entry_time else "--:--"
+                absence_alerts.append({
+                    "type": "danger",
+                    "icon": "person-fill-exclamation",
+                    "title": row.get("name", "Unknown Student"),
+                    "message": row.get("course", "N/A"),
+                    "time": f"Entered: {entry_str}",
+                    "minutes_inside": int(row.get("minutes_inside") or 0),
+                })
+
             alerts = []
-            for row in consecutive_absences:
+            alert_time = datetime.now().strftime("%I:%M %p")
+
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM students s
+                JOIN users u ON s.user_id = u.user_id
+                JOIN (
+                    SELECT user_id, MAX(timestamp) AS entry_time
+                    FROM general_log
+                    WHERE log_type = 'Entry'
+                    GROUP BY user_id
+                ) latest_entry ON latest_entry.user_id = s.user_id
+                LEFT JOIN (
+                    SELECT user_id, MAX(timestamp) AS exit_time
+                    FROM general_log
+                    WHERE log_type = 'Exit'
+                    GROUP BY user_id
+                ) latest_exit ON latest_exit.user_id = s.user_id
+                WHERE s.status = 'Inside'
+                  AND u.role = 'student'
+                  AND u.active = 1
+                  AND (latest_exit.exit_time IS NULL OR latest_entry.entry_time > latest_exit.exit_time)
+                  AND (
+                      NOW() >= TIMESTAMP(DATE(latest_entry.entry_time), %s)
+                      OR TIME(latest_entry.entry_time) >= %s
+                      OR TIME(latest_entry.entry_time) < %s
+                  )
+                """,
+                (CURFEW_TIME, CURFEW_TIME, EARLY_MORNING_CURFEW_CUTOFF),
+            )
+            curfew_students_inside = cursor.fetchone()["cnt"] or 0
+            if curfew_students_inside > 0:
                 alerts.append({
                     "type": "danger",
+                    "icon": "shield-exclamation",
+                    "title": f"Curfew Watch: {curfew_students_inside} student(s) past curfew",
+                    "message": f"Students have an open campus entry past {CURFEW_TRIGGER_LABEL}.",
+                    "time": alert_time,
+                })
+
+            density_threshold = 1000
+            if currently_inside > density_threshold:
+                alerts.append({
+                    "type": "warning",
                     "icon": "exclamation-triangle-fill",
-                    "title": "Consecutive Absence Alert",
-                    "message": f"{row['employee_name']} ({row['department_name']}) has missed 3 consecutive events.",
-                    "time": "Attendance Red Flag"
+                    "title": f"High Campus Density: {currently_inside:,} people inside",
+                    "message": "Live inside count has crossed the dashboard alert threshold.",
+                    "time": alert_time,
+                })
+
+            if peak_row:
+                alerts.append({
+                    "type": "info",
+                    "icon": "graph-up-arrow",
+                    "title": f"Peak Hour Detected at {peak_hour}",
+                    "message": "Today's entry traffic has a clear highest-volume hour.",
+                    "time": "Today",
+                })
+
+            if total_invited > 0 and (total_attended / total_invited) < 0.5:
+                alerts.append({
+                    "type": "warning",
+                    "icon": "calendar-x-fill",
+                    "title": f"Low Event Attendance: {attendance_rate} turnout today",
+                    "message": attendance_raw,
+                    "time": alert_time,
+                })
+
+            if not alerts:
+                alerts.append({
+                    "type": "success",
+                    "icon": "check-circle-fill",
+                    "title": "All systems normal. No issues detected.",
+                    "message": "Campus traffic and event attendance are within expected levels.",
+                    "time": alert_time,
                 })
 
             return {
@@ -2394,6 +2505,7 @@ class Database:
                 "total_employees": f"{total_employees:,}",
                 "dept_distribution": dept_distribution,
                 "alerts": alerts,
+                "absence_alerts": absence_alerts,
             }
         except connector.Error as err:
             print(f"Error fetching overall dashboard stats: {err}")
@@ -2517,8 +2629,6 @@ class Database:
             else:
                 trend = "N/A"
 
-            curfew_time = "21:40:00"
-            early_morning_cutoff = "06:00:00"
             cursor.execute(
                 """
                 SELECT
@@ -2554,7 +2664,7 @@ class Database:
                   )
                 ORDER BY latest_entry.entry_time ASC
                 """,
-                (curfew_time, curfew_time, early_morning_cutoff),
+                (CURFEW_TIME, CURFEW_TIME, EARLY_MORNING_CURFEW_CUTOFF),
             )
             curfew_candidates = cursor.fetchall()
 
@@ -2580,7 +2690,7 @@ class Database:
                 "avg_stay": avg_stay,
                 "hourly_traffic": hourly_traffic,
                 "watchlist": watchlist,
-                "curfew_trigger": "09:40:00 PM",
+                "curfew_trigger": CURFEW_TRIGGER_LABEL,
             }
         except connector.Error as err:
             print(f"Error fetching student dashboard stats: {err}")

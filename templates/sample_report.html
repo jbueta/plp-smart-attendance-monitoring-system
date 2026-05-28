@@ -320,7 +320,9 @@
      PRINTABLE CONTENT — paginated, 10 rows per page
      ══════════════════════════════════════════════════════════════════════ -->
 {% set ROWS_PER_PAGE = 10 %}
-{% set category = request.args.get('category', '').lower() %}
+{% set requested_category = request.args.get('category', '').lower() %}
+{% set category = 'violations' if requested_category == 'violation' else requested_category %}
+{% set report_type = request.args.get('type', '').lower() %}
 {% set total_logs = logs | length if logs else 0 %}
 {% set total_pages = ((total_logs - 1) // ROWS_PER_PAGE + 1) if total_logs > 0 else 1 %}
 
@@ -423,14 +425,7 @@
         <!-- Data table for this page chunk -->
         <table class="report-table">
             <thead>
-                <div style="font-size: 18px; font-weight: 700;">{{ metrics.filter_display or 'All Subjects' }}</div>
-            </div>
-        </div>
-    {% endif %}
-
-    <table class="report-table">
-        <thead>
-            {% if category == 'general' and report_type == 'daily_traffic' %}
+                {% if category == 'general' and report_type == 'daily_traffic' %}
                 <tr>
                     <th style="width: 10%;">No.</th>
                     <th style="width: 18%;">Date</th>
@@ -488,87 +483,12 @@
                     <th style="width: 15%;">Status</th>
                     <th style="width: 15%;">Remarks</th>
                 </tr>
-            {% endif %}
-        </thead>
-        <tbody>
-            {% if logs %}
-                {% if category == 'general' and report_type == 'daily_traffic' %}
-                    {% for log in logs %}
-                    <tr>
-                        <td class="text-center">{{ loop.index }}</td>
-                        <td class="text-center">{{ log.date }}</td>
-                        <td class="text-center">{{ log.entries }}</td>
-                        <td class="text-center">{{ log.exits }}</td>
-                        <td class="text-center">{{ log.peak_hour }}</td>
-                        <td class="text-center">{{ log.avg_time_spent }}</td>
-                    </tr>
-                    {% endfor %}
-
-                {% elif category == 'visitor' and report_type == 'visitor_purpose' %}
-                    {% for log in logs %}
-                    <tr>
-                        <td class="text-center">{{ loop.index }}</td>
-                        <td class="text-start">{{ log.purpose }}</td>
-                        <td class="text-center">{{ log.visitor_count }}</td>
-                        <td class="text-center">{{ log.percentage }}</td>
-                    </tr>
-                    {% endfor %}
-
-                {% elif category == 'general' %}
-                    {% for log in logs %}
-                    <tr>
-                        <td class="text-center">{{ loop.index }}</td>
-                        <td class="text-start">{{ log.name }}</td>
-                        <td class="text-center">{{ log.detail }}</td>
-                        <td class="text-center">{{ log.time_in }}</td>
-                        <td class="text-center">{{ log.time_out }}</td>
-                        <td class="text-center">{{ log.remarks }}</td>
-                    </tr>
-                    {% endfor %}
-
-
-                {% elif category == 'visitor' %}
-                <tr>
-                    <th style="width:5%;">No.</th>
-                    <th style="width:28%;text-align:left;">Visitor Name</th>
-                    <th style="width:22%;">Purpose</th>
-                    <th style="width:15%;">Time In</th>
-                    <th style="width:15%;">Time Out</th>
-                    <th style="width:15%;">Visitor ID</th>
-                </tr>
-                {% elif category == 'event' %}
-                <tr>
-                    <th style="width:5%;">No.</th>
-                    <th style="width:28%;text-align:left;">Participant Name</th>
-                    <th style="width:22%;">Role / Affiliation</th>
-                    <th style="width:15%;">Time In</th>
-                    <th style="width:15%;">Time Out</th>
-                    <th style="width:15%;">Status</th>
-                </tr>
-                {% else %}
-                <tr>
-                    <th style="width:5%;">No.</th>
-                    <th style="width:28%;text-align:left;">Name</th>
-                    <th style="width:22%;">Description</th>
-                    <th style="width:15%;">Time</th>
-                    <th style="width:15%;">Status</th>
-                    <th style="width:15%;">Remarks</th>
-                </tr>
                 {% endif %}
             </thead>
             <tbody>
                 {% for log in page_logs %}
                     {%- set row_num = start_idx + loop.index -%}
-                    {% if category == 'general' %}
-                    <tr>
-                        <td class="text-center">{{ row_num }}</td>
-                        <td class="col-name">{{ log.name }}</td>
-                        <td class="text-center">{{ log.detail }}</td>
-                        <td class="text-center">{{ log.time_in }}</td>
-                        <td class="text-center">{{ log.time_out }}</td>
-                        <td class="text-center">{{ log.remarks }}</td>
-                    </tr>
-                    {% elif category == 'daily_traffic' and report_type == 'daily_traffic' %}
+                    {% if category == 'general' and report_type == 'daily_traffic' %}
                     <tr>
                         <td class="text-center">{{ row_num }}</td>
                         <td class="text-center">{{ log.date }}</td>
@@ -583,6 +503,15 @@
                         <td class="text-start">{{ log.purpose }}</td>
                         <td class="text-center">{{ log.visitor_count }}</td>
                         <td class="text-center">{{ log.percentage }}</td>
+                    </tr>
+                    {% elif category == 'general' %}
+                    <tr>
+                        <td class="text-center">{{ row_num }}</td>
+                        <td class="col-name">{{ log.name }}</td>
+                        <td class="text-center">{{ log.detail }}</td>
+                        <td class="text-center">{{ log.time_in }}</td>
+                        <td class="text-center">{{ log.time_out }}</td>
+                        <td class="text-center">{{ log.remarks }}</td>
                     </tr>
                     {% elif category == 'violations' and report_type == 'curfew_violations' %}
                     <tr>
@@ -720,6 +649,26 @@
         <div class="report-title">{{ report.event_name if report.event_name else report.title }}</div>
         <div class="report-date">DATE: {{ report.date_range }}</div>
         <div class="office-name">REPORT SCOPE: {{ report.department if report.department else 'ALL PROGRAMS' }}</div>
+        {% if category == 'violations' and report_type == 'curfew_violations' %}
+        <div class="d-flex flex-wrap gap-3 mb-4" style="margin-top:12px;">
+            <div style="background: #f8f9fa; padding: 14px 18px; border: 1px solid #dee2e6; border-radius: 12px; min-width: 220px;">
+                <div style="font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: .08em;">Total Curfew Violations</div>
+                <div style="font-size: 24px; font-weight: 700;">{{ metrics.total_violations or 0 }}</div>
+            </div>
+            <div style="background: #f8f9fa; padding: 14px 18px; border: 1px solid #dee2e6; border-radius: 12px; min-width: 220px;">
+                <div style="font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: .08em;">Departments Included</div>
+                <div style="font-size: 24px; font-weight: 700;">{{ logs | length }}</div>
+            </div>
+            <div style="background: #f8f9fa; padding: 14px 18px; border: 1px solid #dee2e6; border-radius: 12px; min-width: 220px;">
+                <div style="font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: .08em;">Top Offenders</div>
+                <div style="font-size: 18px; font-weight: 700;">{{ metrics.top_offenders | length or 0 }}</div>
+            </div>
+            <div style="background: #f8f9fa; padding: 14px 18px; border: 1px solid #dee2e6; border-radius: 12px; min-width: 220px;">
+                <div style="font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: .08em;">Filter Applied</div>
+                <div style="font-size: 18px; font-weight: 700;">{{ metrics.filter_display or 'All Subjects' }}</div>
+            </div>
+        </div>
+        {% endif %}
         <table class="report-table" style="margin-top:12px;">
             <tbody>
                 <tr><td colspan="6" class="text-center" style="padding:40px 0;color:#666;">
