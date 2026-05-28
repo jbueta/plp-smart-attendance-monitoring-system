@@ -6,6 +6,7 @@ STUDENT_NAME_MAX_LENGTH = 80
 COURSE_NAME_MAX_LENGTH = 100
 STUDENT_CREATE_LOCK_NAME = "students.create"
 VALID_STUDENT_STATUSES = {"Inside", "Outside"}
+VALID_STUDENT_TYPES = {"Regular", "Irregular"}
 
 
 def normalize_student_id(value):
@@ -27,6 +28,21 @@ def normalize_student_status(value, default="Outside"):
     if normalized == "outside":
         return "Outside"
     return default
+
+
+def normalize_student_type(value):
+    normalized = normalize_text(value).lower()
+    if normalized == "regular":
+        return "Regular"
+    if normalized == "irregular":
+        return "Irregular"
+    return ""
+
+
+def validate_student_type(value):
+    if normalize_student_type(value):
+        return []
+    return ["Student Type is required. Choose Regular or Irregular."]
 
 
 def validate_student_fields(student_id, student_name):

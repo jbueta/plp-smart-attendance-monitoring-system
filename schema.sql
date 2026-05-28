@@ -600,6 +600,7 @@ CREATE TABLE `students` (
   `user_id` int(11) NOT NULL,
   `student_id` varchar(8) NOT NULL,
   `student_name` varchar(80) DEFAULT NULL,
+  `student_type` enum('Regular','Irregular') NOT NULL DEFAULT 'Regular',
   `course_id` int(11) NOT NULL,
   `status` enum('Inside','Outside') DEFAULT 'Outside',
   `stud_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -614,17 +615,17 @@ TRUNCATE TABLE `students`;
 -- Dumping data for table `students`
 --
 
-INSERT INTO `students` (`user_id`, `student_id`, `student_name`, `course_id`, `status`, `stud_last_updated`) VALUES
-(2, '22-01582', 'Jose Rizal', 1, 'Outside', '2026-03-12 14:32:43'),
-(19, '23-00312', 'JERICHO PAUL D. SALVADOR', 4, 'Outside', '2026-03-17 16:11:32'),
-(1, '23-00314', 'Maria Clara', 5, 'Outside', '2026-04-30 11:32:17'),
-(3, '24-00101', 'Andres Bonifacio', 3, 'Inside', '2026-03-12 14:32:52'),
-(39, '24-00102', 'Maria Santos', 5, 'Outside', '2026-04-30 14:49:08'),
-(42, '24-00254', 'Sasuke Uchiha', 5, 'Outside', '2026-04-30 14:50:59'),
-(43, '24-00256', 'Madara Uchiha', 7, 'Outside', '2026-04-30 15:01:40'),
-(48, '24-00458', 'Martin Del Rosario', 1, 'Outside', '2026-05-01 06:49:47'),
-(40, '26-00251', 'Kulangot', 3, 'Outside', '2026-04-30 14:49:08'),
-(41, '26-00252', 'Naruto', 5, 'Outside', '2026-04-30 14:49:08');
+INSERT INTO `students` (`user_id`, `student_id`, `student_name`, `student_type`, `course_id`, `status`, `stud_last_updated`) VALUES
+(2, '22-01582', 'Jose Rizal', 'Regular', 1, 'Outside', '2026-03-12 14:32:43'),
+(19, '23-00312', 'JERICHO PAUL D. SALVADOR', 'Regular', 4, 'Outside', '2026-03-17 16:11:32'),
+(1, '23-00314', 'Maria Clara', 'Regular', 5, 'Outside', '2026-04-30 11:32:17'),
+(3, '24-00101', 'Andres Bonifacio', 'Regular', 3, 'Inside', '2026-03-12 14:32:52'),
+(39, '24-00102', 'Maria Santos', 'Regular', 5, 'Outside', '2026-04-30 14:49:08'),
+(42, '24-00254', 'Sasuke Uchiha', 'Regular', 5, 'Outside', '2026-04-30 14:50:59'),
+(43, '24-00256', 'Madara Uchiha', 'Regular', 7, 'Outside', '2026-04-30 15:01:40'),
+(48, '24-00458', 'Martin Del Rosario', 'Regular', 1, 'Outside', '2026-05-01 06:49:47'),
+(40, '26-00251', 'Kulangot', 'Regular', 3, 'Outside', '2026-04-30 14:49:08'),
+(41, '26-00252', 'Naruto', 'Regular', 5, 'Outside', '2026-04-30 14:49:08');
 
 -- --------------------------------------------------------
 
@@ -919,6 +920,9 @@ ALTER TABLE `bulletins`
 --
 ALTER TABLE `departments`
   MODIFY `department_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
+
+ALTER TABLE `violations`
+  MODIFY `violation_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `employees`
