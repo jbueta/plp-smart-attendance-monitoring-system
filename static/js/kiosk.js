@@ -48,8 +48,33 @@ function getKioskAuthErrorMessage(data, fallback = 'ID not found!') {
 }
 
 function normalizeManualKioskId(value, type) {
-    const normalized = String(value || '').trim();
-    return type === 'employee' ? normalized : normalized.toUpperCase();
+    const normalized = String(value || '').trim().toUpperCase();
+    
+    if (normalized.startsWith('V') || normalized.startsWith('T') || normalized.startsWith('VT')) {
+        let nums = normalized.replace(/[^0-9]/g, '');
+        if (nums.length > 0) {
+            return 'VT-' + nums.substring(0, 5);
+        }
+        
+        if (normalized.includes('-')) {
+            return 'VT-';
+        }
+        return normalized.replace(/[^A-Z]/g, '');
+    }
+    
+    if (normalized.includes('-')) {
+        let parts = normalized.replace(/[^0-9-]/g, '').split('-');
+        if (parts.length > 1) {
+            return parts[0].substring(0, 2) + '-' + parts[1].substring(0, 5);
+        }
+    }
+    
+    let digits = normalized.replace(/[^0-9]/g, '');
+    if (digits.length > 5) {
+        return digits.substring(0, 2) + '-' + digits.substring(2, 7);
+    }
+    
+    return digits;
 }
 
 function isGeneralKioskScanId(value) {
@@ -74,15 +99,9 @@ function clearManualEntryInput(idField) {
 }
 
 function initGeneralManualIdFormatting() {
-    document.querySelectorAll('#manual-student-id').forEach(input => {
+    document.querySelectorAll('#manual-student-id, #manual-employee-id').forEach(input => {
         input.addEventListener('input', () => {
-            const cursorStart = input.selectionStart;
-            const cursorEnd = input.selectionEnd;
             input.value = normalizeManualKioskId(input.value, 'student');
-
-            if (cursorStart !== null && cursorEnd !== null) {
-                input.setSelectionRange(cursorStart, cursorEnd);
-            }
         });
 
         input.addEventListener('keydown', event => {
@@ -90,14 +109,17 @@ function initGeneralManualIdFormatting() {
 
             event.preventDefault();
             event.stopPropagation();
-            submitManualEntry('student');
+            
+            // Determine type based on input ID
+            const inputType = input.id === 'manual-employee-id' ? 'employee' : 'student';
+            submitManualEntry(inputType);
         });
     });
 
     const manualEntryModal = document.getElementById('manualEntryModal');
     if (manualEntryModal) {
         manualEntryModal.addEventListener('shown.bs.modal', () => {
-            const input = document.getElementById('manual-student-id');
+            const input = document.getElementById('manual-student-id') || document.getElementById('manual-employee-id');
             if (input) {
                 input.focus({ preventScroll: true });
                 input.select();
