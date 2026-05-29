@@ -1226,22 +1226,18 @@ def manual_event_entry():
 
         cursor = conn.cursor(dictionary=True)
 
-        # 1. Look up user_id from employee_id
-        query = """
-            SELECT u.user_id, u.role, e.employee_name, d.department_name as department
-            FROM users u
-            JOIN employees e ON u.user_id = e.user_id
-            LEFT JOIN departments d ON e.department_id = d.department_id
-            WHERE e.employee_id = %s
-        """
-        cursor.execute(query, (employee_id,))
-        user = cursor.fetchone()
-        if not user:
-            return jsonify({"success": False, "message": "Employee ID not found"}), 404
+        # 1. Look up user_id from employee_id (now accepting any scan_id)
+        db_auth = Database(conn, (employee_id, employee_id, employee_id))
+        user_result = db_auth.authenticate_user()
 
-        user_id = user['user_id']
-        employee_name = user['employee_name']
-        department = user['department'] or 'N/A'
+        if not user_result or len(user_result) == 0:
+            return jsonify({"success": False, "message": "ID not found"}), 404
+
+        user_data = user_result[0]
+        user_id = user_data['user_id']
+        role = user_data['role']
+        full_name = user_data.get('full_name', 'Unknown User')
+        department = user_data.get('affiliation', 'N/A')
 
         # 2. Determine entry or exit based on last swipe for this event today
         params = (user_id, event_id)
@@ -1287,11 +1283,17 @@ def manual_event_entry():
         if time_str.startswith('0'):
             time_str = time_str[1:]
 
-        # 5. Update general status (employees table) and insert general_log
+        # 5. Update general status and insert general_log
         new_general_status = 'Inside' if log_type == 'Entry' else 'Outside'
         gate = 'Gate 1' if log_type == 'Entry' else 'Gate 2'
 
-        cursor.execute("UPDATE employees SET status = %s WHERE user_id = %s", (new_general_status, user_id))
+        if role == 'student':
+            cursor.execute("UPDATE students SET status = %s WHERE user_id = %s", (new_general_status, user_id))
+        elif role == 'employee':
+            cursor.execute("UPDATE employees SET status = %s WHERE user_id = %s", (new_general_status, user_id))
+        elif role == 'visitor':
+            cursor.execute("UPDATE visitors SET status = %s WHERE user_id = %s", (new_general_status, user_id))
+
         now = datetime.now()
         formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")
         cursor.execute(
@@ -1302,8 +1304,8 @@ def manual_event_entry():
 
         # 6. Determine status type for UI (success for Present, warning for Late, etc.)
         status_type = "success" if status == 'Present' else "warning" if status == 'Late' else "secondary"
-        # Generate initials from employee name (first letters of first two words)
-        name_parts = employee_name.split()[:2]
+        # Generate initials from name (first letters of first two words)
+        name_parts = full_name.split()[:2]
         initials = ''.join(part[0] for part in name_parts).upper()
 
         # 7. Return data needed to update live feed
@@ -1311,7 +1313,7 @@ def manual_event_entry():
             "success": True,
             "log_type": log_type,
             "log": {
-                "name": employee_name,
+                "name": full_name,
                 "dept": department,
                 "time": time_str,
                 "status": status,

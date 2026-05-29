@@ -27,7 +27,7 @@ try:
         print("Column 'student_type' does not exist. Adding it...")
         cursor.execute("""
             ALTER TABLE students
-            ADD COLUMN student_type ENUM('regular', 'irregular') NOT NULL DEFAULT 'regular' AFTER student_name
+            ADD COLUMN student_type ENUM('Regular', 'Irregular') NOT NULL DEFAULT 'Regular' AFTER student_name
         """)
         conn.commit()
         print("Successfully added 'student_type' column!")

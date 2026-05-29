@@ -38,7 +38,8 @@ def init_db_pool():
     global global_pool
     try:
         current_app.logger.info(
-            "Creating database connection pool for %s:%s/%s as %s...",
+            "Creating %s database connection pool for %s:%s/%s as %s...",
+            config.DB_CONNECTION_MODE,
             dbconfig["host"],
             dbconfig["port"],
             dbconfig["database"],

@@ -23,6 +23,8 @@ from utils.student_schema import (
     normalize_student_id,
     normalize_student_name,
     normalize_student_status,
+    normalize_student_type,
+    validate_student_type,
     validate_course_name,
     validate_student_fields,
 )
@@ -1505,6 +1507,7 @@ class Database:
                     s.student_id,
                     COALESCE(NULLIF(TRIM(s.student_name), ''), 'Unknown Student') AS student_name,
                     s.course_id,
+                    COALESCE(NULLIF(TRIM(s.student_type), ''), 'Regular') AS student_type,
                     COALESCE(NULLIF(TRIM(c.course_name), ''), 'N/A') AS course_name,
                     COALESCE(u.active, 1) AS is_active
                 FROM students s
@@ -1518,6 +1521,7 @@ class Database:
             records = []
             for row in rows:
                 is_active = bool(row.get("is_active"))
+                student_type = normalize_student_type(row.get("student_type")) or "Regular"
                 records.append(
                     {
                         "id": row["student_id"],
@@ -1525,8 +1529,8 @@ class Database:
                         "name": row["student_name"],
                         "course_id": row["course_id"],
                         "course": row["course_name"],
-                        "type": "Regular" if is_active else "Irregular",
-                        "type_class": "success" if is_active else "warning",
+                        "type": student_type,
+                        "type_class": "warning" if student_type == "Irregular" else "success",
                         "status": "Active" if is_active else "Inactive",
                         "status_class": "success" if is_active else "secondary",
                     }
@@ -3376,6 +3380,7 @@ class StudentModel:
         conn,
         student_id,
         student_name,
+        student_type,
         course_id=None,
         course_name=None,
         status="Outside",
@@ -3385,6 +3390,7 @@ class StudentModel:
         try:
             student_id = normalize_student_id(student_id)
             student_name = normalize_student_name(student_name)
+            student_type = normalize_student_type(student_type)
             status = normalize_student_status(status, default="Outside")
 
             validation_errors = validate_student_fields(
@@ -3393,6 +3399,9 @@ class StudentModel:
             )
             if validation_errors:
                 return {"success": False, "error": validation_errors[0]}
+            type_errors = validate_student_type(student_type)
+            if type_errors:
+                return {"success": False, "error": type_errors[0]}
 
             if not conn.in_transaction:
                 conn.start_transaction()
@@ -3455,12 +3464,14 @@ class StudentModel:
                     UPDATE students
                     SET student_name = %s,
                         course_id = %s,
+                        student_type = %s,
                         status = %s
                     WHERE user_id = %s
                     """,
                     (
                         student_name,
                         resolved_course_id,
+                        student_type,
                         status,
                         existing_student["user_id"],
                     ),
@@ -3477,6 +3488,7 @@ class StudentModel:
                 return {
                     "success": True,
                     "student_id": student_id,
+                    "student_type": student_type,
                     "course_id": resolved_course_id,
                     "course_name": resolved_course_name,
                     "reactivated": True,
@@ -3494,13 +3506,14 @@ class StudentModel:
             cursor.execute(
                 """
                 INSERT INTO students
-                    (user_id, student_id, student_name, course_id, status)
-                VALUES (%s, %s, %s, %s, %s)
+                    (user_id, student_id, student_name, student_type, course_id, status)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 (
                     user_id,
                     student_id,
                     student_name,
+                    student_type,
                     resolved_course_id,
                     status,
                 ),
@@ -3509,6 +3522,7 @@ class StudentModel:
             return {
                 "success": True,
                 "student_id": student_id,
+                "student_type": student_type,
                 "course_id": resolved_course_id,
                 "course_name": resolved_course_name,
                 "reactivated": False,
@@ -3523,7 +3537,7 @@ class StudentModel:
             if cursor:
                 cursor.close()
 
-    def add_student(self, student_id, student_name, course_id, status="Outside"):
+    def add_student(self, student_id, student_name, student_type, course_id, status="Outside"):
         conn = connect_db()
         if conn is None:
             return {"success": False, "error": "Database connection failed"}
@@ -3533,6 +3547,7 @@ class StudentModel:
                 conn=conn,
                 student_id=student_id,
                 student_name=student_name,
+                student_type=student_type,
                 course_id=course_id,
                 status=status,
             )
@@ -3544,6 +3559,7 @@ class StudentModel:
         conn,
         student_id,
         student_name,
+        student_type,
         course_name=None,
         course_id=None,
         status="Outside",
@@ -3552,6 +3568,7 @@ class StudentModel:
             conn=conn,
             student_id=student_id,
             student_name=student_name,
+            student_type=student_type,
             course_id=course_id,
             course_name=course_name,
             status=status,
