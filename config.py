@@ -23,6 +23,13 @@ def _get_bool(name: str, default: str = "False") -> bool:
     return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _get_db_setting(name: str, default: str = "") -> str:
+    mode = os.getenv("DB_CONNECTION_MODE", "local").strip().lower()
+    if mode == "radmin":
+        return os.getenv(f"RADMIN_DB_{name}", os.getenv(f"DB_{name}", default))
+    return os.getenv(f"DB_{name}", default)
+
+
 class Config:
     """Base configuration shared by the frontend and backend Flask apps."""
 
@@ -43,11 +50,12 @@ class Config:
     PERMANENT_SESSION_LIFETIME = timedelta(hours=int(os.getenv("SESSION_LIFETIME_HOURS", "2")))
 
     # Database
-    DB_HOST = os.getenv("DB_HOST", "localhost")
-    DB_USER = os.getenv("DB_USER", "root")
-    DB_PASSWORD = os.getenv("DB_PASSWORD", "")
-    DB_NAME = os.getenv("DB_NAME", "smart_monitoring")
-    DB_PORT = int(os.getenv("DB_PORT", "3306"))
+    DB_CONNECTION_MODE = os.getenv("DB_CONNECTION_MODE", "local").strip().lower()
+    DB_HOST = _get_db_setting("RADMIN_NETWORK_NAME", "localhost")
+    DB_USER = _get_db_setting("RADMIN_DB_USER", "root")
+    DB_PASSWORD = _get_db_setting("RADMIN_DB_PASSWORD", "")
+    DB_NAME = _get_db_setting("RADMIN_DB_NAME", "smart_monitoring")
+    DB_PORT = int(_get_db_setting("RADMIN_DB_PORT", "3306"))
     DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "20"))
     DB_AUTOCOMMIT = _get_bool("DB_AUTOCOMMIT")
 

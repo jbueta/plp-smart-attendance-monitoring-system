@@ -50,8 +50,10 @@ from utils.student_schema import (
     normalize_course_name,
     normalize_student_id,
     normalize_student_name,
+    normalize_student_type,
     validate_course_name,
     validate_student_fields,
+    validate_student_type,
 )
 
 try:
@@ -155,7 +157,7 @@ EVENT_FREQUENCIES = {"ONCE", "DAILY", "WEEKLY"}
 EVENT_DAYS = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
 EMPLOYEE_UPLOAD_REQUIRED_COLUMNS = ["EMPLOYEE ID", "EMPLOYEE NAME", "DEPARTMENT"]
 EMPLOYEE_UPLOAD_OPTIONAL_COLUMNS = ["POSITION"]
-STUDENT_UPLOAD_REQUIRED_COLUMNS = ["STUDENT ID", "STUDENT NAME"]
+STUDENT_UPLOAD_REQUIRED_COLUMNS = ["STUDENT ID", "STUDENT NAME", "STUDENT TYPE"]
 STUDENT_UPLOAD_OPTIONAL_COLUMNS = ["COURSE", "COURSE ID", "STATUS"]
 VISITOR_UPLOAD_REQUIRED_COLUMNS = ["NAME", "PURPOSE/OFFICE"]
 VISITOR_UPLOAD_OPTIONAL_COLUMNS = ["DETAILS"]
@@ -2463,7 +2465,7 @@ def parse_student_upload_file(file):
     if header_index is None:
         return {
             "success": False,
-            "error": "Could not find the required headers: Student ID, Student Name, and Course or Course ID.",
+            "error": "Could not find the required headers: Student ID, Student Name, Student Type, and Course or Course ID.",
         }
 
     missing_columns = [
@@ -2502,6 +2504,7 @@ def parse_student_upload_file(file):
                 "row_number": row.get("source_row_number") or (header_source_row_number + 1),
                 "student_id": row_map.get("STUDENT ID", ""),
                 "student_name": row_map.get("STUDENT NAME", ""),
+                "student_type": row_map.get("STUDENT TYPE", ""),
                 "course_name": row_map.get("COURSE", ""),
                 "course_id": course_id,
                 "status": row_map.get("STATUS", ""),
@@ -2571,6 +2574,7 @@ def validate_student_upload_rows(conn, parsed_rows):
         for row in parsed_rows:
             student_id = normalize_student_id(row.get("student_id"))
             student_name = normalize_student_name(row.get("student_name"))
+            student_type = normalize_student_type(row.get("student_type"))
             course_name = normalize_course_name(row.get("course_name"))
             course_id = str(row.get("course_id") or "").strip()
             if course_id.endswith(".0"):
@@ -2583,6 +2587,8 @@ def validate_student_upload_rows(conn, parsed_rows):
                 missing_fields.append("Student ID")
             if not student_name:
                 missing_fields.append("Student Name")
+            if not student_type:
+                missing_fields.append("Student Type")
             if not course_id and not course_name:
                 missing_fields.append("Course or Course ID")
             if missing_fields:
@@ -2590,9 +2596,10 @@ def validate_student_upload_rows(conn, parsed_rows):
                 continue
 
             field_errors = validate_student_fields(student_id=student_id, student_name=student_name)
+            type_errors = validate_student_type(student_type)
             course_errors = validate_course_name(course_name) if course_name else []
-            if field_errors or course_errors:
-                errors.append(f"Row {row_number}: {(field_errors + course_errors)[0]}")
+            if field_errors or type_errors or course_errors:
+                errors.append(f"Row {row_number}: {(field_errors + type_errors + course_errors)[0]}")
                 continue
 
             if course_id:
@@ -2652,6 +2659,7 @@ def validate_student_upload_rows(conn, parsed_rows):
                     "row_number": row_number,
                     "student_id": student_id,
                     "student_name": student_name,
+                    "student_type": student_type,
                     "course_id": resolved_course["course_id"],
                     "course_name": resolved_course["course_name"],
                     "status": status or "Outside",
@@ -2671,18 +2679,23 @@ def add_student_manual():
     data = request.get_json(silent=True) or {}
     student_id = (data.get("student_id") or data.get("id") or "").strip()
     student_name = (data.get("student_name") or data.get("name") or "").strip()
+    student_type = normalize_student_type(data.get("student_type") or data.get("type"))
     course_id = resolve_course_id(data.get("course_id") or data.get("course"))
     status = (data.get("status") or "Outside").strip()
 
     validation_errors = validate_student_fields(student_id=student_id, student_name=student_name)
+    type_errors = validate_student_type(student_type)
     if not course_id:
         return jsonify({"success": False, "error": "Course is required."}), 400
+    if type_errors:
+        return jsonify({"success": False, "error": type_errors[0]}), 400
     if validation_errors:
         return jsonify({"success": False, "error": validation_errors[0]}), 400
 
     result = student_model.add_student(
         student_id=student_id,
         student_name=student_name,
+        student_type=student_type,
         course_id=course_id,
         status=status,
     )
@@ -2709,9 +2722,9 @@ def upload_students():
 def download_student_upload_template():
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["STUDENT ID", "STUDENT NAME", "COURSE"])
-    writer.writerow(["23-00312", "Juan Dela Cruz", "BS Information Technology"])
-    writer.writerow(["24-00101", "Maria Santos", "BS Nursing"])
+    writer.writerow(["STUDENT ID", "STUDENT NAME", "STUDENT TYPE", "COURSE"])
+    writer.writerow(["23-00312", "Juan Dela Cruz", "Regular", "BS Information Technology"])
+    writer.writerow(["24-00101", "Maria Santos", "Irregular", "BS Nursing"])
     csv_content = output.getvalue()
     output.close()
 
@@ -2782,19 +2795,21 @@ def commit_students_upload_payload(rows):
         for row in rows:
             student_id = normalize_student_id(row.get("student_id"))
             student_name = normalize_student_name(row.get("student_name"))
+            student_type = normalize_student_type(row.get("student_type"))
             course_id = str(row.get("course_id") or "").strip()
             course_name = normalize_course_name(row.get("course_name"))
             status = clean_upload_text(row.get("status")) or "Outside"
             row_number = row.get("row_number") or "Unknown"
 
-            if not student_id or not student_name or not course_id:
-                errors.append(f"Row {row_number}: Missing Student ID, Student Name, or Course.")
+            if not student_id or not student_name or not student_type or not course_id:
+                errors.append(f"Row {row_number}: Missing Student ID, Student Name, Student Type, or Course.")
                 continue
 
             result = student_model.add_student_excel(
                 conn=conn,
                 student_id=student_id,
                 student_name=student_name,
+                student_type=student_type,
                 course_id=course_id,
                 course_name=course_name,
                 status=status,
@@ -2826,7 +2841,7 @@ def commit_students_upload_payload(rows):
 @login_required
 def commit_students_upload():
     data = request.get_json(silent=True) or {}
-    rows = data.get("rows", [])
+    rows = data.get("valid_rows", data.get("rows", []))
     if not isinstance(rows, list) or not rows:
         return jsonify({"success": False, "error": "No student rows provided for upload."}), 400
 
@@ -2839,11 +2854,15 @@ def update_student():
     data = request.get_json(silent=True) or {}
     student_id = (data.get("student_id") or data.get("id") or "").strip()
     student_name = (data.get("student_name") or data.get("name") or "").strip()
+    student_type = normalize_student_type(data.get("student_type") or data.get("type"))
     course_id = resolve_course_id(data.get("course_id") or data.get("course"))
 
     validation_errors = validate_student_fields(student_id=student_id, student_name=student_name)
+    type_errors = validate_student_type(student_type)
     if not course_id:
         return jsonify({"success": False, "error": "Course is required."}), 400
+    if type_errors:
+        return jsonify({"success": False, "error": type_errors[0]}), 400
     if validation_errors:
         return jsonify({"success": False, "error": validation_errors[0]}), 400
 
@@ -2889,12 +2908,14 @@ def update_student():
             """
             UPDATE students
             SET student_name = %s,
-                course_id = %s
+                course_id = %s,
+                student_type = %s
             WHERE student_id = %s
             """,
             (
                 normalize_student_name(student_name),
                 course[0],
+                student_type,
                 normalize_student_id(student_id),
             ),
         )
@@ -2904,6 +2925,7 @@ def update_student():
                 "success": True,
                 "course_id": course[0],
                 "course_name": normalize_course_name(course[1]),
+                "student_type": student_type,
             }
         )
     except Exception as err:

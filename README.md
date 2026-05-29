@@ -91,6 +91,7 @@ plp_monitoring_system/
    ```
 3. **Environment Configuration:**
    Copy `.env.template` to `.env` and set your local database credentials, secrets, and allowed origins.
+   To connect through Radmin VPN, keep `DB_CONNECTION_MODE=radmin`, join the Radmin network in the Radmin VPN desktop app, then fill in the blank `RADMIN_*` values in `.env`. The Flask app uses `RADMIN_DB_HOST`, `RADMIN_DB_USER`, `RADMIN_DB_PASSWORD`, `RADMIN_DB_NAME`, and `RADMIN_DB_PORT`; `RADMIN_NETWORK_NAME` and `RADMIN_NETWORK_PASSWORD` are placeholders for the Radmin VPN app itself.
 4. **Database Configuration:**
    Ensure your MySQL server is running and initialize the database using `schema.sql`. The checked-in schema now includes the visitor and employee `is_active` / formatted-ID updates expected by the current codebase.
 5. **Run the Application:**
