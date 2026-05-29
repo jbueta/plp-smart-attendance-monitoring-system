@@ -129,14 +129,18 @@ function initGeneralManualIdFormatting() {
         manualEntryModal.addEventListener('hidden.bs.modal', () => {
             clearManualEntryInput('manual-student-id');
             clearManualEntryInput('manual-employee-id');
-
-            document.querySelectorAll('[data-bs-target="#manualEntryModal"]').forEach(trigger => {
-                if (typeof trigger.blur === 'function') {
-                    trigger.blur();
-                }
-            });
         });
     }
+
+    // Globally enforce focus removal after any modal closes so that
+    // physical keyboard / scanner 'Enter' keys don't accidentally re-trigger the modal.
+    document.addEventListener('hidden.bs.modal', () => {
+        setTimeout(() => {
+            if (document.activeElement && document.activeElement !== document.body) {
+                document.activeElement.blur();
+            }
+        }, 50);
+    });
 }
 
 /**
