@@ -2,7 +2,7 @@
     {% extends "base.html" %}
 
     <!-- Page title -->
-    {% block title %}Employee Attendance - PLP{% endblock %}
+    {% block title %}Event Attendance - PLP{% endblock %}
 
     <!-- Page content -->
     {% block content %}
@@ -28,7 +28,7 @@
         </div>
 
         <div id="welcome-role" class="text-uppercase small fw-bold mb-2" style="letter-spacing: 0.18em; color: #fbbf24;">
-            Employee Verified
+            Participant Verified
         </div>
         
         <h2 id="welcome-action" class="display-6 fw-bold mb-3" style="color: #4ade80; letter-spacing: -0.5px;">
@@ -41,7 +41,7 @@
     
         <div class="px-4 py-3 mx-auto rounded-4" style="max-width: 280px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.04);">
             <div id="welcome-id-label" class="text-uppercase small mb-1 fw-semibold" style="letter-spacing: 0.15em; color: #9ca3af; font-size: 0.75rem;">
-                Employee ID
+                Participant ID
             </div>
             <div id="welcome-id-val" class="h4 font-monospace text-white fw-bold mb-0" style="letter-spacing: 1px;">
                 00000
@@ -90,7 +90,7 @@
                         </div>
                     </div>
 
-                    <h3 class="fw-normal mb-2">Present <span class="text-gold fw-bold">Employee QR</span></h3>
+                    <h3 class="fw-normal mb-2">Present <span class="text-gold fw-bold">Your QR</span></h3>
                     <p class="text-white-50 small mb-4">Scanner is active and ready</p>
 
                     <div class="mt-4">
@@ -136,9 +136,9 @@
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="manual-employee-id" class="form-label text-white-50">Employee ID Number</label>
+                        <label for="manual-employee-id" class="form-label text-white-50">Participant ID Number</label>
                         <input type="text" class="form-control bg-transparent text-white border-secondary"
-                            id="manual-employee-id" placeholder="e.g. 00001" inputmode="numeric" pattern="[0-9]{5}" maxlength="5">
+                            id="manual-employee-id" placeholder="" pattern="[0-9]{5}|[0-9]{2}-[0-9]{5}|VT-[0-9]{5}" maxlength="10">
                     </div>
                     <div class="d-grid gap-2">
                         <button type="button" class="btn btn-primary-gold" onclick="submitManualEntry('employee')">Log
@@ -185,13 +185,13 @@
 
     // Global Overlay Trigger
     window.showSuccessOverlay = function(logType, data) {
-        document.getElementById('welcome-role').textContent = 'EMPLOYEE VERIFIED';
+        document.getElementById('welcome-role').textContent = 'PARTICIPANT VERIFIED';
         document.getElementById('welcome-action').textContent = 'Attendance Logged';
         document.getElementById('welcome-action').style.color = '#4ade80'; 
         
         document.getElementById('welcome-name').textContent = data.name || 'UNKNOWN';
         
-        document.getElementById('welcome-id-label').textContent = 'EMPLOYEE ID';
+        document.getElementById('welcome-id-label').textContent = 'PARTICIPANT ID';
         document.getElementById('welcome-id-val').textContent = data.id || 'N/A';
 
         welcomeOverlay.classList.replace('d-none', 'd-flex');
@@ -205,16 +205,20 @@
     let barcodeBuffer = "";
     let scanTimeout = null;
 
+    function isValidId(id) {
+        return /^(?:[0-9]{5}|[0-9]{2}-[0-9]{5}|VT-[0-9]{5})$/i.test(id);
+    }
+
     function extractEmployeeQrId(rawText) {
         const scannedText = String(rawText || '').trim();
         const bracketMatch = scannedText.match(/(.*?)\[(.*?)\](.*)/s);
 
         if (bracketMatch) {
             const employeeId = bracketMatch[2].trim();
-            return /^[0-9]{5}$/.test(employeeId) ? employeeId : "";
+            return isValidId(employeeId) ? employeeId : "";
         }
 
-        return /^[0-9]{5}$/.test(scannedText) ? scannedText : "";
+        return isValidId(scannedText) ? scannedText : "";
     }
 
     document.addEventListener('keydown', function (e) {
@@ -253,7 +257,7 @@
 
                 frame.style.borderColor = '#F5DD00';
                 frame.style.boxShadow = '0 0 30px rgba(245, 221, 0, 0.3)';
-                feedText.innerText = "VERIFYING EMPLOYEE ID...";
+                feedText.innerText = "VERIFYING ID...";
                 feedText.className = "position-absolute w-100 h-100 d-flex align-items-center justify-content-center text-gold font-monospace fw-bold scanning-text";
 
                 setTimeout(() => {
